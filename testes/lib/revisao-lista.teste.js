@@ -58,6 +58,16 @@ describe("montarAbaRevisao", () => {
     expect(linha(aba, "⚠ ATENÇÃO")).toBeUndefined();
   });
 
+  // OP-107 (12/09/2026): 162 no arquivo, 113 criadas + 49 atualizadas (marcas que a LPC já tinha
+  // e só ganharam `naLE`) — import perfeito, e a tarja dizia "gravou 113 de 162".
+  it("com sobrescrever, marca que a LPC já tinha conta como gravada, não como faltante", () => {
+    const aba = montarAbaRevisao({
+      sigla: "LE", revLabel: "R01", sobrescrever: true,
+      j: resposta({ criados: 113, atualizados: 49, totalNoArquivo: 162 }),
+    });
+    expect(linha(aba, "⚠ ATENÇÃO")).toBeUndefined();
+  });
+
   it("com sobrescrever, faltar marca do arquivo continua sendo divergência", () => {
     const aba = montarAbaRevisao({
       sigla: "LE", revLabel: "R01", sobrescrever: true,
@@ -114,6 +124,12 @@ describe("alertaDeDivergencia", () => {
     expect(alertaDeDivergencia({ previu: 18, criou: 77, ignorou: 0, sobrescrever: true, totalNoArquivo: 77 })).toBe("");
     expect(alertaDeDivergencia({ previu: 18, criou: 18, ignorou: 0, sobrescrever: true, totalNoArquivo: 77 }))
       .toContain("59 NÃO entrou");
+  });
+
+  it("no sobrescrever, criadas + atualizadas é o que foi ao banco", () => {
+    expect(alertaDeDivergencia({ previu: 18, criou: 113, atualizou: 49, ignorou: 0, sobrescrever: true, totalNoArquivo: 162 })).toBe("");
+    expect(alertaDeDivergencia({ previu: 18, criou: 100, atualizou: 49, ignorou: 0, sobrescrever: true, totalNoArquivo: 162 }))
+      .toContain("gravou 149 (100 nova(s) e 49 que a LPC já tinha) — 13 NÃO entrou");
   });
 
   it("conta as linhas ignoradas", () => {

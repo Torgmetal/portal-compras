@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect } from "react";
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -92,7 +93,7 @@ export default function RespostaCobrancaMarcos({ token }) {
               {a.status === "FINALIZADO" && (
                 <>
                   <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#576D7E", margin: "0 0 3px" }}>Data em que foi finalizado *</label>
-                  <input type="date" value={a.dataConclusao || ""} onChange={(e) => set(m.id, { dataConclusao: e.target.value })} style={{ ...inp, marginBottom: 8 }} />
+                  <CampoData value={a.dataConclusao || ""} onChange={(iso) => set(m.id, { dataConclusao: iso })} style={{ ...inp, marginBottom: 8 }} />
                   <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#576D7E", margin: "0 0 3px" }}>Evidência — o que aconteceu para concluir (e quando) *</label>
                   <textarea value={a.evidencia || ""} onChange={(e) => set(m.id, { evidencia: e.target.value })} rows={3} placeholder="Ex.: peças liberadas na inspeção do dia 12/07, romaneio 452 emitido…" style={inp} />
                 </>
@@ -100,7 +101,7 @@ export default function RespostaCobrancaMarcos({ token }) {
               {a.status === "NAO_FINALIZADO" && (
                 <>
                   <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#576D7E", margin: "0 0 3px" }}>Nova data prevista de conclusão *</label>
-                  <input type="date" value={a.novaData || ""} onChange={(e) => set(m.id, { novaData: e.target.value })} style={{ ...inp, marginBottom: 8 }} />
+                  <CampoData value={a.novaData || ""} onChange={(iso) => set(m.id, { novaData: iso })} style={{ ...inp, marginBottom: 8 }} />
                   <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#576D7E", margin: "0 0 3px" }}>Motivo (opcional)</label>
                   <textarea value={a.evidencia || ""} onChange={(e) => set(m.id, { evidencia: e.target.value })} rows={2} placeholder="Por que atrasou / o que falta" style={inp} />
                 </>

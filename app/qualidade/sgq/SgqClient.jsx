@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback } from "react";
 import { FolderTree, Folder, FileText, FileSpreadsheet, FileImage, ChevronRight, ExternalLink, Loader2, AlertCircle, Home, Share2, Copy, Trash2, Check, X, CalendarClock } from "lucide-react";
 
@@ -215,7 +216,7 @@ function CompartilharModal({ onClose }) {
           <div className="flex items-end gap-3 flex-wrap">
             <div>
               <label className="block text-[11px] font-semibold text-torg-gray uppercase tracking-wide mb-1">Validade <span className="font-normal normal-case">— opcional</span></label>
-              <input type="date" value={validade} onChange={(e) => setValidade(e.target.value)} className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-torg-blue/30" />
+              <CampoData value={validade} onChange={(iso) => setValidade(iso)} className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-torg-blue/30" />
             </div>
             <button onClick={criar} disabled={criando} className="px-4 py-2 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">
               {criando ? <Loader2 size={15} className="animate-spin" /> : <Share2 size={15} />} Gerar link

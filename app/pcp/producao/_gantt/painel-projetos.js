@@ -310,7 +310,7 @@ export function criarPainelProjetos(dep){
     if(!confirm("Imprimir "+marcas.length+" desenho(s) da OP-"+r.op+" ("+tipo+")"+emBlocos+"?\n\nCada um sai carimbado com a rastreabilidade e a GRD fica registrada."
       + (blocos.length>1 ? " Sai um download por bloco." : "") + " Pode levar alguns minutos.")) return;
     const foot = dep.$("pFoot"); foot.querySelectorAll("button").forEach(b=>b.disabled=true);
-    let emitidas = 0; const semDesenho = []; let erroZip = null;
+    let emitidas = 0; const semDesenho = [], falhas = []; let erroZip = null;
     try{
       for(let b=0; b<blocos.length; b++){
         if(blocos.length>1) dep.avisar(true, "Bloco "+(b+1)+" de "+blocos.length+" — gerando os desenhos…");
@@ -325,6 +325,7 @@ export function criarPainelProjetos(dep){
         if(!res.ok) throw new Error((blocos.length>1 ? "Bloco "+(b+1)+" de "+blocos.length+": " : "")+(j.error || "Erro ao emitir o lote"));
         emitidas += Number(j.emitidas) || 0;
         semDesenho.push(...(j.semDesenho || []));
+        falhas.push(...(j.erros || []));
         if(Number(j.emitidas) > 0){
           try{ await dep.baixarZip(j, r.op + (blocos.length>1 ? "-bloco"+(b+1)+"de"+blocos.length : ""), r.setor.toLowerCase()); }
           catch(e){ erroZip = e?.message || "falhou"; }
@@ -332,14 +333,18 @@ export function criarPainelProjetos(dep){
       }
       const sem = semDesenho.length;
       const faltantes = sem ? " Sem desenho na pasta da OP: "+semDesenho.slice(0,8).join(", ")+(sem>8?" e mais "+(sem-8):"")+"." : "";
+      /* ⚠ desenho que EXISTE mas falhou ao baixar ou carimbar não é "não encontrado": diz a marca e o motivo,
+         senão o PCP procura na pasta um arquivo que está lá. Vitor (14/09/2026), OP-113. */
+      const comFalha = falhas.length ? " Falhou em "+falhas.length+": "+falhas.slice(0,6).map(f=>f.marca+" ("+(f.erro||"erro")+")").join("; ")+(falhas.length>6?" e mais "+(falhas.length-6):"")+"." : "";
       if(!emitidas){
-        dep.avisar(false, "Nenhum desenho foi encontrado para as "+marcas.length+" marca(s), então nada foi impresso nem liberado."+faltantes
-          + " Confira se os PDFs estão em 2. Engenharia › 2.5 Projetos › 2.5.2 Fabricação, com o nome começando pela marca.");
+        dep.avisar(false, (falhas.length ? "Os desenhos existem, mas nenhum pôde ser emitido." : "Nenhum desenho foi encontrado para as "+marcas.length+" marca(s), então nada foi impresso nem liberado.")
+          + faltantes + comFalha
+          + (falhas.length ? " Tente de novo; se persistir, mande a mensagem acima para o suporte." : " Confira se os PDFs estão em 2. Engenharia › 2.5 Projetos › 2.5.2 Fabricação, com o nome começando pela marca."));
         return;
       }
       dep.avisar(!erroZip, emitidas+" desenho(s) liberado(s)"+(blocos.length>1 ? " em "+blocos.length+" blocos" : "")
         + (erroZip ? ", mas um download falhou ("+erroZip+"). A GRD está registrada; abra os arquivos pela pasta da OP."
-                   : " e baixado(s) em pastas por impressora.") + faltantes);
+                   : " e baixado(s) em pastas por impressora.") + faltantes + comFalha);
       await dep.recarregar();
     }catch(e){ dep.avisar(false, e.message); }
     finally{ foot.querySelectorAll("button").forEach(b=>b.disabled=false); }

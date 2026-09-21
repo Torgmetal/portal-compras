@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2, ShieldCheck, Clock, ExternalLink, FolderOpen, Paintbrush, FileText, ClipboardCheck, Check } from "lucide-react";
 import { TIPO_LABEL, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
+import PitCompacto from "@/components/comercial/PitCompacto";
 import AceitePlano from "./AceitePlano";
 import EditarPlp from "./EditarPlp";
 
@@ -15,24 +16,6 @@ import EditarPlp from "./EditarPlp";
 // inspeção?". Quem abre a OP quer ver o que já foi aprovado e o que falta, sem
 // atravessar a fila de todas as obras.
 export default function AbaQualidade({ opNumero }) {
-  const [pit, setPit] = useState(null);
-  const [salvandoPit, setSalvandoPit] = useState(false);
-  useEffect(() => {
-    fetch(`/api/qualidade/pit/${encodeURIComponent(opNumero)}`, { cache: "no-store" })
-      .then((r) => r.json()).then((j) => { if (!j.error) setPit(j); }).catch(() => {});
-  }, [opNumero]);
-
-  async function salvarPadrao(padrao) {
-    setSalvandoPit(true);
-    try {
-      const r = await fetch(`/api/qualidade/pit/${encodeURIComponent(opNumero)}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ padrao, revisao: pit?.revisao || "0" }),
-      });
-      if (r.ok) setPit((p) => ({ ...p, padrao }));
-    } finally { setSalvandoPit(false); }
-  }
-
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
 
@@ -43,7 +26,7 @@ export default function AbaQualidade({ opNumero }) {
       .catch(() => setErro("Não consegui carregar os relatórios."));
   }, [opNumero]);
 
-  if (erro) return <p className="text-sm text-red-600">{erro}</p>;
+  if (erro) return <><PitCompacto opNumero={opNumero}/><p className="text-sm text-red-600">{erro}</p></>;
   if (!dados) {
     return <p className="text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> carregando…</p>;
   }
@@ -109,50 +92,7 @@ export default function AbaQualidade({ opNumero }) {
           ele existe antes da primeira inspeção e vale para todas elas. */}
       {/* ⚠ O PIT NASCE COM A PROPOSTA, mas o padrão pode ser escolhido aqui — Vitor (26/08/2026):
           "também pode ser selecionado na aba da qualidade, igual vamos fazer no PLP". */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-        <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-1">
-          <ClipboardCheck size={15} className="text-torg-blue" /> Plano de Inspeção e Testes (PIT)
-        </h4>
-        <p className="text-[12px] text-torg-gray mb-3">
-          Escolha o padrão da obra — ele define o que a Qualidade inspeciona, com que percentual e
-          contra qual norma. O documento sai no padrão Torg, com o campo de assinatura do
-          <b> inspetor do cliente</b>.
-        </p>
-        {!pit ? (
-          <p className="text-[12px] text-torg-gray inline-flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> carregando…</p>
-        ) : (
-          <>
-            <div className="grid sm:grid-cols-2 gap-2 mb-3">
-              {(pit.opcoes || []).map((o) => {
-                const on = pit.padrao === o.id;
-                return (
-                  <button key={o.id} onClick={() => salvarPadrao(o.id)} disabled={salvandoPit}
-                    className={`text-left border rounded-lg px-3 py-2 disabled:opacity-60 ${on ? "border-torg-blue bg-torg-blue/5" : "border-gray-200 hover:border-torg-blue-300"}`}>
-                    <span className="block text-[12px] font-semibold text-torg-dark">
-                      {on && <Check size={11} className="inline -mt-0.5 mr-1 text-torg-blue" />}{o.nome}
-                    </span>
-                    <span className="block text-[11px] text-torg-gray">{o.resumo}</span>
-                    <span className="block text-[10px] text-torg-gray-light mt-0.5">{o.itens} itens de inspeção</span>
-                  </button>
-                );
-              })}
-            </div>
-            {pit.padrao ? (
-              <a href={`/api/qualidade/planos/${encodeURIComponent(opNumero)}/pdf?doc=PIT`} target="_blank" rel="noreferrer"
-                className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 inline-flex items-center gap-1.5">
-                <FileText size={13} /> Gerar PIT (PDF)
-              </a>
-            ) : (
-              // ⚠ sem padrão não se emite: um plano de inspeção que ninguém escolheu seria assinado
-              // pelo cliente como se fosse decisão nossa.
-              <p className="text-[12px] text-amber-700">Escolha um padrão acima para emitir o PIT.</p>
-            )}
-            {/* ⚠⚠ O PIT NÃO VALE SEM O ACEITE DO CLIENTE. Vitor (26/08/2026): "o PIT também deve
-                conter o aceite por parte do cliente, não pode deixar de ter esse aceite". */}
-            {pit.padrao && <AceitePlano opNumero={opNumero} doc="PIT" nome="o PIT" />}
-          </>
-        )}
-      </div>
+      <PitCompacto opNumero={opNumero} />
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <h4 className="text-sm font-semibold text-torg-dark flex items-center gap-2 mb-1">

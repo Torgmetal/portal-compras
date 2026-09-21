@@ -1,4 +1,5 @@
 "use client";
+import { contatoParaEnvioAutomatico } from "@/lib/contatos-cliente";
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Send, CheckCircle2, Clock, Mail, Plus, X, AlertCircle, FileText, Save, Lock, FolderCheck, RotateCcw } from "lucide-react";
 
@@ -58,7 +59,7 @@ export default function AceitePlano({ opNumero, doc, nome }) {
       .then((j) => {
         if (j.error) return;
         setD(j);
-        setMarcados(new Set((j.contatos || []).map((c) => c.email)));
+        setMarcados(new Set((j.contatos || []).filter(contatoParaEnvioAutomatico).map((c) => c.email)));
         const r = j.responsaveis?.[doc];
         if (r) {
           setResp({

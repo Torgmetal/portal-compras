@@ -1,4 +1,5 @@
 "use client";
+import mobile from "./modelo-mobile.module.css";
 // ─── OBRA EM 3D: o modelo do Tekla como porta de entrada ──────────────────────
 //
 // Vitor (03/09/2026): "clicar na peça, dar o tipo do material, número do conjunto, quais croquis
@@ -11,6 +12,8 @@
 // terceiro. Ver components/VisualizadorIfc.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, AlertCircle, Star, SlidersHorizontal, FileSpreadsheet, Search, Eye, EyeOff } from "lucide-react";
+import Painel from "@/components/FichaPeca";
+export { default as Painel } from "@/components/FichaPeca";
 import VisualizadorIfc from "@/components/VisualizadorIfc";
 
 // ⚠ as mesmas cores do visualizador (components/VisualizadorIfc), em hexa de CSS: a legenda tem de
@@ -27,6 +30,7 @@ function dataCurta(iso) {
 }
 
 const COR = { pronta: "#0E7A5F", andando: "#B4761E", parado: "#9FB0BF" };
+const chaveMarca = (m) => String(m || "").toUpperCase().replace(/\s/g, "");
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
 const fmtD = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "—");
@@ -99,9 +103,9 @@ export default function ModeloClient({ ops }) {
 
   // ⚠ cores por MARCA, montadas uma vez: o visualizador pinta a cena inteira de uma vez só.
   const cores = useMemo(() => {
-    const e = lista?.estados || {};
-    return Object.fromEntries(Object.entries(e).map(([m, st]) => [m, COR[st] || COR.parado]));
-  }, [lista]);
+    const e = Object.fromEntries(Object.entries(lista?.estados || {}).map(([m, st]) => [chaveMarca(m), st]));
+    return Object.fromEntries((indice || []).map(x => [x.marca, COR[e[chaveMarca(x.marca)]] || COR.parado]));
+  }, [lista, indice]);
 
   // ⚠ o visualizador entrega o índice pronto uma vez; guardar numa função estável evita remontar
   // a cena a cada render do pai (a dependência do efeito lá dentro é a URL, mas o React avisa).
@@ -114,7 +118,6 @@ export default function ModeloClient({ ops }) {
   // fazer uma seleção de várias áreas e você listar as peças?".
   // ⚠ marca casa por texto normalizado: a planilha escreve "T118B256" e o Tag do IFC também, mas
   // um espaço à toa de um lado quebraria o cruzamento inteiro sem dar sinal nenhum.
-  const chaveMarca = (m) => String(m || "").toUpperCase().replace(/\s/g, "");
 
   const daObra = !!niveisObra?.achou && niveisObra.niveis?.length > 0;
   const niveisNaTela = useMemo(() => {
@@ -124,7 +127,8 @@ export default function ModeloClient({ ops }) {
     }));
   }, [daObra, niveisObra, niveis]);
 
-  const setorDe = useCallback((x) => (x?.marca ? lista?.setores?.[x.marca] || null : null), [lista]);
+  const setoresPorMarca = useMemo(() => Object.fromEntries(Object.entries(lista?.setores || {}).map(([m, s]) => [chaveMarca(m), s])), [lista]);
+  const setorDe = useCallback((x) => setoresPorMarca[chaveMarca(x?.marca)] || null, [setoresPorMarca]);
 
   const setores = useMemo(() => {
     const c = new Map();
@@ -135,9 +139,16 @@ export default function ModeloClient({ ops }) {
     return [...c.entries()].sort((a, b) => b[1] - a[1]);
   }, [indice, setorDe]);
 
+  const resumoModelo = useMemo(() => {
+    const itens = (indice || []).filter(x => !x.parafuso);
+    const pintura = itens.filter(x => setorDe(x) === "Pintura").length;
+    const comEtapa = itens.filter(x => setorDe(x)).length;
+    return { pintura, emFabricacao: comEtapa - pintura, semInformacao: itens.length - comEtapa, comEtapa };
+  }, [indice, setorDe]);
+
   const selecionados = useMemo(() => {
     if (!indice) return null;
-    if (!fNiveis.size && !fTipos.size) return null;
+    if (!fNiveis.size && !fTipos.size && !fSetores.size) return null;
     // quando o nível é o da Engenharia, quem manda é a lista de marcas dele
     const alvo = daObra && fNiveis.size
       ? new Set(niveisNaTela.filter((nv) => fNiveis.has(nv.chave)).flatMap((nv) => [...nv.marcas]))
@@ -225,6 +236,7 @@ export default function ModeloClient({ ops }) {
 
   // ── o dossiê da peça clicada ──
   const abrir = useCallback((item) => {
+    if (window.matchMedia("(max-width: 1023px)").matches) setPainel(false);
     setSel(item || null);
     const m = item?.marca;
     if (!m) return setPeca(null);
@@ -346,16 +358,16 @@ export default function ModeloClient({ ops }) {
     // ⚠ `left-64` casa com o `ml-64` do layout de Produção e com a `w-64 fixed` da barra lateral
     // (conferido nos dois arquivos). Fixo em vez de fluido porque a tela precisa da altura inteira
     // da janela: dentro do `p-8` do layout, o modelo nunca passaria de meia tela.
-    <div data-tela-cheia className="fixed inset-y-0 right-0 left-64 flex flex-col bg-torg-dark">
+    <div data-tela-cheia className={`fixed inset-y-0 right-0 left-64 flex flex-col bg-torg-dark ${mobile.tela}`}>
       {/* faixa de controle: tudo numa linha, escura, para a obra ficar sendo a única coisa clara */}
-      <div className="flex items-center gap-2 flex-wrap px-3 py-2 shrink-0 text-white/90">
+      <div className={`flex items-center gap-2 flex-wrap px-3 py-2 shrink-0 text-white/90 ${mobile.barra}`}>
         <span className="text-[13px] font-bold tracking-tight mr-1">Obra em 3D</span>
         <select value={opId} onChange={(e) => setOpId(e.target.value)}
           className="text-[12px] bg-white/10 border border-white/15 rounded-md px-2 py-1 max-w-[300px] outline-none focus:border-white/40">
           {ops.map((o) => <option key={o.id} value={o.id} className="text-torg-dark">OP-{o.numero} — {o.obra || o.cliente || "sem obra"}</option>)}
         </select>
         {lista?.modelos?.length > 1 && (
-          <select value={modelo?.rel || ""} onChange={(e) => { setModelo(lista.modelos.find((m) => m.rel === e.target.value)); setSel(null); setPeca(null); setIndice(null); setFNiveis(new Set()); setFTipos(new Set()); }}
+          <select value={modelo?.rel || ""} onChange={(e) => { setModelo(lista.modelos.find((m) => m.rel === e.target.value)); setSel(null); setPeca(null); setIndice(null); setNiveis([]); setFNiveis(new Set()); setFTipos(new Set()); setFSetores(new Set()); setOcultos(new Set()); setBusca(""); setIndice(null); setFNiveis(new Set()); setFTipos(new Set()); }}
             className="text-[12px] bg-white/10 border border-white/15 rounded-md px-2 py-1 max-w-[340px] outline-none focus:border-white/40">
             {lista.modelos.map((m) => (
               <option key={m.rel} value={m.rel} disabled={m.grande} className="text-torg-dark">
@@ -384,20 +396,21 @@ export default function ModeloClient({ ops }) {
           </div>
         )}
 
-        {modo === "andamento" && lista?.apontamento && !lista.apontamento.comProducao && (
-          <span className="text-[11.5px] text-amber-300">sem apontamento no Syneco — tudo em cinza</span>
+        {modo === "andamento" && indice && !resumoModelo.comEtapa && (
+          <span className="text-[11.5px] text-amber-300">sem etapa identificada para as marcas deste modelo</span>
         )}
 
-        {lista?.resumo && modo === "andamento" && lista?.apontamento?.comProducao > 0 && (
-          <div className="flex items-center gap-2.5 text-[11.5px] text-white/70">
-            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.pronta }} /> {lista.resumo.prontas}</span>
-            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.andando }} /> {lista.resumo.andando}</span>
-            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.parado }} /> {lista.resumo.marcas - lista.resumo.prontas - lista.resumo.andando}</span>
+        {indice && modo === "andamento" && resumoModelo.comEtapa > 0 && (
+          <div className="flex flex-wrap items-center gap-2.5 text-[11.5px] text-white/70">
+            <span>Itens do modelo:</span>
+            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.pronta }} /> {resumoModelo.pintura} com pintura</span>
+            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.andando }} /> {resumoModelo.emFabricacao} em fabricação</span>
+            <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: COR.parado }} /> {resumoModelo.semInformacao} sem informação</span>
           </div>
         )}
 
         {indice && (
-          <button onClick={() => setPainel((v) => !v)}
+          <button onClick={() => { setPainel((v) => !v); if (window.matchMedia("(max-width: 1023px)").matches) { setSel(null); setPeca(null); } }}
             className={`text-[11.5px] font-semibold px-2.5 py-1 rounded-md border inline-flex items-center gap-1.5 ${
               painel || selecionados ? "bg-white text-torg-dark border-white" : "bg-white/10 text-white/80 border-white/15 hover:text-white"}`}>
             <SlidersHorizontal size={12} />
@@ -427,7 +440,7 @@ export default function ModeloClient({ ops }) {
           janela os painéis iam para BAIXO da cena — e como a cena ocupa a altura toda, o painel da
           peça nascia fora da tela. O sintoma era o pior possível: clicar na peça parecia não fazer
           nada. Numa tela de modelo 3D, painel ao lado é o único arranjo que funciona. */}
-      <div className="flex-1 min-h-0 flex flex-row bg-white">
+      <div className={`flex-1 min-h-0 flex flex-row bg-white ${mobile.quadro}`}>
         {/* ⚠ o filtro fica À ESQUERDA e o dossiê à direita: são movimentos opostos — um escolhe o
             que ver, o outro lê o que foi escolhido — e disputar o mesmo lado faria um fechar o
             outro justamente quando se usa os dois juntos. */}
@@ -436,6 +449,7 @@ export default function ModeloClient({ ops }) {
             <div className="p-3.5 space-y-3.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-[12px] font-bold text-torg-dark uppercase tracking-wide">Filtrar a vista</h3>
+                <button className="lg:hidden px-3" aria-label="Fechar filtros" onClick={() => setPainel(false)}>Fechar</button>
                 {(selecionados || fSetores.size) && (
                   <button onClick={() => { setFNiveis(new Set()); setFTipos(new Set()); setFSetores(new Set()); }}
                     className="text-[11px] text-torg-blue hover:underline">limpar</button>
@@ -497,6 +511,7 @@ export default function ModeloClient({ ops }) {
                     <span className="normal-case font-normal text-[10px]"> · até {dataCurta(lista.apontamento.ultimo)}</span>
                   )}
                 </p>
+                <p className="text-[11px] text-torg-gray mb-1">Contagem de itens presentes no modelo.</p>
                 {setores.length > 0 ? (
                   /* ⚠⚠ UMA ETAPA POR VEZ, igual ao portal do cliente. Vitor (05/09/2026): "clico em
                      qual área eu quero saber e aparecem apenas as peças apontadas naquele setor;
@@ -524,9 +539,8 @@ export default function ModeloClient({ ops }) {
                   </div>
                 ) : (
                   <p className="text-[11.5px] text-amber-700 px-1.5 leading-snug">
-                    Esta obra ainda não tem produção lançada no Syneco
-                    {lista?.apontamento?.marcas ? ` (${lista.apontamento.marcas} marcas na lista, nenhuma com ordem apontada)` : " e não tem lista importada no portal"}.
-                    Sem isso não dá para dizer o que está pronto — o modelo mostra a obra, não o andamento.
+                    Não foi identificada uma etapa de fabricação para as marcas deste modelo.
+                    Confira a correspondência das marcas com a lista e os apontamentos da OP.
                   </p>
                 )}
               </div>
@@ -649,6 +663,7 @@ export default function ModeloClient({ ops }) {
         {sel && (
           <aside data-painel-3d className="w-[360px] max-w-[42vw] shrink-0 border-l border-gray-200 overflow-y-auto bg-white">
             <div className="p-4">
+              <button className="lg:hidden float-right px-3" aria-label="Fechar detalhes" onClick={() => { setSel(null); setPeca(null); }}>Fechar</button>
               <div className="flex items-center gap-3 mb-3">
                 <button onClick={() => setOcultos((v) => new Set(v).add(sel.id))}
                   className="text-[11.5px] text-torg-gray hover:text-torg-dark inline-flex items-center gap-1.5 border border-gray-200 rounded-md px-2 py-1">
@@ -731,133 +746,6 @@ function PainelParafuso({ p, qtd }) {
 }
 
 /** O dossiê — cada bloco vem de uma parte do portal que já existia, agora na mesma tela. */
-export function Painel({ d }) {
-  const p = d.pecas?.[0] || {};
-  const feitos = new Set((d.fabrica?.trilha || []).map((t) => t.setor));
-  return (
-    <div className="space-y-3">
-      <div className="flex items-baseline gap-2 flex-wrap">
-        <h3 className="font-mono text-[17px] font-bold text-torg-dark">{d.marca}</h3>
-        <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full border border-torg-blue-200 bg-torg-blue-50 text-torg-blue">
-          {p.tipoPeca === "CONJUNTO" ? "conjunto" : p.tipoPeca === "CROQUI" ? "croqui" : "marca"}
-        </span>
-        {d.fabrica?.setorAtual && (
-          <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full border border-amber-200 bg-amber-50 text-amber-800">
-            {d.fabrica.setorAtual}
-          </span>
-        )}
-        {p.prioridade ? (
-          <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full border border-torg-orange-200 bg-orange-50 text-torg-orange-700 inline-flex items-center gap-1">
-            <Star size={10} className="fill-current" /> prioridade {p.prioridade}
-          </span>
-        ) : null}
-      </div>
-
-      <Bloco titulo="A peça">
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[12.5px]">
-          <dt className="text-torg-gray">Descrição</dt><dd className="font-medium">{p.descricao || "—"}</dd>
-          <dt className="text-torg-gray">Perfil</dt><dd className="font-mono font-medium">{p.perfil || "—"}</dd>
-          <dt className="text-torg-gray">Material</dt><dd className="font-medium">{p.material || "—"}</dd>
-          <dt className="text-torg-gray">Comprimento</dt><dd className="font-medium">{p.comprimentoMm ? `${fmtN(p.comprimentoMm)} mm` : "—"}</dd>
-          <dt className="text-torg-gray">Quantidade</dt><dd className="font-medium">{fmtN(p.qte)} un · {fmtKg(p.pesoTotalKg)}</dd>
-          <dt className="text-torg-gray">Frente</dt><dd className="font-mono font-medium">{p.opNumero || "—"}</dd>
-        </dl>
-      </Bloco>
-
-      {d.croquis?.length > 0 && (
-        <Bloco titulo={`Croquis do conjunto (${d.croquis.length})`}>
-          <div className="max-h-44 overflow-y-auto space-y-0.5">
-            {d.croquis.map((c) => (
-              <div key={c.marca} className="flex gap-2 text-[12px]">
-                <span className="font-mono font-semibold min-w-[86px]">{c.marca}</span>
-                <span className="text-torg-gray flex-1 truncate">{c.perfil || c.descricao || ""}</span>
-                <span className="text-torg-gray tabular-nums">{fmtN(c.qtdNoConjunto)}×</span>
-              </div>
-            ))}
-          </div>
-        </Bloco>
-      )}
-      {d.conjuntos?.length > 0 && (
-        <Bloco titulo="Faz parte de">
-          <p className="font-mono text-[12.5px]">{d.conjuntos.map((c) => c.marca).join(", ")}</p>
-        </Bloco>
-      )}
-
-      {/* ⚠⚠ UMA LINHA POR PERFIL, E O MOTIVO QUANDO NÃO HÁ R. Vitor (03/09/2026), na foto de um
-          conjunto com a mesma cantoneira repetida onze vezes: "aqui não é real que está sem R, é?".
-          Era real — só que por prazo de fornecedor, não por furo de rastreio. "Sem R" sozinho, em
-          vermelho, acusa quem não tem culpa; agora a linha diz POR QUE não há R. */}
-      <Bloco titulo="Rastreabilidade">
-        {d.rastreio?.length ? d.rastreio.map((r, i) => {
-          const mat = d.materialPorPerfil?.[r.perfil] || null;
-          return (
-            <div key={i} className="text-[12px] mb-1.5 last:mb-0">
-              <span className="font-mono font-semibold">{r.perfil}</span>
-              {r.posicoes > 1 && <span className="text-torg-gray-light ml-1">{r.posicoes}×</span>}
-              {r.usadas?.length ? r.usadas.map((u, k) => (
-                <span key={k} className="ml-2">
-                  <span className="font-mono font-semibold text-emerald-700">R {u.r}</span>
-                  {u.corrida && <span className="text-torg-gray"> · corrida {u.corrida}</span>}
-                  {u.nf && <span className="text-torg-gray"> · NF {u.nf}</span>}
-                  {u.indicado && <span className="text-torg-gray-light"> (indicado)</span>}
-                </span>
-              )) : (
-                <span className="ml-2">
-                  {mat?.estado === "ESTOQUE" && !mat.rInformado
-                    ? <span className="text-amber-700">{mat.rotulo === "aguardando entrega" ? "aço a caminho — sem entrada no CMR ainda" : `de estoque · ${mat.rotulo || "sem o R informado"}`}</span>
-                    : mat && mat.estado !== "NA_OP"
-                    ? <span className="text-amber-700">{mat.rotulo || "material não comprado"}</span>
-                    : <span className="text-red-600 italic">sem R</span>}
-                </span>
-              )}
-              {mat?.descricaoCmr && <span className="block text-[11px] text-torg-gray-light truncate" title={mat.descricaoCmr}>{mat.descricaoCmr}</span>}
-            </div>
-          );
-        }) : <p className="text-[12.5px] text-torg-gray italic">Sem rastreio ainda.</p>}
-      </Bloco>
-
-      <Bloco titulo="Onde está na fábrica">
-        <div className="flex flex-wrap gap-1.5">
-          {ETAPAS.map((s) => (
-            <span key={s} className={`text-[11px] px-2 py-0.5 rounded border ${
-              feitos.has(s) ? "border-amber-300 bg-amber-50 text-amber-800 font-semibold" : "border-gray-200 text-torg-gray"}`}>{s}</span>
-          ))}
-        </div>
-        {d.fabrica?.trilha?.length ? (
-          <p className="text-[11.5px] text-torg-gray mt-1.5">
-            {d.fabrica.trilha.map((t) => `${t.setor} ${fmtN(t.un)} un · ${fmtKg(t.kg)} · ${fmtD(t.ultimo)}`).join(" · ")}
-          </p>
-        ) : <p className="text-[12px] text-torg-gray italic mt-1">Nenhum apontamento ainda.</p>}
-      </Bloco>
-
-      {d.liberacoes?.length > 0 && (
-        <Bloco titulo="Programação">
-          {d.liberacoes.map((l, i) => (
-            <p key={i} className="text-[12px]">
-              <b>{fmtD(l.dia) || "sem dia"}</b> · {(l.setores || []).join(" / ")}
-              {l.liberadoPor && <span className="text-torg-gray"> — liberado por {l.liberadoPor}</span>}
-            </p>
-          ))}
-        </Bloco>
-      )}
-
-      <Bloco titulo="Qualidade">
-        {d.relatorios?.length ? d.relatorios.map((r) => (
-          <div key={r.codigo} className="flex gap-2 text-[12px]">
-            <span className="font-mono font-semibold">{r.codigo}</span>
-            <span className="text-torg-gray flex-1">{r.tipoRotulo}</span>
-            {r.resultado && <span className={r.resultado === "APROVADO" ? "text-emerald-700 font-semibold" : "text-red-600 font-semibold"}>{r.resultado}</span>}
-          </div>
-        )) : (
-          <>
-            <p className="text-[12.5px] text-torg-gray italic">Nenhum relatório emitido para esta marca.</p>
-            <p className="text-[11.5px] text-torg-gray-light mt-1">Dimensional, visual de solda e ultrassom aparecem aqui quando o primeiro for emitido.</p>
-          </>
-        )}
-      </Bloco>
-    </div>
-  );
-}
 
 function Bloco({ titulo, children }) {
   return (

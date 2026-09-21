@@ -1,7 +1,8 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut, Ruler, ArrowLeftRight, Minus, Plus } from "lucide-react";
-import { layoutCotas, setaEm, PADDING } from "@/lib/cota-marcacao";
+import { layoutCotas, setaEm, PADDING, letraDaCota, descricaoPadraoCota, renumerarCotas } from "@/lib/cota-marcacao";
 import CampoTolerancia from "./CampoTolerancia";
 import { faixaCorte } from "@/lib/tolerancia-po04";
 
@@ -578,13 +579,13 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
 
   function confirmar(espec) {
     registrar();
-    const letra = LETRAS[cotas.length] || `C${cotas.length + 1}`;
+    const letra = letraDaCota(cotas.length);
     onChange([...cotas, {
       letra,
       // ⚠ o rótulo é SÓ "Cota A". Vitor (21/08/2026): "nas marcações laterais você precisa trazer
       // apenas isso: cota A, Cota B e Cota C". Quem diz o que medir é a marca no desenho, não um
       // nome repetido na tabela.
-      descricao: `Cota ${letra}`,
+      descricao: descricaoPadraoCota(letra),
       projetoMm: espec === "" ? null : Number(espec),
       tolerancia: tol ? `± ${tol}` : "",
       encontradoMm: null,
@@ -595,12 +596,9 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
 
   function remover(i) {
     registrar();
-    // ⚠ as letras se renumeram: buraco no meio (A, C, D) confunde quem mede
-    const restantes = cotas.filter((_, k) => k !== i).map((c, k) => {
-      const letra = LETRAS[k] || `C${k + 1}`;
-      return { ...c, letra, descricao: `Cota ${letra}` };
-    });
-    onChange(restantes);
+    // ⚠ as letras se renumeram: buraco no meio (A, C, D) confunde quem mede — mas a descrição
+    // DIGITADA sobrevive (renumerarCotas só reescreve o rótulo automático)
+    onChange(renumerarCotas(cotas.filter((_, k) => k !== i)));
   }
 
   // ⚠⚠ TROCAR O LADO. Vitor (03/09/2026): "eu preciso conseguir editar para qual lado eu quero que
@@ -642,6 +640,20 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
 
   const conteudo = (
     <div className={amplo ? "fixed inset-0 z-50 bg-white p-4 overflow-auto" : ""}>
+      {/* ⚠⚠ O RECORTE SUMIU E A PESSOA PRECISA SABER POR QUÊ. Recorte gravado antes de 18/09/2026
+          numa folha girada foi escolhido sob outro contrato de coordenadas — reaplicá-lo poria o
+          enquadramento noutro pedaço da folha, e as cotas marcadas em cima dele iriam junto. Some
+          calado, ela reclamaria que o portal "perdeu" o recorte (achado do Codex). */}
+      {dados.recorteAntigoIgnorado && (
+        <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2 flex items-start gap-1.5">
+          <AlertCircle size={13} className="mt-0.5 shrink-0" />
+          <span>
+            O recorte salvo para este desenho é anterior à correção de orientação da folha e não
+            vale mais — a vista voltou ao recorte automático. Refaça em <b>ajustar recorte</b>, e
+            confira as cotas marcadas antes desta data.
+          </span>
+        </p>
+      )}
       <div className="flex items-start justify-between gap-3 mb-1.5">
         <p className="text-[11px] text-torg-gray">
           {borracha
@@ -755,7 +767,13 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
           {cotas.map((c, i) => (
             <li key={i} className="flex items-center gap-2 text-[12px]">
               <span className="w-5 h-5 rounded-full bg-torg-orange text-white font-bold text-[10px] inline-flex items-center justify-center shrink-0">{c.letra}</span>
-              <span className="text-torg-dark flex-1">{c.descricao}</span>
+              {/* ⚠ a descrição é DIGITÁVEL: é ela que sai na coluna "Descrição" da tabela do
+                  relatório (lib/relatorio-inspecao-pdf). No desenho continua só a letra. */}
+              <input value={c.descricao ?? ""} onFocus={registrar}
+                onChange={(e) => onChange(cotas.map((linha, j) => (j === i ? { ...linha, descricao: e.target.value } : linha)))}
+                placeholder={descricaoPadraoCota(c.letra)}
+                aria-label={`Descrição da cota ${c.letra}`}
+                className="flex-1 min-w-0 px-1.5 py-0.5 rounded border border-gray-200 text-torg-dark focus:outline-none focus:border-torg-blue" />
               <span className="font-mono text-torg-dark">{c.projetoMm ?? "—"}</span>
               <CampoTolerancia value={c.tolerancia} label={`Tolerância da cota ${c.letra} (mm)`} onFocus={registrar}
                 onChange={valor=>onChange(cotas.map((linha,j)=>j===i?{...linha,tolerancia:valor}:linha))}/>
@@ -843,7 +861,7 @@ function BarraCota({ letra, valores, semDesenho, tol, onTol, sugestao, onConfirm
       </div>
 
       <div className="flex items-center gap-2 mt-1.5">
-        <input type="number" value={outro} onChange={(e) => setOutro(e.target.value)}
+        <CampoDecimal value={outro} onChange={(txt) => setOutro(txt)}
           placeholder="outro valor (mm)"
           onKeyDown={(e) => { if (e.key === "Enter" && outro !== "") onConfirmar(Number(outro)); }}
           className="w-40 border border-gray-200 rounded px-2 py-1 text-[12px] font-mono" />

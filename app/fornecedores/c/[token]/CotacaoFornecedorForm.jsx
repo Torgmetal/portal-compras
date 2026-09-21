@@ -1,4 +1,6 @@
 "use client";
+import { parseObservacaoCotacao } from "@/lib/cotacao-observacao";
+import CampoData from "@/components/CampoData";
 import { useState, useMemo, useRef } from "react";
 import { dataBR, dataHoraBR } from "@/lib/data-br";
 import { useRouter } from "next/navigation";
@@ -7,33 +9,21 @@ import { fmtOP } from "@/lib/utils";
 import { Loader2, AlertCircle, Send, AlertTriangle, RotateCcw, CheckCircle2, Upload, FileText, Sparkles, PackageX, TrendingDown } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 import { numeroBR } from "@/lib/numero-br";
+import CampoDecimal from "@/components/CampoDecimal";
+import { FRETES } from "@/lib/frete-cotacao";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 // ⚠ fuso fixo de Brasília (ver page.js): servidor em UTC e navegador em BRT não podem escrever dias diferentes
 const fmtData = (d) => (d ? dataBR(d) : "—");
 
-// Extrai prazo/pagamento da observacao salva (formato "Prazo de entrega: X | Pagamento: Y | <obs>")
-function parseObservacao(obs) {
-  if (!obs) return { prazoEntrega: "", condicaoPagamento: "", observacao: "" };
-  const partes = obs.split(" | ");
-  let prazoEntrega = "";
-  let condicaoPagamento = "";
-  const restos = [];
-  for (const p of partes) {
-    const m1 = p.match(/^Prazo de entrega:\s*(.+)$/);
-    const m2 = p.match(/^Pagamento:\s*(.+)$/);
-    if (m1) prazoEntrega = m1[1];
-    else if (m2) condicaoPagamento = m2[1];
-    else restos.push(p);
-  }
-  return { prazoEntrega, condicaoPagamento, observacao: restos.join(" | ") };
-}
+// ⚠ O parser mora em `lib/cotacao-observacao`: quem GRAVA (a rota) e quem LÊ (esta tela e a
+// de compras) têm de concordar no formato, e havia uma cópia só aqui.
 
 export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCotacao: anexosCotacaoInicial = [], vencida, faturamento = null, emRevisaoFinal = false, pedidoDesconto = false }) {
   const router = useRouter();
   const jaEnviou = cotacao.status === "RECEBIDA";
-  const obsParsed = parseObservacao(cotacao.observacao);
+  const obsParsed = parseObservacaoCotacao(cotacao.observacao);
   // State local pra refletir uploads em tempo real (sem precisar de reload da pagina)
   const [anexosCotacao, setAnexosCotacao] = useState(anexosCotacaoInicial);
 
@@ -50,6 +40,9 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
       return {
         id: it.id,
         descricao: it.rmItem.descricao,
+        // ⚠ `observacaoRM` e não `observacao`: esta é a da TORG (escrita na RM); `observacao`,
+        // logo abaixo, é a que o FORNECEDOR digita na proposta. Dois textos, dois donos.
+        observacaoRM: it.rmItem.observacao || "",
         material: it.rmItem.material,
         comprimento: it.rmItem.comprimento,
         largura: it.rmItem.largura,
@@ -78,6 +71,9 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
   );
   const [prazoEntrega, setPrazoEntrega] = useState(jaEnviou ? obsParsed.prazoEntrega : "");
   const [condicaoPagamento, setCondicaoPagamento] = useState(jaEnviou ? obsParsed.condicaoPagamento : "");
+  // ⚠ Sem padrão: CIF e FOB mudam quem paga o frete e quem vai buscar. Marcar um dos dois de
+  // antemão faria a metade dos fornecedores enviar a resposta errada sem perceber.
+  const [tipoFrete, setTipoFrete] = useState(cotacao.tipoFrete || "");
   const [observacaoGeral, setObservacaoGeral] = useState(jaEnviou ? obsParsed.observacao : "");
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -420,6 +416,11 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     if (!prazoEntrega.trim()) {
       return setErro("Informe o prazo de entrega.");
     }
+    // ⚠ Obrigatório, como prazo e pagamento. Deixar opcional devolveria a maioria das cotações em
+    // branco e o comprador continuaria sem saber o que precisa coletar — que é o motivo do campo.
+    if (!tipoFrete) {
+      return setErro("Informe se o frete é CIF (entrega do fornecedor) ou FOB (coleta pela Torg).");
+    }
     if (!condicaoPagamento.trim()) {
       return setErro("Informe a condicao de pagamento.");
     }
@@ -437,6 +438,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
           numeroProposta: numeroProposta.trim(),
           totalProposta: totalPropostaNum,
           prazoEntrega: prazoEntrega || null,
+          tipoFrete: tipoFrete || null,
           condicaoPagamento: condicaoPagamento || null,
           observacao: observacaoGeral || null,
         }),
@@ -958,6 +960,16 @@ dataHoraBR(new Date())
                         <td className="px-2 py-2 text-gray-400 align-top">{i + 1}</td>
                         <td className="px-2 py-2 align-top">
                           <p className={`font-medium text-xs ${l.semEstoque ? "line-through text-gray-400" : "text-torg-dark"}`}>{l.descricao}</p>
+                          {/* ⚠⚠ A ESPECIFICAÇÃO QUE NÃO COUBE NA DESCRIÇÃO. Matheus (16/09/2026),
+                              olhando a RI-0035 pelo link do fornecedor: "não apareceu a observação
+                              que escrevemos no item no momento da criação dele. Precisa aparecer
+                              pro fornecedor embaixo". Naquele item estava o modelo exato da
+                              máquina — sem isso, o fornecedor cota outra. */}
+                          {l.observacaoRM && (
+                            <p className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded px-1.5 py-1 mt-1 whitespace-pre-wrap break-words">
+                              {l.observacaoRM}
+                            </p>
+                          )}
                           {/* Detalhes técnicos — material, dimensões, peso, qtd em peças.
                               Importante pra chapas/perfis: fornecedor precisa entregar
                               QTD de peças com as dimensões especificadas */}
@@ -1028,49 +1040,46 @@ dataHoraBR(new Date())
                           {l.qtdRm} {l.unidade}
                         </td>
                         <td className="px-2 py-2 text-right align-top">
-                          <input
-                            type="number" step="0.01" min="0"
+                          <CampoDecimal
                             value={l.semEstoque ? "" : l.qtdCotada}
-                            onChange={(e) => setLinha(l.id, "qtdCotada", e.target.value)}
+                            onChange={(txt) => setLinha(l.id, "qtdCotada", txt)}
                             disabled={l.semEstoque}
                             className={`w-20 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />
                         </td>
                         <td className="px-2 py-2 text-right align-top">
-                          <input
-                            type="number" step="0.01" min="0"
+                          <CampoDecimal
                             value={l.semEstoque ? "" : l.precoUnit}
-                            onChange={(e) => setLinha(l.id, "precoUnit", e.target.value)}
+                            onChange={(txt) => setLinha(l.id, "precoUnit", txt)}
                             placeholder="0,00"
                             disabled={l.semEstoque}
                             className={`w-24 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />
                         </td>
                         <td className="px-2 py-2 text-right align-top">
-                          <input
-                            type="number" step="0.01" min="0" max="100"
+                          <CampoDecimal
+                            casas={2}
                             value={l.semEstoque ? "" : l.icmsPct}
-                            onChange={(e) => setLinha(l.id, "icmsPct", e.target.value)}
+                            onChange={(txt) => setLinha(l.id, "icmsPct", txt)}
                             placeholder="0"
                             disabled={l.semEstoque}
                             className={`w-16 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />
                         </td>
                         <td className="px-2 py-2 text-right align-top">
-                          <input
-                            type="number" step="0.01" min="0" max="100"
+                          <CampoDecimal
+                            casas={2}
                             value={l.semEstoque ? "" : l.ipiPct}
-                            onChange={(e) => setLinha(l.id, "ipiPct", e.target.value)}
+                            onChange={(txt) => setLinha(l.id, "ipiPct", txt)}
                             placeholder="0"
                             disabled={l.semEstoque}
                             className={`w-16 border rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />
                         </td>
                         <td className="px-2 py-2 text-center align-top">
-                          <input
-                            type="date"
+                          <CampoData
                             value={l.semEstoque ? "" : l.prazoEntrega}
-                            onChange={(e) => setLinha(l.id, "prazoEntrega", e.target.value)}
+                            onChange={(iso) => setLinha(l.id, "prazoEntrega", iso)}
                             disabled={l.semEstoque}
                             className={`w-[130px] border rounded px-1.5 py-1 text-xs tabular-nums focus:ring-1 focus:ring-torg-blue ${l.semEstoque ? "bg-gray-100 border-gray-200 cursor-not-allowed" : inputCls}`}
                           />
@@ -1198,6 +1207,52 @@ dataHoraBR(new Date())
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
                   required
                 />
+              </div>
+              {/* ⚠⚠ O FRETE OCUPA A LINHA INTEIRA, LOGO ABAIXO DOS DOIS CAMPOS. Ele começou na
+                  segunda coluna, ao lado do prazo — mas a legenda das duas opções tem quatro linhas
+                  e esticava só aquela coluna, empurrando "Condição de pagamento" para baixo e
+                  abrindo um buraco embaixo do prazo (Matheus, 17/09/2026: "ficou um pouco quebrado
+                  o layout, ajuste para ficar alinhado as caixas").
+                  ⚠ Continua colado no prazo, que era o pedido original: é a linha seguinte, não
+                  outro bloco. Quem responde "quando chega" responde "e chega como" em seguida. */}
+              <div className="sm:col-span-2">
+                <span className="block text-sm font-medium text-torg-dark mb-1">Frete *</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {Object.values(FRETES).map((f) => {
+                    const escolhido = tipoFrete === f.valor;
+                    return (
+                      <button
+                        key={f.valor}
+                        type="button"
+                        onClick={() => setTipoFrete(f.valor)}
+                        aria-pressed={escolhido}
+                        className={`text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                          escolhido
+                            // ⚠⚠ AZUL CHEIO, NÃO UM FUNDO CLARINHO. O estado anterior era um
+                            // `bg-torg-blue-50` que, na tela do fornecedor, mal se distinguia do
+                            // branco — e este é um campo obrigatório de DUAS opções: não dá para
+                            // ficar em dúvida sobre qual está marcada.
+                            ? "bg-torg-blue border-torg-blue text-white shadow-sm"
+                            : "border-gray-300 text-torg-dark hover:bg-gray-50"}`}
+                      >
+                        <span className="block text-sm font-bold">{f.valor}</span>
+                        {/* ⚠ A ação dentro do botão: "CIF" e "FOB" sozinhos não dizem nada a quem
+                            não vive de logística, e a legenda embaixo é para ler, não para escolher. */}
+                        <span className={`block text-[11px] ${escolhido ? "text-white/90" : "text-torg-gray"}`}>{f.acao}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* ⚠ A legenda aparece SEMPRE, das duas opções, e não só depois de escolher: quem
+                    não sabe a diferença precisa dela ANTES de clicar. É o motivo de o Matheus ter
+                    pedido "com legenda de cada uma". */}
+                <ul className="mt-2 space-y-0.5">
+                  {Object.values(FRETES).map((f) => (
+                    <li key={f.valor} className="text-[11px] text-torg-gray leading-snug">
+                      <b className="text-torg-dark">{f.valor}:</b> {f.legenda}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
             <div>

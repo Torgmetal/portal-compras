@@ -24,6 +24,11 @@ model User {
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
   podeAlterarVerba         Boolean                   @default(false)
+  // ⚠ Permissão fina, no mesmo padrão do `podeAlterarVerba`: cancelar uma RM era privilégio de
+  // tipo ADMIN, e dar ADMIN só para isso entregaria junto gestão de usuários, senhas e verba.
+  // Cancelar é o caminho BRANDO (status CANCELADA + motivo obrigatório + AuditLog); a EXCLUSÃO
+  // definitiva (DELETE, que cascateia cotações e pedidos) continua exclusiva do ADMIN.
+  podeCancelarRM           Boolean                   @default(false)
   tipo                     TipoUsuario
   // Troca de senha: força a definição de nova senha só no 1º acesso do
   // funcionário (senha provisória). Depois que ele troca, não volta a exigir
@@ -71,6 +76,7 @@ model User {
   compromissosCriados      Compromisso[]             @relation("CompromissoCriadoPor")
   modulos                  UserModulo[]
   pmpMetas                 PmpMeta[]                 @relation("PmpMetaCriador")
+  acompanhamentosPedido    AcompanhamentoPedido[]
 }
 
 model PasswordResetToken {
@@ -120,6 +126,7 @@ model UserModulo {
 }
 
 model OP {
+  fasesReferencias      Json? // {empresas:[], fases:[{fase,descricao,referencias:[]}]} — ordem = prioridade
   id                   String               @id @default(cuid())
   numero               String               @unique
   /**
@@ -221,6 +228,10 @@ model OP {
   pastaEngenharia      PastaEngenharia?
   liberacoesProducao   LiberacaoProducao[]
   fotosObra            FotoObra[]
+  // ⚠ referências do cliente (TPR/OC/TAG… com as palavras dele) — ver lib/referencias-cliente.js
+  clienteId            String?
+  clienteRef           Cliente?             @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  referencias          OPReferencia[]
 
   @@index([numero])
   @@index([status])
@@ -421,9 +432,13 @@ model OPMedicao {
   valorContratado   Float?
   valorFaturadoAuto Float?
   op                OP        @relation(fields: [opId], references: [id], onDelete: Cascade)
+  // medição de um aditivo (o pedido Omie do aditivo, escolhido ao vincular)
+  aditivoId         String?
+  aditivo           Aditivo?  @relation(fields: [aditivoId], references: [id], onDelete: SetNull)
 
   @@unique([opId, numeroPedidoOmie])
   @@index([opId])
+  @@index([aditivoId])
 }
 
 model OPReceita {
@@ -452,9 +467,13 @@ model OPReceita {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   op                  OP       @relation(fields: [opId], references: [id], onDelete: Cascade)
+  // receita que veio com um aditivo (antes ia só na observação "· aditivo N")
+  aditivoId           String?
+  aditivo             Aditivo? @relation(fields: [aditivoId], references: [id], onDelete: SetNull)
 
   @@index([opId])
   @@index([categoria])
+  @@index([aditivoId])
 }
 
 // Kick Off da OP — documento de alinhamento divulgado aos setores no início
@@ -681,7 +700,7 @@ model Revisao {
 }
 
 model Aditivo {
-  id              String        @id @default(cuid())
+  id              String          @id @default(cuid())
   opId            String
   numero          Int
   descricao       String
@@ -697,13 +716,107 @@ model Aditivo {
   estudoArquivo   Json?
   estudoDados     Json?
   createdById     String
-  createdAt       DateTime      @default(now())
-  createdBy       User          @relation(fields: [createdById], references: [id])
-  op              OP            @relation(fields: [opId], references: [id], onDelete: Cascade)
+  createdAt       DateTime        @default(now())
+  createdBy       User            @relation(fields: [createdById], references: [id])
+  op              OP              @relation(fields: [opId], references: [id], onDelete: Cascade)
   itens           AditivoItem[]
+  // ⚠⚠ ADITIVO É UM PEDIDO NOVO DO CLIENTE, "como se fosse uma nova OP" (Vitor, 16/09/2026): tem as
+  // referências dele (OC/TAG em OPReferencia), receitas e medições marcadas com o aditivo, um valor
+  // contratado próprio e um ciclo: RASCUNHO → DIVULGADO (comunicado aos setores, com aceite) →
+  // EM_EXECUCAO → ENCERRADO.
+  status          String          @default("RASCUNHO")
+  valor           Float?
+  divulgadoEm     DateTime?
+  divulgadoPara   String?
+  referencias     OPReferencia[]
+  aceites         AditivoAceite[]
+  receitas        OPReceita[]
+  medicoes        OPMedicao[]
 
   @@unique([opId, numero])
   @@index([opId])
+}
+
+// ─── CLIENTE: o dicionário de termos de cada um ───────────────────────────────
+// Vitor (16/09/2026): TMSA fala TPR/OC/ETC/TAG, Danpower ENC/PC, Marko AF, Valmet OC. O portal fixa
+// o PAPEL (projeto, pedido, item, tag) e guarda aqui a PALAVRA de cada cliente. Ver
+// lib/referencias-cliente.js. Cadastro mínimo: nasce da própria OP (OP.cliente) quando alguém
+// preenche os termos.
+model Cliente {
+  id          String   @id @default(cuid())
+  nome        String   @unique
+  razaoSocial String?
+  cnpj        String?
+  termos      Json? // { projeto:{rotulo,exemplo,ativo}, pedido:{…}, item:{…}, tag:{…} }
+  observacoes String?
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  ops         OP[]
+}
+
+// ─── REFERÊNCIAS DO CLIENTE NA OP ─────────────────────────────────────────────
+// Uma linha por código. `papel` é fixo (PROJETO | PEDIDO | ITEM | TAG | OUTRO); `rotulo` é a foto do
+// termo do cliente na época ("OC", "AF", "TPR"). ITEM e TAG pendem do PEDIDO por `paiId`; o pedido que
+// chegou num aditivo carrega `aditivoId`. `OP.refCliente` é recalculado a partir daqui (PROJETO +
+// PEDIDOs) para os documentos ao cliente continuarem iguais.
+model OPReferencia {
+  id        String         @id @default(cuid())
+  opId      String
+  aditivoId String?
+  paiId     String?
+  papel     String
+  rotulo    String
+  codigo    String
+  descricao String?
+  valor     Float?
+  data      DateTime?
+  revisao   String?
+  frente    String? // A/B/C — a frente da Torg a que a TAG corresponde
+  ordem     Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  op        OP             @relation(fields: [opId], references: [id], onDelete: Cascade)
+  aditivo   Aditivo?       @relation(fields: [aditivoId], references: [id], onDelete: SetNull)
+  pai       OPReferencia?  @relation("ArvoreReferencia", fields: [paiId], references: [id], onDelete: Cascade)
+  filhos    OPReferencia[] @relation("ArvoreReferencia")
+
+  @@index([opId, papel])
+  @@index([aditivoId])
+  @@index([paiId])
+}
+
+// ─── NOTA FISCAL DO OMIE POR PEDIDO (parcela) ─────────────────────────────────
+// Vitor (16/09/2026), na aba de faturamento do cliente: "precisa informar o número da NF". O cache
+// diário do Omie traz as parcelas faturadas, mas não o número da nota; ele vem de ConsultarNF pelo
+// código do pedido (cada parcela é um pedido no Omie). Consultado uma vez e guardado aqui — a nota
+// não muda de número. `numero` null = consultado e ainda sem NF (reconsulta depois de 1 dia).
+model NotaFiscalOmie {
+  codigoPedido String    @id
+  numeroPedido String?
+  numero       String?
+  serie        String?
+  chave        String?
+  dataEmissao  DateTime?
+  consultadoEm DateTime  @default(now())
+  erro         String?
+}
+
+// ─── ACEITE DO COMUNICADO DE ADITIVO ──────────────────────────────────────────
+// Mesmo desenho do KickoffAceite: um convite por pessoa, com o token dela; cobrança reusa o convite.
+model AditivoAceite {
+  id        String    @id @default(cuid())
+  aditivoId String
+  email     String
+  token     String    @unique
+  enviadoEm DateTime  @default(now())
+  aceitoEm  DateTime?
+  aceitoIp  String?
+  cobradoEm DateTime?
+  cobrancas Int       @default(0)
+  aditivo   Aditivo   @relation(fields: [aditivoId], references: [id], onDelete: Cascade)
+
+  @@index([aditivoId])
 }
 
 model AditivoItem {
@@ -803,25 +916,25 @@ model RM {
 }
 
 model PedidoOmie {
-  id                   String           @id @default(cuid())
+  id                   String                 @id @default(cuid())
   cotacaoId            String?
   fornecedorNome       String
   nCodFor              String?
   cnpj                 String?
   codigoPedido         String?
   numeroPedido         String?
-  total                Float            @default(0)
-  faturamentoDireto    Boolean          @default(false)
-  status               String           @default("CRIADO")
+  total                Float                  @default(0)
+  faturamentoDireto    Boolean                @default(false)
+  status               String                 @default("CRIADO")
   observacao           String?
   erroOmie             String?
   payload              Json?
   resposta             Json?
   createdById          String?
-  createdAt            DateTime         @default(now())
+  createdAt            DateTime               @default(now())
   anexoNome            String?
   anexoUrl             String?
-  criadoManualmente    Boolean          @default(false)
+  criadoManualmente    Boolean                @default(false)
   opId                 String?
   categoriaItem        String?
   // Categoria de compra + local de estoque escolhidos ao gerar o pedido no Omie —
@@ -834,7 +947,7 @@ model PedidoOmie {
   prazoEntregaPrevisto DateTime?
   statusEntrega        String?
   prazoOriginal        DateTime?
-  tokenEntrega         String?          @unique
+  tokenEntrega         String?                @unique
   itensOmie            Json?
   nfNumero             String?
   nfSerie              String?
@@ -842,11 +955,32 @@ model PedidoOmie {
   recebidoPorId        String?
   recebidoEm           DateTime?
   syncEntregaEm        DateTime? // última verificação de entrega no Omie (rotação do cron sync-entregas)
-  recebidoPor          User?            @relation("PedidoRecebidoPor", fields: [recebidoPorId], references: [id])
-  cotacao              Cotacao?         @relation(fields: [cotacaoId], references: [id])
-  op                   OP?              @relation(fields: [opId], references: [id])
-  rmAtendida           RM?              @relation("PedidoOmieRMAtendida", fields: [rmAtendidaId], references: [id])
+  // ⚠⚠ ENCERRADO NO OMIE ≠ RECEBIDO. Guarda QUANDO O PORTAL DETECTOU o encerramento (o Omie não
+  // devolve a data do ato), e serve só para a tela parar de cobrar prazo de um pedido que o Omie
+  // já deu por acabado. NUNCA baixa item, NUNCA escreve `statusEntrega`/`dataEntregaReal`.
+  encerradoOmieEm      DateTime?
+  // ⚠⚠ DECLARAÇÃO DO FORNECEDOR, NÃO FATO. Ele marca "pedido entregue" no portal público e informa
+  // o número da NF; isso NÃO escreve `dataEntregaReal`, `statusEntrega` nem `nfNumero` (esses vêm
+  // da NF de entrada real, pelo cron `sync-entregas`). Serve para alguém CONFERIR — e o pedido
+  // continua cobrável até a confirmação. Colunas criadas por `scripts/ensure-entrega-declarada.mjs`.
+  fornecedorEntregaEm  DateTime?
+  fornecedorNfNumero   String?
+  // ⚠⚠ PROPOSTA DE PRAZO, NÃO PRAZO. O fornecedor sugere a data pelo link público; ela SÓ vira
+  // `prazoEntregaPrevisto` quando Compras aprova em `/api/compras/prazos-rm/prazo-proposto`.
+  // Matheus (18/09/2026): "sim, o Compras precisa aprovar a alteração depois".
+  // ⚠ `prazoPropostoId` é a versão da proposta: a tela devolve o id que leu, e divergência é 409.
+  // Comparar só a data deixava passar mesma-data-outro-motivo e o vaivém A→B→A (achado do Codex).
+  // Colunas criadas por `scripts/ensure-prazo-proposto.mjs`.
+  prazoProposto        DateTime?
+  prazoPropostoEm      DateTime?
+  prazoPropostoMotivo  String?
+  prazoPropostoId      String?
+  recebidoPor          User?                  @relation("PedidoRecebidoPor", fields: [recebidoPorId], references: [id])
+  cotacao              Cotacao?               @relation(fields: [cotacaoId], references: [id])
+  op                   OP?                    @relation(fields: [opId], references: [id])
+  rmAtendida           RM?                    @relation("PedidoOmieRMAtendida", fields: [rmAtendidaId], references: [id])
   prazoHistorico       PrazoHistorico[]
+  acompanhamentos      AcompanhamentoPedido[]
   rmItens              RMItem[]
   recebimentos         Recebimento[]
 
@@ -854,6 +988,38 @@ model PedidoOmie {
   @@index([opId])
   @@index([status])
   @@index([dataEntregaReal, syncEntregaEm])
+}
+
+// ─── ACOMPANHAMENTO DO PEDIDO DEPOIS QUE ELE VAI PRO OMIE ────────────────────
+//
+// Matheus (16/09/2026): "preciso ter na tela de RMs que foram geradas pedidos um histórico de
+// datas da previsão de entrega para eu ir controlando depois que o pedido vai pro Omie se já foi
+// recebido o material ou encaminhado para obra ou liberado para coleta no prazo estimado".
+//
+// ⚠⚠ LINHA DO TEMPO, NÃO UM STATUS QUE ANDA. Um campo único ("estado atual") responde "onde está"
+// e perde "quando passou por onde" — que é exatamente o controle pedido: comparar o que aconteceu
+// com o prazo estimado. Também não aceitaria o caso comum de entrega em duas levas (parte coletada
+// hoje, o resto semana que vem), porque o segundo lançamento apagaria o primeiro.
+//
+// ⚠ A ETAPA É TEXTO, não enum do Postgres: etapa nova (ex.: "retido na portaria") entra sem
+// migração de tipo, e o conjunto válido mora em `lib/acompanhamento-pedido.js`, onde o teste
+// alcança. Enum aqui obrigaria um ALTER TYPE em produção para cada palavra nova.
+//
+// ⚠ `data` é QUANDO ACONTECEU (o comprador digita, e lança no dia seguinte se precisar);
+// `criadoEm` é quando foi registrado. Um campo só confundiria atraso de fato com atraso de
+// digitação — e o atraso de fato é o que se está medindo.
+model AcompanhamentoPedido {
+  id              String     @id @default(cuid())
+  pedidoId        String
+  etapa           String
+  data            DateTime
+  observacao      String?
+  registradoPorId String?
+  criadoEm        DateTime   @default(now())
+  pedido          PedidoOmie @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  registradoPor   User?      @relation(fields: [registradoPorId], references: [id])
+
+  @@index([pedidoId, data])
 }
 
 model PrazoHistorico {
@@ -931,6 +1097,11 @@ model Cotacao {
   cnpj                   String?
   faturamento            String        @default("Torg")
   prazoPagamento         String?
+  // ⚠⚠ COLUNA PRÓPRIA, NÃO MAIS UM PEDAÇO DE `observacao`. Aquele campo já empilha três coisas
+  // separadas por " | " (prazo, pagamento e o texto do fornecedor) e cada leitor precisa de um
+  // parser. O frete é uma escolha entre DUAS opções e vira filtro/etiqueta na tela de Prazos —
+  // texto livre dentro de outro texto seria um erro anunciado. Ver `lib/frete-cotacao.js`.
+  tipoFrete            String?
   observacao             String?
   total                  Float         @default(0)
   prazoResposta          DateTime?
@@ -2683,6 +2854,12 @@ model PortalCliente {
   // próximo contrato. Nasce DESLIGADO: ligar é uma decisão consciente da obra, e o
   // contrário (descobrir depois que vazou) não tem volta.
   mostrarPeso      Boolean   @default(false)
+  // ⚠ RASTREABILIDADE É OPCIONAL. Vitor (15/09/2026): "a LPC precisa sair as peças que são
+  // posições dos conjuntos e já informar a rastreabilidade de cada croqui (…) queria deixar essa
+  // parte como opcional, pois nem sempre vamos disponibilizar essas informações". Ligado, cada
+  // croqui/avulsa da LPC sai com o R (e a corrida) pelos mesmos três caminhos do carimbo do desenho
+  // (lib/rastreio-lpc.js). Nasce DESLIGADO, como o peso.
+  mostrarRastreio  Boolean   @default(false)
   publicadoEm      DateTime?
   enviadoEm        DateTime?
   primeiroAcessoEm DateTime?
@@ -3246,6 +3423,16 @@ model EtiquetaCampoExtra {
   // `PecaConjunto.descricao` guarda o perfil ("L2''X1/4''"), este é a posição/etiqueta do desenho.
   referencia   String? // ex.: "2"-HC-20A-2371-Cc-NI"
   tagPetrobras String? // ex.: "PS-20A-V1419338-001"
+  /// ⚠⚠ A TAG DO CLIENTE QUE SAI NA FRENTE DA DESCRIÇÃO, no modelo Padrão Torg — ex.: "TC 4706".
+  /// Vem da "Lista de Equivalência de TAG" do TMSA, que tem uma ABA por TAG. Campo SEPARADO do
+  /// `tagPetrobras` de propósito: são clientes e modelos de etiqueta diferentes, e a mesma OP pode
+  /// um dia usar os dois. Quem grava TMSA só toca neste campo; quem grava QWS, só nos dele.
+  ///
+  /// ⚠⚠ ELA É DA PEÇA, NÃO DA MARCA. Medido no arquivo da OP-105: 51 das 96 marcas aparecem em
+  /// mais de uma aba, e as quantidades por aba SOMAM a quantidade da Lista de Expedição — das 4
+  /// peças da 105A3, duas vão para o TC 4706 e duas para o TC 4707. Por isso ela mora aqui, na
+  /// linha por UNIDADE, e não numa coluna de `PecaConjunto`.
+  tagCliente   String?
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
@@ -4225,6 +4412,11 @@ model CronogramaTarefa {
   // de fato será finalizado". É estimativa de ESFORÇO RESTANTE a partir de hoje — não é a duração
   // planejada (`duracaoDias`), que é o que o cronograma previu lá atrás e não muda com a realidade.
   diasParaConcluir    Int?
+  /// ⚠ O NÚMERO DIGITADO À MÃO PREVALECE. Vitor (14/09/2026), sobre o Recebimento da OP-094 que o
+  /// Guilherme pôs em 100 % e o sync do CMR devolveu para 84 %: "não precisa atualizar, deixa como o
+  /// Guilherme fez". Com `avancoManual`, os sincronismos (Syneco na Fabricação, CMR em Suprimentos)
+  /// não tocam o percentual da tarefa. Coluna criada por scripts/ensure-cronograma-avanco-manual.mjs.
+  avancoManual        Boolean                 @default(false)
   // quando a estimativa foi dada — uma de 15 dias atrás não vale como previsão de hoje
   estimativaEm        DateTime?
   responsavelId       String?
@@ -4785,6 +4977,10 @@ enum CotacaoStatus {
 }
 
 enum NotificacaoTipo {
+  // ⚠ Valor novo entra no banco por scripts/ensure-mes-tables.mjs (ALTER TYPE no build), nunca
+  // por `prisma db push` — o banco de produção tem drift de FKs e índices em relação a este
+  // arquivo, e o push os derrubaria.
+  LE_DESATUALIZADA
   MATERIAL_RECEBIDO
   RASTREABILIDADE_DEFINIDA
   RM_CRIADA
@@ -5179,6 +5375,10 @@ model PcpCarteiraObraBaixa {
 // demais ou falhou. Guarda-corpo contra cron morrer silenciosamente.
 model CronHeartbeat {
   job       String    @id // ex.: "sync-entregas", "estoque-produtos"
+  // ⚠⚠ ARRENDAMENTO (lease) PARA UM CRON NÃO ATROPELAR A SI MESMO. Quem segura a vez grava aqui
+  // até quando pretende segurar; outra execução do MESMO job só entra se este instante já passou.
+  // Ver `lib/cron-trava.js` — e por que `pg_advisory_lock` NÃO serve aqui.
+  travadoAte DateTime?
   lastRunAt DateTime  @default(now())
   lastOkAt  DateTime?
   ok        Boolean   @default(true)
@@ -5883,6 +6083,51 @@ model GanttDistribuicao {
 // porque o formato ainda vai mudar com o uso ("vamos vendo como será no dia a dia",
 // Vitor 10/09/2026). Revisão anterior fica congelada em `historico`.
 // Tabela criada por scripts/ensure-analise-critica.mjs (não usar `prisma db push`).
+// Simulação de carga de um romaneio prévio (Planejamento › Romaneios prévios › Simular carga).
+// Criada por scripts/ensure-carga-simulada.mjs. `cargas` é a saída do simulador (lib/carga): volumes
+// posicionados, passos de montagem, madeira — sem as malhas do IFC, que ficam no navegador.
+// `itensHash` = hash dos itens do romaneio na hora da simulação: mudou o romaneio, a simulação está desatualizada.
+model CargaSimulada {
+  id               String   @id @default(cuid())
+  opId             String
+  romaneioPrevioId String?
+  perfil           String
+  perfilNome       String?
+  itensHash        String?
+  resumo           Json     @default("{}")
+  cargas           Json     @default("[]")
+  avisos           Json     @default("{}")
+  criadoPorId      String?
+  createdAt        DateTime @default(now())
+
+  @@index([romaneioPrevioId])
+  @@index([opId])
+}
+
+// Veículos e índice de frete do simulador de carga (Planejamento › Configuração da expedição). Uma linha
+// só (id "padrao"); vazio = premissas de lib/carga/premissas.js. Criada por scripts/ensure-carga-simulada.mjs.
+// Ajustes por marca do simulador de carga (não empacotar, junto com, embalagem, posição, medidas à mão).
+// Por OP: valem para todos os romaneios da obra. Criada por scripts/ensure-carga-simulada.mjs.
+model AjusteCargaMarca {
+  id              String   @id @default(cuid())
+  opId            String
+  marca           String
+  regras          Json     @default("{}")
+  atualizadoPorId String?
+  updatedAt       DateTime @default(now())
+
+  @@unique([opId, marca])
+  @@index([opId])
+}
+
+model ConfigCarga {
+  id              String   @id
+  veiculos        Json     @default("[]")
+  frete           Json     @default("{}")
+  atualizadoPorId String?
+  updatedAt       DateTime @default(now())
+}
+
 model AnaliseCriticaProjeto {
   id              String    @id @default(cuid())
   opId            String    @unique
@@ -6323,4 +6568,19 @@ model MesNestingItem {
   @@index([unidadeId])
   @@index([marca])
   @@index([pecaConjuntoId])
+}
+
+// Escolhas do inspetor reutilizadas nos próximos relatórios da mesma OP/tipo.
+// Sem FK para o relatório de origem: excluir um relatório não apaga o padrão.
+model PadraoInspecao {
+  id          String   @id @default(cuid())
+  opNumero    String
+  tipo        String
+  campo       String
+  valor       String?
+  relatorioId String
+  userId      String
+  updatedAt   DateTime @updatedAt
+
+  @@unique([opNumero, tipo, campo])
 }

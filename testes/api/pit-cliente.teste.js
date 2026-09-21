@@ -1,0 +1,14 @@
+import {it,expect,vi,beforeEach} from 'vitest';
+import {mockPrisma} from '@/testes/apoio/prisma';
+vi.mock('@/lib/prisma',()=>({prisma:mockPrisma}));vi.mock('@/lib/session',()=>({requireRole:vi.fn(async()=>({id:'u'}))}));vi.mock('@/lib/pit-acesso',()=>({requireGestaoPit:vi.fn(async()=>({id:'u'})),requireConsultaPit:vi.fn(async()=>({id:'u'}))}));vi.mock('@vercel/blob',()=>({put:vi.fn(),del:vi.fn()}));
+import {GET,POST} from '@/app/api/qualidade/pit/[opNumero]/cliente/route';
+import {requireGestaoPit} from '@/lib/pit-acesso';
+import {put} from '@vercel/blob';
+const ctx={params:{opNumero:'122'}};
+beforeEach(()=>{vi.clearAllMocks();requireGestaoPit.mockResolvedValue({id:'u'});mockPrisma.oP.findFirst.mockResolvedValue({id:'op'});});
+it('bloqueia upload antes de ler arquivo para usuários não autorizados',async()=>{requireGestaoPit.mockRejectedValue(Error('Forbidden'));expect((await POST({},ctx)).status).toBe(403);expect(put).not.toHaveBeenCalled();});
+it('lista só anexos PIT ativos da obra e não devolve URL pública do armazenamento',async()=>{mockPrisma.documentoQualidade.findMany.mockResolvedValue([]);await GET(new Request('http://x'),ctx);expect(mockPrisma.documentoQualidade.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{opNumero:'122',tipo:'PIT_CLIENTE',ativo:true},select:expect.not.objectContaining({arquivoUrl:true})}));});
+it('impede consultar documento de outra OP',async()=>{mockPrisma.documentoQualidade.findFirst.mockResolvedValue(null);expect((await GET(new Request('http://x?arquivo=outro'),ctx)).status).toBe(404);expect(mockPrisma.documentoQualidade.findFirst).toHaveBeenCalledWith({where:{id:'outro',opNumero:'122',tipo:'PIT_CLIENTE',ativo:true}});});
+it('recusa falso PDF antes do armazenamento',async()=>{const f=new FormData();f.set('nome','PIT cliente');f.set('arquivo',new Blob(['nao pdf'],{type:'application/pdf'}),'arquivo.pdf');expect((await POST({formData:async()=>f},ctx)).status).toBe(400);expect(put).not.toHaveBeenCalled();});
+it('exclusão recusa usuário sem gestão',async()=>{requireGestaoPit.mockRejectedValue(Error('Forbidden'));const {DELETE}=await import('@/app/api/qualidade/pit/[opNumero]/cliente/route');expect((await DELETE({json:async()=>({id:'doc'})},ctx)).status).toBe(403);});
+it('exclui logicamente apenas PIT da mesma OP e registra antes/depois',async()=>{const {DELETE}=await import('@/app/api/qualidade/pit/[opNumero]/cliente/route');mockPrisma.documentoQualidade.findFirst.mockResolvedValue({id:'doc',nome:'PIT',ativo:true});expect((await DELETE({json:async()=>({id:'doc'})},ctx)).status).toBe(200);expect(mockPrisma.documentoQualidade.findFirst).toHaveBeenCalledWith({where:{id:'doc',opNumero:'122',tipo:'PIT_CLIENTE',ativo:true}});expect(mockPrisma.documentoQualidade.update).toHaveBeenCalledWith({where:{id:'doc'},data:{ativo:false}});expect(mockPrisma.auditLog.create).toHaveBeenCalled();});

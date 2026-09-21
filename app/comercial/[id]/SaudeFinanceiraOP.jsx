@@ -1,4 +1,5 @@
 "use client";
+import MargemOrcadaLqc from "@/components/comercial/MargemOrcadaLqc";
 import { useState, useEffect } from "react";
 import { Loader2, AlertCircle, HeartPulse, Info, ChevronDown, ChevronRight, TriangleAlert, FileSpreadsheet } from "lucide-react";
 
@@ -80,7 +81,7 @@ export default function SaudeFinanceiraOP({ opId }) {
       </div>
 
       {/* ── OS TRÊS CENÁRIOS DE MARGEM ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-100 border-b border-gray-100">
+      {data.margemLqc ? <MargemOrcadaLqc dados={data.margemLqc} /> : <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-100 border-b border-gray-100">
         <Cenario
           rotulo="Margem do estudo"
           valor={margem.estudo}
@@ -100,7 +101,7 @@ export default function SaudeFinanceiraOP({ opId }) {
           nota="já considerando o que foi comprado acima da verba"
           destaque
         />
-      </div>
+      </div>}
 
       {/* ── VERBA POR FAMÍLIA: ESTIMADO × REALIZADO ──────────────────────────────────────── */}
       <div className="p-6 space-y-4">
@@ -180,7 +181,7 @@ export default function SaudeFinanceiraOP({ opId }) {
         )}
 
         {/* ── CUSTOS INFORMADOS NA PLANILHA ──────────────────────────────────────────────── */}
-        {estudo ? (
+        {data.margemLqc ? null : estudo ? (
           <div>
             <p className="text-sm font-semibold text-torg-dark mb-2">Custos informados na planilha do Comercial</p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
@@ -211,8 +212,8 @@ export default function SaudeFinanceiraOP({ opId }) {
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
             <Caixa rotulo="Contrato" valor={receita.contrato} nota={receita.contratoExplicito ? "informado na OP" : "soma das receitas"} forte />
             <Caixa rotulo="Receita bruta" valor={receita.bruta} />
-            <Caixa rotulo="Impostos" valor={-receita.impostos} />
-            <Caixa rotulo="Receita líquida" valor={receita.liquida} forte />
+            <Caixa rotulo={data.margemLqc ? "Impostos cadastrados" : "Impostos"} valor={-receita.impostos} nota={data.margemLqc ? "Conferir apuração fiscal; reserva da LQC acima" : null} />
+            {!data.margemLqc && <Caixa rotulo="Receita líquida" valor={receita.liquida} forte />}
             <Caixa rotulo="Já faturado" valor={receita.faturado} nota={receita.faturadoPct != null ? `${fmtPct(receita.faturadoPct)} do contrato` : null} />
           </div>
         </div>
@@ -434,7 +435,7 @@ async function exportarExcel(data, opNumero) {
     codigoDoc: "REL-FIN-001",
     totalColunas: 4,
     kpis: [
-      `Receita líquida: ${fmtMoeda(receita.liquida)}  |  Verba estimada: ${fmtMoeda(totais.estimado)}  |  Já comprado: ${fmtMoeda(totais.realizado)}  |  Margem corrente: ${fmtMoeda(margem.corrente)}`,
+      data.margemLqc ? `Margem orçada da LQC (contrato base): ${data.margemLqc.valido ? fmtMoeda(data.margemLqc.margem) : "Pendente de conferência"}` : `Receita líquida: ${fmtMoeda(receita.liquida)}  |  Verba estimada: ${fmtMoeda(totais.estimado)}  |  Já comprado: ${fmtMoeda(totais.realizado)}  |  Margem corrente: ${fmtMoeda(margem.corrente)}`,
     ],
   });
   [34, 20, 20, 46].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
@@ -449,17 +450,31 @@ async function exportarExcel(data, opNumero) {
     r++;
   };
 
-  secao("MARGEM — os três cenários");
-  linha("Margem do estudo (BDI)", D(margem.estudo), "o que o Comercial previu");
-  linha("Margem da OP na abertura", D(margem.prevista), "receita líquida − verba dos itens");
-  linha("Margem corrente", D(margem.corrente), "já com o que foi comprado acima da verba");
+  if (data.margemLqc) {
+    const lqc = data.margemLqc;
+    secao("MARGEM ORÇADA DA LQC — contrato base, sem aditivos");
+    if (lqc.valido) {
+      linha("Contrato base atual", lqc.receita);
+      linha("Compras e serviços externos", lqc.compras);
+      linha("Custos internos", lqc.internos);
+      linha("Reserva para impostos", lqc.impostos);
+      linha("Reserva financeira", lqc.financeiro);
+      linha("Demais reservas do BDI", lqc.outrasReservas);
+      linha("Resultado orçado", lqc.margem, `${lqc.margemPct.toFixed(2)}% — estimativa do orçamento, não resultado realizado`);
+    } else linha("Pendente de conferência", null, lqc.motivo);
+  } else {
+    secao("MARGEM — os três cenários");
+    linha("Margem do estudo (BDI)", D(margem.estudo), "o que o Comercial previu");
+    linha("Margem da OP na abertura", D(margem.prevista), "receita líquida − verba dos itens");
+    linha("Margem corrente", D(margem.corrente), "já com o que foi comprado acima da verba");
+  }
   r++;
 
   secao("RECEITA — o que se fatura");
   linha("Contrato", D(receita.contrato), receita.contratoExplicito ? "informado na OP" : "soma das receitas");
   linha("Receita bruta", D(receita.bruta));
-  linha("Impostos", D(-receita.impostos));
-  linha("Receita líquida", D(receita.liquida));
+  linha(data.margemLqc ? "Impostos cadastrados nas receitas" : "Impostos", D(-receita.impostos), data.margemLqc ? "Não substitui a reserva de impostos da LQC; conferir apuração fiscal" : "");
+  if (!data.margemLqc) linha("Receita líquida", D(receita.liquida));
   linha("Já faturado", D(receita.faturado), receita.faturadoPct != null ? `${pctTxt(receita.faturadoPct)} do contrato` : "");
   r++;
 

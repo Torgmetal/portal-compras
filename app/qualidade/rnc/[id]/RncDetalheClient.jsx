@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -261,8 +262,8 @@ export default function RncDetalheClient({ id }) {
           {(d.origem === "FORNECEDOR" || d.setorRetrabalho === "FORNECEDOR") && (
             <Campo label="Fornecedor"><input value={d.fornecedor || ""} onChange={(e) => set("fornecedor", e.target.value)} className="inp" /></Campo>
           )}
-          <Campo label="Data"><input type="date" value={d.data || ""} onChange={(e) => set("data", e.target.value)} className="inp" /></Campo>
-          <Campo label="Prazo para resposta"><input type="date" value={d.prazoResposta || ""} onChange={(e) => set("prazoResposta", e.target.value)} className="inp" /></Campo>
+          <Campo label="Data"><CampoData value={d.data || ""} onChange={(iso) => set("data", iso)} className="inp" /></Campo>
+          <Campo label="Prazo para resposta"><CampoData value={d.prazoResposta || ""} onChange={(iso) => set("prazoResposta", iso)} className="inp" /></Campo>
           {cliente && <>
             <Campo label="Nº da RNC do cliente"><input value={d.numeroCliente || ""} onChange={(e) => set("numeroCliente", e.target.value)} placeholder="RTNC-010" className="inp" /></Campo>
             <Campo label="Programa"><input value={d.programa || ""} onChange={(e) => set("programa", e.target.value)} placeholder="ASME" className="inp" /></Campo>
@@ -344,7 +345,7 @@ export default function RncDetalheClient({ id }) {
         <p className="text-[12px] text-torg-gray -mt-1">Evidência de que o tratamento foi conferido — sai no PDF em seção própria.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Campo label="Reinspecionado por"><input value={d.reinspecaoPor || ""} onChange={(e) => set("reinspecaoPor", e.target.value)} placeholder="Nome de quem conferiu" className="inp" /></Campo>
-          <Campo label="Data da reinspeção"><input type="date" value={d.reinspecaoEm || ""} onChange={(e) => set("reinspecaoEm", e.target.value)} className="inp" /></Campo>
+          <Campo label="Data da reinspeção"><CampoData value={d.reinspecaoEm || ""} onChange={(iso) => set("reinspecaoEm", iso)} className="inp" /></Campo>
         </div>
         <Campo label="Resultado da reinspeção"><textarea value={d.resultadoReinspecao || ""} onChange={(e) => set("resultadoReinspecao", e.target.value)} rows={2} className="inp" placeholder="O que foi conferido e qual o resultado." /></Campo>
         <div>
@@ -399,7 +400,7 @@ export default function RncDetalheClient({ id }) {
           {/* Acompanhamento + eficácia */}
           <Secao titulo="Acompanhamento e eficácia">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Campo label="Realizado em"><input type="date" value={d.realizadoEm || ""} onChange={(e) => set("realizadoEm", e.target.value)} className="inp" /></Campo>
+              <Campo label="Realizado em"><CampoData value={d.realizadoEm || ""} onChange={(iso) => set("realizadoEm", iso)} className="inp" /></Campo>
               <Campo label="Acompanhado por"><input value={d.acompanhadoPor || ""} onChange={(e) => set("acompanhadoPor", e.target.value)} className="inp" /></Campo>
             </div>
             <Campo label="Acompanhamento da implementação"><textarea value={d.acompanhamento || ""} onChange={(e) => set("acompanhamento", e.target.value)} rows={2} className="inp" /></Campo>

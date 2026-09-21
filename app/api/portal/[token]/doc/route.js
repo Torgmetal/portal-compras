@@ -28,7 +28,7 @@ export async function GET(req, { params }) {
 
   const doc = await prisma.documentoQualidade.findFirst({
     where: { id, opNumero: portal.opNumero, ativo: true },
-    select: { id: true, nome: true, categoria: true, tipo: true, arquivoUrl: true, sharepointItemId: true, sharepointUrl: true, origem: true },
+    select: { id: true, nome: true, categoria: true, tipo: true, arquivoUrl: true, sharepointItemId: true, sharepointUrl: true, origem: true, opNumero: true },
   });
   if (!doc) return new NextResponse("Documento não encontrado nesta obra.", { status: 404 });
 

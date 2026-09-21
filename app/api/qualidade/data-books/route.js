@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { pesoRealPecas, contagemRealPecas } from "@/lib/peso-op";
 import { requireRole } from "@/lib/session";
 import { montaSecoesIniciais } from "@/lib/databook-secoes";
 import { secoesForaDoEscopo } from "@/lib/qualidade-escopo";
@@ -98,17 +99,16 @@ export async function POST(req) {
     where: { numero: opNumero },
     select: {
       id: true, cliente: true, obra: true, tipoDataBook: true, escopoQualidade: true,
-      pecasConjunto: {
-        where: { OR: [{ tipoPeca: "CONJUNTO" }, { tipoPeca: null }] },
-        select: { qte: true, pesoTotalKg: true },
-      },
+      // ⚠ TODAS as linhas, e a régua de lib/peso-op escolhe a lista: somar CONJUNTO+null contava a
+      // LPC e a LE juntas — a OP-103 nasceu com 854 peças e 21 t (Vitor, 15/09/2026), o dobro.
+      pecasConjunto: { select: { qte: true, pesoTotalKg: true, fonte: true, naLE: true, tipoPeca: true, marca: true } },
     },
   });
   if (!op) {
     return NextResponse.json({ success: false, error: `OP ${opNumero} não encontrada` }, { status: 404 });
   }
-  const pesoTotalKg = op.pecasConjunto.reduce((s, p) => s + (p.pesoTotalKg || 0), 0) || null;
-  const pecas = op.pecasConjunto.reduce((s, p) => s + (p.qte || 0), 0) || null;
+  const pesoTotalKg = pesoRealPecas(op.pecasConjunto) || null;
+  const pecas = contagemRealPecas(op.pecasConjunto) || null;
 
   const book = await prisma.dataBookQualidade.create({
     data: {

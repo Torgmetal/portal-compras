@@ -16,7 +16,7 @@
 // data olhando o cronograma, e o corte corre atrás. A prontidão fica na tela como INFORMAÇÃO, para
 // ele saber o que está pedindo; ordena a lista, mas não impede seleção nenhuma.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, AlertCircle, CalendarClock, ArrowRight, CheckCircle2, X, Upload, Search } from "lucide-react";
+import { Loader2, AlertCircle, CalendarClock, ArrowRight, CheckCircle2, X, Upload, Search, Trash2, Copy } from "lucide-react";
 
 const isoHoje = () => new Date().toISOString().split("T")[0];
 const isoDe = (v) => (v ? String(v).slice(0, 10) : "");
@@ -53,6 +53,12 @@ export default function MontagemConjuntos({ opId }) {
   // ⚠ o dia sugerido é o MARCO do cronograma, não hoje: é ele que o planejamento veio olhar.
 
   const [agindo, setAgindo] = useState(false);
+  // ⚠ exclusão de marca pelo PLANEJAMENTO — pedido do Vitor (17/09/2026) depois da OP-83: a
+  // engenharia subiu a lista corrigida, o portal não reconheceu, "e as peças erradas permanecem na
+  // fila do planejamento ainda". Quem vê o erro é quem programa; até aqui só o Corte/PCP tinha como
+  // tirar a linha, e o endpoint já aceitava o perfil PLANEJAMENTO — faltava a tela.
+  const [confirmarExcluir, setConfirmarExcluir] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!opId) return;
@@ -99,6 +105,22 @@ export default function MontagemConjuntos({ opId }) {
   // marca o que está À VISTA — senão procurar "console", ver 2 cartões e clicar em marcar todos
   // selecionaria os 29 da obra sem avisar, e o erro só apareceria na hora de liberar.
   const prontos = useMemo(() => visiveis.filter((c) => c.prontidao?.pronto), [visiveis]);
+
+  /* ⚠⚠ MARCA REPETIDA NA MESMA OBRA É O SINTOMA DA LISTA REIMPORTADA SOB OUTRA CHAVE. Na OP-83,
+     83 conjuntos apareciam DUAS vezes: a linha antiga sob a frente ("T83A") e a nova sob o número
+     da obra ("083"), porque a chave única é (opNumero, marca) e o import novo não achou a antiga.
+     Quem programa via a marca duplicada sem ter como saber qual era qual — agora o cartão diz
+     "repetida" e a chave de cada uma fica ao lado, que é o que distingue as duas. */
+  const repetidas = useMemo(() => {
+    const conta = new Map();
+    for (const c of lista) {
+      const m = String(c.marca || "").trim().toUpperCase();
+      conta.set(m, (conta.get(m) || 0) + 1);
+    }
+    return new Set([...conta.entries()].filter(([, n]) => n > 1).map(([m]) => m));
+  }, [lista]);
+  const ehRepetida = useCallback((c) => repetidas.has(String(c?.marca || "").trim().toUpperCase()), [repetidas]);
+  const selecionados = useMemo(() => lista.filter((c) => sel.has(c.id)), [lista, sel]);
   const montadosN = useMemo(() => lista.filter((c) => c.montado).length, [lista]);
 
 
@@ -236,6 +258,26 @@ export default function MontagemConjuntos({ opId }) {
     } catch (e) { setErro(e.message); } finally { setAgindo(false); }
   }
 
+  /** Tira as marcas selecionadas DESTA obra. Só o registro da peça sai; o Syneco não é tocado. */
+  async function excluirSelecionadas() {
+    setExcluindo(true); setErro(""); setOkMsg(""); setAvisos([]);
+    try {
+      const r = await fetch("/api/producao/pecas", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...sel] }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Não consegui excluir.");
+      // ⚠ o aviso de lote afetado VEM DA ROTA e precisa aparecer: apagar peça corta a programação
+      // já liberada, e isso era silencioso (ver o comentário em /api/producao/pecas).
+      if (j.lotesAfetados > 0) setAvisos([`${j.lotesAfetados} lote(s) já liberado(s) apontavam para alguma dessas peças — confira a liberação do PCP.`]);
+      setOkMsg(`${j.removidas} marca(s) removida(s) desta obra.`);
+      setSel(new Set());
+      setConfirmarExcluir(false);
+      await carregar();
+    } catch (e) { setErro(e.message); } finally { setExcluindo(false); }
+  }
+
   if (!opId) return null;
   if (carregando) return <p className="text-[12px] text-torg-gray inline-flex items-center gap-2 py-4"><Loader2 size={14} className="animate-spin" /> carregando os conjuntos…</p>;
   if (erro && !conjuntos) return <p className="text-[12px] text-red-700 inline-flex items-center gap-2 py-4"><AlertCircle size={14} /> {erro}</p>;
@@ -322,6 +364,12 @@ export default function MontagemConjuntos({ opId }) {
                     className="px-2 py-1 rounded-md border border-gray-200 bg-white text-torg-gray font-semibold whitespace-nowrap hover:bg-gray-50">
                     {busca.trim() ? `marcar os ${visiveis.length} da busca` : "marcar todos"}
                   </button>
+                  {sel.size > 0 && (
+                    <button onClick={() => setConfirmarExcluir(true)}
+                      className="px-2 py-1 rounded-md border border-red-200 bg-white text-red-700 font-semibold whitespace-nowrap hover:bg-red-50 inline-flex items-center gap-1">
+                      <Trash2 size={11} /> excluir {sel.size} da obra
+                    </button>
+                  )}
                   <button onClick={() => { setColando((v) => !v); setImportado(null); }}
                     className={`px-2 py-1 rounded-md border font-semibold whitespace-nowrap inline-flex items-center gap-1 ${
                       colando ? "border-torg-blue bg-torg-blue text-white" : "border-torg-blue-200 bg-white text-torg-blue hover:bg-torg-blue-50"}`}>
@@ -383,6 +431,30 @@ export default function MontagemConjuntos({ opId }) {
             </div>
           )}
 
+          {confirmarExcluir && (
+            <div className="border-b border-red-200 bg-red-50 p-2.5 text-[12px] text-red-800 space-y-2">
+              <p className="font-semibold inline-flex items-center gap-1.5"><AlertCircle size={13} /> Excluir {sel.size} marca(s) desta obra?</p>
+              <p className="text-[11px]">
+                Sai o registro da peça no portal, com a programação e a prontidão dela. O Syneco não é tocado, e a
+                marca volta se a lista for importada de novo — use quando a linha não deveria existir, como marca
+                repetida ou lista antiga que ficou para trás.
+              </p>
+              <ul className="max-h-24 overflow-y-auto space-y-0.5 font-mono text-[11px]">
+                {selecionados.slice(0, 12).map((c) => (
+                  <li key={c.id}>{c.marca} <span className="text-red-500">· {c.opNumero}</span>{ehRepetida(c) ? " · repetida" : ""}</li>
+                ))}
+                {selecionados.length > 12 && <li className="font-sans">e mais {selecionados.length - 12}…</li>}
+              </ul>
+              <div className="flex gap-2">
+                <button onClick={excluirSelecionadas} disabled={excluindo}
+                  className="px-2.5 py-1 rounded-md bg-red-600 text-white font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">
+                  {excluindo && <Loader2 size={11} className="animate-spin" />} excluir
+                </button>
+                <button onClick={() => setConfirmarExcluir(false)} className="px-2.5 py-1 rounded-md border border-red-200 bg-white font-semibold">cancelar</button>
+              </div>
+            </div>
+          )}
+
           <div className="p-2 space-y-1.5 max-h-[46vh] overflow-y-auto">
             {/* ⚠ LISTA ÚNICA, TUDO SELECIONÁVEL. A prontidão ordena (mais cortado primeiro) e
                 aparece em cada cartão, mas não separa nem esconde ninguém: aqui o planejamento
@@ -401,7 +473,7 @@ export default function MontagemConjuntos({ opId }) {
                 <button onClick={() => setBusca("")} className="underline not-italic">limpar a busca</button>
               </p>
             )}
-            {visiveis.map((c) => <Card key={c.id} c={c} sel={sel} onToggle={toggle} />)}
+            {visiveis.map((c) => <Card key={c.id} c={c} sel={sel} onToggle={toggle} repetida={ehRepetida(c)} />)}
           </div>
         </div>
 
@@ -470,7 +542,7 @@ export default function MontagemConjuntos({ opId }) {
   );
 }
 
-function Card({ c, sel, onToggle, alerta, aviso }) {
+function Card({ c, sel, onToggle, alerta, aviso, repetida = false }) {
   const p = c.prontidao || {};
   const original = isoDe(c.montagemDiaOriginal);
   const moveu = original && original !== isoDe(c.montagemDiaProgramado);
@@ -482,6 +554,12 @@ function Card({ c, sel, onToggle, alerta, aviso }) {
         <input type="checkbox" checked={sel?.has(c.id) || false} onChange={() => onToggle(c.id)} className="rounded border-gray-300" />
         <span className="font-mono font-bold text-torg-dark truncate">{c.marca}</span>
         <span className="text-torg-gray whitespace-nowrap text-[11px]">{c.qte}× · {fmtKg(c.pesoTotalKg)}</span>
+        {repetida && (
+          <span className="text-[9.5px] font-bold uppercase tracking-wide text-amber-800 bg-amber-100 border border-amber-200 rounded px-1 py-0.5 inline-flex items-center gap-0.5 whitespace-nowrap"
+            title="Esta marca aparece mais de uma vez nesta obra — normalmente a lista foi reimportada sob outra chave. Compare a chave ao lado e exclua a que não vale.">
+            <Copy size={9} /> repetida
+          </span>
+        )}
         <span className="ml-auto text-[10px] text-torg-gray-light font-mono">{c.opNumero}</span>
       </div>
       {c.descricao && <p className="text-[10px] text-torg-gray truncate">{c.descricao}</p>}

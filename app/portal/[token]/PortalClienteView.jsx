@@ -617,7 +617,7 @@ function Certificados({ token, lista }) {
       sub={`${lista.length} materiais com rastreabilidade`}>
       {erro && <p className="text-[12px] text-red-600 mb-2">{erro}</p>}
       <div className="overflow-x-auto -mx-1">
-        <table className="w-full text-[13px] min-w-[540px]">
+        <table className="w-full text-[13px] min-w-[640px]">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wide text-gray-400">
               {/* ⚠ A CAIXA MESTRA FICA NO CABEÇALHO DA COLUNA, onde a pessoa procura. Vitor
@@ -637,6 +637,7 @@ function Certificados({ token, lista }) {
               </th>
               <th className="font-semibold pb-2 px-1">Rastreio</th>
               <th className="font-semibold pb-2 px-1">Material</th>
+              <th className="font-semibold pb-2 px-1">Aplicado em (perfil do projeto)</th>
               <th className="font-semibold pb-2 px-1">Corrida</th>
               <th className="font-semibold pb-2 px-1">Certificado</th>
               <th className="font-semibold pb-2 px-1">Fornecedor</th>
@@ -658,6 +659,8 @@ function Certificados({ token, lista }) {
                   {c.r ? `R ${c.r}` : "—"}
                 </td>
                 <td className="py-2 px-1">{c.material}</td>
+                {/* o nome do fornecedor de um lado, o perfil do projeto do outro — o mesmo aço, sem parecer material estranho */}
+                <td className="py-2 px-1 text-gray-600">{c.aplicadoEm || <span className="text-gray-400">—</span>}</td>
                 <td className="py-2 px-1 whitespace-nowrap">{c.corrida || "—"}</td>
                 <td className="py-2 px-1 whitespace-nowrap">{c.certificado || "—"}</td>
                 <td className="py-2 px-1 whitespace-nowrap">{c.fornecedor || "—"}</td>
@@ -1050,6 +1053,8 @@ function GrupoMarcas({ titulo, n, itens, cor, fundo }) {
  *
  * ⚠ a coluna de peso só existe quando a obra liberou (mostrarPeso): estrutura se cota por R$/kg,
  * e o peso item a item entrega a base do nosso preço.
+ * ⚠ a coluna de rastreabilidade idem (mostrarRastreio, só na LPC): o R e a corrida de cada croqui
+ * e peça avulsa — conjunto não leva R, é a soma das posições recuadas abaixo dele.
  */
 function BlocoLista({ icone, titulo, fonte, d, token }) {
   const r = d.revisao;
@@ -1073,8 +1078,8 @@ function BlocoLista({ icone, titulo, fonte, d, token }) {
         </p>
       )}
       <Tabela
-        quebra={[1]} larguraMin={d.comPeso ? 620 : 520}
-        cols={["Marca", "Descrição", "Material", "Qtd.", ...(d.comPeso ? ["Peso"] : [])]}
+        quebra={[1]} larguraMin={(d.comPeso ? 620 : 520) + (d.comRastreio ? 150 : 0)}
+        cols={["Marca", "Descrição", "Material", "Qtd.", ...(d.comPeso ? ["Peso"] : []), ...(d.comRastreio ? ["Rastreab. (R)"] : [])]}
         linhas={d.itens.slice(0, 200).map((p) => [
           // ⚠ a peça do conjunto entra RECUADA e em cinza: a LPC é "lista de peças POR CONJUNTO", e
           // é o recuo que mostra o que compõe o quê. Chapada, ela vira um índice de marcas.
@@ -1082,6 +1087,11 @@ function BlocoLista({ icone, titulo, fonte, d, token }) {
           <span key="d" className={p.nivel ? "text-gray-500" : ""}>{p.descricao}</span>,
           p.material || "—", p.qtd,
           ...(d.comPeso ? [fmtKg(p.pesoKg)] : []),
+          // ⚠ o R na frente, a corrida atrás — é o R que amarra a peça ao certificado. Sem R fica
+          // "—": peça ainda sem material definido, nunca frase ([[torg_nao_declarar_furo]]).
+          ...(d.comRastreio ? [p.rastreio?.r
+            ? <span key="r" className="whitespace-nowrap"><span className="font-mono font-semibold">R {p.rastreio.r}</span>{p.rastreio.corrida ? <span className="text-gray-500 text-[11px]"> · {p.rastreio.corrida}</span> : null}</span>
+            : p.rastreio === null ? "—" : ""] : []),
         ])}
         rodape={d.total > 200 ? `A tela mostra as primeiras 200 marcas — a planilha traz as ${d.total}.` : null}
       />
@@ -1190,8 +1200,8 @@ function Cronograma({ d, detalhado = true }) {
       {/* os três números que respondem à pergunta antes de o cliente procurar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden mb-5">
         <Tile rot="Onde a obra está"
-          val={onde?.etapas?.length ? `${onde.etapas[onde.etapas.length - 1].pct}%` : "—"}
-          pe={onde?.etapas?.length ? `em ${onde.etapas[onde.etapas.length - 1].nome.toLowerCase()}` : "sem apontamento na fábrica"} />
+          val={onde?.atual ? `${onde.atual.pct}%` : "—"}
+          pe={onde?.atual ? `em ${onde.atual.nome.toLowerCase()}` : "sem apontamento na fábrica"} />
         <Tile rot="Próxima entrega prevista"
           val={proxima ? fmtD(proxima.fim).slice(0, 5) : "—"}
           pe={proxima ? (proxima.area || "expedição") : "sem expedição programada"} />
@@ -1298,8 +1308,9 @@ function Cronograma({ d, detalhado = true }) {
               mantém o cronograma honesto quando alguém esquece de atualizar a planilha. */}
           <p className="mt-3 text-[11.5px] text-gray-500 leading-relaxed">
             <span className="inline-block text-[10px] font-bold uppercase tracking-wide text-[#0E7A55] bg-[#E9F6F0] border border-[#BFE5D5] rounded-full px-2 py-0.5 mr-1.5">medido</span>
-            cada peça entra na etapa mais avançada em que a fábrica apontou produção. As barras da
-            linha do tempo, acima, vêm do cronograma do planejamento.
+            cada barra é quanto da estrutura já passou por aquela etapa — os percentuais são os mesmos da
+            linha do tempo acima (apontamento da fábrica, ou informados pelo planejamento); as peças vêm do apontamento
+            {onde?.pisoDeclarado ? <>, com as etapas até <strong>{onde.pisoDeclarado}</strong> dadas como concluídas pelo planejamento</> : null}.
           </p>
         </div>
       )}

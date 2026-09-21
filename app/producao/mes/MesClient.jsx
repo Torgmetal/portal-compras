@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   Activity, ChevronDown, ChevronRight, Weight, Package,
@@ -1494,12 +1495,12 @@ export default function MesClient({
             <div className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Período</div>
             <div>
               <label className="block text-[11px] text-torg-gray mb-1">De</label>
-              <input type="date" value={de} onChange={e => setDe(e.target.value)}
+              <CampoData value={de} onChange={(iso) => setDe(iso)}
                 className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-torg-blue" />
             </div>
             <div>
               <label className="block text-[11px] text-torg-gray mb-1">Até</label>
-              <input type="date" value={ate} onChange={e => setAte(e.target.value)}
+              <CampoData value={ate} onChange={(iso) => setAte(iso)}
                 className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-torg-blue" />
             </div>
             <div>

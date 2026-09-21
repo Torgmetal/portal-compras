@@ -111,19 +111,48 @@ const nomeDoArquivo = (opId, ops) => {
 function usarImpressao() {
   const [tagObra, setTagObra] = useState("");
   const [pdf, setPdf] = useState(null);
+  const [gerando, setGerando] = useState(false);
   // ⚠ As marcas que vão FECHADAS NUMA CAIXA: uma etiqueta só, dizendo "N/N". Vive aqui junto com a
   // TAG porque tem o mesmo ciclo de vida — trocou de obra, os dois deixam de valer.
   const [emCaixa, setEmCaixa] = useState(new Set());
+  // ⚠ A pergunta que o servidor devolve quando há etiqueta sem TAG no lote escolhido. Fica separada
+  // do `erro` porque NÃO é falha: é uma decisão que só quem está com o rolo na mão pode tomar. E
+  // mora aqui pelo mesmo motivo dos outros — trocou de obra, deixa de valer.
+  const [confirmarTag, setConfirmarTag] = useState("");
   const alternarCaixa = (marca) => setEmCaixa((antes) => {
     const novo = new Set(antes);
     if (novo.has(marca)) novo.delete(marca); else novo.add(marca);
     return novo;
   });
   useEffect(() => () => { if (pdf) URL.revokeObjectURL(pdf.url); }, [pdf]);
-  return { tagObra, setTagObra, pdf, setPdf, emCaixa, setEmCaixa, alternarCaixa };
+  return { tagObra, setTagObra, pdf, setPdf, emCaixa, setEmCaixa, alternarCaixa, confirmarTag, setConfirmarTag, gerando, setGerando };
 }
 
 const daObra = (dados) => ({ obra: dados?.op?.obra || "", tag: dados?.tagObra || "" });
+
+/**
+ * ⚠⚠ NÃO É ERRO, É UMA PERGUNTA. A obra tem mapa de TAGs e o lote escolhido tem peça sem cobertura:
+ * imprimir assim é legítimo — a etiqueta sai sem prefixo — mas tem de ser escolha de quem está com
+ * o rolo na mão, e não um adesivo que aparece sem destino no pátio.
+ */
+const PerguntaSemTag = ({ texto, gerando, aoImprimir, aoCancelar }) => (texto ? (
+  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5 flex items-start gap-2 text-amber-800">
+    <AlertCircle size={18} className="mt-0.5 shrink-0" />
+    <div className="flex-1 text-sm">
+      {texto}
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button onClick={aoImprimir} disabled={gerando}
+          className="bg-amber-600 text-white text-[13px] font-semibold rounded-lg px-3 py-1.5 disabled:opacity-40">
+          Imprimir assim mesmo
+        </button>
+        <button onClick={aoCancelar}
+          className="text-[13px] font-semibold text-amber-800 underline underline-offset-2 px-1">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+) : null);
 
 export default function EtiquetasClient() {
   const [opId, setOpId] = useState("");
@@ -131,12 +160,11 @@ export default function EtiquetasClient() {
   const [sel, setSel] = useState(() => new Set());
   const [busca, setBusca] = useState("");
   const [carregando, setCarregando] = useState(false);
-  const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState("");
   // ⚠ O modelo NÃO volta ao padrão ao trocar de obra: quem imprime para um cliente costuma
   // imprimir várias OPs dele seguidas, e voltar sozinho faria a etiqueta errada sair sem aviso.
   const [modelo, setModelo] = useState("padrao");
-  const { tagObra, setTagObra, pdf, setPdf, emCaixa, setEmCaixa, alternarCaixa } = usarImpressao();
+  const { tagObra, setTagObra, pdf, setPdf, emCaixa, setEmCaixa, alternarCaixa, confirmarTag, setConfirmarTag, gerando, setGerando } = usarImpressao();
   const { ops, carregandoOps } = useOps(setErro);
 
   const buscarPecas = useCallback(async (id) => lerJson(
@@ -144,7 +172,7 @@ export default function EtiquetasClient() {
     "Peças da OP"), []);
 
   const abrirOp = useCallback(async (id) => {
-    setOpId(id); setDados(null); setSel(new Set()); setBusca(""); setErro(""); setTagObra(""); setEmCaixa(new Set());
+    setOpId(id); setDados(null); setSel(new Set()); setBusca(""); setErro(""); setConfirmarTag(""); setTagObra(""); setEmCaixa(new Set());
     if (!id) return;
     setCarregando(true);
     try {
@@ -177,18 +205,33 @@ export default function EtiquetasClient() {
   // limpar é a forma clássica de alguém jurar que a marca sumiu do portal.
   const limpar = () => { setSel(new Set()); limparFiltros(); };
 
-  const imprimir = async () => {
+/**
+ * O que a recusa do servidor quer dizer.
+ *
+ * ⚠⚠ 409 COM `precisaConfirmar` NÃO É ERRO, É PERGUNTA (achado do Codex). A obra tem mapa de TAGs e
+ * o lote escolhido tem peça sem cobertura: imprimir assim é legítimo — a etiqueta sai sem prefixo —
+ * mas tem de ser escolha de quem está com o rolo na mão, não um adesivo que aparece sem destino no
+ * pátio. E o "sim" vale só para este lote: o servidor reconfere a cada impressão, porque uma
+ * revisão da L.E. pode criar uma peça nova depois da confirmação.
+ */
+async function lerRecusa(r) {
+  const bruto = await r.text().catch(() => "");
+  let corpo = null;
+  try { corpo = JSON.parse(bruto); } catch { /* corpo não-JSON: fica o status */ }
+  return { msg: corpo?.error || `Erro ${r.status}`, pergunta: r.status === 409 && Boolean(corpo?.precisaConfirmar) };
+}
+
+  const imprimir = async (confirmarSemTag = false) => {
     if (!sel.size) return;
     setGerando(true); setErro("");
     try {
       const r = await fetch("/api/expedicao/etiquetas", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opId, marcas: [...sel], modelo, tagObra, emCaixa: [...emCaixa] }),
+        body: JSON.stringify({ opId, marcas: [...sel], modelo, tagObra, emCaixa: [...emCaixa], confirmarSemTag }),
       });
       if (!r.ok) {
-        const bruto = await r.text().catch(() => "");
-        let msg = `Erro ${r.status}`;
-        try { msg = JSON.parse(bruto).error || msg; } catch { /* corpo não-JSON: fica o status */ }
+        const { msg, pergunta } = await lerRecusa(r);
+        if (pergunta) { setConfirmarTag(msg); return; }
         throw new Error(msg);
       }
       const url = URL.createObjectURL(await r.blob());
@@ -203,6 +246,7 @@ export default function EtiquetasClient() {
       // filtro e a seleção continuam onde estavam (quem imprime costuma imprimir de novo).
       const atualizado = await buscarPecas(opId).catch(() => null);
       if (atualizado) setDados(atualizado);
+      setConfirmarTag("");
     } catch (e) { setErro(e.message); } finally { setGerando(false); }
   };
 
@@ -221,6 +265,9 @@ export default function EtiquetasClient() {
       </div>
       <AvisoImpressao />
       <Calibragem />
+
+      <PerguntaSemTag texto={confirmarTag} gerando={gerando}
+                      aoImprimir={() => imprimir(true)} aoCancelar={() => setConfirmarTag("")} />
 
       {erro && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-5 flex items-start gap-2 text-red-700">
@@ -278,7 +325,7 @@ export default function EtiquetasClient() {
               imprimir={imprimir} gerando={gerando}
             />
             <TabelaMarcas visiveis={visiveis} sel={sel} alterna={alterna} busca={busca} fp={fp}
-              emCaixa={emCaixa} alternarCaixa={alternarCaixa} />
+              emCaixa={emCaixa} alternarCaixa={alternarCaixa} totalDaObra={pecas.length} />
           </div>
         )
       )}

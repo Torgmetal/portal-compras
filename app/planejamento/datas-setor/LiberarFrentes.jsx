@@ -1,4 +1,5 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
 import { avisosPreparacao, materialResolvido } from "@/lib/avisos-preparacao";
 // LIBERAR PARA O PCP — planilha de peças, com filtro, prioridade e pré-seleção do dia.
 //
@@ -15,7 +16,7 @@ import { avisosPreparacao, materialResolvido } from "@/lib/avisos-preparacao";
 // custa prazo). O marco é congelado na liberação — recalcular o cronograma depois não pode apagar
 // um desvio já medido.
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, AlertCircle, Send, Check, X, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning, Timer, FileDown, CalendarRange, FolderTree, PackageSearch } from "lucide-react";
+import { Loader2, AlertCircle, Send, Check, X, CalendarClock, Wand2, Star, RefreshCw, Minus, FileWarning, Timer, FileDown, CalendarRange, FolderTree, PackageSearch, Trash2 } from "lucide-react";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import SeletorRMaterial from "./SeletorRMaterial";
 import { estimarPrazo, classeDaPeca, kgPorMetro } from "@/lib/prazo-preparacao";
@@ -108,6 +109,11 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   const [motivo, setMotivo] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [marcando, setMarcando] = useState(false);
+  // ⚠ Vitor (17/09/2026): "tire essas peças da página do planejamento pois não estamos conseguindo
+  // excluir". Eram 9 croquis órfãos da OP-83 que entraram no import de 16/09 sem conjunto, sem
+  // desenho e sem NC1 — e esta tela, que é onde o Planejamento os vê, não tinha como tirá-los.
+  const [confirmarExcluir, setConfirmarExcluir] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
   const [conferindo, setConferindo] = useState(false);
   const [baixando, setBaixando] = useState(false);
   // ⚠⚠ DECLARAR O FARDO DO ESTOQUE. Vitor (02/09/2026), na linha da T113A-P64 com "✕ não comprado":
@@ -224,6 +230,25 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
     } catch (e) { setErro(e.message); } finally { setMarcando(false); }
   }
 
+  /** Tira as peças selecionadas da obra. Só o registro do portal sai; o Syneco não é tocado. */
+  async function excluirSelecionadas() {
+    if (!sel.size) return;
+    setExcluindo(true); setErro("");
+    try {
+      const r = await fetch("/api/producao/pecas", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...sel] }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Não consegui excluir.");
+      // ⚠ apagar peça corta a programação já liberada, e isso era silencioso: o aviso vem da rota
+      if (j.lotesAfetados > 0) setErro(`${j.removidas} peça(s) removida(s). Atenção: ${j.lotesAfetados} lote(s) já liberado(s) apontavam para alguma delas — confira a liberação do PCP.`);
+      setConfirmarExcluir(false);
+      setSel(new Set());
+      await carregar();
+    } catch (e) { setErro(e.message); } finally { setExcluindo(false); }
+  }
+
   // ⚠ EXPORTA O QUE ESTÁ NA TELA, não a lista bruta: sai com os filtros aplicados e na ordem que a
   // pessoa deixou. Planilha que ignora o filtro obriga a filtrar tudo de novo no Excel.
   // ⚠ E SAI INTEIRA — a tabela mostra no máximo 1.500 linhas, a planilha leva as {f.filtradas}.
@@ -311,6 +336,15 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
 
   async function liberar() {
     if (!selecionadas.length) return false;
+    // ⚠⚠ O PORTÃO DO DESENHO MUDOU DE LUGAR, NÃO SUMIU. Antes ele morava no `disabled` do checkbox;
+    // agora mora aqui, porque marcar a peça passou a servir também para prioridade e exclusão.
+    // Recusa em vez de liberar só as boas: mandar menos do que o número do botão diz é exatamente o
+    // erro que o comentário do `pecaIds` abaixo já registrava.
+    const travadas = selecionadas.filter((x) => !liberavel(x));
+    if (travadas.length) {
+      setErro(`${fmtN(travadas.length)} peça(s) da seleção não descem para o PCP (sem desenho em 2.5.2, sem arquivo de máquina, sem material resolvido ou já programadas): ${travadas.slice(0, 6).map((x) => x.marca).join(", ")}${travadas.length > 6 ? "…" : ""}. Desmarque essas para liberar o resto.`);
+      return false;
+    }
     // a frente da liberação: se a seleção é de uma frente só, usa ela; senão, marca como mista
     const frentes = [...new Set(selecionadas.map((p) => p.frente))];
     const frente = frentes.length === 1 ? frentes[0] : `${frentes.length} frentes`;
@@ -552,7 +586,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
 
         <span className="text-torg-gray-light">·</span>
         <span className="text-[12px] text-torg-gray">Referência de capacidade</span>
-        <input type="number" value={metaKg} onChange={(e) => setMetaKg(e.target.value)} min={500} step={500}
+        <CampoDecimal value={metaKg} onChange={(txt) => setMetaKg(txt)} min={500} step={500}
           className="w-24 text-[13px] border border-gray-200 rounded-lg px-2 py-1 text-right tabular-nums focus:border-torg-blue outline-none" />
         <span className="text-[12px] text-torg-gray">kg</span>
 
@@ -612,8 +646,39 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
               tirar
             </button>
             {marcando && <Loader2 size={12} className="animate-spin text-torg-blue" />}
+            <button onClick={() => setConfirmarExcluir((v) => !v)} disabled={excluindo}
+              title="Tira estas peças da obra no portal — para marca que não deveria estar na lista"
+              className="text-[11px] px-2 py-0.5 rounded-lg border bg-white text-red-700 border-red-200 hover:bg-red-50 disabled:opacity-40 inline-flex items-center gap-1">
+              <Trash2 size={11} /> excluir
+            </button>
             <button onClick={() => { setSel(new Set()); setSugestao(null); }} className="text-[11px] text-torg-gray hover:underline ml-auto">limpar seleção</button>
           </div>
+
+          {confirmarExcluir && (
+            <div className="rounded-lg border border-red-300 bg-red-50 p-2.5 text-[12px] text-red-900 space-y-2">
+              <p className="font-semibold inline-flex items-center gap-1.5">
+                <AlertCircle size={13} /> Excluir {fmtN(sel.size)} peça(s) desta obra?
+              </p>
+              <p className="text-[11px]">
+                Sai o registro da peça no portal, com a programação e a prontidão dela. O Syneco não é tocado, e a
+                peça volta se a lista for importada de novo — use quando a linha não deveria existir, como croqui
+                órfão ou lista antiga que ficou para trás.
+              </p>
+              <ul className="max-h-24 overflow-y-auto space-y-0.5 font-mono text-[11px]">
+                {selecionadas.slice(0, 12).map((x) => (
+                  <li key={x.id}>{x.marca} <span className="text-red-500">· {x.frente || x.opNumero || ""}</span></li>
+                ))}
+                {selecionadas.length > 12 && <li className="font-sans">e mais {selecionadas.length - 12}…</li>}
+              </ul>
+              <div className="flex gap-2">
+                <button onClick={excluirSelecionadas} disabled={excluindo}
+                  className="px-2.5 py-1 rounded-md bg-red-600 text-white font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">
+                  {excluindo && <Loader2 size={11} className="animate-spin" />} excluir
+                </button>
+                <button onClick={() => setConfirmarExcluir(false)} className="px-2.5 py-1 rounded-md border border-red-200 bg-white font-semibold">cancelar</button>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-gray-100 pt-2">
             <span className="text-[10px] uppercase text-torg-gray-light">Descem</span>
@@ -733,13 +798,19 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
                 const on = sel.has(p.id);
                 // ⚠ trava a linha, não some com ela: a marca sem desenho é justamente a que o
                 // Planejamento precisa enxergar para cobrar a Engenharia.
+                // ⚠⚠ TRAVA É "NÃO DESCE PARA O PCP", NÃO "NÃO PODE SER MARCADA". O checkbox vinha
+                // `disabled`, e com isso a peça sem desenho/NC1 não podia ser marcada para NADA —
+                // nem prioridade, nem exclusão. Geraldo e Gabriel (18/09/2026): "não estamos
+                // conseguindo selecionar as marcas pois estão sem NC1 e desenho", justamente para
+                // tirar os croquis órfãos da OP-83. Quem guarda o portão agora é `liberar()`, que
+                // recusa a seleção com peça travada; marcar segue livre.
                 const trava = !liberavel(p);
                 return (
                   <tr key={p.id} className={`${on ? "bg-torg-blue-50/50" : trava ? "bg-red-50/40" : "hover:bg-gray-50/60"} ${p.cortada ? "opacity-60" : ""}`}>
                     <td className="px-3 py-1.5">
-                      <input type="checkbox" className="accent-torg-orange disabled:cursor-not-allowed" checked={on} disabled={trava}
-                        aria-label={trava ? `${p.marca} sem desenho na pasta — não pode ser liberada` : `Selecionar ${p.marca}`}
-                        title={trava ? "Sem desenho em 2.5.2 Fabricação — não desce para o PCP" : ""}
+                      <input type="checkbox" className="accent-torg-orange" checked={on}
+                        aria-label={`Selecionar ${p.marca}${trava ? " (sem desenho — não desce para o PCP)" : ""}`}
+                        title={trava ? "Sem desenho em 2.5.2 Fabricação — não desce para o PCP, mas pode ser marcada para prioridade ou exclusão" : ""}
                         onChange={() => setSel((s) => { const n = new Set(s); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })} />
                     </td>
                     <td className="px-3 py-1.5 font-mono text-[12px] font-semibold text-torg-dark whitespace-nowrap">

@@ -3,16 +3,17 @@ import { useState } from 'react';
 import { Plus, Droplets, Layers, FileText, ChevronRight, Trash2, Paintbrush } from 'lucide-react';
 import { CAMADAS_TINTA, FATURAMENTO, FATURAMENTO_ROTULO, ESTRUTURA_ROTULO } from '@/lib/lqc';
 import s from './Pintura.module.css';
-import { calcularCamadasPintura, estruturasDoQuantitativo, chaveAreaPintura, pinturaComDestino, atualizarDemao, custoHistoricoDaDemao, usarConsumoDaDemao } from '@/lib/lqc';
+import { calcularCamadasPinturaConsulta, estruturasDoQuantitativo, chaveAreaPintura, pinturaComDestino, atualizarDemao, custoHistoricoDaDemao, usarConsumoDaDemao } from '@/lib/lqc';
 import { DocumentosPintura } from './DocumentosPintura';
 import { CotacaoTinta } from './CotacaoTinta';
+import CampoDecimal from "@/components/CampoDecimal";
 const numero = v => Number(v || 0).toLocaleString('pt-BR', {maximumFractionDigits:2});
 const dinheiro = v => Number(v || 0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 export function Pintura({ c, res, setComp, estudoId }) {
  const tintas = Array.isArray(c.tintas) ? c.tintas : [];
  const setC = (fn) => setComp(fn({ ...c, tintas }));
  const [ativo,setAtivo]=useState(0),[vista,setVista]=useState('Sistema de pintura');
- const camadas = calcularCamadasPintura(c);
+ const camadas = calcularCamadasPinturaConsulta(c);
  const linhasAtivas = (c.resumos || []).filter(l => l.ativo !== false);
  const indice = Math.min(ativo, Math.max(0, tintas.length - 1));
  const estruturas=estruturasDoQuantitativo(c);
@@ -21,7 +22,7 @@ export function Pintura({ c, res, setComp, estudoId }) {
  const material=res.grupos.tintas.total.subtotal;
  const custoHistorico=custoHistoricoDaDemao(tintas,indice);
  const alterar=(campo,valor)=>setComp({tintas:atualizarDemao(tintas,indice,{[campo]:valor})});
- const campo=(rotulo,chave,unidade,extra={})=><label className={s.campo}>{rotulo}<div className={s.entrada}><input aria-label={rotulo} type="number" min="0" step="any" value={t[chave]??''} onChange={e=>alterar(chave,e.target.value)} {...extra}/>{unidade&&<span>{unidade}</span>}</div></label>;
+ const campo=(rotulo,chave,unidade,extra={})=><label className={s.campo}>{rotulo}<div className={s.entrada}><CampoDecimal aria-label={rotulo} value={t[chave]??''} onChange={(txt) => alterar(chave,txt)} {...extra}/>{unidade&&<span>{unidade}</span>}</div></label>;
  const adicionar=()=>{const id=crypto.randomUUID();setC(a=>({...a,tintas:[...a.tintas,{id,camada:'INTERMEDIÁRIO',produto:'',cor:'',solidos:'',peliculaSeca:'',precoLitro:'',perda:45,estruturaEscopo:'todas'}]}));setAtivo(tintas.length);};
  return <section className={s.raiz}>
   <div className={s.resumo}><div><span>Área do escopo</span><strong>{numero(res.areaM2)} <small>m²</small></strong><small>{linhasAtivas.length} áreas · {numero(res.pesoTotal/1000)} Ton</small></div><div><span>Consumo de produtos</span><strong>{numero(camadas.reduce((v,x)=>v+(x.litros||0),0))} <small>L de tinta</small></strong><small>{numero(camadas.reduce((v,x)=>v+(x.litrosDiluente||0),0))} L de diluente</small></div><div className={s.total}><span>Custo dos produtos</span><strong data-testid="custo-tintas">{dinheiro(material)}</strong><small>Tintas + diluente · antes do BDI</small></div></div>

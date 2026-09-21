@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Loader2, AlertCircle, Plus } from "lucide-react";
 import { numeroBR } from "@/lib/numero-br";
 import { Modal } from "./Modal";
+import CampoDecimal from "@/components/CampoDecimal";
 
 // Modal de edicao dos dados do item da RM. Permite ajustar descricao, qtd,
 // peso, unidade, codigo, material, comprimento, largura, tratamento. Bloqueado
@@ -104,8 +105,13 @@ export function ModalAdicionarItem({ rmId, onClose, onSaved }) {
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-torg-dark mb-1">Observação</label>
-          <input value={form.observacao} onChange={(e) => set("observacao", e.target.value)} className={inputCls} placeholder="opcional" />
+          {/* ⚠ Mesmo aviso da tela de Nova RM: este texto vai para a cotação do fornecedor. */}
+          <label className="block text-xs font-medium text-torg-dark mb-1">
+            Observação <span className="font-normal text-torg-orange">· o fornecedor vê</span>
+          </label>
+          <input value={form.observacao} onChange={(e) => set("observacao", e.target.value)} className={inputCls}
+            placeholder="Ex.: modelo, marca, embalagem" />
+          <p className="text-[10px] text-torg-gray mt-1">Aparece na cotação do fornecedor, embaixo da descrição do item.</p>
         </div>
       </div>
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
@@ -130,6 +136,7 @@ export function ModalEditarRMItem({ item, rmId, onClose, onSaved }) {
     tratamento: item.tratamento || "",
     peso: item.peso != null ? String(item.peso) : "",
     pesoLinear: item.pesoLinear != null ? String(item.pesoLinear) : "",
+    observacao: item.observacao || "",
   });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -161,6 +168,7 @@ export function ModalEditarRMItem({ item, rmId, onClose, onSaved }) {
           tratamento: form.tratamento.trim() || null,
           peso: parseNum(form.peso),
           pesoLinear: parseNum(form.pesoLinear),
+          observacao: form.observacao.trim() || null,
         }),
       });
       const data = await res.json();
@@ -202,9 +210,8 @@ export function ModalEditarRMItem({ item, rmId, onClose, onSaved }) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Quantidade *</label>
-            <input
-              type="number" step="0.01" min="0" value={form.qtd}
-              onChange={(e) => set("qtd", e.target.value)}
+            <CampoDecimal value={form.qtd}
+              onChange={(txt) => set("qtd", txt)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue"
             />
           </div>
@@ -265,20 +272,35 @@ export function ModalEditarRMItem({ item, rmId, onClose, onSaved }) {
             />
           </div>
         </div>
+        {/* ⚠⚠ ESTE CAMPO FALTAVA NO MODAL DE EDITAR — só existia no de criar. Desde 16/09/2026 a
+            observação do item aparece na cotação do FORNECEDOR, e um texto errado ou interno não
+            tinha como ser corrigido pela tela (há "600,00 - Pedro Locatelli" no banco, escrito
+            quando ninguém sabia que ele seria lido de fora). Campo que o cliente lê precisa de
+            conserto pela tela. */}
+        <div>
+          <label className="block text-xs font-medium text-torg-dark mb-1">
+            Observação <span className="font-normal text-torg-orange">· o fornecedor vê</span>
+          </label>
+          <input
+            type="text" value={form.observacao}
+            onChange={(e) => set("observacao", e.target.value)}
+            placeholder="Ex.: modelo, marca, embalagem"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
+          />
+          <p className="text-[10px] text-torg-gray mt-1">Aparece na cotação do fornecedor, embaixo da descrição do item.</p>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Peso (kg)</label>
-            <input
-              type="number" step="0.01" min="0" value={form.peso}
-              onChange={(e) => set("peso", e.target.value)}
+            <CampoDecimal value={form.peso}
+              onChange={(txt) => set("peso", txt)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Peso linear (kg/m)</label>
-            <input
-              type="number" step="0.001" min="0" value={form.pesoLinear}
-              onChange={(e) => set("pesoLinear", e.target.value)}
+            <CampoDecimal value={form.pesoLinear}
+              onChange={(txt) => set("pesoLinear", txt)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue"
             />
           </div>

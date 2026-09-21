@@ -1,4 +1,5 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Loader2, AlertCircle, Target, Truck, Calendar, Info, Gauge } from "lucide-react";
 
@@ -90,7 +91,7 @@ export default function PrevisaoObra({ opId }) {
         <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-[11px] text-torg-gray">
           <span>Expedido <span className="font-medium text-torg-dark tabular-nums">{fmtKg(calc.exp)}</span></span>
           <span className="inline-flex items-center gap-1">Planejado
-            <input type="number" value={peso ?? ""} onChange={(e) => setPeso(e.target.value)} className="w-24 px-1.5 py-0.5 border border-gray-200 rounded text-right tabular-nums text-torg-dark focus:outline-none focus:ring-1 focus:ring-torg-blue" /> kg
+            <CampoDecimal value={peso ?? ""} onChange={(txt) => setPeso(txt)} className="w-24 px-1.5 py-0.5 border border-gray-200 rounded text-right tabular-nums text-torg-dark focus:outline-none focus:ring-1 focus:ring-torg-blue" /> kg
           </span>
           {peso != data.planejadoKg && <button onClick={() => setPeso(data.planejadoKg)} className="text-torg-blue hover:underline">← lista ({fmtKg(data.planejadoKg)})</button>}
           <span>Resta <span className="font-medium text-torg-dark tabular-nums">{fmtKg(calc.kgRestante)}</span></span>

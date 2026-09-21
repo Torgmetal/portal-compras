@@ -12,10 +12,12 @@
 // guarda coisa que a planilha não tem — o vínculo com a OP, as observações — e uma célula em
 // branco quer dizer "não preenchi", nunca "apague".
 import { NextResponse } from "next/server";
+import { registrarExecucao } from "@/lib/cron-monitor";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { getAccessToken } from "@/lib/sharepoint";
 import { caminhoRelatorio, linhaParaOrcamento, compararOrcamento } from "@/lib/orcamentos-relatorio";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +40,10 @@ async function lerPlanilha(ano) {
 
   // ⚠ SheetJS, não ExcelJS: a planilha tem 5 abas e só uma interessa. Mesmo motivo do import do
   // CMR, onde o ExcelJS estourava a memória lendo o arquivo inteiro.
-  const XLSX = (await import("xlsx")).default;
+  // ⚠ SEM `.default`: o pacote `xlsx` é CJS e o namespace vem direto do `await import`. Com o
+  // `.default` o módulo vinha `undefined` e a rota morria em "Cannot read properties of undefined
+  // (reading 'read')" — o resto do portal sempre importou sem ele (`lib/grd-engenharia-sync.js`).
+  const XLSX = await import("xlsx");
   const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
   const ws = wb.Sheets[ABA];
   if (!ws) throw new Error(`A planilha não tem a aba "${ABA}" (tem: ${wb.SheetNames.join(", ")})`);
@@ -107,8 +112,18 @@ export async function GET(req) {
     try { await requireRole(ROLES); }
     catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
   }
+  // ⚠⚠ ACORDA A COMPUTE DO NEON ANTES DO PRIMEIRO QUERY. Ela suspende quando ociosa
+  // (scale-to-zero) e o primeiro query de um cron estoura com P1001 "Can't reach database server".
+  //
+  // ⚠ SEM `if (doCron)` de propósito: esta função já está acima do teto de complexidade, e um ramo
+  // a mais para poupar ~1ms de um SELECT 1 em banco acordado paga mal. Na chamada manual, se o
+  // banco estiver frio, aquecer é melhor que devolver P1001 na cara de quem clicou.
   const ano = Number(new URL(req.url).searchParams.get("ano")) || new Date().getUTCFullYear();
   try {
+  // ⚠⚠ DENTRO DO `try`, e a medição começa ANTES: `aquecerBanco` LANÇA ao esgotar as tentativas.
+  // Fora do try, a falha escapava sem passar pelo `registrarExecucao` — o cenário que o aquecimento
+  // existe para sobreviver (Neon dormindo) seria justamente o que apagaria o cron do heartbeat.
+    await aquecerBanco(prisma);
     const r = await processar(ano, doCron, null);
     if (doCron && (r.criados > 0 || r.atualizados > 0 || r.revisoes > 0)) {
       // ⚠ registra só quando MUDOU: uma linha por hora dizendo "nada mudou" enterraria as
@@ -118,8 +133,13 @@ export async function GET(req) {
                 entityId: String(ano), diff: { criados: r.criados, atualizados: r.atualizados, revisoes: r.revisoes, porCron: true } },
       }).catch(() => {});
     }
+    // ⚠⚠ HEARTBEAT — só na chamada do cron; a de gente é simulação e não é execução agendada.
+    // Esta rota estava agendada e fora do monitor, e por isso o redirect do middleware (307) passou
+    // meses sem ser notado.
+    if (doCron) await registrarExecucao("orcamento-sharepoint", { ok: true, mensagem: `${r.criados || 0} novo(s) · ${r.atualizados || 0} atualizado(s)` });
     return NextResponse.json({ simulacao: !doCron, ...r });
   } catch (e) {
+    if (doCron) await registrarExecucao("orcamento-sharepoint", { ok: false, mensagem: e.message });
     return NextResponse.json({ error: e.message }, { status: 502 });
   }
 }

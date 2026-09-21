@@ -123,12 +123,19 @@ export async function PATCH(req) {
   let corpo;
   try { corpo = await req.json(); } catch { return NextResponse.json({ error: "Corpo inválido." }, { status: 400 }); }
   const id = String(corpo?.id || "");
-  const evidencia = String(corpo?.evidencia || "").trim() || null;
   if (!id) return NextResponse.json({ error: "id obrigatório" }, { status: 400 });
+  // ⚠ SÓ MEXE NO QUE VEIO. Vitor (16/09/2026) pediu legenda editável na foto já subida; a rota
+  // aplicava a área sempre — mandar só a legenda zeraria a área da foto. Cada campo só entra no
+  // update se a chave existir no corpo.
+  const temEvidencia = corpo && Object.prototype.hasOwnProperty.call(corpo, "evidencia");
+  const temLegenda = corpo && Object.prototype.hasOwnProperty.call(corpo, "observacao");
+  if (!temEvidencia && !temLegenda) return NextResponse.json({ error: "Nada para alterar." }, { status: 400 });
+  const evidencia = temEvidencia ? String(corpo.evidencia || "").trim() || null : undefined;
+  const observacao = temLegenda ? String(corpo.observacao || "").trim().slice(0, 500) || null : undefined;
 
   const foto = await prisma.fotoInspecao.findUnique({ where: { id }, select: { tipo: true, relatorioId: true } });
   if (!foto) return NextResponse.json({ error: "Foto não encontrada." }, { status: 404 });
-  if (!evidenciaValida(foto.tipo, evidencia)) return NextResponse.json({ error: "Área de evidência inválida." }, { status: 400 });
+  if (temEvidencia && !evidenciaValida(foto.tipo, evidencia)) return NextResponse.json({ error: "Área de evidência inválida." }, { status: 400 });
 
   // mesma trava do DELETE: documento enviado para assinatura não se remonta
   const rel = foto.relatorioId
@@ -138,7 +145,7 @@ export async function PATCH(req) {
     return NextResponse.json({ error: `A foto faz parte do ${rel.codigo}, que já foi enviado para assinatura.` }, { status: 409 });
   }
 
-  await prisma.fotoInspecao.update({ where: { id }, data: { evidencia } });
+  await prisma.fotoInspecao.update({ where: { id }, data: { ...(temEvidencia ? { evidencia } : {}), ...(temLegenda ? { observacao } : {}) } });
   return NextResponse.json({ ok: true });
 }
 

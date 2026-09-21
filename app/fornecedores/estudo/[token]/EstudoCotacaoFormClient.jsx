@@ -1,4 +1,5 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import {
@@ -209,13 +210,10 @@ export default function EstudoCotacaoFormClient() {
                         <td className="py-3 px-2 text-center text-gray-500">{item.unidade}</td>
                         <td className="py-3 px-2 text-right">{fmtNum(item.quantidade, item.quantidade % 1 === 0 ? 0 : 2)}</td>
                         <td className="py-3 px-2">
-                          <input
-                            type="number"
+                          <CampoDecimal
                             value={precos[item.id] || ""}
-                            onChange={(e) => setPrecos((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                            onChange={(txt) => setPrecos((prev) => ({ ...prev, [item.id]: txt }))}
                             placeholder="0,00"
-                            min="0"
-                            step="0.01"
                             className="w-28 ml-auto block px-3 py-2 border border-gray-200 rounded-lg text-sm text-right focus:ring-2 focus:ring-[#006EAB]/30 focus:border-[#006EAB] outline-none"
                           />
                         </td>

@@ -1,4 +1,6 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 import { useState, useMemo } from "react";
 import {
   Plus, Trash2, Loader2, Save, HardHat, Home, Building2,
@@ -297,18 +299,18 @@ function LinhaItem({ item, secao, onUpdate, onDelete, salvando, excluindo }) {
         {!secao.usaCustoFixo && (
           <>
             <td className="py-2 pr-2">
-              <input type="number" min="0" step="0.5" value={dias} onChange={(e) => setDias(parseFloat(e.target.value) || 0)}
+              <CampoDecimal value={dias} onChange={(txt) => setDias(numeroBR(txt))}
                 className="w-20 border border-gray-200 rounded px-2 py-1 text-sm text-right" />
             </td>
             <td className="py-2 pr-2">
-              <input type="number" min="0" step="0.01" value={custoDiario} onChange={(e) => setCustoDiario(parseFloat(e.target.value) || 0)}
+              <CampoDecimal value={custoDiario} onChange={(txt) => setCustoDiario(numeroBR(txt))}
                 className="w-28 border border-gray-200 rounded px-2 py-1 text-sm text-right" />
             </td>
           </>
         )}
         {secao.usaCustoFixo && (
           <td className="py-2 pr-2">
-            <input type="number" min="0" step="0.01" value={custoFixo} onChange={(e) => setCustoFixo(parseFloat(e.target.value) || 0)}
+            <CampoDecimal value={custoFixo} onChange={(txt) => setCustoFixo(numeroBR(txt))}
               className="w-28 border border-gray-200 rounded px-2 py-1 text-sm text-right" />
           </td>
         )}
@@ -413,12 +415,12 @@ function NovoItemForm({ secao, descricaoInicial = "", onSalvar, onCancelar }) {
           <>
             <div>
               <label className="text-xs text-torg-gray block mb-1">{secao.colunas.dias}</label>
-              <input type="number" min="0" step="0.5" value={dias} onChange={(e) => setDias(parseFloat(e.target.value) || 0)}
+              <CampoDecimal value={dias} onChange={(txt) => setDias(numeroBR(txt))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-right focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none" />
             </div>
             <div>
               <label className="text-xs text-torg-gray block mb-1">{secao.colunas.custoDiario}</label>
-              <input type="number" min="0" step="0.01" value={custoDiario} onChange={(e) => setCustoDiario(parseFloat(e.target.value) || 0)}
+              <CampoDecimal value={custoDiario} onChange={(txt) => setCustoDiario(numeroBR(txt))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-right focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none" />
             </div>
           </>
@@ -426,7 +428,7 @@ function NovoItemForm({ secao, descricaoInicial = "", onSalvar, onCancelar }) {
         {secao.usaCustoFixo && (
           <div>
             <label className="text-xs text-torg-gray block mb-1">Custo</label>
-            <input type="number" min="0" step="0.01" value={custoFixo} onChange={(e) => setCustoFixo(parseFloat(e.target.value) || 0)}
+            <CampoDecimal value={custoFixo} onChange={(txt) => setCustoFixo(numeroBR(txt))}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-right focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none" />
           </div>
         )}

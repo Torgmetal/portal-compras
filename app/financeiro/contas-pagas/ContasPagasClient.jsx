@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useMemo } from "react";
 import {
   CheckCircle2, Loader2, AlertCircle, Search, CalendarDays,
@@ -191,10 +192,10 @@ export default function ContasPagasClient() {
         </div>
         <div className="flex items-center gap-2 text-sm">
           <CalendarDays size={15} className="text-torg-gray" />
-          <input type="date" value={de} onChange={(e) => { setDe(e.target.value); setPreset(""); }}
+          <CampoData value={de} onChange={(iso) => { setDe(iso); setPreset(""); }}
             className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm" />
           <span className="text-torg-gray">a</span>
-          <input type="date" value={ate} onChange={(e) => { setAte(e.target.value); setPreset(""); }}
+          <CampoData value={ate} onChange={(iso) => { setAte(iso); setPreset(""); }}
             className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm" />
           <button onClick={() => carregar()} disabled={loading}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50 disabled:opacity-50">

@@ -5,6 +5,7 @@
 // disse, e será através de um e-mail que será enviado, e já fique mostrando o status no portal do
 // cliente; o PIT também deve conter o aceite por parte do cliente, não pode deixar de ter esse
 // aceite".
+import {requireGestaoPit,requireConsultaPit} from "@/lib/pit-acesso";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -22,7 +23,7 @@ const ROLES = ["ADMIN", "QUALIDADE", "COMERCIAL"];
 const num = async (params) => String((await params)?.opNumero || "").replace(/\D/g, "").padStart(3, "0");
 
 export async function GET(_req, { params }) {
-  try { await requireRole([...ROLES, "PRODUCAO", "PCP"]); }
+  try { await requireConsultaPit(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const opNumero = await num(params);
@@ -36,7 +37,7 @@ export async function GET(_req, { params }) {
   // Redigitar o e-mail do inspetor a cada envio é como se erra o destinatário de um documento
   // controlado. (Ver OP.clienteContatos.)
   const contatos = Array.isArray(op?.clienteContatos)
-    ? op.clienteContatos.filter((c) => c?.email).map((c) => ({ nome: c.nome || null, email: c.email }))
+    ? op.clienteContatos.filter((c) => c?.email).map((c) => ({ nome: c.nome || null, email: c.email, apenasConsulta: c.apenasConsulta === true }))
     : [];
   // ⚠ os dados da OBRA vão junto. Vitor (27/08/2026): "trazer apenas as informações da Obra por
   // hora" — é o que o portal preenche sozinho no documento, e a tela do plano mostra quais são para
@@ -57,12 +58,14 @@ export async function GET(_req, { params }) {
 // pedido de verificação. Guardar só o nome deixaria o campo preenchido e o fluxo sem destino.
 export async function PUT(req, { params }) {
   let user;
-  try { user = await requireRole(ROLES); }
+  try { user = await requireConsultaPit(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const opNumero = await num(params);
   const body = await req.json().catch(() => ({}));
   const doc = String(body?.doc || "").toUpperCase();
+  if(doc === "PIT"){try{await requireGestaoPit();}catch(e){return NextResponse.json({error:e.message},{status:e.message === "Unauthorized"?401:403});}}
+  if(doc === "PLP"){try{await requireRole(ROLES);}catch(e){return NextResponse.json({error:e.message},{status:e.message === "Unauthorized"?401:403});}}
   if (!DOCS[doc]) return NextResponse.json({ error: "Documento desconhecido (use PIT ou PLP)." }, { status: 400 });
 
   const txt = (v, n = 120) => (v === null || v === undefined ? null : String(v).trim().slice(0, n) || null);
@@ -97,12 +100,14 @@ export async function PUT(req, { params }) {
 
 export async function POST(req, { params }) {
   let user;
-  try { user = await requireRole(ROLES); }
+  try { user = await requireConsultaPit(); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const opNumero = await num(params);
   const body = await req.json().catch(() => ({}));
   const doc = String(body?.doc || "").toUpperCase();
+  if(doc === "PIT"){try{await requireGestaoPit();}catch(e){return NextResponse.json({error:e.message},{status:e.message === "Unauthorized"?401:403});}}
+  if(doc === "PLP"){try{await requireRole(ROLES);}catch(e){return NextResponse.json({error:e.message},{status:e.message === "Unauthorized"?401:403});}}
   if (!DOCS[doc]) return NextResponse.json({ error: "Documento desconhecido (use PIT ou PLP)." }, { status: 400 });
 
   const etapa = String(body?.etapa || "CLIENTE").toUpperCase();

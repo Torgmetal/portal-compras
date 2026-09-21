@@ -4,6 +4,7 @@
 // Vitor (31/08/2026): "quando for enviado alguma revisão ou algo do tipo vc deve alertar ao
 // Gabriel, assim como alertar a ele sempre que receber uma nova grd".
 import { NextResponse } from "next/server";
+import { registrarExecucao } from "@/lib/cron-monitor";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sincronizarGrds } from "@/lib/grd-engenharia-sync";
@@ -12,6 +13,7 @@ import { cabecalhoEmail } from "@/lib/email-layout";
 import { fmtOP } from "@/lib/utils";
 import { escapeHtml } from "@/lib/html";
 import { DESTINO_ENGENHARIA } from "@/lib/grd-roteiro";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -112,5 +114,24 @@ export async function GET(req) {
   if (!doCron) {
     return NextResponse.json({ error: "Use POST para sincronizar." }, { status: 405 });
   }
-  return POST(req);
+  // ⚠⚠ ACORDA A COMPUTE DO NEON ANTES DO PRIMEIRO QUERY. Ela suspende quando ociosa (scale-to-zero)
+  // e o primeiro query de um cron estoura com P1001 "Can't reach database server" — foi assim que o
+  // `cmr-reconciliar` passou 55h parado sem ninguém saber. Faltava nas SEIS rotas que são cron E
+  // botão manual ao mesmo tempo: nasceram como rota de tela, e o aquecimento só virou regra depois.
+  // ⚠⚠ HEARTBEAT. A rota já era agendada e NÃO era cobrada pelo monitor. O comentário acima culpa
+  // o 405, mas a causa real era outra e mais antiga: o middleware mandava o cron para o `/entrar`
+  // (307) antes de o handler existir. Sem heartbeat, os dois defeitos foram invisíveis.
+  const t0 = Date.now();
+  try {
+    // ⚠⚠ DENTRO do bloco que registra a execução: `aquecerBanco` LANÇA ao esgotar as tentativas, e
+    // fora dele a falha escapava sem heartbeat — o cenário que o aquecimento existe para sobreviver
+    // seria justamente o que apagaria o cron do monitor.
+    await aquecerBanco(prisma);
+    const r = await POST(req);
+    await registrarExecucao("grd-sincronizar", { ok: r.status < 400, duracaoMs: Date.now() - t0 });
+    return r;
+  } catch (e) {
+    await registrarExecucao("grd-sincronizar", { ok: false, mensagem: e?.message, duracaoMs: Date.now() - t0 });
+    return NextResponse.json({ error: e?.message || "Falha ao sincronizar." }, { status: 500 });
+  }
 }

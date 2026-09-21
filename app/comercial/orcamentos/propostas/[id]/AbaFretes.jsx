@@ -1,4 +1,6 @@
 "use client";
+import { numeroBR } from "@/lib/numero-br";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useRef } from "react";
 import {
   Plus, Trash2, Loader2, X, Edit3, Check, Truck, MapPin,
@@ -125,11 +127,11 @@ function NovoFreteModal({ onClose, onSalvar, obraDefault }) {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Peso Total (ton)</label>
-              <input type="number" value={pesoTon} onChange={(e) => setPesoTon(e.target.value)} placeholder="0" min="0" step="0.01" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
+              <CampoDecimal value={pesoTon} onChange={(txt) => setPesoTon(txt)} placeholder="0" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
             </div>
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Peso/Carga (ton)</label>
-              <input type="number" value={pesoPorCarga} onChange={(e) => setPesoPorCarga(e.target.value)} placeholder="Ex: 25" min="0" step="0.01" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
+              <CampoDecimal value={pesoPorCarga} onChange={(txt) => setPesoPorCarga(txt)} placeholder="Ex: 25" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
             </div>
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Qtd Viagens</label>
@@ -138,14 +140,14 @@ function NovoFreteModal({ onClose, onSalvar, obraDefault }) {
                   {viagensAuto} <span className="text-xs font-normal text-blue-400">(auto)</span>
                 </div>
               ) : (
-                <input type="number" value={quantidadeViagens} onChange={(e) => setQuantidadeViagens(e.target.value)} placeholder="1" min="1" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
+                <CampoDecimal value={quantidadeViagens} onChange={(txt) => setQuantidadeViagens(txt)} placeholder="1" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
               )}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Custo/Viagem (R$)</label>
-              <input type="number" value={custoPorViagem} onChange={(e) => setCustoPorViagem(e.target.value)} placeholder="0,00" min="0" step="0.01" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
+              <CampoDecimal value={custoPorViagem} onChange={(txt) => setCustoPorViagem(txt)} placeholder="0,00" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none" />
             </div>
             <div>
               <label className="block text-sm font-semibold text-torg-dark mb-1">Custo Total</label>
@@ -597,16 +599,16 @@ export default function AbaFretes({ estudo, estudoId }) {
                             <input type="text" value={editValores.destino} onChange={(e) => setEditValores((v) => ({ ...v, destino: e.target.value }))} placeholder="Destino" className="w-24 px-2 py-1 border border-gray-200 rounded text-xs focus:ring-1 focus:ring-torg-blue/30 outline-none" />
                           </div>
                         </td>
-                        <td className="py-1.5 px-2"><input type="number" value={editValores.distanciaKm} onChange={(e) => setEditValores((v) => ({ ...v, distanciaKm: parseFloat(e.target.value) || 0 }))} className="w-20 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none" /></td>
-                        <td className="py-1.5 px-2"><input type="number" value={editValores.pesoTon} onChange={(e) => setEditValores((v) => ({ ...v, pesoTon: parseFloat(e.target.value) || 0 }))} className="w-20 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none" /></td>
-                        <td className="py-1.5 px-2"><input type="number" value={editValores.pesoPorCarga} onChange={(e) => setEditValores((v) => ({ ...v, pesoPorCarga: e.target.value }))} placeholder="—" min="0" step="0.01" className="w-20 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none" /></td>
+                        <td className="py-1.5 px-2"><CampoDecimal value={editValores.distanciaKm} onChange={(txt) => setEditValores((v) => ({ ...v, distanciaKm: numeroBR(txt) }))} className="w-20 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none" /></td>
+                        <td className="py-1.5 px-2"><CampoDecimal value={editValores.pesoTon} onChange={(txt) => setEditValores((v) => ({ ...v, pesoTon: numeroBR(txt) }))} className="w-20 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none" /></td>
+                        <td className="py-1.5 px-2"><CampoDecimal value={editValores.pesoPorCarga} onChange={(txt) => setEditValores((v) => ({ ...v, pesoPorCarga: txt }))} placeholder="—" className="w-20 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none" /></td>
                         <td className="py-1.5 px-2">
                           <select value={editValores.tipoVeiculo} onChange={(e) => setEditValores((v) => ({ ...v, tipoVeiculo: e.target.value }))} className="w-full px-2 py-1 border border-gray-200 rounded text-xs focus:ring-1 focus:ring-torg-blue/30 outline-none">
                             {TIPOS_VEICULO.map((v) => (<option key={v.value} value={v.value}>{v.label}</option>))}
                           </select>
                         </td>
                         <td className="py-1.5 px-2"><input type="number" value={editValores.quantidadeViagens} onChange={(e) => setEditValores((v) => ({ ...v, quantidadeViagens: parseInt(e.target.value) || 1 }))} min="1" className="w-16 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none" /></td>
-                        <td className="py-1.5 px-2"><input type="number" value={editValores.custoPorViagem} onChange={(e) => setEditValores((v) => ({ ...v, custoPorViagem: parseFloat(e.target.value) || 0 }))} min="0" step="0.01" className="w-24 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none" /></td>
+                        <td className="py-1.5 px-2"><CampoDecimal value={editValores.custoPorViagem} onChange={(txt) => setEditValores((v) => ({ ...v, custoPorViagem: numeroBR(txt) }))} className="w-24 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none" /></td>
                         <td className="py-1.5 px-2 text-right text-xs font-medium tabular-nums text-torg-dark">
                           {(() => { const pc = parseFloat(editValores.pesoPorCarga) || 0; const pt = editValores.pesoTon || 0; const v = pc > 0 && pt > 0 ? Math.ceil(pt / pc) : (editValores.quantidadeViagens || 1); return fmtMoeda(v * (editValores.custoPorViagem || 0)); })()}
                         </td>
@@ -695,10 +697,9 @@ export default function AbaFretes({ estudo, estudoId }) {
                       {/* Valor cotado */}
                       {editandoCot ? (
                         <div className="flex items-center gap-1">
-                          <input
-                            type="number"
+                          <CampoDecimal
                             value={cotacaoEditValor}
-                            onChange={(e) => setCotacaoEditValor(e.target.value)}
+                            onChange={(txt) => setCotacaoEditValor(txt)}
                             placeholder="Valor R$"
                             className="w-28 px-2 py-1 border border-gray-200 rounded text-sm text-right focus:ring-1 focus:ring-torg-blue/30 outline-none"
                           />

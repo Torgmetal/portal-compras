@@ -1,11 +1,9 @@
 "use client";
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { signOut } from "next-auth/react";
 import { fmtOP } from "@/lib/utils";
-import {
-  FileText, Loader2, CheckCircle2, Clock, ExternalLink, Globe, LogOut, PenLine,
-  AlertCircle, RotateCcw, Download, ChevronDown, ChevronRight, Building2,
-} from "lucide-react";
+import { FileText, Loader2, CheckCircle2, Clock, ExternalLink, Globe, LogOut, PenLine, AlertCircle, RotateCcw, Download, ChevronDown, ChevronRight, Building2, Receipt } from "lucide-react";
 
 const fmtDT = (d) => (d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : null);
@@ -114,6 +112,19 @@ export default function MeuEspacoClient() {
               Assim que a Torg enviar um documento ou publicar o portal de uma obra para <b>{d.email}</b>, ela aparece aqui.
             </p>
           </div>
+        )}
+
+        {d?.faturamento && (
+          <Link href="/cliente/faturamento" className="flex items-center justify-between gap-3 bg-white border border-[#F4801F]/40 rounded-xl px-4 py-3 hover:bg-orange-50/40">
+            <div className="flex items-center gap-3 min-w-0">
+              <Receipt size={18} className="text-[#F4801F] shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[13.5px] font-semibold text-torg-dark">Pedidos de compra e faturamento</p>
+                <p className="text-[12px] text-torg-gray truncate">Suas OCs, previsões de nota e o que já foi faturado — sincronizado com o ERP da Torg.</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-torg-gray shrink-0" />
+          </Link>
         )}
 
         {d && d.obras.length > 0 && (

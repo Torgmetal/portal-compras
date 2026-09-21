@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -359,7 +360,7 @@ function AtividadesView({ ata, id, eu, onSaved, onFlash }) {
                                 <input value={cur.ddDescricao || ""} onChange={(e) => setR(a.id, { ddDescricao: e.target.value })} placeholder="O que precisa ser feito" className="w-full text-[13px] border border-gray-200 rounded-md px-2.5 py-1.5" />
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <label className="text-[11px] text-torg-gray">Prazo:</label>
-                                  <input type="date" value={cur.ddPrazo || ""} onChange={(e) => setR(a.id, { ddPrazo: e.target.value })} className="text-[12px] border border-gray-200 rounded-md px-2 py-1" />
+                                  <CampoData value={cur.ddPrazo || ""} onChange={(iso) => setR(a.id, { ddPrazo: iso })} className="text-[12px] border border-gray-200 rounded-md px-2 py-1" />
                                   <input value={cur.ddSetor || ""} onChange={(e) => setR(a.id, { ddSetor: e.target.value })} placeholder="setor (opcional)" className="flex-1 min-w-[120px] text-[12px] border border-gray-200 rounded-md px-2 py-1" />
                                 </div>
                                 <p className="text-[10.5px] text-torg-gray leading-snug">Prazo nesta semana entra nesta ata; em semana futura, vai pra ata daquela semana (criada se preciso).</p>
@@ -433,7 +434,7 @@ function RascunhoEditor({ ata, onSaved }) {
         </div>
         <div>
           <label className="block text-xs font-medium text-torg-dark mb-1">Data da reunião</label>
-          <input type="date" value={dataReuniao} onChange={(e) => setDataReuniao(e.target.value)} className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" />
+          <CampoData value={dataReuniao} onChange={(iso) => setDataReuniao(iso)} className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" />
         </div>
       </div>
       <div>
@@ -512,7 +513,7 @@ function ModalRevisao({ ata, onClose, onSaved }) {
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Data</label>
-              <input type="date" value={dataReuniao} onChange={(e) => setDataReuniao(e.target.value)} className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" />
+              <CampoData value={dataReuniao} onChange={(iso) => setDataReuniao(iso)} className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" />
             </div>
           </div>
           <div>

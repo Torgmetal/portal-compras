@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { FileText, PlusCircle, Loader2, AlertCircle, X, Search, ChevronDown, ShieldAlert, ShieldCheck, Clock, Building2, Users, AlertTriangle, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, ClipboardCheck, ChevronRight, BadgeCheck, Factory, Paperclip, Eye, Send, UploadCloud, Cloud, Pencil, Trash2, MinusCircle, Undo2 } from "lucide-react";
 import ConfirmModal from "@/components/admin/ConfirmModal";
@@ -747,12 +748,12 @@ export default function DocumentosClient() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-torg-gray mb-1">Data de emissão</label>
-                  <input type="date" value={form.dataEmissao} onChange={(e) => setForm({ ...form, dataEmissao: e.target.value })}
+                  <CampoData value={form.dataEmissao} onChange={(iso) => setForm({ ...form, dataEmissao: iso })}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-torg-gray mb-1">Data de validade</label>
-                  <input type="date" value={form.dataValidade} onChange={(e) => setForm({ ...form, dataValidade: e.target.value })}
+                  <CampoData value={form.dataValidade} onChange={(iso) => setForm({ ...form, dataValidade: iso })}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue" />
                 </div>
               </div>

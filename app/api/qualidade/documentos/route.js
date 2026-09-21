@@ -1,5 +1,6 @@
 // GET  /api/qualidade/documentos  — lista + stats (status calculado)
 // POST /api/qualidade/documentos  — cria documento (+ backup ISO no SharePoint)
+import {requireGestaoPit} from "@/lib/pit-acesso";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -135,6 +136,7 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
   }
 
+  if(body.tipo === "PIT_CLIENTE"){try{await requireGestaoPit();}catch(e){return NextResponse.json({error:e.message},{status:e.message === "Unauthorized"?401:403});}}
   if (body.arquivoUrl && !isBlobUrlSegura(body.arquivoUrl)) {
     return NextResponse.json({ success: false, error: "URL de arquivo inválida" }, { status: 400 });
   }

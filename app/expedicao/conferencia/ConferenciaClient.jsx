@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertCircle, CheckCircle2, ClipboardCheck, Loader2, Play } from "lucide-react";
 import { lerJson } from "@/lib/ler-json";
 import { pedirTelaCheia } from "./modo-patio";
+import BotoesRelatorioConferencia from "@/components/BotoesRelatorioConferencia";
 
 // CONFERÊNCIA DE PEÇA — a porta de entrada: começar uma, ou voltar para uma que já está aberta.
 //
@@ -28,29 +29,43 @@ const quando = (iso) => {
 function Cartao({ c }) {
   const aberta = c.status === "ABERTA";
   return (
-    <Link href={`/expedicao/conferencia/${c.id}`} onClick={pedirTelaCheia}
-      className="block bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:border-torg-blue transition-colors">
-      <div className="flex items-start gap-3">
-        <div className={`mt-0.5 shrink-0 ${aberta ? "text-torg-orange" : "text-emerald-600"}`}>
-          {aberta ? <Play size={18} /> : <CheckCircle2 size={18} />}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="font-bold text-torg-dark">
-            OP-{c.opNumero}{c.cliente ? ` · ${c.cliente}` : ""}
+    // ⚠⚠ O LINK NÃO ENVOLVE O CARTÃO INTEIRO, E ISSO É CONSERTO. Os botões de baixar são âncoras
+    // (`<a download>`), e âncora dentro de âncora é HTML inválido: o React acusa erro de
+    // hidratação e o navegador desmonta a estrutura por conta própria — o que quebra tanto o
+    // clique no cartão quanto o download. O link cobre o conteúdo; o rodapé é irmão dele.
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm hover:border-torg-blue transition-colors">
+      <Link href={`/expedicao/conferencia/${c.id}`} onClick={pedirTelaCheia} className="block p-4">
+        <div className="flex items-start gap-3">
+          <div className={`mt-0.5 shrink-0 ${aberta ? "text-torg-orange" : "text-emerald-600"}`}>
+            {aberta ? <Play size={18} /> : <CheckCircle2 size={18} />}
           </div>
-          {c.obra && <div className="text-[13px] text-torg-gray truncate">{c.obra}</div>}
-          <div className="text-[12px] text-torg-gray mt-1">
-            {aberta ? "Aberta" : "Finalizada"} · {c.lancamentos} lançamento(s) ·{" "}
-            {quando(aberta ? c.iniciadaEm : c.finalizadaEm)}
-            {c.iniciadaPorNome ? ` · ${c.iniciadaPorNome}` : ""}
+          <div className="min-w-0 flex-1">
+            <div className="font-bold text-torg-dark">
+              OP-{c.opNumero}{c.cliente ? ` · ${c.cliente}` : ""}
+            </div>
+            {c.obra && <div className="text-[13px] text-torg-gray truncate">{c.obra}</div>}
+            <div className="text-[12px] text-torg-gray mt-1">
+              {aberta ? "Aberta" : "Finalizada"} · {c.lancamentos} lançamento(s) ·{" "}
+              {quando(aberta ? c.iniciadaEm : c.finalizadaEm)}
+              {c.iniciadaPorNome ? ` · ${c.iniciadaPorNome}` : ""}
+            </div>
           </div>
+          <span className={`shrink-0 text-[11px] font-bold px-2 py-1 rounded-lg ${
+            aberta ? "bg-torg-orange/10 text-torg-orange" : "bg-emerald-50 text-emerald-700"}`}>
+            {aberta ? "EM ANDAMENTO" : "OK"}
+          </span>
         </div>
-        <span className={`shrink-0 text-[11px] font-bold px-2 py-1 rounded-lg ${
-          aberta ? "bg-torg-orange/10 text-torg-orange" : "bg-emerald-50 text-emerald-700"}`}>
-          {aberta ? "EM ANDAMENTO" : "OK"}
-        </span>
-      </div>
-    </Link>
+      </Link>
+      {/* ⚠ Só na finalizada, aqui na lista: é o documento de uma conferência ENCERRADA que a
+          expedição leva junto com o romaneio. O relatório parcial de quem ainda está conferindo
+          fica dentro da sessão, onde a pessoa sabe que o número ainda vai mudar. */}
+      {!aberta && (
+        <div className="px-4 pb-3 -mt-1 flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] text-torg-gray">Baixar a listagem de peças:</span>
+          <BotoesRelatorioConferencia id={c.id} compacto />
+        </div>
+      )}
+    </div>
   );
 }
 

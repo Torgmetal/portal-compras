@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, RefreshCw, CalendarRange, ChevronLeft } from 'lucide-react';
 import UltimasLiberacoes from './UltimasLiberacoes';
+import FilaDecisao from './FilaDecisao';
 import PCPDashboardClient from './PCPDashboardClient';
 import { resumoPainel } from '@/lib/pcp-painel-resumo';
 import { MAQUINA_LABEL } from '@/lib/maquina-corte';
@@ -52,6 +53,7 @@ export default function PCPPainelClient({ isAdmin }) {
       <div className={s.actions}><button disabled={loading} onClick={() => carregar()}><RefreshCw size={15}/>{loading ? 'Atualizando…' : 'Atualizar'}</button><Link className={s.primary} href="/pcp/producao"><CalendarRange size={16}/> Programação</Link></div></header>
     <nav className={s.tabs} aria-label="Seções do painel"><a href="#visao-pcp">Visão geral</a><a href="#fluxo-pcp">Fluxo da fábrica</a><a href="#prioridades-pcp">Prioridades</a><button onClick={() => setDetalhe(true)}>Detalhamento do corte</button></nav>
     {erros.length > 0 && <p role="alert" className={s.warning}>Não foi possível carregar: {erros.join(', ')}. Os indicadores dessa fonte estão indisponíveis. Tente atualizar.</p>}
+    <FilaDecisao ops={fontes.producao?.ops} carregando={loading}/>
     <UltimasLiberacoes ops={fontes.producao?.ops || []}/>
     <div className={s.metrics} id="visao-pcp">
       <article><small>Obras com prazo vencido</small><strong className={r.atrasadas > 0 ? s.red : ''}>{n(r.atrasadas)}</strong><p>Entre as obras liberadas ao PCP</p></article>

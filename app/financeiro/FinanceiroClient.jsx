@@ -1,7 +1,9 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Loader2, AlertCircle, X, TrendingUp, TrendingDown, Pencil, Trash2, Activity, Download } from "lucide-react";
+import CampoDecimal from "@/components/CampoDecimal";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -241,12 +243,12 @@ export default function FinanceiroClient({ ops, fluxos, romaneios, semanas, sema
           <div className="flex flex-wrap items-end gap-2 text-xs">
             <label className="flex flex-col gap-0.5">
               <span className="text-torg-gray">De</span>
-              <input type="date" value={fDe} onChange={(e) => setFDe(e.target.value)}
+              <CampoData value={fDe} onChange={(iso) => setFDe(iso)}
                 className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-torg-dark" />
             </label>
             <label className="flex flex-col gap-0.5">
               <span className="text-torg-gray">Até</span>
-              <input type="date" value={fAte} onChange={(e) => setFAte(e.target.value)}
+              <CampoData value={fAte} onChange={(iso) => setFAte(iso)}
                 className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-torg-dark" />
             </label>
             <label className="flex flex-col gap-0.5">
@@ -480,12 +482,12 @@ function ModalImportarOmie({ onClose, onDone }) {
         <div className="grid grid-cols-2 gap-3">
           <label className="text-sm">
             <span className="text-torg-gray">De</span>
-            <input type="date" value={de} onChange={(e) => setDe(e.target.value)}
+            <CampoData value={de} onChange={(iso) => setDe(iso)}
               className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
           </label>
           <label className="text-sm">
             <span className="text-torg-gray">Até</span>
-            <input type="date" value={ate} onChange={(e) => setAte(e.target.value)}
+            <CampoData value={ate} onChange={(iso) => setAte(iso)}
               className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
           </label>
         </div>
@@ -659,7 +661,7 @@ function ModalFluxo({ ops, item, onClose, onSaved }) {
           </div>
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Data prevista *</label>
-            <input type="date" value={form.data} onChange={(e) => set("data", e.target.value)}
+            <CampoData value={form.data} onChange={(iso) => set("data", iso)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           </div>
         </div>
@@ -672,8 +674,8 @@ function ModalFluxo({ ops, item, onClose, onSaved }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Valor (R$) *</label>
-            <input type="number" step="0.01" min="0" value={form.valor || ""}
-              onChange={(e) => set("valor", e.target.value)}
+            <CampoDecimal value={form.valor || ""}
+              onChange={(txt) => set("valor", txt)}
               placeholder="R$ 0,00"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right tabular-nums" />
           </div>
@@ -696,8 +698,8 @@ function ModalFluxo({ ops, item, onClose, onSaved }) {
           {form.realizado && (
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Data realizado</label>
-              <input type="date" value={form.dataRealizado}
-                onChange={(e) => set("dataRealizado", e.target.value)}
+              <CampoData value={form.dataRealizado}
+                onChange={(iso) => set("dataRealizado", iso)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
             </div>
           )}

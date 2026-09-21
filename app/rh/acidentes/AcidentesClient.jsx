@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useMemo } from "react";
 import { AlertTriangle, Search, PlusCircle, Loader2, AlertCircle, X, ChevronDown, ChevronUp, Calendar, Shield, Activity, FileText, Eye, Hash } from "lucide-react";
 
@@ -686,13 +687,23 @@ function Campo({ label, value, onChange, type = "text", placeholder, className =
   return (
     <div className={className}>
       <label className="block text-xs font-medium text-torg-gray mb-1">{label}</label>
-      <input
-        type={type}
-        value={value || ""}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue"
-      />
+      {/* ⚠ `type="date"` aqui é "quero uma data", não "quero o campo do navegador" — que mostra
+          mm/dd/yyyy para quem tem o navegador em inglês. Ver `components/CampoData`. */}
+      {type === "date" ? (
+        <CampoData
+          value={value || ""}
+          onChange={onChange}
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue"
+        />
+      ) : (
+        <input
+          type={type}
+          value={value || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue"
+        />
+      )}
     </div>
   );
 }

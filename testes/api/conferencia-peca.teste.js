@@ -5,9 +5,12 @@ import { mockPrisma } from "@/testes/apoio/prisma";
 // alguns segundos atrás — com duas pessoas conferindo a mesma obra no pátio, o saldo que o celular
 // mostra pode já ter sido consumido. Estes testes travam quem decide.
 
-const mocks = vi.hoisted(() => ({ role: vi.fn() }));
+const mocks = vi.hoisted(() => ({ role: vi.fn(), enviar: vi.fn() }));
 vi.mock("@/lib/session", () => ({ requireRole: mocks.role }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma, prismaDirect: mockPrisma }));
+// ⚠ O envio da planilha ao PCP é mockado aqui: estes testes são sobre ENCERRAR, e um e-mail de
+// verdade sairia a cada rodada da suíte.
+vi.mock("@/lib/conferencia-email", () => ({ enviarConferenciaAoPcp: mocks.enviar }));
 import { POST, PUT, DELETE, PATCH, GET } from "@/app/api/expedicao/conferencia/[id]/route";
 
 const SESSAO = { id: "c1", opId: "op1", opNumero: "097", status: "ABERTA", observacao: null,
@@ -277,6 +280,55 @@ describe("PATCH — encerrar", () => {
     mockPrisma.conferenciaPeca.update.mockResolvedValue({ id: "c1", status: "FINALIZADA" });
     await patch({ acao: "finalizar" });
     expect(mockPrisma.$executeRaw).toHaveBeenCalled();
+  });
+
+  // ─── A planilha que vai ao PCP (Matheus, 17/09/2026) ──────────────────────
+  it("finalizar manda a planilha ao PCP, e devolve o resultado para a tela", async () => {
+    mockPrisma.conferenciaPeca.update.mockResolvedValue({ id: "c1", status: "FINALIZADA" });
+    mocks.enviar.mockResolvedValue({ enviado: true, arquivo: "Conferencia_OP-097.xlsx" });
+    const r = await patch({ acao: "finalizar" });
+    expect(mocks.enviar).toHaveBeenCalledTimes(1);
+    expect((await r.json()).email).toMatchObject({ enviado: true });
+  });
+
+  // ⚠⚠ CANCELADA É O DESFAZER DE QUEM ABRIU POR ENGANO. Mandar planilha dela ao PCP daria ar de
+  // documento ao que foi anulado de propósito — a mesma regra da rota de relatório.
+  it("⚠⚠ cancelar NÃO manda planilha nenhuma", async () => {
+    mockPrisma.conferenciaPeca.update.mockResolvedValue({ id: "c1", status: "CANCELADA" });
+    await patch({ acao: "cancelar" });
+    expect(mocks.enviar).not.toHaveBeenCalled();
+  });
+
+  // ⚠⚠ O OPERADOR ESTÁ NO PÁTIO COM O CAMINHÃO ESPERANDO. Resend fora do ar não pode significar
+  // conferência que não encerra — o status já está gravado quando o e-mail é tentado.
+  it("⚠⚠ e-mail que FALHA não derruba a finalização, e o aviso chega à tela", async () => {
+    mockPrisma.conferenciaPeca.update.mockResolvedValue({ id: "c1", status: "FINALIZADA" });
+    mocks.enviar.mockResolvedValue({ enviado: false, motivo: "Resend fora do ar" });
+    const r = await patch({ acao: "finalizar" });
+    expect(r.status).toBe(200);
+    const corpo = await r.json();
+    expect(corpo.success).toBe(true);
+    expect(corpo.status).toBe("FINALIZADA");
+    expect(corpo.email).toMatchObject({ enviado: false, motivo: "Resend fora do ar" });
+  });
+
+  // ⚠⚠ Quem pegou isto foram os testes ANTIGOS, que não configuram este mock: o envio resolvia
+  // `undefined` e a leitura de `.enviado` estourava DEPOIS de a finalização estar gravada — 500 na
+  // cara do operador por causa de um e-mail.
+  it("⚠⚠ envio que devolve nada não derruba a finalização", async () => {
+    mockPrisma.conferenciaPeca.update.mockResolvedValue({ id: "c1", status: "FINALIZADA" });
+    mocks.enviar.mockResolvedValue(undefined);
+    const r = await patch({ acao: "finalizar" });
+    expect(r.status).toBe(200);
+    expect((await r.json()).email.enviado).toBe(false);
+  });
+
+  it("⚠ e-mail que LANÇA também não derruba — o catch é o cinto do import", async () => {
+    mockPrisma.conferenciaPeca.update.mockResolvedValue({ id: "c1", status: "FINALIZADA" });
+    mocks.enviar.mockRejectedValue(new Error("explodiu"));
+    const r = await patch({ acao: "finalizar" });
+    expect(r.status).toBe(200);
+    expect((await r.json()).email.enviado).toBe(false);
   });
 
   it("já encerrada por outra chamada concorrente: recusa em vez de encerrar de novo", async () => {

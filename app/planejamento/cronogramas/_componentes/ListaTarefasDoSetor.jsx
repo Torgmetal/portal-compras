@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { corDaArea } from "@/lib/cronograma-area-cor";
 import { Check, ChevronDown, ChevronRight, Layers, Loader2, Pencil, Plus } from "lucide-react";
 import { AntecessorasPicker } from "./AntecessorasPicker";
@@ -123,11 +124,11 @@ export function ListaTarefasDoSetor({
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1">
               <span className="text-[10px] text-torg-gray">Início:</span>
-              <input type="date" value={newTaskInicio} onChange={(e) => setNewTaskInicio(e.target.value)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
+              <CampoData value={newTaskInicio} onChange={(iso) => setNewTaskInicio(iso)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-[10px] text-torg-gray">Fim:</span>
-              <input type="date" value={newTaskFim} onChange={(e) => setNewTaskFim(e.target.value)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
+              <CampoData value={newTaskFim} onChange={(iso) => setNewTaskFim(iso)} className="text-[10px] px-1.5 py-0.5 border border-gray-200 rounded bg-white" />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-[10px] text-torg-gray">Duração:</span>

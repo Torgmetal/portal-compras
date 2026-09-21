@@ -10,7 +10,14 @@ export const maxDuration = 15;
 // e resumo de contadores por categoria de status.
 export async function GET(req, { params }) {
   try {
-    await requireRole(["ADMIN", "COMPRAS", "COMERCIAL"]);
+    // ⚠ O Almoxarifado lê os materiais da obra pelo Painel de OPs (Matheus, 17/09/2026) — é a
+    // leitura operacional de quem recebe: o que foi pedido, quanto chegou, de quem e quando.
+    const user = await requireRole(["ADMIN", "COMPRAS", "COMERCIAL", "ALMOXARIFADO"]);
+    // ⚠⚠ MAS SEM OS VALORES DE ESTOQUE. `estoquePreco`/`estoqueTotal` são o custo da alocação —
+    // número de gestão, e fora do que foi liberado ("operacional + preço dos pedidos"). Cortado
+    // AQUI, na resposta, e não escondido na tela: campo que sai da API já vazou.
+    const veValores = user.tipo === "ADMIN"
+      || (user.modulos ?? []).some((m) => m === "COMPRAS" || m === "COMERCIAL");
     const { id } = await params;
 
     const op = await prisma.oP.findUnique({
@@ -143,8 +150,8 @@ export async function GET(req, { params }) {
           nfNumero: ultimoReceb?.nfNumero || ped?.nfNumero || null,
           recebidoEm: ultimoReceb?.dataRecebimento || ped?.recebidoEm || ped?.dataEntregaReal || null,
           // Dados de estoque
-          estoquePreco: it.atendidoEstoquePreco || null,
-          estoqueTotal: it.atendidoEstoqueTotal || null,
+          estoquePreco: veValores ? (it.atendidoEstoquePreco || null) : null,
+          estoqueTotal: veValores ? (it.atendidoEstoqueTotal || null) : null,
           estoqueData: it.atendidoEstoqueEm || null,
           estoqueObs: it.atendidoEstoqueObs || null,
           // Cancelamento

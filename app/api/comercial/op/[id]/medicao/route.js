@@ -20,6 +20,8 @@ const schema = z.object({
   manual: z.boolean().optional().default(false),
   valorBruto: z.number().optional(),
   data: z.string().optional().nullable(), // ISO date
+  // medição de um aditivo (o pedido Omie do aditivo) — Vitor (16/09/2026): "linha de medição nova"
+  aditivoId: z.string().optional().nullable(),
 });
 
 export async function POST(req, { params }) {
@@ -107,6 +109,9 @@ export async function POST(req, { params }) {
       ultimoSync: new Date(),
       payload: resultado.raw,
       createdById: user.id,
+      aditivoId: body.aditivoId
+        ? (await prisma.aditivo.findFirst({ where: { id: body.aditivoId, opId: op.id }, select: { id: true } }))?.id || null
+        : null,
     },
   });
 

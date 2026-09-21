@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useRef } from "react";
 import { ehMaterialDeTinta } from "@/lib/material-tinta";
 
@@ -95,7 +96,7 @@ export default function CmrCampos({ form, setF, pedidoSlot = null, aoBuscarPedid
           {pedidoSlot}
         </div>
       </div>
-      <div><span className={lbl}>Data receb.</span><input type="date" value={form.dataRecebimento} onChange={(e) => setF("dataRecebimento", e.target.value)} className={inp} /></div>
+      <div><span className={lbl}>Data receb.</span><CampoData value={form.dataRecebimento} onChange={(iso) => setF("dataRecebimento", iso)} className={inp} /></div>
       <div><span className={lbl}>Nº NF</span><input value={form.nf} onChange={(e) => setF("nf", e.target.value)} inputMode="numeric" className={inp} /></div>
       <div><span className={lbl}>Fornecedor</span><input value={form.fornecedor} onChange={(e) => setF("fornecedor", e.target.value)} className={inp} /></div>
       <div><span className={lbl}>Obra (OP)</span><input value={form.obra} onChange={(e) => setF("obra", e.target.value)} placeholder="ex.: OP 067" className={inp} /></div>
@@ -108,7 +109,7 @@ export default function CmrCampos({ form, setF, pedidoSlot = null, aoBuscarPedid
       {ehTinta && (
         <div>
           <span className={lbl}>Validade do lote <span className="text-torg-orange">· tinta</span></span>
-          <input type="date" value={form.validade} onChange={(e) => setF("validade", e.target.value)}
+          <CampoData value={form.validade} onChange={(iso) => setF("validade", iso)}
             className={`${inp} ${form.validade ? "" : "border-torg-orange bg-orange-50"}`} />
         </div>
       )}

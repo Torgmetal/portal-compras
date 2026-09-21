@@ -328,5 +328,31 @@ export async function PATCH(req, { params }) {
   const { sessao, atualizada } = resultado;
 
   registro.info(`${sessao.opNumero}: conferência ${atualizada.status.toLowerCase()}`);
-  return NextResponse.json({ success: true, status: atualizada.status });
+
+  // ⚠⚠ A PLANILHA VAI AO PCP DEPOIS DE A FINALIZAÇÃO ESTAR GRAVADA, E NUNCA PODE DERRUBÁ-LA.
+  // Matheus (17/09/2026): "quando o operador finalizar (…) o portal automaticamente envie um
+  // relatório em Excel para pcp@torg.com.br". Quem clica está no pátio, no celular, com o caminhão
+  // esperando — Resend fora do ar não pode significar conferência que não encerra. `enviar` já não
+  // lança; o `catch` é o cinto para o caso de o import falhar.
+  //
+  // ⚠ Só no FINALIZAR. Cancelada é o desfazer de quem abriu por engano, e mandar planilha dela ao
+  // PCP daria ar de documento ao que foi anulado de propósito — a mesma regra da rota de relatório.
+  let email = null;
+  if (finalizar) {
+    const resposta = await import("@/lib/conferencia-email")
+      .then((m) => m.enviarConferenciaAoPcp(sessao))
+      .catch((e) => ({ enviado: false, motivo: e?.message || "falha ao carregar o envio" }));
+    // ⚠⚠ NORMALIZA O QUE VOLTOU, inclusive `undefined`. Sem isto, um envio que devolvesse nada
+    // fazia `resposta.enviado` estourar AQUI — e a finalização, já gravada, respondia 500 ao
+    // operador. Um caminho que existe para nunca derrubar nada não pode derrubar por um contrato
+    // quebrado; quem pegou foi um teste antigo que não configurava o mock.
+    email = resposta && typeof resposta === "object"
+      ? resposta
+      : { enviado: false, motivo: "o envio não respondeu como esperado" };
+    if (!email.enviado) registro.aviso(`${sessao.opNumero}: planilha não seguiu ao PCP — ${email.motivo}`);
+  }
+
+  // ⚠ O resultado do envio volta para a TELA. Sem isso o operador nunca saberia que a planilha não
+  // saiu, e o PCP ficaria esperando um e-mail que ninguém sabe que falhou.
+  return NextResponse.json({ success: true, status: atualizada.status, ...(email ? { email } : {}) });
 }

@@ -363,10 +363,12 @@ export default function ProgramacaoCorteClient({ pecasIniciais, ops, userRole })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro");
-      // Saem da tela de corte (status MONTAGEM) — removo da lista local
-      const set = new Set(lista);
+      // Saem da tela de corte (status MONTAGEM) — removo da lista local; posição de conjunto fica
+      const recusadas = new Set((data.ignoradas || []).map((p) => p.id));
+      const set = new Set(lista.filter((id) => !recusadas.has(id)));
       setPecas((prev) => prev.filter((p) => !set.has(p.id)));
       setSelecionados(new Set());
+      if (data.aviso) alert(data.aviso);
     } catch (e) {
       alert("Erro ao marcar como conjunto: " + e.message);
     } finally {

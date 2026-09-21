@@ -53,6 +53,22 @@ export async function GET() {
     return String(a.numero).localeCompare(String(b.numero));
   });
 
+  // ⚠ os aditivos entram no mesmo painel: comunicado divulgado, quem confirmou, quem falta (16/09/2026)
+  const acAd = await prisma.aditivoAceite.findMany({
+    select: { email: true, enviadoEm: true, aceitoEm: true, cobradoEm: true, cobrancas: true,
+              aditivo: { select: { id: true, numero: true, divulgadoEm: true, status: true, op: { select: { id: true, numero: true, cliente: true, obra: true } } } } },
+    orderBy: { enviadoEm: "asc" },
+  });
+  const porAd = new Map();
+  for (const a of acAd) {
+    const ad = a.aditivo; if (!ad?.op) continue;
+    if (!porAd.has(ad.id)) porAd.set(ad.id, { aditivoId: ad.id, aditivoNumero: ad.numero, status: ad.status, opId: ad.op.id, numero: ad.op.numero, cliente: ad.op.cliente, obra: ad.op.obra || null, divulgadoEm: ad.divulgadoEm, pendentes: [], confirmados: [] });
+    const o = porAd.get(ad.id);
+    if (a.aceitoEm) o.confirmados.push({ email: a.email, aceitoEm: a.aceitoEm, dias: dias(a.aceitoEm) });
+    else o.pendentes.push({ email: a.email, enviadoEm: a.enviadoEm, dias: dias(a.enviadoEm), cobrancas: a.cobrancas || 0, cobradoEm: a.cobradoEm });
+  }
+  const aditivos = [...porAd.values()].map((o) => ({ ...o, totalPend: o.pendentes.length, totalOk: o.confirmados.length, maxDias: o.pendentes.length ? Math.max(...o.pendentes.map((p) => p.dias ?? 0)) : null }))
+    .sort((x, y) => (y.totalPend - x.totalPend) || ((y.maxDias ?? 0) - (x.maxDias ?? 0)));
   const comPendencia = ops.filter((o) => o.totalPend > 0);
   const resumo = {
     obrasComPendencia: comPendencia.length,
@@ -61,5 +77,5 @@ export async function GET() {
     obrasDivulgadas: ops.length,
   };
 
-  return NextResponse.json({ resumo, ops, geradoEm: new Date().toISOString() });
+  return NextResponse.json({ aditivos, resumo, ops, geradoEm: new Date().toISOString() });
 }

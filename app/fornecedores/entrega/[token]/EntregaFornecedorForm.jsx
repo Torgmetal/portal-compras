@@ -1,12 +1,19 @@
 "use client";
 import { useState, useEffect } from "react";
 import {
-  Loader2, AlertCircle, CheckCircle2, CalendarDays,
-  Package, Truck, Clock, History,
+  Loader2, AlertCircle, CheckCircle2, CalendarDays, Package, Truck, Clock, History, Hourglass,
 } from "lucide-react";
+import Formulario from "./Formulario";
 
+// ⚠⚠ PRAZO SE FORMATA EM UTC. Ele vem de um `<input type="date">` e é gravado como meia-noite
+// UTC; no fuso de São Paulo isso ainda é o dia ANTERIOR, e a página mostrava ao fornecedor uma
+// data um dia antes da que ele mesmo digitou (18/09/2026).
 const fmtData = (d) =>
-  d ? new Date(d).toLocaleDateString("pt-BR") : "—";
+  d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—";
+
+/** ⚠ Para CARIMBO de quando algo aconteceu — aí o fuso local é o certo, não UTC. */
+const fmtQuando = (d) =>
+  d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—";
 
 const fmtQtd = (qtd, unidade) => {
   if (qtd == null) return "—";
@@ -19,7 +26,13 @@ export default function EntregaFornecedorForm({ token }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
 
+  // ⚠⚠ DUAS RESPOSTAS POSSÍVEIS, UMA DE CADA VEZ. Matheus (18/09/2026): "é interessante ter a
+  // opção de Pedido Entregue e campo para informar número da NF". Deixar os dois formulários
+  // abertos ao mesmo tempo convidaria a preencher os dois e o servidor recusaria — a escolha vem
+  // antes, e cada aba mostra só o que ela pede.
+  const [aba, setAba] = useState("previsao"); // "previsao" | "entregue"
   const [novoPrazo, setNovoPrazo] = useState("");
+  const [nfNumero, setNfNumero] = useState("");
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [sucesso, setSucesso] = useState(false);
@@ -40,15 +53,22 @@ export default function EntregaFornecedorForm({ token }) {
     })();
   }, [token]);
 
+  const entregueAba = aba === "entregue";
+
   const enviar = async () => {
-    if (!novoPrazo) { setErroEnvio("Selecione a data de previsao"); return; }
+    if (entregueAba && !nfNumero.trim()) { setErroEnvio("Informe o numero da nota fiscal"); return; }
+    if (!entregueAba && !novoPrazo) { setErroEnvio("Selecione a data de previsao"); return; }
     setEnviando(true);
     setErroEnvio("");
     try {
+      // ⚠ Manda um OU outro, nunca os dois: o servidor recusa corpo ambíguo de propósito.
+      const corpo = entregueAba
+        ? { entregue: true, nfNumero: nfNumero.trim(), motivo: motivo.trim() || undefined }
+        : { novoPrazo, motivo: motivo.trim() || undefined };
       const res = await fetch(`/api/fornecedores/entrega/${token}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ novoPrazo, motivo: motivo.trim() || undefined }),
+        body: JSON.stringify(corpo),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao enviar");
@@ -103,9 +123,20 @@ export default function EntregaFornecedorForm({ token }) {
     return (
       <div className="text-center py-12">
         <CheckCircle2 size={48} className="text-emerald-500 mx-auto mb-3" />
-        <h2 className="text-xl font-bold text-torg-dark">Previsao registrada!</h2>
+        <h2 className="text-xl font-bold text-torg-dark">
+          {entregueAba ? "Entrega informada!" : "Previsao enviada!"}
+        </h2>
+        {/* ⚠⚠ "INFORMADA", NÃO "CONFIRMADA". O fornecedor precisa saber que a Torg ainda vai
+            conferir o recebimento — prometer baixa aqui faria ele parar de acompanhar um pedido
+            que talvez não tenha chegado. */}
         <p className="text-sm text-torg-gray mt-2">
-          A nova data de entrega foi registrada com sucesso. A equipe de Compras da Torg Metal ja foi notificada.
+          {entregueAba
+            ? "Obrigado. A equipe de Compras da Torg Metal foi avisada e vai conferir o recebimento."
+            /* ⚠⚠ "ENVIADA PARA ANALISE", NUNCA "REGISTRADA COM SUCESSO". Desde 18/09/2026 a data
+               do fornecedor não passa a valer sozinha — ela espera Compras aprovar. Dizer
+               "registrada" o faria programar o carregamento para uma data que a Torg ainda não
+               aceitou, e ninguém descobriria a divergência até o caminhão. */
+            : "A data foi enviada para a equipe de Compras da Torg Metal, que vai confirmar se ela atende a programacao da obra. Voce recebe um retorno por e-mail se ela nao puder ser aceita."}
         </p>
         <p className="text-sm text-torg-gray mt-1">
           Obrigado, <strong>{d.fornecedor}</strong>.
@@ -117,6 +148,9 @@ export default function EntregaFornecedorForm({ token }) {
   const diasAtraso = d.prazoEntregaPrevisto
     ? Math.max(0, Math.ceil((Date.now() - new Date(d.prazoEntregaPrevisto).getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
+
+  const form = { aba, setAba, entregueAba, novoPrazo, setNovoPrazo, nfNumero, setNfNumero,
+    motivo, setMotivo, erroEnvio, setErroEnvio, enviando, enviar };
 
   return (
     <div className="space-y-6 max-w-xl mx-auto">
@@ -148,6 +182,18 @@ export default function EntregaFornecedorForm({ token }) {
             <div className="flex items-center justify-between text-sm">
               <span className="text-torg-gray">Prazo original</span>
               <span className="text-gray-500 line-through">{fmtData(d.prazoOriginal)}</span>
+            </div>
+          )}
+          {/* ⚠⚠ A PROPOSTA PENDENTE PRECISA APARECER. Sem isto o fornecedor respondia, voltava ao
+              link e via o prazo ANTIGO intacto — parecia que a resposta se perdeu, e ele mandaria
+              de novo (e cada reenvio é outro aviso para `compras@`). */}
+          {d.propostaEmAnalise && (
+            <div className="flex items-start gap-2 text-sm rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+              <Hourglass size={14} className="text-amber-600 mt-0.5 shrink-0" />
+              <span className="text-amber-800">
+                Voce informou <b>{fmtData(d.propostaEmAnalise.prazo)}</b> em {fmtQuando(d.propostaEmAnalise.em)}.
+                {" "}Esta data esta <b>em analise</b> pela equipe de Compras e ainda nao substituiu o prazo acima.
+              </span>
             </div>
           )}
           {diasAtraso > 0 && (
@@ -216,7 +262,7 @@ export default function EntregaFornecedorForm({ token }) {
                 <div>
                   <span className="text-torg-gray">Atualizado para</span>{" "}
                   <span className="font-medium text-amber-700">{fmtData(h.prazoNovo)}</span>
-                  <span className="text-gray-400 ml-1.5">em {fmtData(h.criadoEm)}</span>
+                  <span className="text-gray-400 ml-1.5">em {fmtQuando(h.criadoEm)}</span>
                   {h.motivo && <p className="text-gray-500 italic mt-0.5">{h.motivo}</p>}
                 </div>
               </div>
@@ -225,58 +271,7 @@ export default function EntregaFornecedorForm({ token }) {
         </div>
       )}
 
-      {/* Formulario */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-3 border-b border-gray-100 bg-amber-50/50">
-          <h3 className="text-sm font-semibold text-amber-800">
-            Informar nova previsao de entrega
-          </h3>
-        </div>
-        <div className="px-6 py-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">
-              Data prevista de entrega *
-            </label>
-            <input
-              type="date"
-              value={novoPrazo}
-              onChange={(e) => setNovoPrazo(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">
-              Observacao <span className="font-normal text-torg-gray">(opcional)</span>
-            </label>
-            <textarea
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Ex: Material em transito, previsao de chegada na proxima semana"
-              rows={3}
-              maxLength={500}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue"
-            />
-          </div>
-
-          {erroEnvio && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 flex items-center gap-2">
-              <AlertCircle size={14} /> {erroEnvio}
-            </div>
-          )}
-
-          <button
-            onClick={enviar}
-            disabled={enviando || !novoPrazo}
-            className="w-full py-3 bg-torg-blue text-white text-sm font-semibold rounded-lg hover:bg-torg-blue/90 disabled:opacity-50 inline-flex items-center justify-center gap-2"
-          >
-            {enviando ? (
-              <><Loader2 size={16} className="animate-spin" /> Enviando...</>
-            ) : (
-              <><CalendarDays size={16} /> Confirmar previsao de entrega</>
-            )}
-          </button>
-        </div>
-      </div>
+      <Formulario estado={form} />
 
       {/* Nota */}
       <p className="text-[11px] text-center text-gray-400 pb-4">

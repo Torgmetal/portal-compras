@@ -6,6 +6,7 @@ import { FormLancamento, ListaLancamentos, PainelMarcas } from "./componentes";
 import { useSessao } from "./useSessao";
 import ModoPatio from "./ModoPatio";
 import { usarEhCelular } from "../modo-patio";
+import BotoesRelatorioConferencia from "@/components/BotoesRelatorioConferencia";
 
 // A TELA DE CAMPO. Matheus (08/09/2026): "a ideia é usar essa tela em um celular em campo ou tablet
 // para ele conferir as peças antes de ir para pintura e etiquetagem".
@@ -49,6 +50,18 @@ function Cabecalho({ dados, encerrada }) {
         )}
       </div>
       {dados?.progresso && <Barra p={dados.progresso} />}
+      {/* ⚠ Na sessão o botão aparece também com a conferência ABERTA — é o relatório parcial de
+          quem quer ver, no meio do turno, o que ainda falta bipar. Quem está aqui dentro sabe que
+          o número ainda vai mudar; na LISTA ele só aparece nas finalizadas, que é o documento que
+          acompanha o romaneio. A cancelada não emite nada (a rota recusa). */}
+      {status !== "CANCELADA" && dados?.conferencia?.id && (
+        <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2 flex-wrap">
+          <span className="text-[12px] text-torg-gray">
+            {encerrada ? "Listagem de peças conferidas:" : "Parcial do que já foi conferido:"}
+          </span>
+          <BotoesRelatorioConferencia id={dados.conferencia.id} />
+        </div>
+      )}
     </div>
   );
 }

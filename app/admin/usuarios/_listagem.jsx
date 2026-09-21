@@ -590,7 +590,7 @@ export default function ListagemUsuarios() {
                       </td>
 
                       {/* E-mail */}
-                      <td className="px-4 py-3 text-torg-gray">{u.email}</td>
+                      <td className="px-4 py-3 text-torg-gray">{u.email?.endsWith("@funcionario.torg") ? <span className="text-[12px]">sem e-mail · entra pelo CPF{u.funcionario?.nome ? ` (${u.funcionario.nome.split(" ")[0]})` : ""}</span> : <>{u.email}{u.funcionario ? <span className="ml-1 text-[10px] text-emerald-700" title="Vinculado ao RH: entra também pelo CPF">· CPF</span> : null}</>}</td>
 
                       {/* Módulos */}
                       {aba === "PORTAL" && (

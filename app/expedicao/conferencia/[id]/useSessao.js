@@ -61,10 +61,19 @@ export function useSessao(id) {
   const encerrar = useCallback(async (acao) => {
     setAgindo(true); setErro(""); setOk("");
     try {
-      await lerJson(await fetch(url, {
+      const r = await lerJson(await fetch(url, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao }),
       }), "Encerrar");
       await carregar();
+      // ⚠⚠ O ENVIO DA PLANILHA AO PCP APARECE PARA QUEM FINALIZOU. Ele é deliberadamente
+      // não-fatal no servidor (o caminhão não espera o Resend) — mas falhar em silêncio faria o
+      // operador ir embora achando que o PCP recebeu, e o PCP esperar um e-mail que ninguém sabe
+      // que não saiu. Sucesso também se diz: é o aviso de que não precisa reenviar à mão.
+      if (r?.email) {
+        setOk(r.email.enviado
+          ? `Conferência finalizada. Planilha enviada ao PCP (${r.email.arquivo}).`
+          : `Conferência finalizada — mas a planilha NÃO foi enviada ao PCP (${r.email.motivo}). Avise o PCP ou baixe o Excel e mande à mão.`);
+      }
       return true;
     } catch (e) { setErro(e.message); return false; } finally { setAgindo(false); }
   }, [url, carregar]);

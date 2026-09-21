@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { podeCancelarRM } from "@/lib/permissao-rm";
 import { ArrowLeft } from "lucide-react";
 import { calcularVerbaOP } from "@/lib/verba-op";
 import RMComprasClient from "./RMComprasClient";
@@ -54,6 +55,14 @@ export default async function RMComprasDetail({ params }) {
       // ⚠ A observação carrega o texto livre que o fornecedor digitou em prazo/pagamento — é onde a
       // SOUFER escreveu "SEM DISPONIBILIDADE" (T67-011-R00). Sem ela o mapa não tem como avisar.
       observacao: true,
+      // ⚠⚠ A CONDIÇÃO DE PAGAMENTO TEM CAMPO PRÓPRIO, e a tela não o lia (Matheus, 16/09/2026:
+      // "quando o fornecedor preenche forma de pagamento devia aparecer também na tela pra gente
+      // avaliar igual o prazo de entrega"). A rota de submissão grava a resposta em DOIS lugares —
+      // `prazoPagamento` e, de novo, dentro de `observacao` como "Pagamento: X" — e até aqui o
+      // único lugar que mostrava era o EXCEL do mapa comparativo, que alguém precisa baixar e
+      // abrir. Comparar duas propostas em 28 dias e à vista sem isso na tela é comparar preço
+      // fingindo que o prazo não existe.
+      prazoPagamento: true,
       // Itens completos com rmItem details — pra mostrar todos os itens
       // (incluindo de outras RMs) no modal de lancamento manual
       itens: {
@@ -109,6 +118,15 @@ export default async function RMComprasDetail({ params }) {
       ehPrimaria: c.rmId === rm.id,
       rmsVinculadas,
       itensCotaveis,
+      // ⚠⚠ AS OBSERVAÇÕES DOS ITENS VÊM À PARTE, E POR ISSO. `itens` é apagado logo abaixo para
+      // não inchar o payload, e `itensCotaveis` só traz item em status cotável — numa RM já
+      // fechada (tudo PEDIDO_GERADO) ele é VAZIO. Era o que escondia o que o fornecedor escreveu
+      // item a item: 1.266 observações no banco, e na RI-0007 as 7 da FERRO STORE não apareciam
+      // nem depois de a tela passar a mostrá-las (16/09/2026). Aqui vai só o que tem texto — são
+      // poucas linhas, e não dependem do status.
+      observacoesItens: (c.itens || [])
+        .filter((it) => String(it.observacao || "").trim())
+        .map((it) => ({ id: it.id, descricao: it.rmItem?.descricao || "Item", observacao: it.observacao })),
       // limpa itens pra nao bloar payload (itensCotaveis tem o que precisa)
       itens: undefined,
     };
@@ -230,6 +248,28 @@ export default async function RMComprasDetail({ params }) {
       nfSerie: true,
       recebidoEm: true,
       recebidoPor: { select: { name: true } },
+      // ⚠⚠ O ACOMPANHAMENTO PÓS-OMIE (Matheus, 16/09/2026): a previsão, cada remarcação dela e as
+      // etapas lançadas à mão. Tudo isto já existia no banco — `prazoEntregaPrevisto` em 274 dos
+      // 295 pedidos — e só aparecia na tela Compras › Entregas; aqui, onde se olha a RM, não havia
+      // como saber se o material chegou no prazo estimado.
+      prazoEntregaPrevisto: true,
+      prazoOriginal: true,
+      prazoHistorico: {
+        select: { id: true, prazoAnterior: true, prazoNovo: true, motivo: true, criadoEm: true, alteradoPor: { select: { name: true } } },
+        orderBy: { criadoEm: "asc" },
+      },
+      acompanhamentos: {
+        select: { id: true, etapa: true, data: true, observacao: true, registradoPor: { select: { name: true } } },
+        orderBy: { data: "asc" },
+      },
+      // ⚠ As duas últimas fontes de previsão, para a régua daqui não discordar da tela de Prazos:
+      // a data que o fornecedor pôs item a item, e o prazo em palavras da observação.
+      cotacao: {
+        select: {
+          observacao: true,
+          itens: { where: { vencedor: true }, select: { prazoEntrega: true, vencedor: true } },
+        },
+      },
       rmItens: {
         where: { rmId: rm.id },
         select: { id: true, descricao: true },
@@ -286,6 +326,7 @@ export default async function RMComprasDetail({ params }) {
         rm={data}
         outrasRMs={outrasRMs}
         userRole={user.role}
+        podeCancelarRM={podeCancelarRM(user)}
         dadosMapa={dadosMapaSerial}
         apiBaseMapa={apiBaseMapa}
         categoriasCustom={JSON.parse(JSON.stringify(categoriasCustom))}

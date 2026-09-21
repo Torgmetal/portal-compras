@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useComponenteEstavel } from "@/lib/react-estavel";
 import { AlertTriangle, Check, ClipboardList } from "lucide-react";
 import { escopoDoTipo, amostragemDoTipo } from "@/lib/pit-escopo";
 import PlpPainel from "./PlpPainel";
@@ -131,7 +132,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
   // podermos informar número ou N/A, e Pull-off precisamos ter que colocar N/A". Campo em branco
   // num relatório assinado é ambíguo — não se sabe se o ensaio não se aplicava ou se esqueceram.
   // "N/A" é o inspetor dizendo que conferiu e não se aplica.
-  const Campo = ({ rot, k, tipo = "text", opcoes = null, largura = "", na = false }) => (
+  const Campo = useComponenteEstavel(({ rot, k, tipo = "text", opcoes = null, largura = "", na = false }) => (
     <label className={`block ${largura}`}>
       <span className="flex items-center gap-1.5 text-[10px] font-semibold text-torg-gray mb-0.5">
         <span>{rot}</span>
@@ -145,7 +146,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
         )}
       </span>
       {opcoes ? (
-        <select value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
+        <select aria-label={rot} value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
           className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue disabled:bg-gray-50">
           <option value="">—</option>
           {opcoes.map((o) => <option key={o.id || o} value={o.id || o}>{o.nome || o}</option>)}
@@ -161,7 +162,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
         <span className="block text-[10px] text-torg-blue mt-0.5">PLP: {String(doPlp[k])}</span>
       )}
     </label>
-  );
+  ));
 
   const mediaRug = mediaRugosidade(rug);
   const rugFora = mediaRug != null && (mediaRug < RUGOSIDADE_MIN || mediaRug > RUGOSIDADE_MAX);

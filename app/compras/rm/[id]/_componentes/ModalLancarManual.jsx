@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
+import { parseObservacaoCotacao, condicaoPagamentoDe } from "@/lib/cotacao-observacao";
 import { useRouter } from "next/navigation";
 import { Loader2, AlertCircle, X, Edit3 } from "lucide-react";
 import { numeroBR } from "@/lib/numero-br";
@@ -71,9 +72,20 @@ export function ModalLancarManual({ cotacao, rm, onClose }) {
         };
       });
   });
-  const [prazoEntrega, setPrazoEntrega] = useState("");
-  const [condicaoPagamento, setCondicaoPagamento] = useState("");
-  const [observacao, setObservacao] = useState("");
+  // ⚠⚠ NASCEM COM O QUE O FORNECEDOR JÁ MANDOU (Matheus, 16/09/2026: "quando meu fornecedor
+  // preencher prazo de entrega e prazo faturamento deve aparecer nos campos quando eu editar uma
+  // cotação"). Vazios, eles não apenas escondiam a resposta dele — APAGAVAM: a rota `lancar-manual`
+  // REMONTA `Cotacao.observacao` a partir destes três campos e regrava `prazoPagamento`, então
+  // salvar uma edição com eles em branco descartava o prazo de entrega e a condição de pagamento
+  // que o fornecedor tinha informado. Mostrar e preservar são, aqui, a mesma correção.
+  //
+  // ⚠ A leitura vem de `lib/cotacao-observacao`, a mesma que a lista de cotações usa — a
+  // observação empilha três coisas num campo só, e duas telas que a separam de jeitos diferentes
+  // divergem no primeiro ajuste.
+  const respondido = parseObservacaoCotacao(cotacao.observacao);
+  const [prazoEntrega, setPrazoEntrega] = useState(respondido.prazoEntrega || "");
+  const [condicaoPagamento, setCondicaoPagamento] = useState(() => condicaoPagamentoDe(cotacao) || "");
+  const [observacao, setObservacao] = useState(respondido.observacao || "");
   // Total da nota declarado pelo fornecedor (PDF). Quando preenchido, vira
   // a "fonte da verdade" do total — gerar-pedidos vai escalar precos pra bater.
   const [totalPropostaInput, setTotalPropostaInput] = useState(

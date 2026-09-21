@@ -1,0 +1,138 @@
+---
+name: torg_apontamentos_syneco_planilha
+description: Planilha "Apontamentos para o Syneco" — o que o portal deu baixa (baixaSetores) e o Syneco ainda não tem, por marca e setor; em Produção › Meu trabalho (todas as obras) e em Peças › OP › setor (só aquele setor)
+metadata:
+  type: project
+---
+
+**Onde:** `Produção › Meu trabalho` ("Hoje na fábrica", `components/producao/MinhaFila.jsx`) tem o botão
+*Planilha p/ Syneco* no cabeçalho, ao lado de *Modelo 3D* — gera a planilha do SETOR escolhido no posto.
+`Produção › Gestão das OPs` (`PainelProducaoClient`, aba Visão geral) tem o card com o total de todas as
+OPs vivas e o botão *Planilha para o Syneco*. Em `Produção › Peças › OP › setor`, o botão
+*Apontamentos p/ Syneco* ao lado de *Exportar seleção* gera só daquela OP e setor.
+⚠ `/producao` renderiza `MinhaFila`, NÃO `PainelProducaoClient` (que é o /producao/gestao) — errei
+isso na primeira entrega e o Vitor não achou o botão. Lib `lib/apontamentos-syneco.js`, rota
+`/api/producao/apontamentos-syneco?opId&setor`, planilha no padrão Torg (`criarExcelTabular`).
+
+**Why:** Vitor (14/09/2026): "precisamos ter uma forma de exportar a planilha de Apontamentos para ser
+corrigido no Syneco, onde poderíamos colocar isso?". A baixa do portal só adianta; o Syneco é o
+registro oficial (cronograma do cliente, PDF e portal do cliente leem de lá). Já existia a "Baixa
+Syneco" no Gantt do PCP, mas por marcas selecionadas — o encarregado não vive no Gantt.
+
+**How to apply:**
+- Linha = baixa do portal (limitada à qte da marca; sem `qtd` = marca inteira) − produzido no Syneco no
+  setor (`mesOrdem` por `whereSetorSyneco`); só saldo > 0. Obra vai no código SKA (`opNumero` da LPC).
+- Medido em 14/09: 3.496 marcas / 14.855 peças em 4 obras (067: 8.694 croquis de corte baixados em
+  agosto como "fora do escopo — já fabricada"). Quando o Syneco recebe o lançamento, a linha some no sync.
+- Relacionado: [[torg_syneco_apontamento_fonte]], [[torg_pecaconjunto_opnumero]], [[torg_baixa_etapa_anterior]].
+
+## ⚠⚠ SÓ BAIXA DE SETOR — romaneio, terceiro e fechamento administrativo ficam de fora (17/09/2026)
+
+Vitor: *"vc esta trazendo algumas informações sem sentido, informações de romaneio, enfim está bem
+ruim"* → *"somente dos setores para podermos baixar as peças"*.
+
+A planilha lia TODA linha de `baixaSetores`. Medido no banco no mesmo dia: das **3.527** baixas,
+**3.504 não eram produção de ninguém no chão de fábrica** — 1.723 `porNome: "Romaneio importado"`
+(a peça já embarcou, a baixa nasceu da importação do FORM-22), 1.280 com
+`motivo: "preparação encerrada — nada mais a cortar nesta obra"` (fechamento em massa do corte),
+456 `"Guarda-corpo — fabricação no terceiro"` (fabricada FORA: não existe operação para lançar) e
+45 `"Fora do escopo — já fabricada (Vitor)"`. Sobravam 23 baixas reais, escondidas atrás de 3.503
+linhas de ruído; depois de subtrair o que o Syneco já tem, a planilha sai com **8 linhas**.
+
+- `ehBaixaDeSetor(bx)` (`lib/apontamentos-syneco.js`) é o portão: recusa pelo `motivo` de fechamento
+  e pelo `porNome` de importação/terceiro. ⚠ A regra mora no VALOR GRAVADO, não numa rota — nenhum
+  código vivo escreve esses nomes (são scripts/importações históricas), e uma importação nova de
+  romaneio volta a cair no filtro sozinha. Baixa em lote feita por uma PESSOA (`lote: true` com
+  motivo de produção) continua valendo.
+- `obraDoSyneco(opNumero, obrasDaOP)`: a coluna **Obra (Syneco)** mostrava `083` em 724 linhas — o
+  número do PORTAL, que não existe do lado de lá ([[torg_pecaconjunto_opnumero]]). Agora só sai
+  código `T\d+[A-Z]*`; na falta dele, a obra que o Syneco tem para aquela OP (quando é uma só), e
+  senão `—`. ⚠ `MesOrdem.obra` é NOT NULL: um `{ not: null }` no `groupBy` invalida a consulta
+  inteira e o `catch` devolvia lista vazia calada.
+- A planilha passou a ordenar por **setor** primeiro (ela é trabalhada setor a setor).
+
+## A 2ª aba: apontamento na frente manda dar baixa atrás (17/09/2026)
+
+Vitor: *"antes tínhamos uma planilha que pegava esses furos de apontamentos, exemplo: se a peça
+estava apontada na pintura já indicava que tinha que dar baixa nos setores anteriores que não foram
+dado baixa"*. A planilha passou a ter **duas abas**, que são duas ORIGENS diferentes:
+
+| Aba | De onde vem | Hoje |
+|---|---|---|
+| **Baixa do portal** | alguém baixou no portal, o Syneco não tem (`baixaSetores`) | 8 linhas |
+| **Setores anteriores** | o próprio Syneco: peça apontada à frente prova que passou atrás | 1.090 linhas · 4.366 peças · 146 t |
+
+`lib/baixa-etapa-anterior.js` (`lancamentosAtrasados` é puro), cadeia
+`Corte → Preparação → Montagem → Solda → Acabamento → Jato → Pintura`. Regra de
+[[torg_baixa_etapa_anterior]]. As travas, todas com teste:
+
+- ⚠⚠ **só é alvo o setor que TEM ordem no Syneco.** Etapa sem ordem não é "zero apontado", é peça
+  que não passa por ali — sem isso, toda chapa que pula a Preparação viraria linha falsa.
+- ⚠ **Acabamento nunca é cobrado** (opcional; mesma regra de `lib/conjuntos-setor.js`).
+- ⚠ **terceiro e encaminhamento cortam a cadeia**: quem volta do terceiro no Jato não deve nada à
+  Montagem. Terceiro **sem destino** ou com destino EXPEDIÇÃO fica FORA — melhor não listar do que
+  mandar lançar etapa que talvez não tenha acontecido.
+- ⚠ **teto no `planejadoUn`** da própria ordem; **inativo sem produção** (MesInativo) é feito fora.
+- ⚠ A **prova** é o setor MAIS ADIANTADO com apontamento (empate vai para o mais à frente): "chegou
+  na Pintura" convence mais que "chegou no Jato".
+- Distribuição hoje: Preparação 524, Jato 518, Corte 24, Solda 16, Montagem 8; OPs 083, 067 e 089
+  concentram 78%.
+
+### Conferido com um caso forçado — T113A9 (17/09/2026)
+
+Vitor forçou o apontamento errado de propósito para testar: a TESOURA **T113A9** (obra T113) ficou
+com Montagem 1, **Solda 0**, Acabamento 0, **Jato 1** (operador TERCEIRO), Pintura 0. A aba
+*Setores anteriores* pega: `Solda · apontado 0 · a lançar 1 · prova "Jato tem 1 apontada(s)"`.
+
+- ⚠ **Acabamento zerado NÃO é cobrado, de propósito**, mesmo tendo ordem planejada: no Syneco as
+  ordens nascem para a rota inteira ([[torg_programacao_syneco]]), então "tem ordem" não prova que a
+  peça passa por ali — e a peça pode ir do Jato à Pintura sem acabamento. É a mesma exceção que já
+  valia na detecção de furo das telas de setor.
+- ⚠ **Marca duplicada estragava o peso.** A T113A9 existe sob `113` (antiga, 579,86 kg) e `T113A`
+  (vigente, 580,53 kg) — [[torg_lpc_chave_duplicada]]. A linha escolhida passou a ser a da **LPC
+  vigente** (`naLPC`), não a primeira que aparece.
+
+## A planilha abre no RESUMO e traz uma aba por SETOR (18/09/2026)
+
+Vitor: *"o que eu preciso é que vc gere na planilha as peças que estão faltando apontamentos das ops
+que estamos fazendo"*. Uma aba corrida com 1.084 linhas não se lança — quem lança trabalha setor a
+setor. `lib/apontamentos-syneco-planilha.js` (puro, testado) monta:
+
+1. **Resumo** — OP × setor, com lançamentos, peças e kg. É por onde se escolhe o que atacar.
+2. **Uma aba por setor** com linha (Corte, Preparação, Montagem, Solda, Acabamento, Jato, Pintura),
+   na ordem física da fábrica. ⚠ Setor sem linha NÃO vira aba vazia.
+3. **Baixa do portal**, só quando existe.
+
+⚠ **O Syneco NÃO importa planilha** — confirmado pelo Vitor em 18/09/2026, e eu tinha perguntado
+depois de já ter isso registrado. O único caminho para dentro do SKA é a API na LAN, que o agente usa
+**só para ler** ([[torg_mes_syneco]]). Então a planilha é lista de DIGITAÇÃO, e a ordem das colunas
+segue a ordem em que se digita lá.
+
+⚠⚠ **Lançar em massa credita a produção ao DIA DO LANÇAMENTO.** Em 18/09/2026 os 1.084 lançamentos
+estavam concentrados em Preparação (526) e Jato (518); jogar tudo de uma vez infla o mês desses dois
+setores e estraga o indicador de produtividade ([[torg_syneco_apontamento_fonte]] avisa que a dedução
+não serve para produtividade por período). Confirmar se o Syneco aceita data retroativa antes.
+
+**Medido em 18/09/2026:** 1.084 lançamentos · 4.360 peças · 147.710 kg · 901 marcas, em 10 obras, TODAS
+com apontamento nos últimos 9 dias — não é histórico morto. As OPs 083, 067 e 089 concentram 78%.
+
+### ⚠⚠ Pintura e Acabamento NUNCA têm linha — e a planilha vazia parecia quebrada (18/09/2026)
+
+Geraldo gerou a planilha no posto dele e "não tem nada". Não estava quebrada:
+
+- **Pintura é a ÚLTIMA etapa da rota.** Não existe apontamento adiante para provar que a peça passou
+  por ela, então ela jamais é cobrada. Pela construção de `lancamentosAtrasados`, o último setor da
+  `CADEIA` nunca vira alvo.
+- **Acabamento é opcional** (a peça pode ir do Jato à Pintura sem passar) e por isso nunca é alvo.
+
+Ou seja, **dois dos sete postos sempre recebem planilha vazia**, e a aba em branco não distinguia
+"não há o que lançar" de "o portal falhou". `motivoDoVazio(setorSyneco)` agora escreve a razão, com
+o nome do setor, **na aba e no aviso da tela** (`MinhaFila`). ⚠ A explicação vai também numa LINHA da
+aba, não só no subtítulo — subtítulo sozinho some no cabeçalho e a aba continua parecendo em branco.
+
+⚠ O aviso da tela somava só a baixa do portal: dizia "nada a lançar" com a planilha cheia de furos do
+Syneco. Agora soma as DUAS origens.
+
+Medido no mesmo dia, direto na rota: sem filtro 1.077 · Corte 24 · Preparação 526 · Solda 9 · Jato
+518 · **Montagem 0 · Acabamento 0 · Pintura 0**. (A Montagem tinha 7 pela manhã e foi lançada no
+Syneco no meio do dia — a lista encolhe sozinha conforme lançam, que é o comportamento esperado.)

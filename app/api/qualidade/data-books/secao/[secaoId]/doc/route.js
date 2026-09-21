@@ -68,8 +68,9 @@ export async function DELETE(req, { params }) {
     }
   }
 
+  let user;
   try {
-    await requireRole(["ADMIN", "QUALIDADE"]);
+    user = await requireRole(["ADMIN", "QUALIDADE"]);
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }
@@ -77,9 +78,20 @@ export async function DELETE(req, { params }) {
   const documentoId = new URL(req.url).searchParams.get("documentoId");
   if (!documentoId) return NextResponse.json({ success: false, error: "documentoId obrigatório" }, { status: 400 });
 
-  await prisma.dataBookSecaoDoc
+  const removido = await prisma.dataBookSecaoDoc
     .delete({ where: { secaoId_documentoId: { secaoId: params.secaoId, documentoId } } })
-    .catch(() => {});
+    .catch(() => null);
+
+  // ⚠ TIRAR DO LIVRO DEIXA RASTRO. Os dois relatórios de pintura da OP-089 sumiram da §14 em
+  // 15/09/2026 e ninguém soube dizer quem tirou — esta rota era a única mutação de seção sem
+  // AuditLog. Quem confere o data book precisa saber que o anexo foi removido de propósito.
+  if (removido) {
+    const doc = await prisma.documentoQualidade.findUnique({ where: { id: documentoId }, select: { nome: true, numeroDocumento: true, opNumero: true } }).catch(() => null);
+    await prisma.auditLog.create({
+      data: { userId: user.id, action: "REMOVER_DOC_SECAO_DATABOOK", entity: "DataBookSecao", entityId: params.secaoId,
+        diff: { documentoId, numeroDocumento: doc?.numeroDocumento || null, nome: doc?.nome || null, opNumero: doc?.opNumero || null } },
+    }).catch(() => {});
+  }
 
   return NextResponse.json({ success: true });
 }

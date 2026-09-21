@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertOctagon, Plus, Loader2, X, AlertCircle, CheckCircle2, Building2, User, Upload, FileSpreadsheet, ListChecks } from "lucide-react";
@@ -289,8 +290,8 @@ function ModalNova({ onClose, onCriada }) {
           <div className="grid grid-cols-2 gap-3">
             <Campo label={cliente ? "Cliente *" : "Cliente"}><input value={f.cliente} onChange={(e) => set("cliente", e.target.value)} className="inp" /></Campo>
             <Campo label="OP / Obra"><input value={f.opNumero} onChange={(e) => set("opNumero", e.target.value)} placeholder="T69" className="inp" /></Campo>
-            <Campo label="Data"><input type="date" value={f.data} onChange={(e) => set("data", e.target.value)} className="inp" /></Campo>
-            <Campo label="Prazo para resposta"><input type="date" value={f.prazoResposta} onChange={(e) => set("prazoResposta", e.target.value)} className="inp" /></Campo>
+            <Campo label="Data"><CampoData value={f.data} onChange={(iso) => set("data", iso)} className="inp" /></Campo>
+            <Campo label="Prazo para resposta"><CampoData value={f.prazoResposta} onChange={(iso) => set("prazoResposta", iso)} className="inp" /></Campo>
             {cliente && <>
               <Campo label="Nº da RNC do cliente"><input value={f.numeroCliente} onChange={(e) => set("numeroCliente", e.target.value)} placeholder="RTNC-010" className="inp" /></Campo>
               <Campo label="Programa"><input value={f.programa} onChange={(e) => set("programa", e.target.value)} placeholder="ASME" className="inp" /></Campo>

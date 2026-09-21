@@ -1,4 +1,6 @@
 "use client";
+import CampoData from "@/components/CampoData";
+import CampoDecimal from "@/components/CampoDecimal";
 // A ABA CRONOGRAMA — as atividades dos cronogramas ativos, agrupadas por setor.
 //
 // ⚠⚠ UM COMPONENTE, DUAS TELAS. Vitor (29/08/2026): "preciso criar uma forma com que a engenharia
@@ -498,7 +500,7 @@ function ModalPreencher({ atividade, onClose, onSalvo, onErro }) {
         <div className="mb-3">
           <span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">% concluído</span>
           <div className="flex items-center gap-2 mt-1">
-            <input type="number" min={0} max={100} value={pct} onChange={(e) => setPct(e.target.value)}
+            <CampoDecimal min={0} max={100} value={pct} onChange={(txt) => setPct(txt)}
               className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue outline-none" />
             <button onClick={() => setPct(100)} className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2 hover:bg-emerald-100 flex items-center gap-1">
               <CheckCircle2 size={13} /> Marcar cumprida (100%)
@@ -522,7 +524,7 @@ function ModalPreencher({ atividade, onClose, onSalvo, onErro }) {
 
         <label className="block mb-3">
           <span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Data de conclusão <span className="text-gray-400">(opcional)</span></span>
-          <input type="date" value={dataReal} onChange={(e) => setDataReal(e.target.value)}
+          <CampoData value={dataReal} onChange={(iso) => setDataReal(iso)}
             className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue outline-none" />
         </label>
 

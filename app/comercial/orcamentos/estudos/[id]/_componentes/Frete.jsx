@@ -1,5 +1,5 @@
 "use client";
-import { APRESENTACAO_FRETE, FATURAMENTO, FATURAMENTO_ROTULO, MODOS_FRETE, numeroBr } from "@/lib/lqc";
+import { APRESENTACAO_FRETE, FATURAMENTO, FATURAMENTO_ROTULO, MODOS_FRETE, NIVEIS_EMBALAGEM, numeroBr } from "@/lib/lqc";
 import { CargasPorClasse } from "./CargasPorClasse";
 import { Campo, Inp, Kpi, Sel } from "./campos";
 import { fmtKg, fmtR$ } from "../_lib/formatos";
@@ -137,6 +137,46 @@ export function Frete({ c, res, setComp }) {
 
       <CargasPorClasse c={c} res={res} setComp={setComp} />
 
+      {/* ⚠ EMBALAGEM (MADEIRA) — Vitor (12/09/2026): "vamos colocar essa parte do material de embalagem no
+          portal (…) pois isso pode impactar bem no preço". Quatro níveis medidos no simulador de carga
+          (OP-118) e no real de 2026; o valor entra diluído no R$/kg, lado Torg. Estudo sem nível fica sem
+          madeira na conta — por isso a tarja. */}
+      {(() => {
+        const e = c.embalagem || {}, re = res.embalagem || {};
+        const setE = (k, v) => setComp({ embalagem: { ...e, [k]: v } });
+        const nivel = NIVEIS_EMBALAGEM.find((x) => x.key === e.nivel) || null;
+        return (
+          <div className="bg-white border border-gray-100 rounded-xl p-5">
+            <p className="text-[12px] font-bold text-torg-dark mb-1">Embalagem (madeira)</p>
+            <p className="text-[11px] text-torg-gray mb-3">Caibro, sarrafo, tábua, engradado e caixa por quilo de aço. Entra diluída no R$/kg da estrutura.</p>
+            <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-2">
+              {NIVEIS_EMBALAGEM.map((x) => (
+                <label key={x.key} className={`flex items-start gap-2.5 border rounded-lg px-3 py-2.5 cursor-pointer ${e.nivel === x.key ? "border-torg-blue bg-torg-blue-50/50" : "border-gray-200 hover:border-gray-300"}`}>
+                  <input type="radio" name="embalagem" checked={e.nivel === x.key} onChange={() => setComp({ embalagem: { ...e, nivel: x.key, rsKg: "" } })} className="mt-0.5" />
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-semibold text-torg-dark">{x.nome} <span className="font-mono text-torg-blue">R$ {x.rsKg.toFixed(2).replace(".", ",")}/kg</span></span>
+                    <span className="block text-[11px] text-torg-gray">{x.quando}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {nivel ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pt-3 border-t border-gray-100 items-end">
+                <Campo r="R$/kg usado" ajuda={`tabela ${nivel.rsKg.toFixed(2).replace(".", ",")} — digite para sobrepor`}>
+                  <Inp value={e.rsKg ?? ""} placeholder={nivel.rsKg.toFixed(2).replace(".", ",")} onChange={(ev) => setE("rsKg", ev.target.value)} className="w-full text-right" /></Campo>
+                <Kpi r="Peso do escopo" v={fmtKg(res.pesoTotal)} />
+                <Kpi r="Madeira" v={fmtR$(re.total)} />
+                <Kpi r="Origem do valor" v={nivel.fonte} />
+              </div>
+            ) : (
+              <p className="text-[11px] text-torg-dark bg-[#FFF7ED] border border-[#F4801F]/30 rounded-lg px-3 py-2 mt-3">
+                Nível não escolhido: a composição está <strong>sem madeira de embalagem</strong>. Escolha um dos quatro para o custo entrar no R$/kg.
+              </p>
+            )}
+          </div>
+        );
+      })()}
+
       {/* ⚠ DESLIGADA POR ORA. Vitor (23/08/2026): "vamos deixar o cálculo da QualP por hora, vamos
           retirar a opção da tela do frete por hora". A consulta depende de assinatura paga
           (R$ 390 a R$ 702/mês), e botão que não funciona é pior que botão que não existe — quem
@@ -166,6 +206,7 @@ export function Frete({ c, res, setComp }) {
         <Kpi r="Peso do escopo" v={fmtKg(res.pesoTotal)} />
         {modo === "viagem" && <Kpi r="Viagens" v={`${r.viagens || 0} × ${fmtKg(r.capacidadeKg)}`} />}
         <Kpi r="Frete total" v={fmtR$(r.total)} />
+        {res.embalagem?.total > 0 && <Kpi r="Embalagem" v={`${fmtR$(res.embalagem.total)} · ${fmtR$(res.embalagem.porKg)}/kg`} />}
         <Kpi r="Equivale a" v={`${fmtR$(r.porKg)}/kg`} />
         <Kpi r="Na proposta" v={r.apresentacao === "separado" ? "Item separado" : "No R$/kg"} cor="text-torg-blue" />
       </div>

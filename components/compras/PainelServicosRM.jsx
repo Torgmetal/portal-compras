@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { buscarRMsDeServico } from "@/lib/rms-servico";
 import { Forklift, Hammer, FileText, ClipboardList, Truck, DollarSign } from "lucide-react";
+import SeletorObraServico from "./SeletorObraServico";
+import { LIMITE_SEM_OBRA } from "@/lib/rms-painel";
 
 // Painel de RMs de SERVIÇOS — usado pelas páginas /compras/aluguel e
 // /compras/montagem (cada uma com o tipo fixo). Esses tipos não passam por
@@ -30,18 +32,38 @@ function valorRM(rm) {
   }, 0);
 }
 
-export default async function PainelServicosRM({ tipo, verArquivadas }) {
+export default async function PainelServicosRM({ tipo, verArquivadas, opSelecionada = null }) {
   const ehAluguel = tipo === "ALUGUEL";
   const base = ehAluguel ? "/compras/aluguel" : "/compras/montagem";
 
-  const { rms, statusCount } = await buscarRMsDeServico(tipo, verArquivadas);
+  const { rms, statusCount, obras, total, truncada } =
+    await buscarRMsDeServico(tipo, verArquivadas, opSelecionada);
   const valorAtivo = rms.reduce((s, rm) => s + valorRM(rm), 0);
 
+  // ⚠⚠ O VALOR É SOMADO DAS LINHAS CARREGADAS, então com a lista cortada ele é PARCIAL. O total
+  // não sai de um `aggregate` porque não é um campo: é a soma dos itens, com o fallback de
+  // diária × dias para registros antigos sem `valorTotal`. Enquanto não houver corte os dois
+  // números são o mesmo; quando houver, o rótulo passa a dizer que é das carregadas — número de
+  // dinheiro parcial sem aviso é pior que lista curta, porque ninguém desconfia de um total.
+  const parcial = truncada && !opSelecionada;
+  const rotuloValor = parcial
+    ? `Valor das ${rms.length} carregadas`
+    : (verArquivadas ? "Valor no histórico" : "Valor em aberto");
+
+  /** Preserva a obra ao alternar Ativas/Histórico — trocar de aba não é trocar de obra. */
+  const href = (arquivadas) => {
+    const q = new URLSearchParams();
+    if (arquivadas) q.set("arquivadas", "1");
+    if (opSelecionada) q.set("op", opSelecionada);
+    const s = q.toString();
+    return s ? `${base}?${s}` : base;
+  };
+
   const cards = [
-    { label: verArquivadas ? "RMs no histórico" : "RMs ativas", value: rms.length, color: "bg-torg-blue", Icon: FileText },
+    { label: verArquivadas ? "RMs no histórico" : "RMs ativas", value: total, color: "bg-torg-blue", Icon: FileText },
     { label: "Abertas", value: statusCount.ABERTA || 0, color: "bg-torg-orange", Icon: ClipboardList },
     { label: "Pedido gerado", value: statusCount.PEDIDO_GERADO || 0, color: "bg-torg-dark", Icon: Truck },
-    { label: verArquivadas ? "Valor no histórico" : "Valor em aberto", value: fmtMoeda(valorAtivo), color: "bg-emerald-600", Icon: DollarSign },
+    { label: rotuloValor, value: fmtMoeda(valorAtivo), color: "bg-emerald-600", Icon: DollarSign },
   ];
 
   return (
@@ -59,46 +81,31 @@ export default async function PainelServicosRM({ tipo, verArquivadas }) {
         </div>
         {/* Ativas / Histórico */}
         <div className="inline-flex bg-gray-100 rounded-lg p-1">
-          <Link href={base}
+          <Link href={href(false)}
             className={`px-3 py-1.5 rounded-md text-xs font-medium ${!verArquivadas ? "bg-white text-torg-blue shadow-sm" : "text-torg-gray hover:text-torg-dark"}`}>
             Ativas
           </Link>
-          <Link href={`${base}?arquivadas=1`}
+          <Link href={href(true)}
             className={`px-3 py-1.5 rounded-md text-xs font-medium ${verArquivadas ? "bg-white text-torg-blue shadow-sm" : "text-torg-gray hover:text-torg-dark"}`}>
             Histórico
           </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {cards.map((c) => (
-          <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
-            <div className={`${c.color} p-2.5 rounded-lg`}>
-              <c.Icon size={20} className="text-white" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs text-torg-gray truncate">{c.label}</p>
-              <p className="text-xl font-extrabold text-torg-dark tabular-nums truncate">{c.value}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      <CardsServico cards={cards} />
+
+      <SeletorObraServico
+        obras={JSON.parse(JSON.stringify(obras))}
+        opSelecionada={opSelecionada}
+        verArquivadas={verArquivadas}
+        base={base}
+        truncada={truncada}
+        total={total}
+        limite={LIMITE_SEM_OBRA}
+      />
 
       {rms.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-          {ehAluguel
-            ? <Forklift size={48} className="mx-auto text-gray-300 mb-4" />
-            : <Hammer size={48} className="mx-auto text-gray-300 mb-4" />}
-          <p className="text-torg-gray text-lg">
-            {verArquivadas ? "Nada no histórico" : `Nenhuma RM de ${ehAluguel ? "aluguel" : "montagem"} ativa`}
-          </p>
-          {!verArquivadas && (
-            <p className="text-sm text-torg-gray mt-2">
-              O solicitante cria em <strong>/rm/nova</strong> escolhendo o tipo
-              {ehAluguel ? " “Aluguel de Equipamentos”" : " “Medição de Montagem”"}.
-            </p>
-          )}
-        </div>
+        <VazioServico ehAluguel={ehAluguel} verArquivadas={verArquivadas} opSelecionada={opSelecionada} />
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
@@ -156,10 +163,60 @@ export default async function PainelServicosRM({ tipo, verArquivadas }) {
             </table>
           </div>
           <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between text-sm">
-            <span className="text-torg-gray">{rms.length} RM{rms.length !== 1 ? "s" : ""}</span>
-            <span className="font-bold text-torg-dark">Total: <span className="text-emerald-700">{fmtMoeda(valorAtivo)}</span></span>
+            <span className="text-torg-gray">
+              {rms.length} RM{rms.length !== 1 ? "s" : ""}{parcial ? ` de ${total}` : ""}
+            </span>
+            <span className="font-bold text-torg-dark">
+              {parcial ? "Total das carregadas: " : "Total: "}
+              <span className="text-emerald-700">{fmtMoeda(valorAtivo)}</span>
+            </span>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Os quatro cartões do topo. Fora da função principal só para ela caber no teto de linhas. */
+function CardsServico({ cards }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {cards.map((c) => (
+        <div key={c.label} className="bg-white rounded-xl shadow-sm border border-torg-blue-100 p-4 flex items-center gap-3">
+          <div className={`${c.color} p-2.5 rounded-lg`}>
+            <c.Icon size={20} className="text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs text-torg-gray truncate">{c.label}</p>
+            <p className="text-xl font-extrabold text-torg-dark tabular-nums truncate">{c.value}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * ⚠ Com obra escolhida o vazio diz QUAL obra e QUAL aba. A obra segue selecionada ao alternar
+ * Ativas/Histórico, então pode ter RM numa aba e nenhuma na outra — voltar sozinho para "todas"
+ * responderia outra pergunta e esconderia o fato.
+ */
+function VazioServico({ ehAluguel, verArquivadas, opSelecionada }) {
+  const rotuloTipo = ehAluguel ? "aluguel" : "montagem";
+  const Icone = ehAluguel ? Forklift : Hammer;
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+      <Icone size={48} className="mx-auto text-gray-300 mb-4" />
+      <p className="text-torg-gray text-lg">
+        {opSelecionada
+          ? `A OP ${opSelecionada} não tem RM de ${rotuloTipo} ${verArquivadas ? "no histórico" : "ativa"}.`
+          : (verArquivadas ? "Nada no histórico" : `Nenhuma RM de ${rotuloTipo} ativa`)}
+      </p>
+      {!verArquivadas && !opSelecionada && (
+        <p className="text-sm text-torg-gray mt-2">
+          O solicitante cria em <strong>/rm/nova</strong> escolhendo o tipo
+          {ehAluguel ? " “Aluguel de Equipamentos”" : " “Medição de Montagem”"}.
+        </p>
       )}
     </div>
   );

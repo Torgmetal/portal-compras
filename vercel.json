@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ':(exclude)docs' ':(exclude)testes' ':(exclude)*.md' ':(exclude)versao-build.json'",
   "redirects": [
     {
       "source": "/:path((?!api/).*)",
@@ -82,7 +83,7 @@
     },
     {
       "path": "/api/cron/data-book",
-      "schedule": "*/5 * * * *"
+      "schedule": "15 10-21 * * 1-5"
     },
     {
       "path": "/api/cron/rnc-abertas",
@@ -94,7 +95,11 @@
     },
     {
       "path": "/api/cron/cmr-reconciliar",
-      "schedule": "40 5 * * *"
+      "schedule": "40 5,13 * * *"
+    },
+    {
+      "path": "/api/cron/omie-encerrados",
+      "schedule": "20 7 * * *"
     },
     {
       "path": "/api/cron/pasta-engenharia",
@@ -113,8 +118,16 @@
       "schedule": "20 6-20 * * 1-5"
     },
     {
+      "path": "/api/comercial/estudos/importar-sharepoint",
+      "schedule": "40 6-20 * * 1-5"
+    },
+    {
       "path": "/api/cron/casar-certificados",
       "schedule": "50 5,13 * * *"
+    },
+    {
+      "path": "/api/cron/conferir-listas",
+      "schedule": "0 10 * * 1-5"
     }
   ]
 }

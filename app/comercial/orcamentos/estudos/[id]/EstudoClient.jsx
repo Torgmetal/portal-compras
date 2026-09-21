@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileSpreadsheet, Loader2, Save } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { Bdi } from "./_componentes/Bdi";
 import { Cenario } from "./_componentes/Cenario";
@@ -55,6 +56,7 @@ export const ABAS = [
 ];
 
 export default function EstudoClient({ id }) {
+  const router = useRouter();
   const { showToast } = useStore();
   const [d, setD] = useState(null);
   const [aba, setAba] = useState("RESUMOS");
@@ -141,6 +143,9 @@ export default function EstudoClient({ id }) {
             {salvando ? <span className="inline-flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> salvando…</span>
               : sujo ? "alterações pendentes" : <span className="inline-flex items-center gap-1"><Save size={11} /> salvo</span>}
           </span>
+          <button type="button" disabled={salvando || sujo} onClick={() => router.push(`/comercial/nova?lqc=${encodeURIComponent(id)}`)}
+            title={salvando || sujo ? "Aguarde salvar as alterações da LQC" : "Revisar dados e gerar a OP"}
+            className="text-[12px] font-semibold border border-torg-blue text-torg-blue rounded-lg px-3 py-1.5 disabled:opacity-50">Gerar OP</button>
           <ImportarLqc id={id} onPronto={(j) => setD((p) => ({ ...p, estudo: j.estudo, resultado: j.resultado }))} showToast={showToast} />
           <a href={`/api/comercial/estudos/${id}/planilha`}
             className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5">
@@ -149,6 +154,9 @@ export default function EstudoClient({ id }) {
         </div>
       </div>
 
+      {c.avisosImportacao?.length > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        {c.avisosImportacao.map((aviso,i) => <p key={i}>{aviso}</p>)}
+      </div>}
       {/* barra de resultado — sempre visível, porque é a pergunta que o orçamentista faz */}
       {/* ⚠ VALOR NÃO QUEBRA. Vitor (23/08/2026): "não deixe quebrar essas coisas" — "R$
           12.096.000,00" saía com o "R$" numa linha e o número na outra. Número partido ao meio é

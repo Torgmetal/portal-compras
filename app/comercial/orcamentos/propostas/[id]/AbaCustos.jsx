@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { Save, Loader2, AlertCircle, Info } from "lucide-react";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 function fmtMoeda(v) {
   if (!v && v !== 0) return "—";
@@ -40,12 +42,10 @@ function InputCusto({ valor, onChange, sufixo = "/kg", prefixo = "R$", placehold
   return (
     <div className={`flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-torg-blue/20 focus-within:border-torg-blue transition-all ${extraClass}`}>
       <span className="px-2.5 py-1.5 bg-gray-50 text-xs text-torg-gray border-r border-gray-200 select-none">{prefixo}</span>
-      <input
-        type="number"
+      <CampoDecimal
         value={valor || ""}
-        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+        onChange={(txt) => onChange(numeroBR(txt))}
         placeholder={placeholder}
-        min="0"
         step={step}
         className="w-full px-2.5 py-1.5 text-sm text-right text-torg-dark outline-none bg-transparent"
       />
@@ -57,13 +57,10 @@ function InputCusto({ valor, onChange, sufixo = "/kg", prefixo = "R$", placehold
 function InputPerc({ valor, onChange, step = "0.5" }) {
   return (
     <div className="flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-torg-blue/20 focus-within:border-torg-blue transition-all">
-      <input
-        type="number"
+      <CampoDecimal
         value={valor || ""}
-        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+        onChange={(txt) => onChange(numeroBR(txt))}
         placeholder="0"
-        min="0"
-        max="100"
         step={step}
         className="w-full px-2.5 py-1.5 text-sm text-right text-torg-dark outline-none bg-transparent"
       />

@@ -24,7 +24,7 @@ import { requireRole } from "@/lib/session";
 import { rastreioDoConjunto } from "@/lib/rastreio-peca";
 import { amarracoesDaOp, aplicarAmarracaoNosItens, rDoMaterialDaObra } from "@/lib/r-amarrado";
 import { analisarMaterial, statusMaterialPlanejamento } from "@/lib/material-liberacao";
-import { normalizeSetorSyneco } from "@/lib/syneco-dia";
+import { producaoDaMarca } from "@/lib/ficha-peca-producao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -156,26 +156,10 @@ export async function GET(req) {
     }
   } catch { /* idem */ }
 
-  // ── ONDE A PEÇA ESTÁ NA FÁBRICA. O status gravado só anda até o corte; daí em diante quem sabe
-  // é o apontamento do Syneco (ver lib/peca-setor-real). Devolve o que cada setor já produziu.
-  const apont = await prisma.mesApontamento.findMany({
-    where: { opId, opSka: { contains: marca } },
-    select: { setor: true, produzidoKg: true, produzidoUn: true, dataInicio: true },
-    orderBy: { dataInicio: "asc" },
-  }).catch(() => []);
-  const porSetor = new Map();
-  for (const a of apont) {
-    const s = normalizeSetorSyneco(a.setor) || "?";
-    const g = porSetor.get(s) || { setor: s, un: 0, kg: 0, primeiro: null, ultimo: null };
-    g.un += Number(a.produzidoUn) || 0;
-    g.kg += Number(a.produzidoKg) || 0;
-    const d = a.dataInicio ? a.dataInicio.toISOString().slice(0, 10) : null;
-    if (d) { if (!g.primeiro || d < g.primeiro) g.primeiro = d; if (!g.ultimo || d > g.ultimo) g.ultimo = d; }
-    porSetor.set(s, g);
-  }
-  // a última etapa com produção é onde a peça está
-  const trilha = [...porSetor.values()].sort((a, b) => String(a.ultimo).localeCompare(String(b.ultimo)));
-  const setorAtual = trilha.length ? trilha[trilha.length - 1].setor : null;
+  // Falha de integração não pode ser apresentada como ausência de produção.
+  const fabrica = await producaoDaMarca(opId, marca).catch(() => ({
+    setorAtual: null, trilha: [], erro: "Não foi possível consultar a produção. Tente novamente.",
+  }));
 
   // ── programação: em que dia caiu, em que bancada, e se já foi liberada ──
   const libs = await prisma.liberacaoProducao.findMany({
@@ -239,7 +223,7 @@ export async function GET(req) {
     croquis: comoConjunto.map((x) => ({ ...x.croqui, qtdNoConjunto: x.qtdNoConjunto })),
     conjuntos: comoCroqui.map((x) => ({ ...x.conjunto, qtdNoConjunto: x.qtdNoConjunto })),
     rastreio, material, materialPorPerfil,
-    fabrica: { setorAtual, trilha: trilha.map((t) => ({ ...t, kg: Math.round(t.kg) })) },
+    fabrica,
     liberacoes, relatorios,
     tiposRelatorio: TIPO_RELATORIO,
   });

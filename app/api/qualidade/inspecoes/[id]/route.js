@@ -1,3 +1,4 @@
+import { salvarInspecaoComPadroes } from "@/lib/padroes-inspecao";
 import { pecasInformadasSchema, textoPeca, quantidadesPorMarca } from "@/lib/inspecao-pecas";
 // GET   — o relatório para a tela de edição/prévia.
 // PATCH  — salva o que o elaborador preencheu (dimensões encontradas, resultados, observações).
@@ -327,7 +328,7 @@ export async function PATCH(req, { params }) {
     dados.resultados.pecas = pecasSalvas.map(textoPeca).join(", ");
   }
 
-  const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });
+  const atualizado = await salvarInspecaoComPadroes(rel, dados, user.id);
 
   // ⚠ BACKUP NA PASTA DA OBRA, na APROVAÇÃO. Vitor (22/08/2026): "salvar os relatórios em PDF na
   // pasta da qualidade de cada OP para podermos garantir o backup". Guarda quando o documento

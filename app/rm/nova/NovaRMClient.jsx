@@ -7,6 +7,8 @@ import { fmtOP } from "@/lib/utils";
 import { ArrowLeft, Loader2, AlertCircle, CheckCircle2, Trash2, Upload, FileSpreadsheet, X, RailSymbol, Building2, Plus, Search, Package, Forklift, Hammer } from "lucide-react";
 import { categoriasUnicasOP, CATEGORIAS_MATERIAL, CATEGORIAS_SERVICOS_TERCEIRIZADOS, CATEGORIAS_ALUGUEL, CATEGORIA_OUTRO } from "@/lib/op-categorias";
 import { parseTekla } from "@/lib/parse-tekla";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -511,12 +513,19 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Observação</label>
+            {/* ⚠⚠ O RÓTULO AVISA QUEM LÊ. Este texto vai para a tela do fornecedor junto com a
+                cotação, e o campo era só "Observação · Opcional" — quem escrevia não tinha como
+                saber. Matheus (16/09/2026): "deixe na descrição do campo Observação para
+                fornecedor algo do tipo". No banco há observação de item com preço-alvo e nome de
+                colaborador, escritos quando ninguém sabia que o fornecedor veria. */}
+            <label className="block text-sm font-medium text-torg-dark mb-1">
+              Observação <span className="font-normal text-torg-orange">· o fornecedor vê</span>
+            </label>
             <input
               type="text"
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}
-              placeholder="Opcional"
+              placeholder="Ex.: prazo, condição de entrega — aparece na cotação do fornecedor"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
             />
           </div>
@@ -586,13 +595,10 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-torg-dark mb-1">Valor da diária (R$) *</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
+                        <CampoDecimal
                           value={it.valorDiaria || ""}
-                          onChange={(e) => {
-                            const vd = parseFloat(e.target.value) || 0;
+                          onChange={(txt) => {
+                            const vd = numeroBR(txt);
                             setItensImportados((prev) => prev.map((x, j) => j === i
                               ? { ...x, valorDiaria: vd, valorTotal: vd * (Number(x.qtdDias) || 0) }
                               : x));
@@ -700,12 +706,9 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                 </div>
                 <div className="w-44">
                   <label className="block text-xs font-medium text-torg-gray mb-1">Valor da medição (R$) *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                  <CampoDecimal
                     value={it.valorTotal}
-                    onChange={(e) => setItensImportados((prev) => prev.map((x, xi) => (xi === i ? { ...x, valorTotal: e.target.value } : x)))}
+                    onChange={(txt) => setItensImportados((prev) => prev.map((x, xi) => (xi === i ? { ...x, valorTotal: txt } : x)))}
                     placeholder="0,00"
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg text-right focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none"
                   />
@@ -808,7 +811,11 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                   {!ehInterna && <th className="px-2 py-2 text-right font-medium text-gray-500 uppercase">Peso (kg)</th>}
                   {!ehInterna && <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase" title="OP destino (multi-OP)">OP dest.</th>}
                   {!ehInterna && <th className="px-2 py-2 text-center font-medium text-gray-500 uppercase" title="Vai pro estoque (categoria 3.1)?">Estq.</th>}
-                  {ehInterna && <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase min-w-[200px]">Observação</th>}
+                  {ehInterna && (
+                    <th className="px-2 py-2 text-left font-medium text-gray-500 uppercase min-w-[200px]" title="Este texto vai junto na cotação — o fornecedor lê">
+                      Observação <span className="normal-case text-torg-orange">· o fornecedor vê</span>
+                    </th>
+                  )}
                   <th className="w-8"></th>
                 </tr>
               </thead>
@@ -843,9 +850,8 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                     </td>
                     )}
                     <td className="px-2 py-1.5 text-right">
-                      <input
-                        type="number" step="0.01" min="0" value={it.qtd || ""}
-                        onChange={(e) => editarItem(i, "qtd", parseFloat(e.target.value) || 0)}
+                      <CampoDecimal value={it.qtd || ""}
+                        onChange={(txt) => editarItem(i, "qtd", numeroBR(txt))}
                         className="w-14 border border-gray-200 rounded px-2 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
                       />
                     </td>
@@ -889,9 +895,8 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                     )}
                     {!ehInterna && (
                     <td className="px-2 py-1.5 text-right">
-                      <input
-                        type="number" step="0.01" min="0" value={it.peso || ""}
-                        onChange={(e) => editarItem(i, "peso", parseFloat(e.target.value) || 0)}
+                      <CampoDecimal value={it.peso || ""}
+                        onChange={(txt) => editarItem(i, "peso", numeroBR(txt))}
                         placeholder="—"
                         className="w-20 border border-gray-200 rounded px-2 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
                       />
@@ -928,7 +933,8 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
                       <input
                         type="text" value={it.observacao || ""}
                         onChange={(e) => editarItem(i, "observacao", e.target.value)}
-                        placeholder="Observação (opcional)"
+                        placeholder="Ex.: modelo, marca, embalagem"
+                        title="Aparece na cotação do fornecedor — é onde se escreve a especificação que não cabe na descrição"
                         className="w-full min-w-[180px] border border-gray-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-torg-blue"
                       />
                     </td>

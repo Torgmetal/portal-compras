@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
@@ -179,8 +180,8 @@ function ModalNovo({ onClose, onCriado }) {
             <Campo label="Faixa de uso"><input value={f.faixaUso} onChange={(e) => set("faixaUso", e.target.value)} placeholder="0 a 300 mm" className={inp} /></Campo>
             <Campo label="Laboratório"><input value={f.laboratorio} onChange={(e) => set("laboratorio", e.target.value)} placeholder="Laboratório acreditado (RBC)" className={inp} /></Campo>
             <Campo label="Nº do certificado"><input value={f.numeroDocumento} onChange={(e) => set("numeroDocumento", e.target.value)} placeholder="CAL-2026-0472" className={inp} /></Campo>
-            <Campo label="Data de calibração"><input type="date" value={f.dataEmissao} onChange={(e) => set("dataEmissao", e.target.value)} className={inp} /></Campo>
-            <Campo label="Validade"><input type="date" value={f.dataValidade} onChange={(e) => set("dataValidade", e.target.value)} className={inp} /></Campo>
+            <Campo label="Data de calibração"><CampoData value={f.dataEmissao} onChange={(iso) => set("dataEmissao", iso)} className={inp} /></Campo>
+            <Campo label="Validade"><CampoData value={f.dataValidade} onChange={(iso) => set("dataValidade", iso)} className={inp} /></Campo>
             <div className="sm:col-span-2"><Campo label="Norma / referência"><input value={f.norma} onChange={(e) => set("norma", e.target.value)} placeholder="ISO/IEC 17025 · NBR ISO 10012" className={inp} /></Campo></div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-gray-100">

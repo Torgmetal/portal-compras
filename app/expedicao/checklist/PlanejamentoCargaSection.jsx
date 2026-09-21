@@ -1,7 +1,9 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useMemo, useEffect } from "react";
 import { Truck, Plus, Calendar, Package, Wrench, CheckCircle2, Clock, AlertTriangle, ChevronDown, ChevronRight, Loader2, X, Search, ClipboardList, AlertCircle, ShieldAlert, Ban, Pencil, Save, History } from "lucide-react";
 import { validarProntidaoExpedicao } from "@/lib/expedicao";
+import CampoDecimal from "@/components/CampoDecimal";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const fmtKg = (v) =>
@@ -268,7 +270,7 @@ function PlanCard({ plan, aberto, onToggle, onChanged }) {
         <div className="border-t border-gray-100 bg-torg-blue-50/30 px-4 py-3 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
             <label className="text-xs text-torg-gray">Data prevista:</label>
-            <input type="date" value={data} onChange={(e) => setData(e.target.value)} className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
+            <CampoData value={data} onChange={(iso) => setData(iso)} className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none" />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -284,7 +286,7 @@ function PlanCard({ plan, aberto, onToggle, onChanged }) {
                       {item.descricao}{item.pecaConjunto && <span className="font-mono text-torg-blue ml-1">({item.pecaConjunto.marca})</span>}
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <input type="number" min={0} step="any" value={qtds[item.id] ?? ""} onChange={(e) => setQtds((q) => ({ ...q, [item.id]: e.target.value }))} className="w-20 text-xs text-center border border-gray-300 rounded px-1.5 py-1 focus:border-torg-blue outline-none" />
+                      <CampoDecimal min={0} value={qtds[item.id] ?? ""} onChange={(txt) => setQtds((q) => ({ ...q, [item.id]: txt }))} className="w-20 text-xs text-center border border-gray-300 rounded px-1.5 py-1 focus:border-torg-blue outline-none" />
                     </td>
                     <td className="px-3 py-2 text-right text-xs">{item.pesoEstimadoKg ? fmtKg(item.pesoEstimadoKg) : "—"}</td>
                   </tr>
@@ -560,10 +562,9 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium text-torg-dark mb-1 block">Data prevista</label>
-              <input
-                type="date"
+              <CampoData
                 value={dataPrevista}
-                onChange={(e) => setDataPrevista(e.target.value)}
+                onChange={(iso) => setDataPrevista(iso)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue focus:border-transparent"
               />
             </div>
@@ -822,12 +823,11 @@ function ItemCheckbox({ item, checked, onToggle, qtd, onQtd, pesoEscolhido }) {
             onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
           >
             Qtd:
-            <input
-              type="number" min="0" max={item.qtd} step="any"
+            <CampoDecimal max={item.qtd}
               value={qtd ?? item.qtd}
               disabled={!checked}
               onClick={(e) => e.stopPropagation()}
-              onChange={(e) => onQtd?.(e.target.value)}
+              onChange={(txt) => onQtd?.(txt)}
               title={checked ? `Máximo ${item.qtd}` : "Selecione o item pra ajustar a quantidade"}
               className="w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-[11px] tabular-nums disabled:bg-gray-100 disabled:text-gray-400 outline-none focus:border-torg-blue"
             />

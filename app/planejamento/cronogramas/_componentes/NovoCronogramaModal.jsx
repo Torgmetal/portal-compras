@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useEffect, useState } from "react";
 import { AlertCircle, AlertTriangle, GanttChart, Loader2, Plus, X } from "lucide-react";
 
@@ -110,8 +111,8 @@ export function NovoCronogramaModal({ onClose, onCreated }) {
           <section className="space-y-4 border-t border-gray-100 pt-5" aria-labelledby="novo-periodo">
             <div className="flex items-baseline justify-between gap-3"><h4 id="novo-periodo" className="text-sm font-semibold text-torg-dark">Período previsto</h4><span className="text-xs text-torg-gray">Opcional</span></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div><label htmlFor="novo-inicio" className={rotulo}>Início</label><input id="novo-inicio" type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className={campo}/></div>
-              <div><label htmlFor="novo-fim" className={rotulo}>Término previsto</label><input id="novo-fim" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className={campo}/></div>
+              <div><label htmlFor="novo-inicio" className={rotulo}>Início</label><CampoData id="novo-inicio" value={dataInicio} onChange={(iso) => setDataInicio(iso)} className={campo}/></div>
+              <div><label htmlFor="novo-fim" className={rotulo}>Término previsto</label><CampoData id="novo-fim" value={dataFim} onChange={(iso) => setDataFim(iso)} className={campo}/></div>
             </div>
           </section>
 

@@ -1,0 +1,14 @@
+import {vi,it,expect,beforeEach} from 'vitest';
+import {mockPrisma} from '@/testes/apoio/prisma';
+vi.mock('@/lib/prisma',()=>({prisma:mockPrisma}));
+vi.mock('@/lib/session',()=>({requireRole:vi.fn()}));
+import {requireRole} from '@/lib/session';
+import {DELETE} from '@/app/api/qualidade/planos-acao/[id]/route';
+const plano={id:'p',numero:21,indicador:'absenteismo',processo:'RH',itens:[{oque:'Acompanhar faltas'}]};
+const excluir=()=>DELETE(null,{params:{id:'p'}});
+beforeEach(()=>{vi.clearAllMocks();requireRole.mockResolvedValue({id:'u',tipo:'USUARIO',modulos:['RH']});mockPrisma.planoAcao.findUnique.mockResolvedValue(plano);mockPrisma.naoConformidade.findMany.mockResolvedValue([]);mockPrisma.analiseCriticaProjeto.findMany.mockResolvedValue([]);});
+it('permite ao RH excluir seu plano e guarda snapshot na auditoria',async()=>{expect((await excluir()).status).toBe(200);expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({data:expect.objectContaining({diff:expect.objectContaining({antes:plano,depois:null})})});expect(mockPrisma.planoAcao.delete).toHaveBeenCalledWith({where:{id:'p'}});});
+it('recusa plano de outro setor e plano interno da Qualidade',async()=>{mockPrisma.planoAcao.findUnique.mockResolvedValueOnce({...plano,processo:'COMPRAS'});expect((await excluir()).status).toBe(403);mockPrisma.planoAcao.findUnique.mockResolvedValueOnce({...plano,indicador:null});expect((await excluir()).status).toBe(403);expect(mockPrisma.planoAcao.delete).not.toHaveBeenCalled();});
+it('retorna 404 para plano ausente',async()=>{mockPrisma.planoAcao.findUnique.mockResolvedValue(null);expect((await excluir()).status).toBe(404);});
+it('limpa vínculos sem excluir a RNC ou a análise',async()=>{requireRole.mockResolvedValue({id:'u',tipo:'ADMIN'});expect((await excluir()).status).toBe(200);expect(mockPrisma.naoConformidade.updateMany).toHaveBeenCalledWith({where:{planoAcaoId:'p'},data:{planoAcaoId:null}});expect(mockPrisma.analiseCriticaProjeto.delete).not.toHaveBeenCalled();});
+it('distingue ausência de sessão e falta de permissão',async()=>{requireRole.mockRejectedValueOnce(new Error('Unauthorized'));expect((await excluir()).status).toBe(401);requireRole.mockRejectedValueOnce(new Error('Forbidden'));expect((await excluir()).status).toBe(403);});

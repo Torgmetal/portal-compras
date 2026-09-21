@@ -1,7 +1,9 @@
 "use client";
+import BlocoObservacao from "@/components/BlocoObservacao";
+import { parseObservacaoCotacao, condicaoPagamentoDe } from "@/lib/cotacao-observacao";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { XCircle, Loader2, Check, Mail, Edit3, Plus } from "lucide-react";
+import { XCircle, Loader2, Check, Mail, Edit3, Plus, MessageSquareText } from "lucide-react";
 import { CotacaoAnexoChip } from "./CotacaoAnexoChip";
 import { ModalLancarManual } from "./ModalLancarManual";
 import { ModalVincularRM } from "./ModalVincularRM";
@@ -132,6 +134,77 @@ export function CotacoesList({ rm, outrasRMs = [] }) {
                   {c.recebidaEm && ` · respondida em ${fmtData(c.recebidaEm)}`}
                   {c.prazoResposta && ` · prazo ${fmtData(c.prazoResposta)}`}
                 </p>
+                {/* ⚠⚠ O QUE O FORNECEDOR ESCREVEU — E QUE A TELA ENGOLIA. Matheus (16/09/2026):
+                    "quando um fornecedor responde as solicitações preciso ver o campo Observações
+                    que eles escrevem". Medido no mesmo dia: 447 cotações e 1.266 itens de cotação
+                    com texto gravado, invisível aqui. É onde a SOUFER escreveu "SEM
+                    DISPONIBILIDADE" — a informação que decide a compra, guardada no banco.
+
+                    ⚠ `Cotacao.observacao` empilha prazo, pagamento e o texto livre num campo só;
+                    `parseObservacaoCotacao` separa. Prazo de entrega e condição de pagamento saem
+                    aqui porque não têm campo próprio NA TELA.
+
+                    ⚠⚠ O PAGAMENTO ESTAVA FALTANDO, E O COMENTÁRIO ANTERIOR DISFARÇAVA ISSO. Ele
+                    dizia "o pagamento já sai no mapa comparativo" — sai, no EXCEL do mapa, que
+                    alguém precisa baixar e abrir. Na tela não aparecia em canto nenhum. Matheus
+                    (16/09/2026): "quando o fornecedor preenche forma de pagamento devia aparecer
+                    também na tela pra gente avaliar igual o prazo de entrega". Comparar uma
+                    proposta em 28 dias com outra à vista sem ver isso é comparar só o preço. */}
+                {(() => {
+                  const { prazoEntrega, observacao } = parseObservacaoCotacao(c.observacao);
+                  const pagamento = condicaoPagamentoDe(c);
+                  // ⚠ `observacoesItens`, não `c.itens`: a página apaga os itens do payload e a
+                  // lista que sobra só tem item em status cotável — numa RM já fechada, vazia.
+                  const porItem = c.observacoesItens || [];
+                  if (!observacao && !prazoEntrega && !pagamento && !porItem.length) return null;
+                  return (
+                    <div className="mt-1.5 space-y-1">
+                      {/* ⚠ Os dois na MESMA linha quando cabem: são as duas condições comerciais
+                          da proposta e quem compara lê as duas juntas. Empilhados, viram duas
+                          linhas de 11px que o olho passa batido. */}
+                      {(prazoEntrega || pagamento) && (
+                        <p className="text-[11px] text-torg-gray flex flex-wrap gap-x-3 gap-y-0.5">
+                          {prazoEntrega && (
+                            <span><b className="font-semibold text-torg-dark">Prazo de entrega:</b> {prazoEntrega}</span>
+                          )}
+                          {pagamento && (
+                            <span><b className="font-semibold text-torg-dark">Pagamento:</b> {pagamento}</span>
+                          )}
+                        </p>
+                      )}
+                      {/* ⚠ A resposta GERAL fica sempre à vista: é a que o fornecedor digitou
+                          pensando na proposta inteira ("sem disponibilidade", "frete por conta
+                          da Torg"), e é a que decide a compra. */}
+                      <BlocoObservacao texto={observacao} rotulo="Resposta do fornecedor" compacto />
+
+                      {/* ⚠⚠ AS DE ITEM VÊM FECHADAS, E ISSO É DESENHO, NÃO PREGUIÇA. Uma cotação
+                          de 7 itens vira sete tarjas âmbar empilhadas e empurra preço e botões
+                          para fora da vista — testado na RI-0007. Boa parte desse texto é o que o
+                          leitor de PDF extraiu ("CST 060 - ICMS ST: 0,00"), útil quando se procura,
+                          ruído quando se está conferindo a lista. O resumo diz QUANTAS são, então
+                          ninguém precisa abrir para saber que existem.
+
+                          ⚠ Com o nome do item na frente: saber QUE há observação sem saber DE QUAL
+                          item não ajuda ninguém. */}
+                      {porItem.length > 0 && (
+                        <details className="mt-1">
+                          <summary className="text-[11px] text-amber-800 cursor-pointer select-none hover:underline inline-flex items-center gap-1">
+                            <MessageSquareText size={12} className="text-amber-600" />
+                            {/* ⚠ "observação" perde o ~ no plural: emendar "ões" no fim dava
+                                "observaçãoões". A palavra troca inteira. */}
+                            {porItem.length} {porItem.length > 1 ? "observações" : "observação"} nos itens
+                          </summary>
+                          <div className="mt-0.5">
+                            {porItem.map((i) => (
+                              <BlocoObservacao key={i.id} compacto rotulo={i.descricao} texto={i.observacao} />
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* Anexos da cotacao (PDF/imagens da proposta) */}
                 {(c.anexos || []).length > 0 && (
                   <div className="mt-1.5 flex flex-wrap gap-1.5">

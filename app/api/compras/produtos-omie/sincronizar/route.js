@@ -3,9 +3,11 @@
 // O portal só conhecia os itens que já passaram por uma RM (~190 de 2.4k) — perfis existentes no
 // Omie apareciam "sem código" no romaneio de terceiro. (Vitor 18/08.)
 import { NextResponse } from "next/server";
+import { registrarExecucao } from "@/lib/cron-monitor";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sincronizarProdutosOmie } from "@/lib/omie-produtos";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -24,11 +26,29 @@ export async function POST() {
   }
 }
 
+// ⚠⚠ HEARTBEAT. Esta rota está agendada no `vercel.json` e NÃO era cobrada pelo monitor — foi por
+// isso que ela pôde ficar meses sendo redirecionada para o `/entrar` (307) sem ninguém saber.
+// Cron que não registra execução é cron que morre calado. Ver `lib/cron-monitor.js`.
 export async function GET(req) {
   const auth = req.headers.get("authorization") || "";
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
-  try { return NextResponse.json({ ok: true, ...(await sincronizarProdutosOmie()) }); }
-  catch (e) { return NextResponse.json({ error: e.message }, { status: 502 }); }
+  // ⚠⚠ ACORDA A COMPUTE DO NEON ANTES DO PRIMEIRO QUERY. Ela suspende quando ociosa (scale-to-zero)
+  // e o primeiro query de um cron estoura com P1001 "Can't reach database server" — foi assim que o
+  // `cmr-reconciliar` passou 55h parado sem ninguém saber. Faltava nas SEIS rotas que são cron E
+  // botão manual ao mesmo tempo: nasceram como rota de tela, e o aquecimento só virou regra depois.
+  const t0 = Date.now();
+  try {
+  // ⚠⚠ DENTRO DO `try`, e a medição começa ANTES: `aquecerBanco` LANÇA ao esgotar as tentativas.
+  // Fora do try, a falha escapava sem passar pelo `registrarExecucao` — o cenário que o aquecimento
+  // existe para sobreviver (Neon dormindo) seria justamente o que apagaria o cron do heartbeat.
+    await aquecerBanco(prisma);
+    const r = await sincronizarProdutosOmie();
+    await registrarExecucao("produtos-omie", { ok: true, mensagem: `${r.gravados ?? 0} produto(s)`, duracaoMs: Date.now() - t0 });
+    return NextResponse.json({ ok: true, ...r });
+  } catch (e) {
+    await registrarExecucao("produtos-omie", { ok: false, mensagem: e.message, duracaoMs: Date.now() - t0 });
+    return NextResponse.json({ error: e.message }, { status: 502 });
+  }
 }

@@ -15,7 +15,7 @@ import {usaQuantidadeInspecao, pecasInformadasSchema, resultadosComPecas} from "
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { tipoNoEscopo } from "@/lib/qualidade-escopo";
-import { camposDoRelatorioPintura } from "@/lib/plp";
+import { valoresIniciaisInspecao } from "@/lib/padroes-inspecao";
 import { TIPO } from "@/lib/qualidade-campo";
 import { requireRole } from "@/lib/session";
 import { procedimentoTolerancia } from "@/lib/relatorio-dimensional";
@@ -150,15 +150,9 @@ export async function POST(req) {
   // ⚠ SNAPSHOT. Grava no relatório em vez de consultar o PLP na hora de imprimir: o documento
   // tem de registrar o que estava especificado NO DIA. PLP revisado depois não reescreve
   // relatório antigo — mesma razão do tipo da peça ser gravado aqui e não lido no PDF.
-  let semente = {};
-  if (tipo === "PINTURA") {
-    try {
-      const plp = await prisma.planoPintura.findUnique({ where: { opNumero } });
-      semente = camposDoRelatorioPintura(plp);
-    } catch { /* sem PLP o formulário nasce em branco, como antes */ }
-  }
 
   try {
+    const semente = await valoresIniciaisInspecao(opNumero, tipo);
     // dimensional não usa fotos (Vitor: "não vamos usar fotos"), então nasce sem elas —
     // `criarRelatorio` exige foto, por isso o dimensional cria direto.
     const { proximoNumero } = await import("@/lib/relatorio-inspecao");

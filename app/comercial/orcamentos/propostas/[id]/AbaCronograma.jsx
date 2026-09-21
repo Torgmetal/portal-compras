@@ -1,4 +1,5 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState } from "react";
 import {
   Plus, Trash2, Loader2, X, Edit3, Check, Sparkles, RefreshCw,
@@ -406,25 +407,25 @@ export default function AbaCronograma({ estudo, estudoId }) {
                           className="w-full px-2 py-1 border border-gray-200 rounded text-xs focus:ring-1 focus:ring-torg-blue/30 outline-none" />
                       </td>
                       <td className="py-1.5 px-2">
-                        <input type="number" value={editValores.pesoKg}
-                          onChange={(e) => setEditValores((v) => ({ ...v, pesoKg: e.target.value }))}
+                        <CampoDecimal value={editValores.pesoKg}
+                          onChange={(txt) => setEditValores((v) => ({ ...v, pesoKg: txt }))}
                           className="w-full px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none" />
                       </td>
                       <td className="py-1.5 px-2">
-                        <input type="number" value={editValores.diasFabricacao} min="0"
-                          onChange={(e) => setEditValores((v) => ({ ...v, diasFabricacao: e.target.value }))}
+                        <CampoDecimal value={editValores.diasFabricacao}
+                          onChange={(txt) => setEditValores((v) => ({ ...v, diasFabricacao: txt }))}
                           className="w-14 px-2 py-1 border border-gray-200 rounded text-xs text-center focus:ring-1 focus:ring-torg-blue/30 outline-none" />
                       </td>
                       <td colSpan={semanasVisiveis} className="py-1.5 px-2">
                         <div className="flex items-center gap-3 text-xs text-torg-gray">
                           <label className="flex items-center gap-1">
-                            Inicio: <input type="number" value={editValores.semanaInicio} min="1"
-                              onChange={(e) => setEditValores((v) => ({ ...v, semanaInicio: e.target.value }))}
+                            Inicio: <CampoDecimal value={editValores.semanaInicio}
+                              onChange={(txt) => setEditValores((v) => ({ ...v, semanaInicio: txt }))}
                               className="w-12 px-2 py-1 border border-gray-200 rounded text-xs text-center focus:ring-1 focus:ring-torg-blue/30 outline-none" />
                           </label>
                           <label className="flex items-center gap-1">
-                            Mont.: <input type="number" value={editValores.diasMontagem} min="0" placeholder="—"
-                              onChange={(e) => setEditValores((v) => ({ ...v, diasMontagem: e.target.value }))}
+                            Mont.: <CampoDecimal value={editValores.diasMontagem} placeholder="—"
+                              onChange={(txt) => setEditValores((v) => ({ ...v, diasMontagem: txt }))}
                               className="w-12 px-2 py-1 border border-gray-200 rounded text-xs text-center focus:ring-1 focus:ring-torg-blue/30 outline-none" /> dias
                           </label>
                           <label className="flex items-center gap-1">
@@ -524,8 +525,8 @@ export default function AbaCronograma({ estudo, estudoId }) {
             </div>
             <div className="w-28 shrink-0">
               <label className="block text-[10px] text-torg-gray uppercase tracking-wide mb-1">Peso (kg)</label>
-              <input type="number" value={novoItem.pesoKg} placeholder="0" min="0"
-                onChange={(e) => setNovoItem((p) => ({ ...p, pesoKg: e.target.value }))}
+              <CampoDecimal value={novoItem.pesoKg} placeholder="0"
+                onChange={(txt) => setNovoItem((p) => ({ ...p, pesoKg: txt }))}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-right focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue outline-none bg-white" />
             </div>
             <div className="w-24 shrink-0">

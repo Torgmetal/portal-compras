@@ -1,4 +1,5 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Check, X, Plus, Trash2, AlertCircle, Pencil, Upload, Sparkles } from "lucide-react";
 import { METODOS_PREPARO, PLP_PADRAO, descreverSistema } from "@/lib/plp";
@@ -445,8 +446,8 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
               logo acima. Segue sozinha até alguém escrever outro valor; aí para de seguir. */}
           <Campo rotulo="Espessura total (µm)">
             <div className="flex items-center gap-1.5">
-              <input type="number" value={so(f.espessuraTotal)}
-                onChange={(e) => { set("espessuraTotal", e.target.value); set("totalManual", true); }}
+              <CampoDecimal value={so(f.espessuraTotal)}
+                onChange={(txt) => { set("espessuraTotal", txt); set("totalManual", true); }}
                 placeholder={String(somaDemaos || "")} className={cls} />
               {f.totalManual && somaDemaos > 0 && Number(f.espessuraTotal) !== somaDemaos && (
                 <button onClick={() => setF((x) => ({ ...x, espessuraTotal: String(somaDemaos), totalManual: false }))}

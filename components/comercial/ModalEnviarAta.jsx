@@ -1,4 +1,5 @@
 "use client";
+import { contatoParaEnvioAutomatico } from "@/lib/contatos-cliente";
 import { useState, useEffect, useCallback } from "react";
 import { X, Loader2, Send, Plus, Trash2, AlertCircle, CheckCircle2, Building2, Users, FileText } from "lucide-react";
 
@@ -27,7 +28,7 @@ export default function ModalEnviarAta({ opId, ataId, onClose, onEnviado }) {
         if (!ok || !j.success) return setErro(j.error || "Erro ao carregar");
         setDados(j);
         const pre = {};
-        for (const c of j.clientes || []) pre[norm(c.email)] = { nome: c.nome || "", email: norm(c.email), tipo: "CLIENTE" };
+        for (const c of (j.clientes || []).filter(contatoParaEnvioAutomatico)) pre[norm(c.email)] = { nome: c.nome || "", email: norm(c.email), tipo: "CLIENTE" };
         setSel(pre);
       })
       .catch(() => setErro("Erro ao carregar"))

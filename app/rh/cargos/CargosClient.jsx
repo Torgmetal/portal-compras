@@ -1,4 +1,5 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useRef } from "react";
 import { faixaForaDeOrdem } from "@/lib/cargo-faixa";
 import { Briefcase, Search, PlusCircle, Loader2, AlertCircle, X, ChevronDown, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Pencil } from "lucide-react";
@@ -337,8 +338,8 @@ export default function CargosClient() {
                 <div className="grid grid-cols-3 gap-3">
                   {[["salarioBase", "Base"], ["salarioMedio", "Médio"], ["salarioMaximo", "Máximo"]].map(([k, rotulo]) => (
                     <div key={k}>
-                      <input type="number" min="0" step="0.01" value={form[k]} placeholder={rotulo}
-                        onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+                      <CampoDecimal value={form[k]} placeholder={rotulo}
+                        onChange={(txt) => setForm({ ...form, [k]: txt })}
                         className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue" />
                       <span className="block mt-1 text-[11px] text-torg-gray">{rotulo}</span>
                     </div>

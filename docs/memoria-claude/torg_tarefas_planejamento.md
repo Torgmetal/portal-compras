@@ -1,0 +1,29 @@
+---
+name: torg_tarefas_planejamento
+description: "Portal Compras — tela Planejamento › Tarefas: 4 abas (Semanais/Cronograma/Cobrança/Respostas), lembrete com lista fixa de contatos, e os 2 fluxos de resposta (cliente e setor)"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: d9c0cffd-a288-4e74-b94d-9b9291161750
+  modified: 2026-07-31T18:13:54.347Z
+---
+
+**`/planejamento/tarefas`** (`app/planejamento/tarefas/TarefasClient.jsx`, ~1500 linhas) tem **4 abas** (state `aba`): **Semanais** (`TarefaPlanejamento`, board por setor/semana), **Cronograma** (`AtividadesCronograma` — `CronogramaTarefa`), **Cobrança** (`AbaCobranca`, 13/07: compras atrasadas + marcos + entregas, ver [[torg_cronograma]]), **Respostas** (`AbaRespostas`, 14/07).
+
+**Aba Cronograma = "programação" consolidada (30/07, commit 07ebda1):** `AtividadesCronograma` puxa TODAS as tarefas dos cronogramas ATIVOS via `GET /api/planejamento/cronogramas/atividades` (filtros departamento/status/**op** já existiam no back). Vitor quis o fluxo alinhado: conforme cria cronograma de cada etapa, as tarefas/datas caem aqui. UI agora **agrupada por SETOR** (seções por departamento, não mais tabela plana); tarefas ativas detalhadas (OP/atividade/prazo/%/status/notificar) e as **100% não são descritas** — colapsam como "N cumpridas" (expande p/ ver, riscado). Filtro por OP é input texto (contains). `concluida = percentual>=100` vem da API. **Exportar + Preencher (30/07, commit b74aa55):** botão "Exportar" gera Excel padrão Torg (`criarRelatorioTorg` de `lib/excel-relatorio.js`, import dinâmico no client) das atividades filtradas (9 cols). Ação "Preencher" (lápis) em cada atividade abre `ModalPreencher` que grava DIRETO no cronograma via `PATCH /api/planejamento/cronogramas/tarefas/[id]` (% + "marcar cumprida 100%" + data de conclusão `dataFimReal` + observação) — a % dispara o recálculo/rollup do back. Não precisa abrir o cronograma pra atualizar. **Hold/Bloqueio (30/07, commit cfaa0e2):** o `ModalPreencher` tem "Colocar em Hold / Bloqueio" (motivo) → grava `motivoBloqueio` no cronograma (trava a sequência via recálculo, [[torg_cronograma]]). A API `/atividades` marca `bloqueada = motivoBloqueio && !dataLiberacao` e **exclui do atrasada** (tarefa não liberada pelo cliente parava de aparecer como atrasada). UI mostra status "Hold" + contadores "em hold" (setor + KPI). Liberar = desmarcar (motivoBloqueio null) → volta ao normal.
+
+⚠️ **Dois cadastros de tarefa DIFERENTES, não confundir:** `TarefaPlanejamento` (aba Semanais, cobrança/lembrete por setor+cliente) ≠ `CronogramaTarefa` (módulo Cronograma). Não há ponte automática entre eles.
+
+**Lembrete das tarefas** (`ModalLembrete` + `POST .../tarefas/[id]/lembrete`): manda e-mail (Resend). Destinatários = **lista FIXA** definida pelo Vitor em **`lib/contatos-tarefas.js`** (agrupada por área: Comercial/Engenharia/Qualidade/PCP/Diretoria — commit e3217d7). NÃO é mais "todos os usuários"; o setor da tarefa vem pré-marcado. `SETOR_MODULO`/`SETOR_LABEL` no route ainda mapeiam o broadcast do POST.
+
+**Fluxos de RESPOSTA (14/07, commit 31159fa) — modelo `TarefaResposta`** (origem CLIENTE|SETOR, tipo CONCLUIDO/NOVA_DATA/COMENTARIO, autor, texto):
+- **Cliente**: `avisar-cliente` → link `clienteToken` → `/cliente/tarefa/[token]` (público) → grava `TarefaResposta` (CLIENTE) + atualiza status/data + avisa Planejamento.
+- **Setor**: o lembrete ganhou botão "Responder em 1 clique" → `respostaToken` → **`/tarefa/resposta/[token]`** (público, sem login) → grava `TarefaResposta` (SETOR). Antes o lembrete era só de ida.
+- Os dois caem no **Painel de Respostas** (aba Respostas → `GET /api/planejamento/tarefas/respostas`, filtro Todas/Setor/Cliente). Schema via SQL ALTER no Neon + schema.prisma + generate.
+- Middleware libera `/tarefa/resposta/` e `/api/tarefa/resposta/` (público por token), igual ao `/cliente/tarefa/`.
+
+**Cobrança de MARCOS com resposta amarrada (14/07, commit 96f9913):** o botão "Cobrar {setor}" da aba Cobrança (`POST /api/planejamento/cobranca`) agora cria um **`CobrancaMarco`** (token + tarefaIds dos marcos + respostas) e o e-mail leva link **`/cobranca-marcos/[token]`** (público). Formulário OBRIGATÓRIO por marco: **FINALIZADO** → data de conclusão + evidência (texto "o que/quando"); **NÃO FINALIZADO** → nova data. Ao responder: finalizado → marco `percentualRealizado=100` + `dataFimReal` + `CronogramaRegistro` c/ evidência; não-finalizado → `dataFimPrevista=novaData` + registro. Avisa Planejamento. Finalizados somem da lista (100%). Evidência é TEXTO (upload de arquivo é possível se pedirem). Middleware libera `/cobranca-marcos/`.
+
+Distinto da cobrança do CRONOGRAMA (`notificar-atrasos` → `CronogramaCobranca` → resposta em `/planejamento/cronogramas/resposta/[token]` → atualiza datas + aba "Linha de Controle" do cronograma).
+
+**Extração de tarefas por IA + OP (Distribuir Tarefas):** `/planejamento/distribuir-tarefas` cola ata/transcrição → `POST /api/planejamento/extrair-tarefas` → `lib/extrair-tarefas.js` (Claude sonnet-4-6) devolve tarefas com setor/prioridade/prazo/**opNumero**; a tela revisa e salva via `.../tarefas/distribuir`. A OP fica na `TarefaPlanejamento` (`opNumero`+`opId`), e o Painel de Respostas mostra a OP DELA (a `TarefaResposta` não tem OP própria). ⚠️ Problema (Vitor, 21/07/2026): a OP no Painel saía "—" porque a reunião cita a OP UMA vez (ex.: "OP-097/Valmet") e a IA só marcava o item que repetia o número. FIX (cc5dc78): (1) o prompt manda **HERDAR a OP da reunião** pras tarefas irmãs do mesmo projeto/cliente (null só se genérica ou reunião multi-OP) — testado no modelo real; (2) campo **"OP desta rodada"** na revisão preenche as tarefas sem OP num clique (não sobrescreve as detectadas), ao lado de "Data programada". Tarefas antigas ficam com a OP que tinham — corrigir na mão (cada tarefa tem campo OP) se precisar.

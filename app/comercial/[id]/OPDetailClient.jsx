@@ -1,5 +1,7 @@
 "use client";
-import { useState, useMemo } from "react";
+import MargemOrcadaLqc from "@/components/comercial/MargemOrcadaLqc";
+import CampoData from "@/components/CampoData";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, Edit3, Clock, DollarSign, AlertCircle, Loader2, X, CheckCircle2, FileText, History, Trash2, RotateCcw, Pencil, Truck, Rocket, Ruler, Factory, ShoppingCart, GanttChart, FileSpreadsheet, Building2, ShieldCheck, Globe } from "lucide-react";
@@ -9,6 +11,7 @@ import SaudeFinanceiraOP from "./SaudeFinanceiraOP";
 import MateriaisOPSection from "@/components/MateriaisOPSection";
 import { pesoRealPecas } from "@/lib/peso-op";
 import RelatoriosOPSection from "@/components/RelatoriosOPSection";
+import FasesReferencias from "@/components/comercial/FasesReferencias";
 import AbaPlanejamento from "./AbaPlanejamento";
 import AnaliseCriticaSection from "./AnaliseCriticaSection";
 import AbaExpedicao from "./AbaExpedicao";
@@ -16,6 +19,10 @@ import ConsultaExpedicao from "./ConsultaExpedicao";
 import DesenhosOPSection from "./DesenhosOPSection";
 import ListaExpedicaoSection from "./ListaExpedicaoSection";
 import AbaObra from "./AbaObra";
+import ReferenciasClienteEditor, { pedidoVazio } from "@/components/comercial/ReferenciasClienteEditor";
+import ReferenciasClienteResumo from "@/components/comercial/ReferenciasClienteResumo";
+import ModalDivulgarAditivo from "@/components/comercial/ModalDivulgarAditivo";
+import { agruparReferencias } from "@/lib/referencias-cliente";
 import AbaQualidade from "./AbaQualidade";
 import AbaPortalCliente from "./AbaPortalCliente";
 import AbaProducao from "./AbaProducao";
@@ -31,6 +38,8 @@ import { fmtOP } from "@/lib/utils";
 import OrcamentoComercial from "@/components/OrcamentoComercial";
 import { itensDaPlanilhaComercial } from "@/lib/op-categorias";
 import { numeroBR } from "@/lib/numero-br";
+import { omiePedidoCompraUrl } from "@/lib/omie-urls";
+import CampoDecimal from "@/components/CampoDecimal";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -97,8 +106,15 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
   const inicial = vistasVisiveis.find((v) => v.key === (podeVerFinanceiro ? "resumo" : "obra"))?.key
     || vistasVisiveis[0]?.key || "obra";
   const [vista, setVista] = useState(inicial);
+  // ?vista=obra#aditivo-1 — o sino e o e-mail do aditivo caem direto na aba certa, no cartão certo
+  useEffect(() => {
+    const pedida = new URLSearchParams(window.location.search).get("vista");
+    if (pedida && vistasVisiveis.some((v) => v.key === pedida)) setVista(pedida);
+    if (window.location.hash) setTimeout(() => document.querySelector(window.location.hash)?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [exportandoLPC, setExportandoLPC] = useState(false);
-  const [modalAditivo, setModalAditivo] = useState(false);
+  const [modalDivulgarAditivo, setModalDivulgarAditivo] = useState(null); // { id, numero }
   const [modalRevisao, setModalRevisao] = useState(false);
   const [modalPrazo, setModalPrazo] = useState(false);
   const [modalVerba, setModalVerba] = useState(null); // { tipo: "op"|"aditivo", itemId, atual }
@@ -284,6 +300,11 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
                       <span className="text-torg-gray">{op.obra}</span>
                     </>
                   )}
+                  {(op.aditivos || []).length > 0 && (
+                    <button onClick={() => setVista("obra")} className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-900 font-bold border border-orange-300 whitespace-nowrap hover:bg-orange-200" title="Esta obra tem aditivo — ver na aba Obra">
+                      {op.aditivos.length === 1 ? "1 ADITIVO" : `${op.aditivos.length} ADITIVOS`}{op.aditivos.some((a) => a.status === "RASCUNHO") ? " · não comunicado" : ""}
+                    </button>
+                  )}
                   {op.refCliente && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium border border-amber-100 whitespace-nowrap" title="Referência do cliente para esta obra">Ref. cliente: {op.refCliente}</span>
                   )}
@@ -348,7 +369,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
           {/* Ações */}
           <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100">
             <button
-              onClick={() => setModalAditivo(true)}
+              onClick={() => router.push(`/comercial/${op.id}/aditivo/novo`)}
               disabled={encerradaOuCancelada}
               className="px-3.5 py-2 bg-torg-blue text-white text-xs rounded-lg hover:bg-torg-blue-700 font-medium flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -491,7 +512,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
           {/* Duas colunas: Receita | Despesa */}
           <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-gray-100">
             {/* Coluna: Receita (entrada) */}
-            <div className="p-5">
+            {op.kpisFinanceiros.margemLqc ? <MargemOrcadaLqc dados={op.kpisFinanceiros.margemLqc} /> : <div className="p-5">
               <p className="text-[11px] uppercase tracking-wide text-torg-blue font-semibold mb-3">
                 Receita do contrato (entrada)
               </p>
@@ -537,7 +558,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
                   </div>
                 </div>
               )}
-            </div>
+            </div>}
 
             {/* Coluna: Despesa (saída) */}
             <div className="p-5">
@@ -587,7 +608,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
           </div>
 
           {/* Margem prevista */}
-          {op.kpisFinanceiros.receitaBruta > 0 && (
+          {!op.kpisFinanceiros.margemLqc && op.kpisFinanceiros.receitaBruta > 0 && (
             <div className="border-t border-gray-100 px-5 py-3 flex items-center justify-between bg-gray-50/50">
               <p className="text-xs text-torg-gray uppercase tracking-wide font-semibold">
                 Margem prevista (líquido − verba)
@@ -737,6 +758,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
           )}
         </div>
         <ReceitasTabela
+          origemLqc={!!op.kpisFinanceiros?.margemLqc}
           receitas={op.receitas || []}
           onEditar={(r) => setModalReceita(r)}
         />
@@ -773,14 +795,24 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
       {/* Aditivos */}
       {op.aditivos.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-torg-dark">Aditivos ({op.aditivos.length})</h3>
+          <h3 className="text-lg font-semibold text-torg-dark">Itens de verba dos aditivos ({op.aditivos.length})</h3>
+          <p className="text-xs text-torg-gray -mt-2">Aqui só a verba de compra de cada aditivo. O aditivo em si — pedido do cliente, TAGs, prazo, o que muda, comunicado aos setores — está na aba <button onClick={() => setVista("obra")} className="text-torg-blue font-semibold hover:underline">Obra</button>.</p>
           {op.aditivos.map((ad) => (
             <div key={ad.id} className="bg-white rounded-xl shadow-sm border border-torg-orange-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-torg-orange-100 bg-torg-orange-50/50">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
-                    <h4 className="font-semibold text-torg-orange-700">Aditivo {ad.numero}</h4>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-semibold text-torg-orange-700">Aditivo {ad.numero}</h4>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${ad.status === "DIVULGADO" ? "bg-emerald-50 text-emerald-700 border-emerald-100" : ad.status === "EM_EXECUCAO" ? "bg-blue-50 text-blue-700 border-blue-100" : ad.status === "ENCERRADO" ? "bg-gray-100 text-gray-600 border-gray-200" : "bg-amber-50 text-amber-800 border-amber-100"}`}>
+                        {ad.status === "DIVULGADO" ? "Divulgado aos setores" : ad.status === "EM_EXECUCAO" ? "Em execução" : ad.status === "ENCERRADO" ? "Encerrado" : "Não comunicado"}
+                      </span>
+                      {ad.valor != null && <span className="text-xs text-torg-gray">{fmtMoeda(ad.valor)}</span>}
+                    </div>
                     <p className="text-sm text-torg-gray whitespace-pre-line leading-relaxed">{ad.descricao}</p>
+                    {(op.referencias || []).some((r) => r.aditivoId === ad.id) && (
+                      <div className="mt-2"><ReferenciasClienteResumo arvore={agruparReferencias((op.referencias || []).filter((r) => r.aditivoId === ad.id))} /></div>
+                    )}
                     {(ad.dataInicio || ad.dataFimPrevista || ad.orcamentoRef) && (
                       <p className="text-[11px] text-torg-gray mt-1">
                         {ad.dataInicio && `início ${fmtData(ad.dataInicio)}`}
@@ -794,6 +826,18 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
                     <p className="text-xs text-torg-gray">
                       {ad.createdBy?.name} • {fmtData(ad.createdAt)}
                     </p>
+                    {(ad.aceites || []).length > 0 && (
+                      <span className="text-[11px] text-torg-gray" title={(ad.aceites || []).map((a) => `${a.email}${a.aceitoEm ? " ✓" : " (pendente)"}`).join("\n")}>
+                        aceites {(ad.aceites || []).filter((a) => a.aceitoEm).length}/{(ad.aceites || []).length}
+                      </span>
+                    )}
+                    {podeGerenciarComercial && !encerradaOuCancelada && (
+                      <button onClick={() => setModalDivulgarAditivo({ id: ad.id, numero: ad.numero })}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg inline-flex items-center gap-1 ${ad.status === "RASCUNHO" ? "bg-torg-orange text-white" : "bg-white border border-torg-orange-200 text-torg-orange-700 hover:bg-torg-orange-50"}`}
+                        title="Manda o comunicado do aditivo (PDF + aceite) aos setores">
+                        <Rocket size={14} /> {ad.status === "RASCUNHO" ? "Divulgar aos setores" : "Reenviar comunicado"}
+                      </button>
+                    )}
                     {podeAlterarVerbaDireto && !encerradaOuCancelada && (
                       <button
                         onClick={() => setModalAddAditivo({ id: ad.id, numero: ad.numero })}
@@ -876,7 +920,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
         </div>
       )}
 
-      {vista === "obra" && <AbaObra op={op} podeEditar={podeGerenciarComercial && !encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} />}
+      {vista === "obra" && <AbaObra op={op} onAtualizar={() => router.refresh()} podeEditar={podeGerenciarComercial && !encerradaOuCancelada} onEditar={() => setModalEditarOP(true)} encerrada={encerradaOuCancelada} onNovoAditivo={() => router.push(`/comercial/${op.id}/aditivo/novo`)} onDivulgarAditivo={(ad) => setModalDivulgarAditivo(ad)} />}
 
       {vista === "planejamento" && (
         <div className="space-y-6">
@@ -886,12 +930,14 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
           <ListaExpedicaoSection opId={op.id}>
             <ConsultaExpedicao opId={op.id} focoPendentes semCard />
           </ListaExpedicaoSection>
+          <FasesReferencias opId={op.id} consulta />
           <AbaPlanejamento opId={op.id} />
         </div>
       )}
 
       {vista === "engenharia" && (
         <div className="space-y-4">
+          <FasesReferencias opId={op.id} />
           <DesenhosOPSection opId={op.id} opNumero={op.numero} obra={op.obra} cliente={op.cliente} refCliente={op.refCliente} />
           {/* Análise Crítica de Projeto (PO-13) — Vitor (10/09/2026): na pasta da OP, aba Engenharia, "para não ficar alguma coisa a mais" */}
           <AnaliseCriticaSection opId={op.id} isDiretoria={isDiretoria} />
@@ -981,6 +1027,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
 
       {vista === "producao" && (
         <div className="space-y-6">
+          <FasesReferencias opId={op.id} consulta />
           <AbaProducao opId={op.id} opNumero={op.numero} obra={op.obra} cliente={op.cliente} refCliente={op.refCliente} />
         </div>
       )}
@@ -1075,8 +1122,8 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
       })()}
 
       {/* Modais */}
-      {modalAditivo && (
-        <ModalAditivo opId={op.id} proximoNumero={op.aditivos.length + 1} onClose={() => setModalAditivo(false)} onSaved={() => router.refresh()} />
+      {modalDivulgarAditivo && (
+        <ModalDivulgarAditivo aditivo={modalDivulgarAditivo} onClose={() => setModalDivulgarAditivo(null)} onEnviado={() => router.refresh()} />
       )}
       {modalRevisao && (
         <ModalRevisao opId={op.id} proximoNumero={op.revisoes.length + 1} onClose={() => setModalRevisao(false)} onSaved={() => router.refresh()} />
@@ -1143,6 +1190,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
       {modalMedicao && (
         <ModalMedicao
           opId={op.id}
+          aditivos={op.aditivos || []}
           onClose={() => setModalMedicao(false)}
           onSaved={() => { setModalMedicao(false); router.refresh(); }}
         />
@@ -1277,7 +1325,7 @@ function MedicoesCard({ medicoes, resumo, receitaBruta, valorTotalContrato = 0, 
                   <td className="px-4 py-2 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
                       <a
-                        href={`/api/omie/pedido-compra-pdf/${m.codigoPedidoOmie || m.numeroPedidoOmie}`}
+                        href={omiePedidoCompraUrl(m.codigoPedidoOmie || m.numeroPedidoOmie)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-mono font-semibold text-torg-blue hover:underline"
@@ -1488,8 +1536,10 @@ function statusMedicaoClasses(etapa) {
 }
 
 // Modal pra vincular medicao
-function ModalMedicao({ opId, onClose, onSaved }) {
+function ModalMedicao({ opId, aditivos = [], onClose, onSaved }) {
   const [tipo, setTipo] = useState("VENDA"); // VENDA | SERVICO
+  // a medição de um aditivo aponta para ele — "linha de medição nova" (Vitor, 16/09/2026)
+  const [aditivoId, setAditivoId] = useState("");
   const [numero, setNumero] = useState("");
   const [descricao, setDescricao] = useState("");
   const [modoManual, setModoManual] = useState(false);
@@ -1519,6 +1569,7 @@ function ModalMedicao({ opId, onClose, onSaved }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           numeroPedido: numero.trim(),
+          aditivoId: aditivoId || null,
           descricao: descricao.trim() || null,
           tipoDocumento: tipo,
           manual,
@@ -1604,6 +1655,16 @@ function ModalMedicao({ opId, onClose, onSaved }) {
             </button>
           </div>
         </div>
+
+        {aditivos.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-torg-dark mb-1">Esta medição é de qual pedido?</label>
+            <select value={aditivoId} onChange={(e) => setAditivoId(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
+              <option value="">Contrato-base</option>
+              {aditivos.map((a) => <option key={a.id} value={a.id}>Aditivo {a.numero}{a.valor != null ? ` — ${fmtMoeda(a.valor)}` : ""}</option>)}
+            </select>
+          </div>
+        )}
 
         <p className="text-xs text-torg-gray">
           Digite o número da <strong>{tipoLabel}</strong> que você criou no Omie (ex: <code>1500</code> ou <code>233/1</code>).
@@ -1835,17 +1896,15 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Data de início</label>
-            <input
-              type="date" value={form.dataInicio}
-              onChange={(e) => set("dataInicio", e.target.value)}
+            <CampoData value={form.dataInicio}
+              onChange={(iso) => set("dataInicio", iso)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Data de fim prevista</label>
-            <input
-              type="date" value={form.dataFimPrevista}
-              onChange={(e) => set("dataFimPrevista", e.target.value)}
+            <CampoData value={form.dataFimPrevista}
+              onChange={(iso) => set("dataFimPrevista", iso)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
             />
           </div>
@@ -1856,10 +1915,9 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
             <label className="block text-xs font-medium text-torg-dark mb-1">
               Valor total do contrato (R$)
             </label>
-            <input
-              type="number" step="0.01" min="0"
+            <CampoDecimal
               value={form.valorTotalContrato}
-              onChange={(e) => set("valorTotalContrato", e.target.value)}
+              onChange={(txt) => set("valorTotalContrato", txt)}
               placeholder="Ex: 250000.00"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue tabular-nums"
             />
@@ -1871,10 +1929,9 @@ function ModalEditarOP({ opId, op, onClose, onSaved }) {
             <label className="block text-xs font-medium text-torg-dark mb-1">
               R$/kg a faturar
             </label>
-            <input
-              type="number" step="0.01" min="0"
+            <CampoDecimal
               value={form.valorFaturarPorKg}
-              onChange={(e) => set("valorFaturarPorKg", e.target.value)}
+              onChange={(txt) => set("valorFaturarPorKg", txt)}
               placeholder="Ex: 8.50"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue tabular-nums"
             />
@@ -2223,7 +2280,7 @@ function ModalClienteFiscal({ opId, op, onClose, onSaved }) {
 }
 
 // Tabela das receitas no detalhe da OP
-function ReceitasTabela({ receitas, onEditar }) {
+function ReceitasTabela({ receitas, onEditar, origemLqc = false }) {
   if (!receitas || receitas.length === 0) {
     return (
       <p className="px-6 py-4 text-sm text-torg-gray">
@@ -2232,9 +2289,19 @@ function ReceitasTabela({ receitas, onEditar }) {
     );
   }
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm min-w-[820px]">
-        <thead className="bg-gray-50">
+    <div className="overflow-x-auto" role="region" aria-label="Receitas do contrato" tabIndex={0}>
+      <table className="w-full table-fixed text-sm min-w-[1100px]">
+        <colgroup>
+          <col className="w-[110px]" />
+          <col />
+          <col className="w-[70px]" />
+          <col className="w-[100px]" />
+          <col className="w-[165px]" />
+          <col className="w-[140px]" />
+          <col className="w-[165px]" />
+          <col className="w-[90px]" />
+        </colgroup>
+        <thead className="bg-gray-50 [&_th]:whitespace-nowrap">
           <tr>
             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
@@ -2246,10 +2313,11 @@ function ReceitasTabela({ receitas, onEditar }) {
             <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        <tbody className="divide-y divide-gray-100 [&_td]:align-top [&_td]:py-3 [&_td]:leading-6">
           {receitas.map((r) => {
             const aliqTotal = (r.icmsPct || 0) + (r.ipiPct || 0) + (r.pisPct || 0)
               + (r.cofinsPct || 0) + (r.issPct || 0) + (r.irrfPct || 0) + (r.csllPct || 0);
+            const fiscalPendente = origemLqc && [r.icmsPct, r.ipiPct, r.pisPct, r.cofinsPct, r.issPct, r.irrfPct, r.csllPct].every((v) => v == null);
             const impostosVal = (r.valor || 0) * (aliqTotal / 100);
             const liq = (r.valor || 0) - impostosVal;
             return (
@@ -2257,7 +2325,7 @@ function ReceitasTabela({ receitas, onEditar }) {
                 <td className="px-4 py-2 text-torg-dark text-xs">
                   <span className="font-medium">{labelCategoriaReceita(r.categoria)}</span>
                 </td>
-                <td className="px-4 py-2 text-torg-dark">
+                <td className="px-4 py-2 text-torg-dark break-words [text-wrap:pretty]">
                   {r.descricao}
                   {r.tipoPreco && r.tipoPreco !== "VALOR" && r.quantidade != null && (
                     <span className="block text-[10px] text-torg-gray tabular-nums">
@@ -2267,18 +2335,18 @@ function ReceitasTabela({ receitas, onEditar }) {
                 </td>
                 <td className="px-4 py-2 text-torg-gray text-xs font-mono">{r.cfop || "—"}</td>
                 <td className="px-4 py-2 text-torg-gray text-xs max-w-[180px] truncate" title={r.enderecoFaturamento || ""}>{r.enderecoFaturamento || "—"}</td>
-                <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums">{fmtMoeda(r.valor)}</td>
-                <td className="px-4 py-2 text-right text-torg-orange-700 tabular-nums text-xs">
-                  − {fmtMoeda(impostosVal)}
-                  <span className="text-[10px] text-torg-gray block">
-                    {aliqTotal > 0 ? `${aliqTotal.toFixed(2)}%` : "sem impostos"}
+                <td className="px-4 py-2 text-right text-torg-dark font-medium tabular-nums whitespace-nowrap">{fmtMoeda(r.valor)}</td>
+                <td className="px-4 py-2 text-right text-torg-orange-700 tabular-nums text-xs whitespace-nowrap">
+                  {fiscalPendente ? "A definir" : `− ${fmtMoeda(impostosVal)}`}
+                  <span className="text-[10px] text-torg-gray block whitespace-nowrap">
+                    {fiscalPendente ? "Conferir tributação" : aliqTotal > 0 ? `${aliqTotal.toFixed(2)}%` : "sem impostos"}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-right text-torg-blue font-bold tabular-nums">{fmtMoeda(liq)}</td>
+                <td className={`px-4 py-2 text-right tabular-nums whitespace-nowrap ${fiscalPendente ? "text-torg-gray font-medium" : "text-torg-blue font-bold"}`}>{fiscalPendente ? "A definir" : fmtMoeda(liq)}</td>
                 <td className="px-4 py-2 text-right">
                   <button
                     onClick={() => onEditar(r)}
-                    className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1"
+                    className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1 whitespace-nowrap"
                   >
                     <Pencil size={12} /> Editar
                   </button>
@@ -2473,20 +2541,18 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Quantidade *</label>
-              <input
-                type="number" step="0.01" min="0"
+              <CampoDecimal
                 value={form.quantidade}
-                onChange={(e) => set("quantidade", e.target.value)}
+                onChange={(txt) => set("quantidade", txt)}
                 placeholder="0"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:ring-2 focus:ring-torg-blue"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Valor unit. (R$/{un}) *</label>
-              <input
-                type="number" step="0.0001" min="0"
+              <CampoDecimal
                 value={form.valorUnitario}
-                onChange={(e) => set("valorUnitario", e.target.value)}
+                onChange={(txt) => set("valorUnitario", txt)}
                 placeholder="R$ 0,00"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:ring-2 focus:ring-torg-blue"
               />
@@ -2499,10 +2565,9 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
         ) : (
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Valor bruto (R$) *</label>
-            <input
-              type="number" step="0.01" min="0"
+            <CampoDecimal
               value={form.valor || ""}
-              onChange={(e) => set("valor", e.target.value)}
+              onChange={(txt) => set("valor", txt)}
               placeholder="R$ 0,00"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-right tabular-nums focus:ring-2 focus:ring-torg-blue"
             />
@@ -2583,10 +2648,9 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
             ].map((imp) => (
               <div key={imp.key}>
                 <label className="block text-[11px] font-medium text-torg-gray mb-1">{imp.label}</label>
-                <input
-                  type="number" step="0.01" min="0" max="100"
+                <CampoDecimal
                   value={form[imp.key]}
-                  onChange={(e) => set(imp.key, e.target.value)}
+                  onChange={(txt) => set(imp.key, txt)}
                   placeholder="0"
                   className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue"
                 />
@@ -2705,21 +2769,21 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
   return (
     <div>
       <p className="px-6 pt-4 text-xs font-semibold text-torg-gray uppercase tracking-wide">{titulo}</p>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" role="region" aria-label={`Itens — ${titulo}`} tabIndex={0}>
         {/* larguras fixas: sem elas a Descrição ficava espremida em 5 linhas e o resto sobrando */}
-        <table className="w-full text-sm min-w-[1040px] table-fixed">
-          <thead className="bg-gray-50">
+        <table className="w-full text-sm min-w-[1100px] table-fixed">
+          <thead className="bg-gray-50 [&_th]:whitespace-nowrap">
             <tr>
-              <th className="w-[120px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+              <th className="w-[130px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
-              <th className="w-[130px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Detalhes</th>
-              <th className="w-[90px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Local</th>
-              <th className="w-[190px] px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Verba</th>
-              <th className="w-[110px] px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Fat. direto</th>
-              <th className="w-[130px] px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
+              <th className="w-[135px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Detalhes</th>
+              <th className="w-[80px] px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Local</th>
+              <th className="w-[180px] px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Verba</th>
+              <th className="w-[145px] px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Faturamento</th>
+              <th className="w-[135px] px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 [&_td]:align-top [&_td]:py-3">
             {itens.map((it) => {
               const temPendente = (it.solicitacoesVerba || []).length > 0;
               const consumido = Number(it.consumido) || 0;
@@ -2732,18 +2796,21 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
               return (
                 <tr key={it.id}>
                   <td className="px-4 py-3 align-top text-torg-gray text-xs">{labelCategoria(it.categoria)}</td>
-                  {/* ⚠ NADA de line-clamp/truncate aqui: Vitor (19/08) — "consegue trazer todas as
-                      informações escritas, pois abreviar pode nos atrapalhar". A descrição do item
-                      e a origem dele na planilha precisam ser lidas por inteiro. */}
+                  {/* Descrição integral; observações extensas podem ser abertas sem perder conteúdo. */}
                   <td className="px-4 py-3 align-top text-torg-dark font-medium leading-snug break-words">
                     <span className="block">{it.descricao}</span>
-                    {it.observacao && <span className="block text-[11px] font-normal text-torg-gray mt-0.5">{it.observacao}</span>}
+                    {it.observacao && (it.observacao.length > 120 ? (
+                      <details className="mt-1 text-xs font-normal text-torg-gray">
+                        <summary className="cursor-pointer text-torg-blue hover:underline w-fit py-1">Ver observação</summary>
+                        <p className="mt-2 leading-relaxed whitespace-pre-wrap break-words">{it.observacao}</p>
+                      </details>
+                    ) : <span className="block text-[11px] font-normal text-torg-gray mt-1 leading-relaxed">{it.observacao}</span>)}
                   </td>
                   <td className="px-4 py-3 align-top text-torg-gray text-xs">{detalhesItem(it)}</td>
                   <td className="px-4 py-3 align-top text-torg-gray text-xs">{localLabel(it.localEstoque) || "—"}</td>
                   <td className="px-4 py-3 align-top text-right tabular-nums">
                     <div className="flex items-baseline justify-end gap-1.5">
-                      <span className="text-torg-dark font-semibold">{fmtMoeda(verba)}</span>
+                      <span className="text-torg-dark font-semibold whitespace-nowrap">{fmtMoeda(verba)}</span>
                       {consumido > 0 && (
                         <span className={`text-[10px] font-medium ${corSaldo}`}>
                           {pctUsado.toFixed(0)}%
@@ -2778,7 +2845,7 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
                     {onToggleFD ? (
                       <button
                         onClick={() => onToggleFD(it)}
-                        className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
+                        className={`text-xs font-semibold whitespace-nowrap px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
                           it.faturamentoDireto
                             ? "bg-torg-orange/10 text-torg-orange border-torg-orange/30 hover:bg-torg-orange/20"
                             : "bg-torg-blue/10 text-torg-blue border-torg-blue/20 hover:bg-torg-blue/20"
@@ -2788,7 +2855,7 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
                         {it.faturamentoDireto ? "Faturado Cliente" : "Faturado Torg"}
                       </button>
                     ) : (
-                      <span className={`text-xs font-medium px-2.5 py-0.5 rounded-lg border ${
+                      <span className={`text-xs font-medium whitespace-nowrap inline-block px-2.5 py-0.5 rounded-lg border ${
                         it.faturamentoDireto
                           ? "bg-torg-orange/10 text-torg-orange border-torg-orange/30"
                           : "bg-torg-blue/10 text-torg-blue border-torg-blue/20"
@@ -2798,11 +2865,11 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
                     )}
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <div className="inline-flex items-center gap-3 justify-end">
+                    <div className="flex flex-col items-end gap-2">
                       {podeAlterarVerbaDireto && onEditar && (
                         <button
                           onClick={() => onEditar(it)}
-                          className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1"
+                          className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1 whitespace-nowrap min-h-[28px]"
                           title="Editar item — alteração direta dos campos"
                         >
                           <Pencil size={12} /> Editar
@@ -2811,7 +2878,7 @@ function BlocoItens({ titulo, itens, onSolicitarVerba, onEditar, onToggleFD, isM
                       <button
                         onClick={() => onSolicitarVerba(it)}
                         disabled={temPendente}
-                        className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1 whitespace-nowrap min-h-[28px] disabled:opacity-40 disabled:cursor-not-allowed"
                         title={
                           temPendente
                             ? "Já tem solicitação pendente"
@@ -2953,10 +3020,9 @@ function ModalPrazo({ opId, dataAtual, onClose, onSaved }) {
         </p>
         <div>
           <label className="block text-sm font-medium text-torg-dark mb-1">Nova data fim</label>
-          <input
-            type="date"
+          <CampoData
             value={novaData}
-            onChange={(e) => setNovaData(e.target.value)}
+            onChange={(iso) => setNovaData(iso)}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
           />
         </div>
@@ -3034,12 +3100,9 @@ function ModalSolicitarVerba({ tipo, itemId, atual, descricao, podeAlterarVerbaD
         </div>
         <div>
           <label className="block text-sm font-medium text-torg-dark mb-1">Valor proposto (R$)</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
+          <CampoDecimal
             value={valorProposto || ""}
-            onChange={(e) => setValorProposto(e.target.value)}
+            onChange={(txt) => setValorProposto(txt)}
             placeholder="R$ 0,00"
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue tabular-nums"
           />
@@ -3170,7 +3233,7 @@ function ModalEditarItem({ tipo, item, onClose, onSaved }) {
 }
 
 // Modal de adicionar itens NOVOS a uma OP existente (ADMIN-only).
-// Mesma UX do ModalAditivo mas vai pra OP base, sem criar aditivo.
+// Mesma UX dos itens de verba da abertura do aditivo, mas vai pra OP base, sem criar aditivo.
 function ModalAdicionarItens({ opId, aditivo = null, onClose, onSaved }) {
   const [itens, setItens] = useState([novoItem()]);
   const [erro, setErro] = useState("");
@@ -3283,146 +3346,3 @@ function ModalAdicionarItens({ opId, aditivo = null, onClose, onSaved }) {
   );
 }
 
-function ModalAditivo({ opId, proximoNumero, onClose, onSaved }) {
-  const [descricao, setDescricao] = useState("");
-  const [itens, setItens] = useState([novoItem()]);
-  const [orcAd, setOrcAd] = useState({ pasta: null, ref: null, propostas: [], estudo: null, dados: null });
-  const [dataInicioAd, setDataInicioAd] = useState("");
-  const [dataFimAd, setDataFimAd] = useState("");
-  const [erro, setErro] = useState("");
-  const [salvando, setSalvando] = useState(false);
-
-  const updateItem = (i, novo) => setItens((p) => p.map((it, idx) => (idx === i ? novo : it)));
-  const addItem = (cat = "MATERIA_PRIMA") => setItens((p) => [...p, novoItem(cat)]);
-  const removeItem = (i) => setItens((p) => p.filter((_, idx) => idx !== i));
-
-  const totalVerba = itens.reduce((s, it) => s + (Number(it.valorVerba) || 0), 0);
-
-  const submit = async () => {
-    if (!descricao.trim()) return setErro("Descreva o motivo do aditivo.");
-    const validos = itens.filter((it) => it.descricao.trim());
-    if (validos.length === 0) return setErro("Adicione pelo menos um item.");
-
-    setSalvando(true);
-    try {
-      const res = await fetch(`/api/comercial/op/${opId}/aditivo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          descricao: descricao.trim(),
-          itens: validos.map((it) => ({
-            ...it,
-            qtdContratada: Number(it.qtdContratada) || null,
-            meses: Number(it.meses) || null,
-            valorPorMes: Number(it.valorPorMes) || null,
-            valorVerba: Number(it.valorVerba),
-          })),
-          dataInicio: dataInicioAd || null,
-          dataFimPrevista: dataFimAd || null,
-          orcamentoPasta: orcAd.pasta, orcamentoRef: orcAd.ref,
-          propostas: orcAd.propostas, estudoArquivo: orcAd.estudo, estudoDados: orcAd.dados,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
-      onSaved();
-      onClose();
-    } catch (e) {
-      setErro(e.message);
-      setSalvando(false);
-    }
-  };
-
-  return (
-    <Modal titulo={`Novo Aditivo ${proximoNumero}`} onClose={onClose}>
-      <div className="px-6 py-5 space-y-4">
-        {/* O aditivo nasce de OUTRA proposta e OUTRO estudo — e a informação precisa chegar a
-            todos os setores. Mesmo bloco da criação da OP. (Vitor 19/08.) */}
-        <OrcamentoComercial
-          valor={orcAd}
-          onChange={(v) => {
-            setOrcAd(v);
-            const daPlanilha = itensDaPlanilhaComercial(v.dados?.comercial, v.dados?.custos, v.dados);
-            if (daPlanilha.length) setItens((prev) => (prev.some((i) => String(i.descricao || "").trim()) ? prev : daPlanilha));
-            const prop = (v.propostas || []).find((p) => p.descricao);
-            if (prop?.descricao) setDescricao((d) => d || `Aditivo ${proximoNumero} — ${prop.obra || prop.numeroProposta || ""}\n\n${prop.descricao}`);
-          }}
-        />
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Data de início</label>
-            <input type="date" value={dataInicioAd} onChange={(e) => setDataInicioAd(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-torg-dark mb-1">Fim previsto</label>
-            <input type="date" value={dataFimAd} onChange={(e) => setDataFimAd(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-          </div>
-        </div>
-
-        {erro && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-3 py-2 flex items-start gap-2">
-            <AlertCircle size={14} className="mt-0.5" /> <span>{erro}</span>
-          </div>
-        )}
-        <div>
-          <label className="block text-sm font-medium text-torg-dark mb-1">Descrição do aditivo</label>
-          <textarea
-            value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
-            rows={2}
-            placeholder="Ex: Aditivo 1 — inclusão de pipe rack adicional."
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
-          />
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-            <label className="block text-sm font-medium text-torg-dark">Itens do aditivo</label>
-            <div className="flex gap-2">
-              <button onClick={() => addItem("MATERIA_PRIMA")} className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1">
-                <Plus size={12} /> Material
-              </button>
-              <button onClick={() => addItem("ALUGUEL_PLATAFORMA")} className="text-xs text-torg-orange-700 hover:text-torg-dark font-medium inline-flex items-center gap-1">
-                <Plus size={12} /> Aluguel
-              </button>
-              <button onClick={() => addItem("OUTRO")} className="text-xs text-torg-gray hover:text-torg-dark font-medium inline-flex items-center gap-1">
-                <Plus size={12} /> Outro
-              </button>
-            </div>
-          </div>
-          <div className="border border-gray-100 rounded-lg divide-y divide-gray-100">
-            {itens.map((it, i) => (
-              <ItemFormRow
-                key={i}
-                item={it}
-                onChange={(novo) => updateItem(i, novo)}
-                onRemove={() => removeItem(i)}
-                canRemove={itens.length > 1}
-                compact
-              />
-            ))}
-          </div>
-          <div className="mt-2 text-right text-sm">
-            <span className="text-torg-gray">Total verba do aditivo: </span>
-            <span className="font-bold text-torg-orange-700 tabular-nums">{fmtMoeda(totalVerba)}</span>
-          </div>
-        </div>
-      </div>
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-        <button onClick={onClose} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">
-          Cancelar
-        </button>
-        <button
-          onClick={submit}
-          disabled={salvando}
-          className="px-5 py-2 bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 text-sm font-medium flex items-center gap-2 disabled:opacity-50"
-        >
-          {salvando && <Loader2 size={14} className="animate-spin" />} Criar aditivo
-        </button>
-      </div>
-    </Modal>
-  );
-}

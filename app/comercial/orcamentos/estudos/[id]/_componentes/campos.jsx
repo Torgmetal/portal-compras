@@ -1,7 +1,21 @@
 "use client";
+import CampoData from "@/components/CampoData";
+import CampoDecimal from "@/components/CampoDecimal";
 import { fmtKg, fmtR$ } from "../_lib/formatos";
 
-export const Inp = (p) => <input {...p} className={`border border-gray-200 rounded px-2 py-1 text-[12px] ${p.className || ""}`} />;
+// ⚠⚠ O WRAPPER DESPACHA, PARA NÃO FICAR UM BURACO POR ONDE O `type="date"` VOLTA. Quem escreve
+// `<Inp type="date">` aqui não está escolhendo o campo do navegador — está pedindo uma data, e
+// data neste portal é `dd/mm/aaaa` (o porquê está em `lib/data-digitada`). O mesmo vale para o
+// número decimal, cujo campo nativo descarta a vírgula (`lib/decimal-digitado`).
+export const Inp = ({ type, ...p }) => {
+  const cls = `border border-gray-200 rounded px-2 py-1 text-[12px] ${p.className || ""}`;
+  if (type === "date") return <CampoData {...p} className={cls} />;
+  if (type === "number" && p.step !== "1") {
+    const { step, min, max, ...resto } = p;
+    return <CampoDecimal {...resto} className={cls} />;
+  }
+  return <input type={type} {...p} className={cls} />;
+};
 
 /** ⚠ `rotulos` mostra texto de gente sem mexer no VALOR — que é a chave que a planilha compara. */
 export const Sel = ({ opcoes, rotulos, ...p }) => (

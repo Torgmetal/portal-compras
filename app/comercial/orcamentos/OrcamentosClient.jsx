@@ -1,4 +1,6 @@
 "use client";
+import CampoData from "@/components/CampoData";
+import CampoDecimal from "@/components/CampoDecimal";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { FileSpreadsheet, PlusCircle, Search, X, ChevronDown, Pencil, Trash2, Eye, Loader2, AlertCircle, Filter, FileDown, FileText, TrendingUp, XCircle, FileCheck2, DollarSign, Calendar, BarChart3, RefreshCw, ArrowRight, FileSpreadsheet as IconLqc } from "lucide-react";
@@ -759,6 +761,8 @@ function FormOrcamentoModal({ orcamento, onSalvar, onClose }) {
   const [erro, setErro] = useState(null);
 
   const set = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  // ⚠ `CampoDecimal` entrega o TEXTO já limpo, não o evento — ver `components/CampoDecimal`.
+  const setTexto = (field) => (txt) => setForm((prev) => ({ ...prev, [field]: txt }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -940,11 +944,9 @@ function FormOrcamentoModal({ orcamento, onSalvar, onClose }) {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Valor (R$)</label>
-              <input
-                type="number"
-                step="0.01"
+              <CampoDecimal
                 value={form.valor}
-                onChange={set("valor")}
+                onChange={setTexto("valor")}
                 placeholder="0,00"
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-torg-blue/30 focus:border-torg-blue tabular-nums"
               />
@@ -955,37 +957,33 @@ function FormOrcamentoModal({ orcamento, onSalvar, onClose }) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Data solicitada</label>
-              <input
-                type="date"
+              <CampoData
                 value={form.dataSolicitada}
-                onChange={set("dataSolicitada")}
+                onChange={setTexto("dataSolicitada")}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-torg-blue/30"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-amber-600 mb-1">Prazo de entrega</label>
-              <input
-                type="date"
+              <CampoData
                 value={form.prazoEntrega}
-                onChange={set("prazoEntrega")}
+                onChange={setTexto("prazoEntrega")}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-torg-blue/30"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Data envio</label>
-              <input
-                type="date"
+              <CampoData
                 value={form.dataEnvio}
-                onChange={set("dataEnvio")}
+                onChange={setTexto("dataEnvio")}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-torg-blue/30"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Data fechamento</label>
-              <input
-                type="date"
+              <CampoData
                 value={form.dataFechamento}
-                onChange={set("dataFechamento")}
+                onChange={setTexto("dataFechamento")}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-torg-blue/30"
               />
             </div>

@@ -1,0 +1,33 @@
+/* ---------------------------------------------------------------------------
+   TORG — atributos de usuario (UDA) da MONTAGEM para obras TMSA / Vale
+   Tekla Structures 2025. Copie este arquivo para a pasta do MODELO de teste
+   (fica valendo so nele) ou para a pasta "firm" para valer em todos.
+   Reabra o modelo depois de copiar.
+   Nos relatorios os campos saem como ASSEMBLY.USERDEFINED.<nome>.
+   --------------------------------------------------------------------------- */
+assembly(0, "Assembly")
+{
+    tab_page("TORG_TMSA_VALE", "TMSA / Vale", 1)
+    {
+        attribute("SKU_TMSA", "SKU (marca TMSA)", string, "%s", no, none, "0.0", "0.0")
+        {
+            value("", 0)
+        }
+        attribute("TAG_CLIENTE", "TAG", string, "%s", no, none, "0.0", "0.0")
+        {
+            value("", 0)
+        }
+        attribute("CWP_CLIENTE", "CWP", string, "%s", no, none, "0.0", "0.0")
+        {
+            value("", 0)
+        }
+        attribute("ITEM_LX", "Item LX", string, "%s", no, none, "0.0", "0.0")
+        {
+            value("", 0)
+        }
+        attribute("DESENHO_CLIENTE", "Desenho cliente / rev.", string, "%s", no, none, "0.0", "0.0")
+        {
+            value("", 0)
+        }
+    }
+}

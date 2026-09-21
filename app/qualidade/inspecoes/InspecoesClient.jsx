@@ -1,8 +1,10 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Loader2, FileText, Check, Send, AlertCircle, ChevronRight, ExternalLink, Plus, X, ShieldCheck, Trash2, Link2 } from "lucide-react";
 import { TIPO_LABEL, TIPOS_RELATORIO, usaCotas, pendenciasParaAssinatura } from "@/lib/qualidade-campo";
+import { rotuloFase } from "@/lib/fase-peca";
+import FiltroFase from "@/components/qualidade/FiltroFase";
 
 /**
  * INSPEÇÕES — as fotos do celular viram relatório aqui, no computador.
@@ -448,6 +450,14 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
   // juntas, e este filtro só estreita a busca por quem já sabe o que quer.
   const [famFiltro, setFamFiltro] = useState("");
   const [pecas, setPecas] = useState(null);
+  // ⚠ POR FASE. Vitor (14/09/2026): "precisamos que separe por fases (…) isso deve ter em todos os
+  // tipos de relatórios". As fases vêm da API; em obra com mais de uma, a lista abre na PRIMEIRA
+  // (relatório nasce de uma fase só) e o inspetor troca pelo chip. `faseDefinida` impede que
+  // "Todas as fases" seja desfeito pela resposta seguinte.
+  const [fases, setFases] = useState([]);
+  const [fase, setFase] = useState(null);
+  const faseDefinida = useRef(false);
+  const [temMais, setTemMais] = useState(false);
   const [sel, setSel] = useState([]);
   const [inspetor, setInspetor] = useState("");
   // Vitor (21/08/2026): "traga eles no seletor para podermos escolher um deles para testarmos".
@@ -476,17 +486,27 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
     return () => { vivo = false; };
   }, [op]);
 
-  // lista as peças da OP — CONJUNTO mostra conjuntos, AVULSAS mostra todas
+  // lista as peças da OP. Dimensional de CONJUNTO: só conjuntos (um por relatório, com desenho);
+  // dimensional de AVULSAS: tudo, inclusive croqui (é onde se mede o que saiu do corte); os demais
+  // tipos (pintura, solda, US, LP): produto final — conjunto e peça avulsa, sem croqui nem
+  // acessório. Vitor (14/09/2026): "isso não pode aparecer na tela do inspetor".
+  const modo = !ehDimensional || ehPreMontagem ? "&todas=1" : escopo === "AVULSAS" ? "&todas=1&croquis=1" : "";
   useEffect(() => {
-    if (!op) { setPecas(null); return; }
+    if (!op) { setPecas(null); setFases([]); return; }
     let vivo = true;
     setPecas(null);
     const t = setTimeout(() => {
-      fetch(`/api/campo/pecas?opId=${op.id}&q=${encodeURIComponent(q)}${escopo === "AVULSAS" ? "&todas=1" : ""}`)
-        .then((r) => r.json()).then((j) => { if (vivo) setPecas(j.pecas || []); }).catch(() => vivo && setPecas([]));
+      fetch(`/api/campo/pecas?opId=${op.id}&q=${encodeURIComponent(q)}${modo}${fase ? `&fase=${encodeURIComponent(fase)}` : ""}`)
+        .then((r) => r.json()).then((j) => {
+          if (!vivo) return;
+          setPecas(j.pecas || []); setTemMais(!!j.temMais);
+          const fs = j.fases || [];
+          setFases(fs);
+          if (!faseDefinida.current && fs.length >= 2) { faseDefinida.current = true; setFase(fs[0]); }
+        }).catch(() => vivo && setPecas([]));
     }, 250);
     return () => { vivo = false; clearTimeout(t); };
-  }, [op, q, escopo]);
+  }, [op, q, modo, fase]);
 
   // os projetos da obra (pré-montagem): as duas famílias juntas — ver nota do famFiltro acima.
   useEffect(() => {
@@ -500,8 +520,9 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
     return () => { vivo = false; };
   }, [ehPreMontagem, op]);
 
-  // trocar de escopo/OP invalida a seleção e a prévia
-  useEffect(() => { setSel([]); setListaAberta(true); }, [op, escopo]);
+  // trocar de escopo/OP invalida a seleção e a prévia — e a fase volta a ser decidida pela obra
+  useEffect(() => { setSel([]); setListaAberta(true); setFase(null); faseDefinida.current = false; }, [op, escopo]);
+  const escolherFase = (f) => { faseDefinida.current = true; setFase(f); };
 
   // ⚠ SÓ O DIMENSIONAL DE CONJUNTO É UMA PEÇA SÓ. Vitor (21/08/2026): "precisa me dar opção de
   // selecionar mais de uma peça". O escopo (conjunto × avulsas) existe apenas no dimensional, mas a
@@ -594,7 +615,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] font-semibold text-torg-gray">
-                    {ehPreMontagem ? "Projetos" : escopo === "CONJUNTO" ? "Conjunto" : "Peças"} {sel.length ? `· ${sel.length} selecionada(s)` : ""}
+                    {ehPreMontagem ? "Projetos" : ehDimensional && escopo === "CONJUNTO" ? "Conjunto" : "Peças"} {sel.length ? `· ${sel.length} selecionada(s)` : ""}
                   </span>
                   <span className="flex items-center gap-2">
                     {sel.length > 0 && (
@@ -679,13 +700,17 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
                     só peças com NC1 <span className="text-torg-gray/70">({comNc1.size} na OP)</span>
                   </label>
                 )}
+                <FiltroFase fases={fases} fase={fase} onChange={escolherFase} />
                 <div className="border border-gray-100 rounded-lg max-h-56 overflow-y-auto">
                   {pecas === null && <p className="p-2 text-[12px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> buscando…</p>}
-                  {(pecas || []).filter((p) => !soNc1 || comNc1?.has(String(p.marca).toUpperCase())).map((p) => {
+                  {(pecas || []).filter((p) => !soNc1 || comNc1?.has(String(p.marca).toUpperCase())).map((p, i, arr) => {
                     const on = sel.includes(p.marca);
                     const nc = comNc1?.has(String(p.marca).toUpperCase());
-                    return (
-                      <button key={p.marca} onClick={() => alternar(p.marca)}
+                    // com "Todas as fases" a lista vem separada por cabeçalho de fase
+                    const cabecalho = !fase && fases.length >= 2 && (i === 0 || arr[i - 1].fase !== p.fase);
+                    return (<div key={p.marca}>
+                      {cabecalho && <p className="px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-torg-gray bg-gray-50 border-b border-gray-100">{rotuloFase(p.fase)}</p>}
+                      <button onClick={() => alternar(p.marca)}
                         className={`w-full text-left px-2 py-1.5 border-b border-gray-50 flex items-center gap-2 ${on ? "bg-torg-blue/5" : "hover:bg-gray-50"}`}>
                         <span className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center ${on ? "bg-torg-blue border-torg-blue" : "border-gray-300"}`}>
                           {on && <Check size={11} className="text-white" />}
@@ -697,9 +722,10 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
                         {/* NC1 = dimensão exata (comprimento e posição de furo); sem ele, lê o desenho */}
                         {nc && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 shrink-0">NC1</span>}
                       </button>
-                    );
+                    </div>);
                   })}
                   {pecas && !pecas.length && <p className="p-2 text-[12px] text-torg-gray">Nada encontrado.</p>}
+                  {temMais && <p className="p-2 text-[11px] text-torg-gray border-t border-gray-100">Mostrando as primeiras 60 marcas — busque pela marca{fases.length >= 2 ? " ou escolha a fase" : ""}.</p>}
                 </div>
                 </>)}
               </div>

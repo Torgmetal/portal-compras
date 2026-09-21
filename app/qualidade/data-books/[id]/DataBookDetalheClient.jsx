@@ -72,10 +72,17 @@ export default function DataBookDetalheClient({ id, userId }) {
     }
   }
 
+  // ⚠⚠ A RESPOSTA PRECISA SER LIDA — ELA JÁ EXPLICAVA, E A TELA JOGAVA FORA (15/09/2026).
+  // Matheus: "no X a gente clica, ele roda e não tira". O servidor estava certo: o data book da
+  // OP-106 tinha sido EMITIDO, e a rota devolvia 409 dizendo para abrir uma revisão — regra do
+  // Vitor, "data book emitido não se mexe, é um documento". Sem `res.ok`, o botão girava e o
+  // usuário ficava sem saber se era travamento, permissão ou defeito.
   async function desvincular(secao, documentoId) {
     setAcao(secao.id);
     try {
-      await fetch(`/api/qualidade/data-books/secao/${secao.id}/doc?documentoId=${encodeURIComponent(documentoId)}`, { method: "DELETE" });
+      const res = await fetch(`/api/qualidade/data-books/secao/${secao.id}/doc?documentoId=${encodeURIComponent(documentoId)}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) throw new Error(json.error || `Não consegui remover (HTTP ${res.status}).`);
       await carregar();
     } catch (e) {
       alert(e.message);
@@ -481,13 +488,13 @@ export default function DataBookDetalheClient({ id, userId }) {
             <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
               <strong>O cliente pediu ajuste:</strong> “{data.avaliacaoObs}”
               <span className="block mt-1">
-                Corrija o rascunho e mande conferir de novo — as assinaturas continuam travadas até o ok.
+                Corrija o rascunho e mande conferir de novo — ou siga para as assinaturas mesmo assim (a tela pede confirmação e registra que a conferência ficou pendente).
               </span>
             </p>
           ) : data.avaliacaoEnviadaEm ? (
             <p className="mt-3 rounded-lg border border-torg-blue-100 bg-torg-blue-50/40 px-3 py-2 text-[12px] text-torg-dark">
               Rascunho no portal do cliente desde {new Date(data.avaliacaoEnviadaEm).toLocaleString("pt-BR")} —
-              aguardando o retorno dele. As assinaturas só liberam depois do ok.
+              aguardando o retorno dele. Dá para seguir para as assinaturas sem esperar — a tela pede confirmação.
             </p>
           ) : (
             <p className="mt-3 text-[12px] text-torg-gray">
@@ -499,7 +506,8 @@ export default function DataBookDetalheClient({ id, userId }) {
       )}
 
       {/* Fluxo de assinaturas — Elaborador → Inspetor → Resp. Técnico → Cliente (por e-mail/link) */}
-      <FluxoAssinaturas id={id} cliente={data.cliente} clienteEmail={data.clienteEmail} onChange={carregar} />
+      <FluxoAssinaturas id={id} cliente={data.cliente} clienteEmail={data.clienteEmail}
+        avaliacaoPendente={!!(data.avaliacaoEnviadaEm && !data.avaliacaoOkEm)} avaliacaoObs={data.avaliacaoObs || null} onChange={carregar} />
 
       {/* Rastreabilidade da obra — casamento LPC × certificados de material (seção 04) */}
       {rastr && rastr.totalMateriais > 0 && (
@@ -556,7 +564,7 @@ export default function DataBookDetalheClient({ id, userId }) {
 
 const PAPEL_LABEL_UI = { ELABORADOR: "Elaborador", INSPETOR: "Inspetor responsável", RESP_TECNICO: "Resp. Técnico · Guilherme A. Corte Campos", CLIENTE: "Cliente (aceite)" };
 
-function FluxoAssinaturas({ id, cliente, clienteEmail, onChange }) {
+function FluxoAssinaturas({ id, cliente, clienteEmail, avaliacaoPendente = false, avaliacaoObs = null, onChange }) {
   const [chain, setChain] = useState(null);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ elaboradorNome: "", elaboradorEmail: "", inspetorNome: "", inspetorEmail: "", rtEmail: "", clienteNome: cliente || "", clienteEmail: clienteEmail || "" });
@@ -580,9 +588,20 @@ function FluxoAssinaturas({ id, cliente, clienteEmail, onChange }) {
       if (!/^\S+@\S+\.\S+$/.test((form[k] || "").trim())) { alert("Preencha os 4 e-mails: elaborador, inspetor, responsável técnico e cliente."); return; }
     }
     if (!confirm("Iniciar o fluxo de assinaturas? O elaborador recebe o link por e-mail; ao assinar, o próximo é acionado automaticamente, até o cliente.")) return;
+    // ⚠ CONFERÊNCIA DO CLIENTE PENDENTE É AVISO, NÃO TRAVA. Vitor (15/09/2026): "vamos tirar essa
+    // necessidade de ter que mandar sempre o rascunho, deixe como opção". A API devolve 409 com
+    // `conferenciaPendente`; aqui se pergunta e, confirmado, manda de novo com `ignorarConferencia`.
+    const corpo = { ...form };
+    if (avaliacaoPendente) {
+      if (!confirm(
+        (avaliacaoObs ? `O cliente pediu ajuste na conferência do rascunho: “${avaliacaoObs}”.` : "O cliente está com o rascunho para conferir e ainda não deu o ok.") +
+        "\n\nEnviar para assinatura mesmo assim? (fica registrado que a conferência não foi concluída)"
+      )) return;
+      corpo.ignorarConferencia = true;
+    }
     setIniciando(true);
     try {
-      const r = await fetch(`/api/qualidade/data-books/${id}/assinaturas`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      const r = await fetch(`/api/qualidade/data-books/${id}/assinaturas`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Erro");
       setChain(j.assinaturas);

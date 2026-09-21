@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Download, Factory, Loader2, Weight, X } from "lucide-react";
 import { DEPT_COLORS, DEPT_ICONS, DEPT_LABEL } from "../_lib/rotulos";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 export function ImportarPesoModal({ cronogramaId, onClose, onImported }) {
   const [data, setData] = useState(null);
@@ -173,12 +175,11 @@ export function ImportarPesoModal({ cronogramaId, onClose, onImported }) {
                       </span>
                       <div className="flex items-center gap-1">
                         <span className="text-[9px] text-torg-gray">Plan:</span>
-                        <input
-                          type="number"
+                        <CampoDecimal
                           min={0}
                           step={100}
                           value={d.qtdePlanejada || ""}
-                          onChange={(e) => updatePeso(s.tarefaId, "qtdePlanejada", parseFloat(e.target.value) || 0)}
+                          onChange={(txt) => updatePeso(s.tarefaId, "qtdePlanejada", numeroBR(txt))}
                           className="w-20 text-[10px] px-1.5 py-1 border border-gray-200 rounded text-right"
                           placeholder="0"
                         />
@@ -186,12 +187,11 @@ export function ImportarPesoModal({ cronogramaId, onClose, onImported }) {
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-[9px] text-torg-gray">Real:</span>
-                        <input
-                          type="number"
+                        <CampoDecimal
                           min={0}
                           step={100}
                           value={d.qtdeRealizada || ""}
-                          onChange={(e) => updatePeso(s.tarefaId, "qtdeRealizada", parseFloat(e.target.value) || 0)}
+                          onChange={(txt) => updatePeso(s.tarefaId, "qtdeRealizada", numeroBR(txt))}
                           className="w-20 text-[10px] px-1.5 py-1 border border-gray-200 rounded text-right"
                           placeholder="0"
                         />

@@ -1,4 +1,6 @@
 "use client";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   CalendarDays, Users, Clock, Target, Weight, Plus, Trash2, Check,
@@ -813,10 +815,9 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
               <label className="text-[10px] text-torg-gray uppercase tracking-wide block mb-1">
                 <Target size={12} className="inline mr-1" />Peso meta (kg)
               </label>
-              <input
-                type="number"
+              <CampoDecimal
                 value={form.pesoMetaKg || ""}
-                onChange={(e) => setForm({ ...form, pesoMetaKg: Number(e.target.value) || 0 })}
+                onChange={(txt) => setForm({ ...form, pesoMetaKg: numeroBR(txt) || 0 })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue"
                 placeholder="0"
               />
@@ -825,10 +826,9 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
               <label className="text-[10px] text-torg-gray uppercase tracking-wide block mb-1">
                 <Weight size={12} className="inline mr-1" />Peso realizado (kg)
               </label>
-              <input
-                type="number"
+              <CampoDecimal
                 value={form.pesoRealizadoKg || ""}
-                onChange={(e) => setForm({ ...form, pesoRealizadoKg: Number(e.target.value) || 0 })}
+                onChange={(txt) => setForm({ ...form, pesoRealizadoKg: numeroBR(txt) || 0 })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue"
                 placeholder="0"
               />
@@ -837,11 +837,9 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
               <label className="text-[10px] text-torg-gray uppercase tracking-wide block mb-1">
                 <TrendingUp size={12} className="inline mr-1" />Produtividade (kg/p/h)
               </label>
-              <input
-                type="number"
-                step="0.1"
+              <CampoDecimal
                 value={form.produtividadeEstimada ?? ""}
-                onChange={(e) => setForm({ ...form, produtividadeEstimada: e.target.value ? Number(e.target.value) : null })}
+                onChange={(txt) => setForm({ ...form, produtividadeEstimada: txt ? numeroBR(txt) : null })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue"
                 placeholder="ex: 12.5"
               />
@@ -850,10 +848,9 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
               <label className="text-[10px] text-torg-gray uppercase tracking-wide block mb-1">
                 <Users size={12} className="inline mr-1" />Qtd pessoas
               </label>
-              <input
-                type="number"
+              <CampoDecimal
                 value={form.qtdPessoas || ""}
-                onChange={(e) => setForm({ ...form, qtdPessoas: Number(e.target.value) || 0 })}
+                onChange={(txt) => setForm({ ...form, qtdPessoas: numeroBR(txt) || 0 })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue"
                 placeholder="0"
               />
@@ -862,11 +859,9 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
               <label className="text-[10px] text-torg-gray uppercase tracking-wide block mb-1">
                 <Clock size={12} className="inline mr-1" />Horas normais
               </label>
-              <input
-                type="number"
-                step="0.1"
+              <CampoDecimal
                 value={form.horasNormais || ""}
-                onChange={(e) => setForm({ ...form, horasNormais: Number(e.target.value) || 0 })}
+                onChange={(txt) => setForm({ ...form, horasNormais: numeroBR(txt) || 0 })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue"
                 placeholder="8.8"
               />
@@ -875,11 +870,9 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
               <label className="text-[10px] text-torg-gray uppercase tracking-wide block mb-1">
                 <Clock size={12} className="inline mr-1" />HE projetadas
               </label>
-              <input
-                type="number"
-                step="0.5"
+              <CampoDecimal
                 value={form.horasExtrasProjetadas || ""}
-                onChange={(e) => setForm({ ...form, horasExtrasProjetadas: Number(e.target.value) || 0 })}
+                onChange={(txt) => setForm({ ...form, horasExtrasProjetadas: numeroBR(txt) || 0 })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue"
                 placeholder="0"
               />
@@ -888,11 +881,9 @@ export default function ControleClient({ ops, pecasDisponiveis: pecasInicial, us
               <label className="text-[10px] text-torg-gray uppercase tracking-wide block mb-1">
                 <Clock size={12} className="inline mr-1" />HE realizadas
               </label>
-              <input
-                type="number"
-                step="0.5"
+              <CampoDecimal
                 value={form.horasExtrasRealizadas ?? ""}
-                onChange={(e) => setForm({ ...form, horasExtrasRealizadas: e.target.value ? Number(e.target.value) : null })}
+                onChange={(txt) => setForm({ ...form, horasExtrasRealizadas: txt ? numeroBR(txt) : null })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue"
                 placeholder="—"
               />

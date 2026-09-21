@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useMemo, useEffect } from "react";
 import { FileText, RefreshCw, Clock, Search, Loader2, AlertCircle, ArrowUp, ArrowDown, ChevronsUpDown, Landmark, AlertTriangle, FileSpreadsheet } from "lucide-react";
 import { log } from "@/lib/log";
@@ -359,10 +360,10 @@ function ConciliacaoNfse({ projetos = [], onVinculado }) {
               {/* Seletor de período */}
               <div className="flex items-center gap-2 flex-wrap text-xs">
                 <span className="text-torg-gray font-medium">Período:</span>
-                <input type="date" value={de} max={ate} onChange={e => setDe(e.target.value)}
+                <CampoData value={de} max={ate} onChange={(iso) => setDe(iso)}
                   className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
                 <span className="text-gray-400">até</span>
-                <input type="date" value={ate} min={de} max={hojeISO} onChange={e => setAte(e.target.value)}
+                <CampoData value={ate} min={de} max={hojeISO} onChange={(iso) => setAte(iso)}
                   className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-torg-blue focus:border-torg-blue" />
                 <button onClick={consultar} disabled={loading}
                   className="px-2.5 py-1 bg-torg-blue text-white rounded-lg hover:opacity-90 inline-flex items-center gap-1 disabled:opacity-50">

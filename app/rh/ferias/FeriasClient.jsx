@@ -1,4 +1,6 @@
 "use client";
+import CampoData from "@/components/CampoData";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useCallback, Fragment } from "react";
 import {
   CalendarDays, Loader2, AlertCircle, RefreshCw, CalendarPlus, X, Trash2,
@@ -210,7 +212,7 @@ export default function FeriasClient() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-torg-gray mb-1">Início do gozo *</label>
-                  <input type="date" value={form.dataInicio} onChange={(e) => setForm({ ...form, dataInicio: e.target.value })}
+                  <CampoData value={form.dataInicio} onChange={(iso) => setForm({ ...form, dataInicio: iso })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue" />
                 </div>
                 <div>
@@ -231,13 +233,13 @@ export default function FeriasClient() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-torg-gray mb-1">Salário base p/ cálculo (R$)</label>
-                  <input type="number" min="0" step="0.01" value={form.salarioBase} onChange={(e) => setForm({ ...form, salarioBase: e.target.value })}
+                  <CampoDecimal value={form.salarioBase} onChange={(txt) => setForm({ ...form, salarioBase: txt })}
                     placeholder="0,00" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue" />
                   <p className="text-[10px] text-torg-gray mt-1">Vem do cadastro; ajuste se precisar (recalcula os valores).</p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-torg-gray mb-1">Descontos (empréstimos etc.)</label>
-                  <input type="number" min="0" step="0.01" value={form.descontos} onChange={(e) => setForm({ ...form, descontos: e.target.value })}
+                  <CampoDecimal value={form.descontos} onChange={(txt) => setForm({ ...form, descontos: txt })}
                     placeholder="0,00" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue" />
                 </div>
                 <div>

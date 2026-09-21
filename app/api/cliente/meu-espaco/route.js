@@ -1,3 +1,4 @@
+import { contatoParaEnvioAutomatico } from "@/lib/contatos-cliente";
 // O PORTAL DO CLIENTE LOGADO — as obras dele, com os documentos de cada uma.
 //
 // ⚠⚠ TUDO PELO E-MAIL DA SESSÃO, nunca por parâmetro. Uma rota que aceitasse "?email=" deixaria
@@ -12,6 +13,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { opsComFaturamentoPara } from "@/lib/cliente-faturamento-servidor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +34,7 @@ export async function GET() {
       orderBy: { envio: { enviadoEm: "desc" } },
       select: {
         token: true, assinadoEm: true, convidadoEm: true, ordem: true, setor: true, ip: true,
-        envio: { select: { titulo: true, tipo: true, opNumero: true, revisao: true, enviadoEm: true, status: true } },
+        envio: { select: { titulo: true, tipo: true, opNumero: true, revisao: true, enviadoEm: true, status: true, snapshot: true } },
       },
       take: 200,
     }),
@@ -52,6 +54,11 @@ export async function GET() {
     prisma.portalCliente.findMany({ where: { clienteEmail: igual }, select: { opNumero: true } }).catch(() => []),
   ]);
 
+  // ⚠ envio antigo de relatório de inspeção nasceu sem `opNumero` na coluna (só no snapshot e no
+  // título "· OP-103") — sem isto o documento não se pendurava em obra nenhuma e sumia da lista.
+  const opDoEnvio = (e) => e?.opNumero || e?.snapshot?.opNumero || (String(e?.titulo || "").match(/OP-(\d+)/)?.[1] ?? null);
+  for (const a of assinaturas) a.envio.opNumero = opDoEnvio(a.envio);
+
   // ── as OPs em que este e-mail aparece ──
   const nums = new Set();
   for (const a of assinaturas) if (a.envio.opNumero) nums.add(soNum(a.envio.opNumero));
@@ -64,9 +71,12 @@ export async function GET() {
   // cliente, e muita gente chega ao portal por aí antes de assinar qualquer coisa.
   const porContato = await prisma.oP.findMany({
     where: { OR: [{ clienteEmail: igual }, { clienteContatos: { array_contains: [{ email: user.email }] } }] },
-    select: { numero: true },
+    select: { numero: true, clienteEmail: true, clienteContatos: true },
   }).catch(() => []);
-  for (const o of porContato) nums.add(soNum(o.numero));
+  for (const o of porContato) {
+    const email = user.email.trim().toLowerCase();
+    if (o.clienteEmail?.trim().toLowerCase() === email || (Array.isArray(o.clienteContatos) && o.clienteContatos.some(c => c.email?.trim().toLowerCase() === email && contatoParaEnvioAutomatico(c)))) nums.add(soNum(o.numero));
+  }
 
   const ops = nums.size
     ? await prisma.oP.findMany({
@@ -159,5 +169,7 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ nome: user.name || null, email: user.email, obras });
+  // a aba "Pedidos e faturamento" só aparece para quem a Torg marcou com o papel (por obra)
+  const faturamento = (await opsComFaturamentoPara(email).catch(() => [])).length > 0;
+  return NextResponse.json({ nome: user.name || null, email: user.email, obras, faturamento });
 }

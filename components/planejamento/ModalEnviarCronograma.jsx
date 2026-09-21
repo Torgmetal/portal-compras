@@ -1,4 +1,5 @@
 "use client";
+import { contatoParaEnvioAutomatico } from "@/lib/contatos-cliente";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { X, Loader2, Send, Plus, Trash2, AlertCircle, CheckCircle2, Building2, Users, Clock, Pencil, Check, Eye, FileDown } from "lucide-react";
 
@@ -76,7 +77,7 @@ export default function ModalEnviarCronograma({ cronogramaId, onClose, onEnviado
         }
         // já vem marcado quem é do cliente — é o alvo do envio
         const pre = {};
-        for (const c of j.clientes || []) pre[norm(c.email)] = { nome: c.nome || "", email: norm(c.email), tipo: "CLIENTE" };
+        for (const c of (j.clientes || []).filter(contatoParaEnvioAutomatico)) pre[norm(c.email)] = { nome: c.nome || "", email: norm(c.email), tipo: "CLIENTE" };
         setSel(pre);
       })
       .catch(() => setErro("Erro ao carregar"))
@@ -108,7 +109,7 @@ export default function ModalEnviarCronograma({ cronogramaId, onClose, onEnviado
   async function salvarContatos(lista) {
     const r = await fetch(`/api/planejamento/cronogramas/${cronogramaId}/contatos-cliente`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contatos: lista.map((c) => ({ nome: c.nome || "", email: norm(c.email) })) }),
+      body: JSON.stringify({ contatos: lista.map((c) => ({ nome: c.nome || "", email: norm(c.email), emailAnterior: c.emailAnterior || c.email })) }),
     });
     const j = await r.json();
     if (!r.ok || !j.success) throw new Error(j.error || "Erro ao salvar");
@@ -118,7 +119,7 @@ export default function ModalEnviarCronograma({ cronogramaId, onClose, onEnviado
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(editForm.email.trim())) return setErro("E-mail inválido.");
     setErro(""); setSalvandoEdit(true);
     try {
-      const lista = registrados().map((c) => (norm(c.email) === norm(origEmail) ? { nome: editForm.nome.trim(), email: norm(editForm.email) } : c));
+      const lista = registrados().map((c) => (norm(c.email) === norm(origEmail) ? { nome: editForm.nome.trim(), email: norm(editForm.email), emailAnterior: origEmail } : c));
       await salvarContatos(lista);
       setEditKey(null);
     } catch (e) { setErro(e.message); } finally { setSalvandoEdit(false); }

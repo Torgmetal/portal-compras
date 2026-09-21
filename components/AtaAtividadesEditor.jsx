@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState } from "react";
 import { Sparkles, Loader2, Plus, Trash2, AlertCircle, FolderKanban, RotateCcw } from "lucide-react";
 
@@ -109,7 +110,7 @@ export default function AtaAtividadesEditor({ secoes, setSecoes, envolvidos }) {
                       </select>
                       <input value={it.responsavel} onChange={(e) => setItem(i, j, "responsavel", e.target.value)} placeholder="Responsável" className="flex-1 min-w-[130px] text-[12px] border border-gray-200 rounded px-2 py-1.5" />
                       <label className="text-[10px] text-torg-gray uppercase tracking-wide">Prazo</label>
-                      <input type="date" value={it.prazo} onChange={(e) => setItem(i, j, "prazo", e.target.value)} className="text-[12px] border border-gray-200 rounded px-2 py-1.5" />
+                      <CampoData value={it.prazo} onChange={(iso) => setItem(i, j, "prazo", iso)} className="text-[12px] border border-gray-200 rounded px-2 py-1.5" />
                       <button type="button" onClick={() => removeItem(i, j)} className="text-gray-300 hover:text-red-500 p-1" title="Remover atividade"><Trash2 size={14} /></button>
                     </div>
                   </div>

@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Truck, Loader2, CheckCircle2, AlertCircle, Send } from "lucide-react";
+import CampoDecimal from "@/components/CampoDecimal";
 
 function fmtNum(v, dec = 0) {
   if (!v && v !== 0) return "—";
@@ -190,13 +191,10 @@ export default function FreteFormClient() {
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Valor Total do Frete (R$) <span className="text-red-400">*</span>
               </label>
-              <input
-                type="number"
+              <CampoDecimal
                 value={valorCotado}
-                onChange={(e) => setValorCotado(e.target.value)}
+                onChange={(txt) => setValorCotado(txt)}
                 placeholder="0,00"
-                min="0"
-                step="0.01"
                 required
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#006EAB]/30 focus:border-[#006EAB] outline-none"
               />

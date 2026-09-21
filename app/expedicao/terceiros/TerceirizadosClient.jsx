@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import ImportarItensTerceiro from "@/components/terceiros/ImportarItensTerceiro";
 import ModalRetorno from "@/components/terceiros/ReceberTerceiro";
 import { DESTINOS_TERCEIRO, retornoEmAtraso } from "@/lib/terceiros-retorno";
@@ -433,11 +434,11 @@ function ModalRomaneio({ ops, rom, onClose, onSalvo }) {
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Data de envio</label>
-              <input type="date" value={f.dataEnvio} onChange={(e) => setF((v) => ({ ...v, dataEnvio: e.target.value }))} className={inp} />
+              <CampoData value={f.dataEnvio} onChange={(iso) => setF((v) => ({ ...v, dataEnvio: iso }))} className={inp} />
             </div>
             <div>
               <label className="block text-xs font-medium text-torg-dark mb-1">Setor previsto de retorno</label><select className={inp} value={f.destinoRetorno} onChange={e=>setF(v=>({...v,destinoRetorno:e.target.value}))}><option value="">Escolher setor</option>{DESTINOS_TERCEIRO.map(d=><option key={d}>{d}</option>)}</select><label className="block text-xs font-medium text-torg-dark mb-1">Previsão de retorno</label>
-              <input type="date" value={f.dataPrevRetorno} onChange={(e) => setF((v) => ({ ...v, dataPrevRetorno: e.target.value }))} className={inp} />
+              <CampoData value={f.dataPrevRetorno} onChange={(iso) => setF((v) => ({ ...v, dataPrevRetorno: iso }))} className={inp} />
             </div>
           </div>
 

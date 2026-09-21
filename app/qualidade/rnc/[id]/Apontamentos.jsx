@@ -13,6 +13,8 @@ import { Plus, Trash2, Check, X } from "lucide-react";
 import { DISPOSICAO_NC } from "@/lib/nao-conformidade";
 import { SETORES_RETRABALHO } from "@/lib/retrabalho";
 import { contagemProcedencia, pesoRetrabalhoTotal, pesoRetrabalhoPorSetor } from "@/lib/rnc-apontamentos";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 const SETOR_NOME = Object.fromEntries(SETORES_RETRABALHO.map((s) => [s.id, s.nome]));
 const novoId = () => `ap${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -114,8 +116,8 @@ function ItemApontamento({ a, i, cliente, set, del, podeApagar }) {
             </label>
             <label className="block">
               <span className="block text-[11px] text-torg-gray mb-1">Peso (kg)</span>
-              <input type="number" step="0.01" min="0" value={a.pesoKg ?? ""} placeholder="0"
-                onChange={(e) => set(i, "pesoKg", e.target.value === "" ? null : Number(e.target.value))}
+              <CampoDecimal value={a.pesoKg ?? ""} placeholder="0"
+                onChange={(txt) => set(i, "pesoKg", txt === "" ? null : numeroBR(txt))}
                 disabled={a.decisao !== "RETRABALHAR"} className="inp disabled:bg-gray-50 disabled:text-gray-400" />
             </label>
             <label className="block">

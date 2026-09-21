@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminDoPortal } from "@/lib/session";
 import { gerarSenhaTemporaria } from "@/lib/gerar-senha";
 import { MODULOS_VALIDOS } from "@/lib/modulos";
+import { validarVinculoFuncionario, loginDe } from "@/lib/usuario-funcionario";
 
 // ⚠ CLIENTE é acesso de fora: sem módulo nenhum, serve para ASSINAR documento logado (o portal da
 // obra segue aberto por token). Ver TipoUsuario no schema.
@@ -14,11 +15,14 @@ const TIPOS_VALIDOS   = ["ADMIN", "USUARIO", "CLIENTE"];
 
 const schemaPost = z.object({
   name:             z.string().min(2, "Nome deve ter pelo menos 2 caracteres").max(100),
-  email:            z.string().email("E-mail inválido").toLowerCase(),
+  // ⚠ e-mail OPCIONAL quando há funcionário do RH vinculado: a conta nasce com `cpf@funcionario.torg` e a pessoa entra pelo CPF
+  email:            z.string().email("E-mail inválido").toLowerCase().optional().or(z.literal("")),
+  funcionarioId:    z.string().min(1).optional().nullable(),
   tipo:             z.enum(TIPOS_VALIDOS),
   modulos:          z.array(z.enum(MODULOS_VALIDOS)).optional().default([]),
   setor:            z.string().max(100).optional().nullable(),
   podeAlterarVerba: z.boolean().default(false),
+  podeCancelarRM: z.boolean().default(false),
 });
 
 /** Selects reutilizáveis */
@@ -31,8 +35,10 @@ const selectUsuario = {
   setor:            true,
   ativo:            true,
   podeAlterarVerba: true,
+  podeCancelarRM: true,
   createdAt:        true,
   updatedAt:        true,
+  funcionario:      { select: { id: true, nome: true, cpf: true } }, // vínculo com o RH = entra pelo CPF
 };
 
 // ─── GET ─────────────────────────────────────────────────────────────────────
@@ -93,8 +99,17 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: "Usuário do tipo USUARIO deve ter pelo menos um módulo." }, { status: 400 });
   }
 
+  // Funcionário do RH: valida o vínculo e, sem e-mail informado, usa o e-mail interno (login pelo CPF)
+  let vinculo = null;
+  if (body.funcionarioId) {
+    vinculo = await validarVinculoFuncionario(body.funcionarioId);
+    if (!vinculo.ok) return NextResponse.json({ success: false, error: vinculo.erro }, { status: 400 });
+  }
+  const email = (body.email || "").trim() || vinculo?.emailInterno;
+  if (!email) return NextResponse.json({ success: false, error: "Informe o e-mail ou vincule um funcionário do RH (aí ele entra pelo CPF)." }, { status: 400 });
+
   // Verifica duplicidade de e-mail
-  const existente = await prisma.user.findUnique({ where: { email: body.email } });
+  const existente = await prisma.user.findUnique({ where: { email } });
   if (existente) {
     return NextResponse.json({ success: false, error: "Já existe um usuário com esse e-mail." }, { status: 409 });
   }
@@ -105,11 +120,13 @@ export async function POST(req) {
   const novoUsuario = await prisma.user.create({
     data: {
       name:             body.name,
-      email:            body.email,
+      email,
+      funcionarioId:    vinculo?.funcionario.id ?? null,
       password:         hash,
       tipo:             body.tipo,
       setor:            body.setor ?? null,
       podeAlterarVerba: body.podeAlterarVerba,
+      podeCancelarRM: body.podeCancelarRM,
       ativo:            true,
       ...(body.tipo === "USUARIO" && body.modulos?.length > 0 && {
         modulos: { create: body.modulos.map((m) => ({ modulo: m })) },
@@ -127,10 +144,12 @@ export async function POST(req) {
       entityId: novoUsuario.id,
       diff: {
         email:            novoUsuario.email,
+        funcionarioId:    vinculo?.funcionario.id ?? null,
         tipo:             novoUsuario.tipo,
         modulos:          novoUsuario.modulos.map((m) => m.modulo),
         setor:            novoUsuario.setor,
         podeAlterarVerba: novoUsuario.podeAlterarVerba,
+        podeCancelarRM: novoUsuario.podeCancelarRM,
       },
     },
   });
@@ -139,6 +158,7 @@ export async function POST(req) {
     success: true,
     data: {
       usuario:        novoUsuario,
+      login:          loginDe(novoUsuario), // { por: "cpf"|"email", login, semEmail } — o que a pessoa digita para entrar
       senhaTemporaria, // retornada em plaintext UMA VEZ — tela deve exibir e descartar
     },
   }, { status: 201 });

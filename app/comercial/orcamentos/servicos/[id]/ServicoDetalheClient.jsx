@@ -6,6 +6,8 @@ import { useStore } from "@/lib/store";
 import { SERVICOS, SERVICO_LABEL, STATUS_SERVICO } from "@/lib/orcamento-servico";
 import { precoHoraDoServico, configCustoHoraCoerente } from "@/lib/custo-hora-calc";
 import { DEFAULT_INCLUSOS, DEFAULT_EXCLUSOS } from "@/lib/proposta-textos";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 const os = (n) => (n ? `OS-${String(n).padStart(3, "0")}` : "—");
 const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
@@ -489,10 +491,10 @@ export default function ServicoDetalheClient({ id }) {
                           ))}
                         </select>
                       </td>
-                      <td className="px-3 py-1.5 text-right"><input type="number" step="0.01" value={l.comprimento} onChange={(e) => setLinha(i, "comprimento", e.target.value)} className="w-20 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" /></td>
+                      <td className="px-3 py-1.5 text-right"><CampoDecimal value={l.comprimento} onChange={(txt) => setLinha(i, "comprimento", txt)} className="w-20 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" /></td>
                       <td className="px-3 py-1.5 text-right"><input type="number" step="1" value={l.qtdBarras} onChange={(e) => setLinha(i, "qtdBarras", e.target.value)} className="w-20 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" /></td>
                       <td className="px-3 py-1.5 text-right tabular-nums text-torg-dark font-medium whitespace-nowrap">{fmtKg(pesoLinha(l))}</td>
-                      <td className="px-3 py-1.5 text-right"><input type="number" step="0.1" value={l.tempoMinBarra} onChange={(e) => setLinha(i, "tempoMinBarra", e.target.value)} className="w-24 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" /></td>
+                      <td className="px-3 py-1.5 text-right"><CampoDecimal value={l.tempoMinBarra} onChange={(txt) => setLinha(i, "tempoMinBarra", txt)} className="w-24 border border-gray-200 rounded px-1.5 py-1 text-xs text-right tabular-nums focus:ring-1 focus:ring-torg-blue" /></td>
                       <td className="px-3 py-1.5 text-right tabular-nums text-torg-dark whitespace-nowrap">{fmtH(tempoLinha(l))}</td>
                       <td className="px-3 py-1.5 text-center"><button onClick={() => rmLinha(i)} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button></td>
                     </tr>
@@ -539,7 +541,7 @@ export default function ServicoDetalheClient({ id }) {
               {cfMetodo === "HORA" ? (
                 <div>
                   <label className="text-xs text-torg-gray">Valor por hora (R$/h)</label>
-                  <input type="number" step="0.01" value={cfValorHora || ""} onChange={(e) => setCfValorHora(e.target.value === "" ? 0 : Number(e.target.value))} placeholder="0,00"
+                  <CampoDecimal value={cfValorHora || ""} onChange={(txt) => setCfValorHora(txt === "" ? 0 : numeroBR(txt))} placeholder="0,00"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
                   {cfPrecoSugerido > 0 ? (
                     <p className="text-[11px] text-torg-gray mt-1">Custo-hora ({cfSetorPreco.nome}): <strong className="text-torg-dark tabular-nums">{fmtBRL(cfPrecoSugerido)}/h</strong>{num(cfValorHora) !== cfPrecoSugerido && (<button type="button" onClick={() => setCfValorHora(cfPrecoSugerido)} className="ml-1.5 text-torg-blue hover:underline font-medium">usar</button>)}</p>
@@ -558,7 +560,7 @@ export default function ServicoDetalheClient({ id }) {
               ) : (
                 <div>
                   <label className="text-xs text-torg-gray">Preço por kg (R$/kg)</label>
-                  <input type="number" step="0.01" value={cfPrecoKg || ""} onChange={(e) => setCfPrecoKg(e.target.value === "" ? 0 : Number(e.target.value))} placeholder="0,00"
+                  <CampoDecimal value={cfPrecoKg || ""} onChange={(txt) => setCfPrecoKg(txt === "" ? 0 : numeroBR(txt))} placeholder="0,00"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-torg-blue tabular-nums" />
                   {cfPrecoKgSugerido > 0 && (
                     <p className="text-[11px] text-torg-gray mt-1">Pelo custo-hora daria <strong className="text-torg-dark tabular-nums">{fmtBRL(cfPrecoKgSugerido)}/kg</strong>{num(cfPrecoKg) !== cfPrecoKgSugerido && (<button type="button" onClick={() => setCfPrecoKg(cfPrecoKgSugerido)} className="ml-1.5 text-torg-blue hover:underline font-medium">usar</button>)}</p>

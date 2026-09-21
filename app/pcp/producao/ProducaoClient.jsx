@@ -14,11 +14,13 @@
 // própria GRD emitida, que já grava quem imprimiu, quando e quantas vezes. Por isso o botão diz
 // "Imprimir e liberar" — o ato é um só, e chamar de duas coisas faria alguém procurar um segundo
 // botão que não existe.
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import { FILAS_DECISAO, pertenceFilaDecisao } from "@/lib/pcp-fila-decisao";
 import { Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Printer, Factory, Monitor, CalendarClock, Clock, Package, CheckCircle2, FileText, FileSpreadsheet, Flag, X, Users, BellRing } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
 import CompraChip, { ModalRastreabilidade } from "@/components/CompraChip";
+import FichaPecaModal from "@/components/FichaPecaModal";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 import SeparacaoModal from "@/components/SeparacaoModal";
 import GanttProgramacao from "./GanttProgramacao";
@@ -171,7 +173,11 @@ async function lerJson(r, oQue) {
   return j;
 }
 
-export default function ProducaoClient() {
+export default function ProducaoClient({ portalProducao = false, entradaDecisao = null } = {}) {
+  const [filaDecisao, setFilaDecisao] = useState("");
+  const [marcaDecisao, setMarcaDecisao] = useState("");
+  const entradaAplicada = useRef(null);
+  const consultaDetalhe = useRef(0);
   const [revisaoGantt, setRevisaoGantt] = useState(0);
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -186,6 +192,7 @@ export default function ProducaoClient() {
   const [imprimindo, setImprimindo] = useState(false);
   const [aviso, setAviso] = useState(null);
   const [desenho, setDesenho] = useState(null);
+  const [ficha, setFicha] = useState(null);
   const [filtroPecas, setFiltroPecas] = useState("");
   // ⚠ Vitor (24/08/2026): "preciso ter o filtro para selecionar o que não iniciou". "Não iniciou"
   // é união de duas situações — a que o programador nem programou e a que ele programou e a fábrica não
@@ -228,31 +235,52 @@ export default function ProducaoClient() {
   }, [verTodas]);
   useEffect(() => { carregar(); }, [carregar]);
 
-  const carregarDetalhe = useCallback(async (opId, setor) => {
+  const carregarDetalhe = useCallback(async (opId, setor, conferir = !!filaDecisao) => {
+    const consulta = ++consultaDetalhe.current;
     setCarregandoDet(true); setSel(new Set());
     try {
       const qs = new URLSearchParams({ opId });
       if (setor) qs.set("setor", setor);
-      if (setor === "MONTAGEM") qs.set("preprogramar", "1");
+      if (conferir) qs.set("decisao", "1");
+      else if (setor === "MONTAGEM") qs.set("preprogramar", "1");
       const r = await fetch(`/api/pcp/despacho?${qs}`, { cache: "no-store" });
       const j = await lerJson(r, "Peças da OP");
-      setDetalhe(j);
-    } catch (e) { setDetalhe(null); setAviso({ ok: false, texto: e.message }); }
-    finally { setCarregandoDet(false); }
-  }, []);
+      if (consulta === consultaDetalhe.current) setDetalhe(j);
+    } catch (e) { if (consulta === consultaDetalhe.current) { setDetalhe(null); setAviso({ ok: false, texto: e.message }); } }
+    finally { if (consulta === consultaDetalhe.current) setCarregandoDet(false); }
+  }, [filaDecisao]);
+
+  useEffect(() => {
+    const chave = JSON.stringify(entradaDecisao);
+    if (!entradaDecisao || entradaAplicada.current === chave || !dados) return;
+    entradaAplicada.current = chave;
+    const { opId, setor, fila, marca } = entradaDecisao;
+    if (!Object.hasOwn(FILAS_DECISAO, fila) || !["CORTE", "MONTAGEM"].includes(setor)) return;
+    if (!dados.ops?.some(o => o.opId === opId)) {
+      setAviso({ ok: false, texto: "Esta OP não está mais na fila liberada. Atualize o painel do PCP." });
+      return;
+    }
+    setAberta(opId); setSetorAba(setor); setFilaDecisao(fila); setMarcaDecisao(marca || "");
+    setDetalhe(null); setSel(new Set());
+    carregarDetalhe(opId, setor, true);
+    requestAnimationFrame(() => document.getElementById('pcp-op-' + opId)?.scrollIntoView({block:'start'}));
+  }, [entradaDecisao, dados, carregarDetalhe]);
+  useEffect(() => () => { consultaDetalhe.current++; }, []);
 
   function abrir(op, setorSolicitado) {
-    if (aberta === op.opId && !setorSolicitado) { setAberta(null); setDetalhe(null); return; }
+    setFilaDecisao(""); setMarcaDecisao("");
+    if (aberta === op.opId && !setorSolicitado) { consultaDetalhe.current++; setAberta(null); setDetalhe(null); return; }
     // ⚠ abre no setor que o filtro já escolheu; sem filtro, no primeiro que tem fila — é onde a
     // obra está parada, e é a pergunta que o PCP faz ao clicar.
     const setor = setorSolicitado || op.setores.find((s) => s.pendenteKg > 0)?.setor || op.setores[0]?.setor || "";
     setAberta(op.opId); setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); limparColunas(); setColAberta(null);
-    carregarDetalhe(op.opId, setor);
+    carregarDetalhe(op.opId, setor, false);
   }
 
   function trocarSetor(op, setor) {
+    setFilaDecisao(""); setMarcaDecisao("");
     setSetorAba(setor); setDetalhe(null); setFiltroPecas(""); limparColunas(); setColAberta(null);
-    carregarDetalhe(op.opId, setor);
+    carregarDetalhe(op.opId, setor, false);
   }
 
   // ⚠ A BARRA DE FILTROS SAIU (Vitor, 01/09/2026: "remova essa parte") — busca, abas de setor e a
@@ -271,11 +299,13 @@ export default function ProducaoClient() {
   // Situação já têm funil próprio, e dois controles para o mesmo recorte se contradizem na tela
   // (chip dizendo "Programadas 47" com a coluna filtrada em outra coisa).
   const pecas = useMemo(() => {
-    const base = (detalhe?.pecas || []).filter((p) => passaColuna(p, null));
+    const base = (detalhe?.pecas || []).filter((p) => passaColuna(p, null))
+      .filter(p => !filaDecisao || pertenceFilaDecisao(p, filaDecisao, detalhe?.decisao?.porId[p.id]))
+      .filter(p => !marcaDecisao || p.marca === marcaDecisao);
     const q = filtroPecas.trim().toLowerCase();
     if (!q) return base;
     return base.filter((p) => [p.marca, p.descricao, p.perfil].some((x) => String(x || "").toLowerCase().includes(q)));
-  }, [detalhe, filtroPecas, passaColuna]);
+  }, [detalhe, filtroPecas, passaColuna, filaDecisao, marcaDecisao]);
 
   const marcasSel = useMemo(() => [...new Set(pecas.filter((p) => sel.has(p.id)).map((p) => p.marca))], [pecas, sel]);
 
@@ -312,7 +342,7 @@ export default function ProducaoClient() {
     if (!confirm(`Imprimir e liberar ${marcasSel.length} desenho(s) da ${fmtOP(detalhe.opNumero)}${emBlocos}?\n\nCada um sai carimbado com a rastreabilidade e a GRD fica registrada.${blocos.length > 1 ? " Sai um download por bloco." : ""} Pode levar alguns minutos.`)) return;
     setImprimindo(true); setAviso(null);
     try {
-      const j = { emitidas: 0, semDesenho: [], arquivos: [] };
+      const j = { emitidas: 0, semDesenho: [], arquivos: [], erros: [] };
       for (let b = 0; b < blocos.length; b++) {
         if (blocos.length > 1) setAviso({ ok: true, texto: `Bloco ${b + 1} de ${blocos.length} — gerando os desenhos…` });
         const r = await fetch("/api/producao/desenhos/lote", {
@@ -322,6 +352,7 @@ export default function ProducaoClient() {
         const parcial = await lerJson(r, `Emissão do lote de desenhos${blocos.length > 1 ? ` (bloco ${b + 1} de ${blocos.length})` : ""}`);
         j.emitidas += Number(parcial.emitidas) || 0;
         j.semDesenho.push(...(parcial.semDesenho || []));
+        j.erros.push(...(parcial.erros || []));
         j.arquivos.push(...(parcial.arquivos || []));
         if (Number(parcial.emitidas) > 0) {
           try { await baixarZipLote(parcial, `${detalhe.opNumero}${blocos.length > 1 ? `-bloco${b + 1}de${blocos.length}` : ""}`); }
@@ -337,11 +368,16 @@ export default function ProducaoClient() {
       const emitidas = Number(j.emitidas) || 0;
       const semDesenho = j.semDesenho?.length || 0;
       const faltantes = semDesenho ? ` Sem desenho na pasta da OP: ${j.semDesenho.slice(0, 8).join(", ")}${semDesenho > 8 ? ` e mais ${semDesenho - 8}` : ""}.` : "";
+      // ⚠ desenho que EXISTE mas falhou ao baixar ou carimbar não é "não encontrado": diz a marca e o motivo, senão
+      // o PCP procura na pasta um arquivo que está lá. Vitor (14/09/2026), OP-113.
+      const falhas = j.erros || [];
+      const comFalha = falhas.length ? ` Falhou em ${falhas.length}: ${falhas.slice(0, 6).map((f) => `${f.marca} (${f.erro || "erro"})`).join("; ")}${falhas.length > 6 ? ` e mais ${falhas.length - 6}` : ""}.` : "";
       if (!emitidas) {
         setAviso({
           ok: false,
-          texto: `Nenhum desenho foi encontrado para as ${marcasSel.length} marca(s) selecionada(s), então nada foi impresso nem liberado.${faltantes}`
-            + " Confira se os PDFs estão em 2. Engenharia › 2.5 Projetos › 2.5.2 Fabricação, com o nome começando pela marca.",
+          texto: (falhas.length ? "Os desenhos existem, mas nenhum pôde ser emitido." : `Nenhum desenho foi encontrado para as ${marcasSel.length} marca(s) selecionada(s), então nada foi impresso nem liberado.`)
+            + faltantes + comFalha
+            + (falhas.length ? " Tente de novo; se persistir, mande a mensagem acima para o suporte." : " Confira se os PDFs estão em 2. Engenharia › 2.5 Projetos › 2.5.2 Fabricação, com o nome começando pela marca."),
         });
         return;
       }
@@ -354,7 +390,7 @@ export default function ProducaoClient() {
         ok: !erroZip,
         texto: `${emitidas} desenho(s) liberado(s)`
           + (erroZip ? `, mas o download falhou (${erroZip}). A GRD está registrada; abra os arquivos pela pasta da OP no servidor.` : " e baixado(s) em pastas por impressora.")
-          + faltantes,
+          + faltantes + comFalha,
       });
       setSel(new Set());
       await carregarDetalhe(aberta, setorAba); // a GRD nova aparece na coluna
@@ -533,14 +569,14 @@ export default function ProducaoClient() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-extrabold text-torg-dark tracking-tight inline-flex items-center gap-2">
-            <Factory size={22} className="text-torg-orange" /> Produção
+            <Factory size={22} className="text-torg-orange" /> {portalProducao ? "Ordens e peças" : "Produção"}
           </h1>
           <p className="text-sm text-torg-gray mt-1">
             As obras na fábrica. Clique numa OP para ver as peças, o que o programador já programou e liberar para fabricar.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/pcp/dashboard-prioridades"
+          <Link href={portalProducao ? "/producao/prioridades" : "/pcp/dashboard-prioridades"}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-torg-gray hover:bg-gray-50">
             <Monitor size={15} /> Painel da fábrica
           </Link>
@@ -599,6 +635,11 @@ export default function ProducaoClient() {
             const open = aberta === o.opId;
             return (
               <div id={"pcp-op-"+o.opId} key={o.opId} className={`bg-white rounded-xl border shadow-[0_1px_3px_rgba(0,41,69,0.06)] overflow-hidden ${open ? "border-torg-blue-200" : "border-gray-100"}`}>
+                {open && filaDecisao && <div className="p-4 bg-sky-50 text-sm text-torg-dark flex flex-wrap gap-3 items-center">
+                  <span className="flex-1 min-w-0"><b>{FILAS_DECISAO[filaDecisao]}</b>{marcaDecisao ? ` · ${marcaDecisao}` : ""}. Conferências atualizadas ao abrir; selecione as peças para continuar.</span>
+                  <button className="min-h-[44px] text-torg-blue underline" onClick={()=>{setFilaDecisao("");setMarcaDecisao("");setSel(new Set());setDetalhe(null);carregarDetalhe(o.opId,setorAba,false);}}>Ver todas as peças da OP</button>
+                  <Link href="/pcp#decisao-pcp" className="min-h-[44px] inline-flex items-center text-torg-blue underline">Voltar à fila</Link>
+                </div>}
                 {/* ⚠ DIV, NÃO BUTTON. A linha carrega o CompraChip, que é um botão com modal
                     próprio — botão dentro de botão é HTML inválido e o React avisa em cada
                     render. O chevron é o botão de verdade (é por ele que o teclado abre a OP);
@@ -892,6 +933,7 @@ export default function ProducaoClient() {
                                         <FileText size={11} className="text-torg-gray-light shrink-0" />
                                         <span className="truncate">{p.marca}</span>
                                       </button>
+                                      <button type="button" onClick={() => setFicha({ opId: aberta, marca: p.marca })} className="ml-2 min-h-11 px-2 text-xs text-torg-blue underline underline-offset-2" aria-label={`Abrir ficha da peça ${p.marca}`}>Ficha</button>
                                       {/* ⚠ o número é a POSIÇÃO NA FILA da OP — é assim que a peça aparece
                                           ordenada no Painel de Produção, e é o que prova que ela foi
                                           mandada. Sem número, não foi. */}
@@ -1043,6 +1085,7 @@ export default function ProducaoClient() {
         </div>
       )}
 
+      {ficha && <FichaPecaModal {...ficha} onClose={() => setFicha(null)} />}
       {desenho && <DesenhoPecaModal opNumero={desenho.opNumero} marca={desenho.marca} onClose={() => setDesenho(null)} />}
       {rastro && <ModalRastreabilidade opNumero={rastro} onClose={() => setRastro(null)} />}
       {separacao && (

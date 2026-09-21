@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { ArrowLeft, Loader2, Plus, Trash2, List, AlertCircle } from "lucide-react";
+import ConfigCargaSection from "./ConfigCargaSection";
 
 export default function ConfigExpedicaoClient() {
   const [termos, setTermos] = useState(null);
@@ -39,7 +40,7 @@ export default function ConfigExpedicaoClient() {
   }
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className="space-y-5 max-w-5xl">
       <a href="/planejamento/cronogramas" className="text-sm text-torg-gray hover:text-torg-blue inline-flex items-center gap-1">
         <ArrowLeft size={15} /> Cronogramas
       </a>
@@ -92,6 +93,7 @@ export default function ConfigExpedicaoClient() {
           </p>
         </div>
       </div>
+      <ConfigCargaSection />
     </div>
   );
 }

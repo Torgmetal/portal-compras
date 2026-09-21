@@ -17,7 +17,10 @@ import { pecasDaLista, sincronizarRevisao, revisaoParaOCliente } from "@/lib/por
 import { TIPO_LABEL } from "@/lib/qualidade-campo";
 import { pecasTekla, pesoRealPecas } from "@/lib/peso-op";
 import { etapaDasMarcas } from "@/lib/portal-obra-consulta";
+import { rastreioDaOp } from "@/lib/rastreio-peca";
+import { rastreioDaLpc, chaveRastreio } from "@/lib/rastreio-lpc";
 import { aplicarAvancoSyneco } from "@/lib/cronograma-syneco";
+import { pisoDeclarado, aplicarPiso, acumuladoPorEtapa } from "@/lib/onde-obra-piso";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -135,6 +138,10 @@ export async function GET(req, { params }) {
   const ativas = secoesDoPortal(portal);
   const tem = (s) => ativas.includes(s);
   const dados = {};
+  // ⚠ o rastreio da obra inteira é a consulta mais cara da rota e serve a duas seções (certificados
+  // e a LPC com R): calcula uma vez por visita, só se alguém pedir.
+  let rastreioPromessa = null;
+  const rastreioDaObra = () => (rastreioPromessa ||= rastreioDaOp(portal.opNumero, op.id));
 
   // ⚠ PREVIEW NOSSO NÃO É ACESSO DO CLIENTE. O botão "ver como o cliente vê" abre esta mesma rota;
   // sem marcar, ele contava acesso, gravava "primeiro acesso" e tirava foto de revisão em nome de
@@ -169,7 +176,7 @@ export async function GET(req, { params }) {
         select: {
           id: true, nome: true, area: true, departamento: true, isSummary: true,
           dataInicioPrevista: true, dataFimPrevista: true, updatedAt: true,
-          percentualPrevisto: true, percentualRealizado: true,
+          percentualPrevisto: true, percentualRealizado: true, avancoManual: true,
         },
         orderBy: [{ dataInicioPrevista: "asc" }],
         take: 600,
@@ -275,17 +282,22 @@ export async function GET(req, { params }) {
               const g = dist.get(k) || { n: 0, kg: 0 };
               g.n++; g.kg += kg; dist.set(k, g);
             }
-            const ORDEM = ["Preparação", "Montagem", "Solda", "Acabamento", "Jato", "Pintura"];
+            // ⚠⚠ O BLOCO É O REFLEXO DO CRONOGRAMA (Vitor, 15/09/2026, OP-102): acumulado por fase,
+            // com o percentual da linha do tempo onde ela existe; peças medidas pelo apontamento,
+            // com as fases dadas como 100% à mão valendo como piso. Ver lib/onde-obra-piso.
+            const piso = pisoDeclarado(tarefasCru);
+            const ajust = aplicarPiso(dist, { n: semN, kg: semKg }, piso);
+            const etapas = acumuladoPorEtapa(ajust.dist, kgTotal, dados.cronograma.tarefas || []);
+            const atual = [...etapas].reverse().find((e) => e.pct > 0) || null;
             dados.cronograma.onde = {
               pecas: base.length, kg: Math.round(kgTotal),
-              etapas: ORDEM.filter((k) => dist.has(k)).map((k) => ({
-                nome: k, pecas: dist.get(k).n, kg: Math.round(dist.get(k).kg),
-                pct: Math.round((dist.get(k).kg / kgTotal) * 100),
-              })),
-              naoIniciada: { pecas: semN, kg: Math.round(semKg), pct: Math.round((semKg / kgTotal) * 100) },
+              etapas,
+              // a etapa mais avançada em andamento — o que o cliente lê no cartão
+              atual: atual ? { nome: atual.nome, pct: atual.pct } : null,
+              naoIniciada: { pecas: ajust.naoIniciada.n, kg: Math.round(ajust.naoIniciada.kg), pct: kgTotal > 0 ? Math.round((ajust.naoIniciada.kg / kgTotal) * 100) : 0 },
+              pisoDeclarado: piso,
             };
           }
-
           // ── EMBARQUES ─────────────────────────────────────────────────────────────────────────
           // ⚠ romaneio EMITIDO é o que saiu; o resto é PROGRAMADO. Chamar tudo de "embarcado" seria
           // prometer ao cliente uma carga que ainda está no pátio.
@@ -349,9 +361,23 @@ export async function GET(req, { params }) {
       orderBy: [{ importRef: "asc" }, { nome: "asc" }],
       take: 500,
     });
+    // ⚠⚠ O NOME DO CMR É O DO FORNECEDOR; O CLIENTE CONHECE O PERFIL DO PROJETO. OP-113, Alexandre
+    // (14/09/2026): "tem materiais no portal que não constam na lista de materiais do projeto" — era
+    // "PERFIL DOBRADO UDCE 200x75x25x2,25" (SOUFER) para o UE200X75X20X2.25 do projeto. O mesmo aço
+    // com dois nomes parecia material estranho. A coluna "aplicado em" diz em qual perfil do projeto
+    // cada R foi consumido (pelo mesmo casamento que dá o R à peça); quem não foi consumido por peça
+    // nenhuma (tinta, consumível, material ainda não cortado) fica sem — e isso também informa.
+    const aplicadoEm = new Map();
+    if (op?.id) {
+      try {
+        const r = await rastreioDaObra();
+        for (const v of r.porMarca.values()) for (const u of v.usadas || []) { if (!u.rastreio) continue; const s = aplicadoEm.get(u.rastreio) || new Set(); if (v.perfil) s.add(v.perfil); aplicadoEm.set(u.rastreio, s); }
+      } catch { /* a tabela sai sem a coluna — nunca sem a tabela */ }
+    }
     dados.certificados = certs.map((c) => ({
       id: c.id, r: c.importRef || null, material: c.nome, certificado: c.numeroDocumento,
       corrida: c.numeroCorrida, fornecedor: c.fornecedor, norma: c.norma,
+      aplicadoEm: c.importRef && aplicadoEm.has(c.importRef) ? [...aplicadoEm.get(c.importRef)].sort().join(", ") : null,
       // só oferece download do que tem arquivo de verdade atrás
       baixavel: !!(c.sharepointItemId || c.arquivoUrl),
     }));
@@ -423,8 +449,19 @@ export async function GET(req, { params }) {
   // permissão para o cliente baixar". Uma LPC de obra grande passa de mil marcas: rolar isso numa
   // página não é conferir nada. A tela dá as primeiras 200 pra ele reconhecer a lista; conferir de
   // verdade é na planilha, que sai completa em /api/portal/[token]/lista.
+  // ⚠ RASTREABILIDADE É OPCIONAL, POR OBRA — e só na LPC. Vitor (15/09/2026): "já informar a
+  // rastreabilidade de cada croqui (…) queria deixar essa parte como opcional, pois nem sempre
+  // vamos disponibilizar essas informações". Ligada, cada croqui/avulsa sai com o R e a corrida
+  // pelos três caminhos do carimbo do desenho (lib/rastreio-lpc). Como o peso: o que não se
+  // divulga não sai daqui.
+  const comRastreio = portal.mostrarRastreio === true;
   const listaDe = async (chave) => {
     const pecas = await pecasDaLista(prisma, op.id, chave);
+    let rastreio = null;
+    if (comRastreio && chave === "LPC" && pecas.length) {
+      try { rastreio = await rastreioDaLpc(portal.opNumero, op.id, pecas, { res: await rastreioDaObra().catch(() => null) }); }
+      catch { rastreio = null; /* a lista sai sem a coluna — nunca sem a lista */ }
+    }
     // A foto da revisão é tirada aqui, na visita do cliente — ver lib/portal-listas.
     // ⚠ no preview interno NÃO se tira foto: revisão é o histórico do que o cliente viu, e nós
     // abrimos esta página dezenas de vezes por dia enquanto montamos o portal.
@@ -438,14 +475,21 @@ export async function GET(req, { params }) {
       // o peso do conjunto já é a soma dos croquis dele (regra da casa). O total dobraria no dia em
       // que as subpeças entraram, e ninguém ligaria uma coisa à outra.
       pesoKg: comPeso ? Math.round(pecas.filter((p) => !p.nivel).reduce((sm, p) => sm + (p.pesoTotalKg || 0), 0)) : null,
-      itens: pecas.slice(0, 500).map((p) => ({
-        marca: p.marca, descricao: p.descricao || p.perfil || "—",
-        // ⚠ o nível vai junto: sem ele a tela não sabe que a linha é peça DE um conjunto, e a LPC
-        // vira uma lista chapada onde ninguém enxerga o que compõe o quê.
-        nivel: p.nivel || 0, conjunto: p.conjunto || null,
-        material: p.material || null, qtd: p.qte,
-        ...(comPeso ? { pesoKg: Math.round(p.pesoTotalKg || 0) } : {}),
-      })),
+      comRastreio: !!rastreio,
+      itens: pecas.slice(0, 500).map((p) => {
+        const rr = rastreio?.get(chaveRastreio(p.marca, p.perfil)) || null;
+        return {
+          marca: p.marca, descricao: p.descricao || p.perfil || "—",
+          // ⚠ o nível vai junto: sem ele a tela não sabe que a linha é peça DE um conjunto, e a LPC
+          // vira uma lista chapada onde ninguém enxerga o que compõe o quê.
+          nivel: p.nivel || 0, conjunto: p.conjunto || null,
+          material: p.material || null, qtd: p.qte,
+          ...(comPeso ? { pesoKg: Math.round(p.pesoTotalKg || 0) } : {}),
+          // ⚠ conjunto (sem perfil) não leva a chave: o R dele são os das posições. Peça com perfil e
+          // sem R leva `null`, que a tela mostra como "—".
+          ...(rastreio && p.perfil ? { rastreio: rr ? { r: rr.r, corrida: rr.corrida } : null } : {}),
+        };
+      }),
       revisao: revisaoParaOCliente(rev, comPeso, { clienteViuEm }),
     };
   };

@@ -16,7 +16,25 @@ import { NextResponse } from "next/server";
 // ("OPs · aberto a todos os setores"). O portão nunca foi atualizado junto, então o link aparecia
 // pra todos e derrubava quem clicasse. As ABAS é que limitam o que cada um vê lá dentro
 // (lib/op-abas.js).
-const COMERCIAL_RESTRITO = ["nova", "orcamentos", "aprovacoes", "kickoffs", "apresentacoes", "indicadores"];
+// ⚠⚠ CRONS AGENDADOS FORA DE `/api/cron/` — quatro rotas de MÓDULO que a Vercel também chama.
+// Descoberto em 13/09/2026: o `vercel.json` as agenda, o middleware as mandava para o `/entrar`
+// (307) e elas NUNCA rodaram. O `cmr-sincronizar` não tinha uma única linha em `CronHeartbeat`, e
+// as outras três nem eram cobradas pelo monitor — morreram caladas.
+//
+// ⚠⚠ SÓ O `GET`, E O CAMINHO EXATO (pedido do Codex, 13/09/2026). Estas rotas não são endpoints de
+// cron dedicados: o `POST` delas é o botão do módulo, e em duas (GRD e orçamento) o `POST` com o
+// segredo grava SEM sessão. Liberar por `startsWith`, ou liberar todos os métodos, ampliaria quem
+// pode escrever — o que aqui não é o pedido. O `GET` de cada uma valida o `CRON_SECRET` no próprio
+// handler, que é o mesmo contrato de `/api/cron/`.
+const CRONS_FORA_DO_PREFIXO = new Set([
+  "/api/qualidade/cmr/sincronizar",
+  "/api/compras/produtos-omie/sincronizar",
+  "/api/engenharia/grd/sincronizar",
+  "/api/comercial/orcamento/importar-sharepoint",
+  "/api/comercial/estudos/importar-sharepoint",
+]);
+
+const COMERCIAL_RESTRITO = ["nova", "orcamentos", "aprovacoes", "kickoffs", "apresentacoes", "indicadores", "clientes"];
 
 /**
  * Falta módulo pra esta rota? Devolve o nome do que falta, ou null se pode passar.
@@ -43,6 +61,18 @@ function moduloNegado(path, token) {
   // Recebimento (CMR): quem LANÇA os recebimentos é o Almoxarifado. Ele acessa essa tela do
   // Compras sem ter o módulo COMPRAS inteiro (a Sidebar de Compras filtra o resto pra ele).
   if (path.startsWith("/compras/recebimento-cmr")) return nega("COMPRAS", "ALMOXARIFADO");
+  // Painel de OPs: o Almoxarifado acompanha o que foi comprado para cada obra — o que já virou
+  // pedido, o que está a caminho e quanto. Matheus (17/09/2026): "libere o painel de OPs para o
+  // almoxarifado@torg.com.br, ele precisa ver somente a tela de compras de cada OP."
+  //
+  // ⚠⚠ ISTO É SÓ O PORTÃO DA ROTA. A tela mostra MUITO mais do que "compras da OP" — verba da obra,
+  // saldo, mapa de cotação com o preço de cada concorrente e os botões de finalizar/excluir. Quem
+  // decide o que cada público vê é a própria página (`ehCompras`), e é lá que os dados deixam de
+  // ser calculados e serializados. Passar por aqui não é permissão para ver tudo.
+  //
+  // ⚠ Qualquer página nova sob `/compras/painel-ops/` herda este portão pelo `startsWith` e
+  // precisa declarar o próprio `requireRole` — não confie neste `if` para protegê-la.
+  if (path.startsWith("/compras/painel-ops")) return nega("COMPRAS", "ALMOXARIFADO");
   if (path.startsWith("/compras")) return nega("COMPRAS");
   // Módulo Indicadores (visão gerencial consolidada) é só do ADMIN. Cada setor continua
   // vendo os SEUS indicadores pela aba "Indicadores" dentro do próprio módulo.
@@ -217,12 +247,16 @@ export default withAuth(
           // pro /entrar e NENHUM cron rodava (ex.: conciliação de recebimento).
           path.startsWith("/api/cron/") ||
           path.startsWith("/api/producao/sync-sharepoint") ||
+          (req.method === "GET" && CRONS_FORA_DO_PREFIXO.has(path)) ||
           // Resposta de cobranca de cronograma — publico via token
           path.startsWith("/planejamento/cronogramas/resposta/") ||
           path.startsWith("/api/planejamento/cronogramas/cobranca/") ||
           // Aceite do Kick Off pelos setores — publico via token unico
           path.startsWith("/kickoff/aceite/") ||
           path.startsWith("/api/kickoff/aceite/") ||
+          // Aceite do Comunicado de Aditivo pelos setores — publico via token unico (16/09/2026)
+          path.startsWith("/aditivo/aceite/") ||
+          path.startsWith("/api/aditivo/aceite/") ||
           // Ata de reunião da OP — cliente vê e aceita, publico via token
           path.startsWith("/ata-op/") ||
           path.startsWith("/api/ata-op/") ||

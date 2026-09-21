@@ -93,7 +93,7 @@ export async function GET(req) {
       op: { select: { id: true, numero: true, cliente: true, obra: true, status: true } },
       tarefas: {
         where: { outlineLevel: { gte: 1 } },
-        select: { id: true, nome: true, departamento: true, percentualRealizado: true, dataFimPrevista: true, isSummary: true, outlineLevel: true, duracaoDias: true, area: true },
+        select: { id: true, nome: true, departamento: true, percentualRealizado: true, avancoManual: true, dataFimPrevista: true, isSummary: true, outlineLevel: true, duracaoDias: true, area: true },
       },
     },
     // ⚠ ordenado no JS logo abaixo: `opNumero` é TEXTO, então o banco põe "T113" antes de "115"

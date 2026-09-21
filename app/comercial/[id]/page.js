@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { margemOrcadaLqc } from "@/lib/lqc-op-margem";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
@@ -38,6 +39,7 @@ export async function carregarDetalheOP(id, user) {
         orderBy: { numero: "asc" },
         include: {
           createdBy: { select: { name: true } },
+          aceites: { select: { email: true, aceitoEm: true, enviadoEm: true } },
           itens: {
             orderBy: { ordem: "asc" },
             include: {
@@ -62,6 +64,7 @@ export async function carregarDetalheOP(id, user) {
         select: { id: true, numero: true, tipoRM: true, categoriasOP: true, status: true },
       },
       receitas: { orderBy: { ordem: "asc" } },
+      referencias: { orderBy: { ordem: "asc" } },
       medicoes: { orderBy: { createdAt: "asc" } },
     },
   });
@@ -345,6 +348,7 @@ export async function carregarDetalheOP(id, user) {
     opData.materiaisEstoque = { itens: [], valorConsumido: 0, totalReservado: 0, totalConsumido: 0 };
   }
   opData.kpisFinanceiros = {
+    margemLqc: margemOrcadaLqc(op),
     verbaTotal, totalEmPedidos, saldo, consumoPct,
     receitaBruta, totalImpostos, receitaLiquida,
     margemPrevista, margemPct,

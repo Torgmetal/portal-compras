@@ -46,6 +46,9 @@ describe("o fornecedor marca 'não tenho' e ainda assim digita preço", () => {
         { cotacaoItemId: "ci-sem", precoUnit: 2, qtdCotada: 109.2, icmsPct: 12, ipiPct: 5, semEstoque: true },
         { cotacaoItemId: "ci-com", precoUnit: 7.8, qtdCotada: 109.2, semEstoque: false },
       ],
+      // ⚠ `tipoFrete` virou OBRIGATÓRIO na rota em 17/09/2026. Este teste não o mandava e passou a
+      // receber 400 — sinal certo: o contrato mudou de propósito, não é regressão.
+      tipoFrete: "CIF",
     }), { params: { token: "tk" } });
     expect(r.status).toBe(200);
 
@@ -108,5 +111,54 @@ describe("marcar vencedor", () => {
     });
     mockPrisma.cotacaoItem.update.mockResolvedValue({});
     expect((await marcarVencedor(req("http://localhost/x", { vencedor: false }), { params: { id: "ci1" } })).status).toBe(200);
+  });
+});
+
+// ─── O frete é obrigatório, e a trava é do SERVIDOR (Matheus, 17/09/2026) ────
+//
+// ⚠⚠ A tela já bloqueia, mas a tela é a parte fácil. O que esta prova protege é o resto: aba
+// aberta antes desta versão, reenvio, qualquer POST fora do formulário. Sem a trava no servidor, o
+// campo seria "obrigatório" só para quem não tivesse motivo de burlá-lo — e aí o comprador
+// continuaria sem saber o que precisa coletar, que é o motivo do campo existir.
+describe("frete obrigatório na submissão", () => {
+  beforeEach(() => {
+    mockPrisma.cotacao.findUnique.mockResolvedValue({
+      id: "cot1", token: "tk", status: "ENVIADA", nCodOmie: null, itens: [{ id: "ci-com" }],
+    });
+    mockPrisma.cotacao.update.mockResolvedValue({ id: "cot1" });
+    mockPrisma.cotacaoItem.update.mockResolvedValue({});
+    mockPrisma.cotacaoItem.findMany.mockResolvedValue([]);
+    mockPrisma.rMItem.updateMany.mockResolvedValue({ count: 0 });
+  });
+
+  const corpo = (extra) => ({
+    itens: [{ cotacaoItemId: "ci-com", precoUnit: 7.8, qtdCotada: 109.2, semEstoque: false }],
+    ...extra,
+  });
+
+  it("sem frete, recusa com a mensagem que o FORNECEDOR precisa ler", async () => {
+    const r = await submeter(req("http://localhost/api/cotacao/submeter/tk", corpo()), { params: { token: "tk" } });
+    expect(r.status).toBe(400);
+    const { error } = await r.json();
+    expect(error).toContain("CIF");
+    expect(error).toContain("FOB");
+    // ⚠ e não o despejo JSON do Zod, que era o que a rota devolvia antes
+    expect(error).not.toContain('"code"');
+    expect(mockPrisma.cotacao.update).not.toHaveBeenCalled();
+  });
+
+  it("valor fora da lista também é recusado", async () => {
+    const r = await submeter(req("http://localhost/api/cotacao/submeter/tk", corpo({ tipoFrete: "por conta deles" })), { params: { token: "tk" } });
+    expect(r.status).toBe(400);
+    expect(mockPrisma.cotacao.update).not.toHaveBeenCalled();
+  });
+
+  it("com CIF ou FOB, grava o que o fornecedor escolheu", async () => {
+    for (const v of ["CIF", "FOB"]) {
+      mockPrisma.cotacao.update.mockClear();
+      const r = await submeter(req("http://localhost/api/cotacao/submeter/tk", corpo({ tipoFrete: v })), { params: { token: "tk" } });
+      expect(r.status, v).toBe(200);
+      expect(mockPrisma.cotacao.update.mock.calls[0][0].data).toMatchObject({ tipoFrete: v });
+    }
   });
 });

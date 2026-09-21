@@ -1,0 +1,31 @@
+---
+name: torg_calibracao
+description: "Aba Calibração da Qualidade — avaliação Aprovado/Reprovado dos certificados de calibração (PO-20), com foto do equipamento + relatório"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: 1754de4f-06da-423d-8c20-70c99cbd5bad
+  modified: 2026-08-15T19:18:08.300Z
+---
+
+Módulo `/qualidade/calibracao` (novo 11/08/2026) para **avaliar os certificados de calibração** dos equipamentos e emitir o **Relatório de Avaliação** (Aprovado/Reprovado), conforme **PO-20**. Item no menu `SidebarQualidade` (ícone Ruler), logo abaixo de Controle de Documentos.
+
+**Reaproveita os certificados existentes**: a lista puxa `DocumentoQualidade` categoria `EQUIPAMENTOS` (ativo) — inclui os importados do servidor (54 na estreia, nenhum avaliado). NÃO é cadastro separado. O certificado sem avaliação aparece como PENDENTE.
+
+**Model `AvaliacaoCalibracao`** (1:1 com o certificado, numeração RAC-001): identificacao/faixaUso/laboratorio (o resto vem do documento), anexos `fotoEquipamentoUrl` + `relatorioUrl` (Vercel Blob, reusa o `upload-token` do Controle de Documentos), `criterios` Json (PO-20), `criterioAceitacao`, `parecer`, `conclusao` PENDENTE|APROVADO|REPROVADO, avaliadorId/avaliadoEm. Tabela criada via SQL no PROD + garantida no build (`ensure-mes-tables.mjs`), pois db push está bloqueado por drift [[torg_qualidade]].
+
+**Regra do Vitor (15/08):** avaliar **NÃO exige anexo nenhum** — dá pra Aprovar/Reprovar e gerar o RAC direto; foto e relatório são **evidência OPCIONAL**. Evoluiu em 2 passos no mesmo dia: `af6fc11` tirou a obrigatoriedade da FOTO (só relatório); `043ba98` tirou também a do relatório (Vitor seguia travado no botão Aprovar mesmo com a foto opcional). Agora `podeAvaliar = true` no client; a trava do PATCH `/[id]` (que exigia relatório) foi removida; PDF renderiza sem foto (`embutirFoto` retorna null). `temAnexos` (lib/calibracao.js = tem relatório) virou só indicador visual, não trava mais.
+
+**Nomenclatura/duplicatas dos certs EQUIPAMENTOS (15/08 — EM ANDAMENTO, Vitor pediu p/ AGUARDAR):** a importação (`importar-servidor`) grava `nome = nome do arquivo` (~linha 144) e deduplica só por `sharepointItemId` (~linha 69) → 3 levas (15–16/06 cru, 16/06 nomes certos, 10/08 cru de novo) deixaram **107 certs, 75 com nome de arquivo, ~38 grupos de duplicata**. Nome correto = `SIGLA-NN-NOME` (AA=ALICATE, CP=CALIBRE DE FOLGA, CS=CALIBRE DE SOLDA, ES=ESQUADRO, LX=LUXIMETRO, MPS=MEDIDOR DE ESPESSURA, MS=MAQUINA DE SOLDA, NV=NIVEL, PQ=PAQUIMETRO, RGT=RUGOSIMETRO, TH=THERMOHIGROMETRO, TM=TERMOMETRO, TQ=TORQUIMETRO, TR=TRENA; MTR-xxxx=metrologia externa, mantém o código). Plano aprovado "padronizar+remover duplicatas": **28 cópias idênticas (mesmo nº)=seguro apagar** + **22 renomear** + corrigir a importação (dedup por nº + não rebaixar nome bom). Os **29 "antigos" (recalibração) NÃO automatizar** — rótulos/números embaralhados na importação (ex.: cert novo `E4263202-0726` veio nomeado "MS-1" mas o nº era do "MS-04"; TR tem validade só no cert velho) → Vitor confere na planilha (`calibracao-vigencia.xlsx`). Só 1 RAC existe (RAC-001, AA-ALICATE, pendente); AA tem nó (RAC no nº antigo `E4263004-0825`, mas o arquivo é o novo `E4263001-0726`).
+
+**Critérios do PO-20 são editáveis em `lib/calibracao.js`** (`CRITERIOS_CALIBRACAO_PADRAO` + `CRITERIO_ACEITACAO_PADRAO`). Vitor vai **ajustar o PO-20 e mandar as informações** — quando mandar, atualizar essa lista (avaliações já feitas guardam o próprio snapshot em `criterios`).
+
+PDF em `lib/avaliacao-calibracao-pdf.js` (padrão Torg A4, foto do equipamento embutida via fetch do Blob, carimbo verde/vermelho). Rotas: `/api/qualidade/calibracao` (lista+cadastro), `/[id]` (GET garante avaliação, PATCH salva), `/[id]/pdf`. Commit f7e9a96.
+
+**Análise por IA (commit dbc4b7f, feedback do Vitor):** botão "Analisar certificado" na tela → `/[id]/analisar` baixa o cert (Blob ou SharePoint via `fetchRhItemResponse`) e lê com Claude (`lib/extrair-calibracao.js`, mesmo padrão de extrair-doc-qualidade): extrai laboratório, acreditação, faixa, EMP, **pontos** (nominal/erro/incerteza) e **padrões usados na calibração** (nome/certificado/validade = rastreabilidade). Validado num cert real (Trena TR-06: 9 pontos + 3 padrões OK).
+- **Erro → %**: base = **valor nominal** do ponto (span no ponto zero); veredito = `|erro|+incerteza ≤ limite`. Helpers em `lib/calibracao.js` (`erroPercent`, `avaliarPontos`, `avaliarPadroes`, `padraoVencido`).
+- **Limite (%)**: **PO-20 = 10%** do valor nominal (erro+incerteza), default `ERRO_MAX_PERCENT_SUGERIDO=10` aplicado ao criar a avaliação; editável por equipamento (recalcula sem IA no PATCH); se o campo for esvaziado, usa o **EMP declarado no certificado**. A **norma (ISO 9001 §7.1.5 / ISO 10012) NÃO fixa %** — quem define é o PO-20.
+- **Base = % do valor nominal, CONFIRMADO pelo Vitor**. NÃO trocar p/ fundo de escala sem ele pedir. Colunas "Limite %"/"Situação" ficam "—" quando o limite é null (linhas criadas antes do default de 10) — backfill `erroMaxPercent=10` + recomputar `analise.pontos` resolve.
+- **BUG do % dobrado (corrigido, commit 1650bb1)**: muitos certificados (ex.: METRUS/alicate) já trazem as colunas **"Erro %"** e **"U %"** EM PORCENTAGEM. O portal lia como absoluto e dividia de novo pelo nominal → contava o % 2x (0,17% virava 42,5% em ponto de faixa baixa) e REPROVAVA instrumento que o laboratório APROVOU. Fix: campo `errosEmPercent` na extração (IA detecta "Erro %"; fallback `unidade=="%"`); `avaliarPontos` usa `|erro|`/`|incerteza|` direto quando `errosEmPercent`. **Sempre conferir o certificado real quando um resultado parecer absurdo** — o Vitor pegou isso ("o laboratório nos passaria errado?").
+- **IA compartilhada**: usa a mesma `ANTHROPIC_API_KEY` do portal [[torg_ia_integracao]]; se acabar o crédito, a análise (e toda IA do portal) para com "credit balance too low" — recarregar em console.anthropic.com › Plans & Billing. A rota /analisar já traduz esse erro pra PT.
+- A análise (`analise` Json + `analisadoEm`) **pré-preenche os critérios** do PO-20 (acreditado / erros no limite / padrões na validade); o avaliador confirma. PDF ganhou tabela de pontos (erro %) + tabela de padrões (em dia/vencido) + acreditação. Vitor vai ajustar o PO-20 e mandar as infos → atualizar `CRITERIOS_CALIBRACAO_PADRAO`.

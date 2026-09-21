@@ -8,6 +8,7 @@ import {
   adicionarLinhaTotais, downloadWorkbook, CORES,
 } from "@/lib/excel-relatorio";
 import { ordenarACNoFim } from "@/lib/marca-ac";
+import FichaPecaModal from "@/components/FichaPecaModal";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import { fmtOP } from "@/lib/utils";
 import { MAQUINA_LABEL, MAQUINA_COR, MAQUINAS, calcularResumoBarras } from "@/lib/maquina-corte";
@@ -43,6 +44,7 @@ const fmtKg = (v) => {
 
 export default function PecasClient({ ops, pecasIniciais, userRole }) {
   const router = useRouter();
+  const [ficha, setFicha] = useState(null);
   const [pecas, setPecas] = useState(pecasIniciais);
   const [modalImport, setModalImport] = useState(false);
   const [filtroOp, setFiltroOp] = useState("");
@@ -335,6 +337,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
 
   return (
     <div className="space-y-4 max-w-7xl">
+      {ficha && <FichaPecaModal {...ficha} onClose={() => setFicha(null)} />}
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -581,7 +584,7 @@ export default function PecasClient({ ops, pecasIniciais, userRole }) {
                       <td className="px-3 py-1.5 text-xs font-mono text-torg-blue">{fmtOP(p.opNumero)}</td>
                       <td className="px-3 py-1.5 text-[10px] text-gray-400 tabular-nums">{p.item || ""}</td>
                       <td className="px-3 py-1.5">
-                        <span className="text-xs font-semibold text-torg-dark font-mono">{p.marca}</span>
+                        {userRole === "COMERCIAL" ? <span className="text-xs font-semibold text-torg-dark font-mono">{p.marca}</span> : <button type="button" onClick={() => setFicha({opId: p.opId || p.op?.id, marca: p.marca})} className="min-h-11 text-xs font-semibold text-torg-blue font-mono underline underline-offset-2" aria-label={`Abrir ficha da peça ${p.marca}`}>{p.marca}</button>}
                         {p.tipoPeca === "CONJUNTO" && <span className="ml-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-torg-blue/10 text-torg-blue">CJ</span>}
                         {p.tipoPeca === "CROQUI" && <span className="ml-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">CR</span>}
                       </td>

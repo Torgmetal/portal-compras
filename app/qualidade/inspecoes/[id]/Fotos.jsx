@@ -33,6 +33,10 @@ export default function Fotos({ rel, travado }) {
   const [fotos, setFotos] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  // ⚠ LEGENDA, OPCIONAL. Vitor (16/09/2026): a coluna existia e o PDF imprimia, mas nenhuma tela
+  // deixava escrever. Esta vale para as próximas fotos anexadas; a de cada foto já subida se edita
+  // embaixo da miniatura (PATCH só da legenda — não mexe na área).
+  const [legenda, setLegenda] = useState("");
   const inputRef = useRef(null);
 
   const carregar = useCallback(async () => {
@@ -59,6 +63,7 @@ export default function Fotos({ rel, travado }) {
         fd.append("tipo", rel.tipo);
         fd.append("relatorioId", rel.id);
         if (evidencia) fd.append("evidencia", evidencia);
+        if (legenda.trim()) fd.append("observacao", legenda.trim());
         const r = await fetch("/api/campo/foto", { method: "POST", body: fd });
         // ⚠ erro de plataforma vem em HTML, não em JSON — ver lib/resposta-json.js
         const j = await lerJson(r);
@@ -79,6 +84,19 @@ export default function Fotos({ rel, travado }) {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "Não foi possível mover a foto.");
       await carregar();
+    } catch (e) { setErro(e.message); }
+  }
+
+  async function editarLegenda(id, texto) {
+    setErro("");
+    try {
+      const r = await fetch("/api/campo/foto", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, observacao: texto }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "Não foi possível salvar a legenda.");
+      setFotos((p) => (p || []).map((f) => (f.id === id ? { ...f, observacao: String(texto || "").trim() || null } : f)));
     } catch (e) { setErro(e.message); }
   }
 
@@ -113,6 +131,11 @@ export default function Fotos({ rel, travado }) {
       </div>
 
       {erro && <p className="text-[11px] text-red-600 mb-2 inline-flex items-center gap-1.5"><AlertTriangle size={12} /> {erro}</p>}
+      {!travado && (
+        <input value={legenda} onChange={(e) => setLegenda(e.target.value)} maxLength={500}
+          placeholder="Legenda para as próximas fotos (opcional) — sai embaixo da foto no PDF"
+          className="w-full mb-2 text-[11px] border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-torg-blue" />
+      )}
 
       {fotos === null ? (
         <p className="text-[11px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> carregando…</p>
@@ -121,14 +144,14 @@ export default function Fotos({ rel, travado }) {
           {areas.map((a) => (
             <BlocoArea key={a.k} rot={a.rot} lista={daArea(a.k)} areas={areas} atual={a.k}
               travado={travado} enviando={enviando} onEnviar={(e) => receber(e, a.k)}
-              onMover={mover} onRemover={remover} />
+              onMover={mover} onRemover={remover} onLegenda={editarLegenda} />
           ))}
           {/* ⚠ o acervo: foto anexada antes de existir área (e a que veio do celular) fica aqui até
               alguém dizer de que ensaio ela é — some sozinha do bloco quando classificada. */}
           {daArea(null).length > 0 && (
             <BlocoArea rot="Sem área — classifique para entrar na moldura certa" lista={daArea(null)}
               areas={areas} atual="" travado={travado} enviando={enviando} onEnviar={(e) => receber(e, null)}
-              onMover={mover} onRemover={remover} semBotao alerta />
+              onMover={mover} onRemover={remover} onLegenda={editarLegenda} semBotao alerta />
           )}
           <p className="text-[10px] text-torg-gray">
             Cada área sai na sua moldura na folha do registro fotográfico. Pode ter mais de uma foto por área:
@@ -136,7 +159,7 @@ export default function Fotos({ rel, travado }) {
           </p>
         </div>
       ) : fotos.length ? (
-        <Grade lista={fotos} travado={travado} onRemover={remover} />
+        <Grade lista={fotos} travado={travado} onRemover={remover} onLegenda={editarLegenda} />
       ) : (
         <p className="text-[11px] text-torg-gray">
           Nenhuma foto. {travado ? "" : "As que você anexar saem numa folha própria no fim do PDF, no mesmo formato do relatório."}
@@ -146,7 +169,7 @@ export default function Fotos({ rel, travado }) {
   );
 }
 
-function BlocoArea({ rot, lista, areas, atual, travado, enviando, onEnviar, onMover, onRemover, semBotao = false, alerta = false }) {
+function BlocoArea({ rot, lista, areas, atual, travado, enviando, onEnviar, onMover, onRemover, onLegenda = null, semBotao = false, alerta = false }) {
   const ref = useRef(null);
   return (
     <div className={`border rounded-lg p-2 ${alerta ? "border-amber-200 bg-amber-50/40" : "border-gray-100"}`}>
@@ -165,7 +188,7 @@ function BlocoArea({ rot, lista, areas, atual, travado, enviando, onEnviar, onMo
         )}
       </div>
       {lista.length ? (
-        <Grade lista={lista} travado={travado} onRemover={onRemover} onMover={onMover} areas={areas} atual={atual} />
+        <Grade lista={lista} travado={travado} onRemover={onRemover} onMover={onMover} onLegenda={onLegenda} areas={areas} atual={atual} />
       ) : (
         <p className="text-[10px] text-torg-gray">sem foto</p>
       )}
@@ -173,7 +196,7 @@ function BlocoArea({ rot, lista, areas, atual, travado, enviando, onEnviar, onMo
   );
 }
 
-function Grade({ lista, travado, onRemover, onMover = null, areas = [], atual = "" }) {
+function Grade({ lista, travado, onRemover, onMover = null, onLegenda = null, areas = [], atual = "" }) {
   return (
     <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
       {lista.map((f) => (
@@ -183,6 +206,17 @@ function Grade({ lista, travado, onRemover, onMover = null, areas = [], atual = 
             <img src={f.url} alt={f.marca || "foto do ensaio"} className="w-full h-20 object-cover rounded-lg border border-gray-200" />
           </a>
           {f.marca && <p className="text-[9px] text-torg-gray truncate mt-0.5">{f.marca}</p>}
+          {/* ⚠ legenda editável na própria miniatura; salva ao sair do campo ou no Enter. Input não
+              controlado (defaultValue + key) para não desmontar enquanto se digita. */}
+          {travado
+            ? (f.observacao ? <p className="text-[9px] text-torg-dark leading-tight mt-0.5" title={f.observacao}>{f.observacao}</p> : null)
+            : onLegenda && (
+              <input key={`${f.id}:${f.observacao || ""}`} defaultValue={f.observacao || ""} maxLength={500} placeholder="legenda…"
+                title="Legenda da foto — sai embaixo dela no PDF"
+                onBlur={(e) => { if ((e.target.value || "").trim() !== (f.observacao || "")) onLegenda(f.id, e.target.value); }}
+                onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                className="mt-0.5 w-full text-[9px] border border-gray-200 rounded px-1 py-0.5 text-torg-dark outline-none focus:border-torg-blue" />
+            )}
           {!travado && onMover && areas.length > 0 && (
             <select value={atual} onChange={(e) => onMover(f.id, e.target.value)}
               title="Área de evidência"

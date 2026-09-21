@@ -15,9 +15,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { listarLqcs, escolherPorOrcamento, baixarLqc } from "@/lib/lqc-sharepoint";
+import { listarLqcs, escolherPorOrcamento, baixarLqc, decidirImportacao } from "@/lib/lqc-sharepoint";
+import { registrarExecucao } from "@/lib/cron-monitor";
 import { importarLqc } from "@/lib/lqc-importar";
 import { calcularLqc } from "@/lib/lqc";
+import { aquecerBanco } from "@/lib/db-retry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +27,11 @@ export const maxDuration = 800;
 
 const ROLES = ["ADMIN", "COMERCIAL"];
 
-async function processar(ano, aplicar, user) {
+async function processar(ano, aplicar, user, { forcar = [] } = {}) {
+  // ⚠ `forcar`: números cujo estudo do portal DEVE ser sobrescrito pela planilha mesmo sendo mais
+  // recente — Vitor (16/09/2026) sobre o 81: "pode sobrescrever a 81 pois a que fizemos no portal
+  // foi para apenas testar". É decisão de quem sabe o que tem dentro, por isso vem no pedido.
+  const forcados = new Set((Array.isArray(forcar) ? forcar : []).map(Number).filter(Boolean));
   const { lqcs, ignorados } = await listarLqcs(ano);
   const escolhidas = escolherPorOrcamento(lqcs);
 
@@ -56,20 +62,20 @@ async function processar(ano, aplicar, user) {
       detalhe.push({ numero, arquivo: escolhida.nome, acao: "sem orçamento", motivo: `não existe ${numero}-${aa} na central` });
       continue;
     }
-    // ⚠ ESTUDO MONTADO À MÃO NÃO É SOBRESCRITO. Quem veio de importação carrega
-    // `composicao.origemSharePoint`; quem não carrega foi construído aqui dentro, por alguém, e a
-    // planilha não passa por cima disso. (Primeira versão desta guarda testava uma flag
-    // `custosEditados` que não existe no portal — protegia nada e parecia proteger.)
-    const feitoNoPortal = jaTem?.composicao && Object.keys(jaTem.composicao).length > 0 && !jaTem.composicao.origemSharePoint;
-    if (feitoNoPortal) {
+    // ⚠ ESTUDO MONTADO À MÃO NÃO É SOBRESCRITO, e estudo importado e depois TRABALHADO no portal
+    // também não: a planilha só passa por cima se for mais nova que a última mexida
+    // (`decidirImportacao`, com o porquê lá). (A primeira guarda testava uma flag `custosEditados`
+    // que não existe; a segunda só olhava `origemSharePoint` e ia sobrescrever o 81 em 16/09/2026.)
+    const decisao = jaTem && forcados.has(numero) ? { acao: "atualizar", motivo: "forçado no pedido" } : decidirImportacao(jaTem, escolhida);
+    if (decisao.acao === "pulado") {
       resumo.pulados++;
-      detalhe.push({ numero, arquivo: escolhida.nome, acao: "pulado", motivo: "estudo montado no portal — a planilha não sobrescreve" });
+      detalhe.push({ numero, arquivo: escolhida.nome, acao: "pulado", motivo: decisao.motivo });
       continue;
     }
 
     detalhe.push({
       numero, arquivo: escolhida.nome, revisao: escolhida.revisao,
-      acao: jaTem ? "atualizar" : "criar",
+      acao: decisao.acao,
       orcamento: orc.numero, cliente: orc.cliente,
       outrasVersoes: outras.map((o) => o.nome),
     });
@@ -87,7 +93,17 @@ async function processar(ano, aplicar, user) {
           ultimoErro = r.erro;
         } catch (e) { ultimoErro = e.message; }
       }
-      if (!lido) { resumo.erros.push({ numero, arquivo: escolhida.nome, erro: ultimoErro || "não deu para ler" }); continue; }
+      if (!lido) {
+        // ⚠ PLANILHA SEM A ABA DE RESUMO NÃO É ERRO DE LEITURA — é uma LQC salva pela metade (ou um
+        // teste, como a 299-26 em 16/09/2026). Como "erro" ela acusava no heartbeat a cada hora;
+        // como "pulado" fica visível no detalhe, com o motivo, sem gritar.
+        if (/n[ãa]o tem a aba de resumo/i.test(ultimoErro || "")) {
+          resumo.pulados++;
+          detalhe[detalhe.length - 1] = { numero, arquivo: escolhida.nome, acao: "pulado", motivo: `planilha sem a aba de resumo — ${ultimoErro}` };
+          continue;
+        }
+        resumo.erros.push({ numero, arquivo: escolhida.nome, erro: ultimoErro || "não deu para ler" }); continue;
+      }
       if (usada.id !== escolhida.id) resumo.erros.push({ numero, arquivo: escolhida.nome, aviso: `ilegível — usei ${usada.nome}` });
 
       // ⚠⚠ O PREÇO DO AÇO PRECISA CHEGAR AQUI, SENÃO O ESTUDO NASCE SEM A MAIOR PARCELA DO CUSTO.
@@ -100,7 +116,9 @@ async function processar(ano, aplicar, user) {
       const precoAco = (area) => lido.precosPorArea?.[area] ?? lido.precoMateriaPrima ?? null;
       const resumos = lido.resumos.map((r) => ({ ...r, precoKg: precoAco(r.area) }));
       const composicao = {
+        ...lido.custosImportados,
         resumos, tintas: lido.tintas || [], origemSharePoint: usada.nome,
+        avisosImportacao: lido.avisos || [],
         ...(lido.fixadoresRsKg ? { fixadoresRsKg: lido.fixadoresRsKg } : {}),
         // sem o BDI o cálculo fecha com preço = custo, e a tela mostra CUSTO chamando de preço
         ...(lido.bdi && Object.keys(lido.bdi).length ? { bdi: lido.bdi } : {}),
@@ -139,12 +157,43 @@ async function processar(ano, aplicar, user) {
   return { ...resumo, ignorados, detalhe };
 }
 
+// ⚠⚠ O CRON DA VERCEL DISPARA GET, NÃO POST (mesma lição da importação de orçamentos). Vitor
+// (16/09/2026): "as LQCs vc está atualizando? pois está puxando a última dia 09/09" — esta rota só
+// existia como chamada manual e ninguém chamava: a última importação foi 30/08 e 17 LQCs novas
+// ficaram no SharePoint sem estudo. Para GENTE o GET continua sendo SIMULAÇÃO; só o cron aplica.
 export async function GET(req) {
-  try { await requireRole(ROLES); }
-  catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  const auth = req.headers.get("authorization");
+  const doCron = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
+  if (!doCron) {
+    try { await requireRole(ROLES); }
+    catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
+  }
+  // ⚠⚠ ACORDA A COMPUTE DO NEON ANTES DO PRIMEIRO QUERY. Ela suspende quando ociosa
+  // (scale-to-zero) e o primeiro query de um cron estoura com P1001 "Can't reach database server".
+  //
+  // ⚠ SEM `if (doCron)` de propósito: esta função já está acima do teto de complexidade, e um ramo
+  // a mais para poupar ~1ms de um SELECT 1 em banco acordado paga mal. Na chamada manual, se o
+  // banco estiver frio, aquecer é melhor que devolver P1001 na cara de quem clicou.
   const ano = Number(new URL(req.url).searchParams.get("ano")) || new Date().getUTCFullYear();
-  try { return NextResponse.json({ simulacao: true, ...(await processar(ano, false, null)) }); }
-  catch (e) { return NextResponse.json({ error: e.message }, { status: 502 }); }
+  try {
+  // ⚠⚠ DENTRO DO `try`, e a medição começa ANTES: `aquecerBanco` LANÇA ao esgotar as tentativas.
+  // Fora do try, a falha escapava sem passar pelo `registrarExecucao` — o cenário que o aquecimento
+  // existe para sobreviver (Neon dormindo) seria justamente o que apagaria o cron do heartbeat.
+    await aquecerBanco(prisma);
+    const r = await processar(ano, doCron, null);
+    if (doCron && (r.criados > 0 || r.atualizados > 0)) {
+      // registra só quando MUDOU — uma linha por hora dizendo "nada" enterraria as importações de verdade
+      await prisma.auditLog.create({
+        data: { userId: null, action: "IMPORTAR_LQC_SHAREPOINT", entity: "EstudoFabricacao",
+                entityId: String(ano), diff: { criados: r.criados, atualizados: r.atualizados, pulados: r.pulados, erros: r.erros.length, porCron: true } },
+      }).catch(() => {});
+    }
+    if (doCron) await registrarExecucao("lqc-sharepoint", { ok: true, mensagem: `${r.criados || 0} novo(s) · ${r.atualizados || 0} atualizado(s) · ${r.pulados || 0} pulado(s)${r.erros.length ? ` · ${r.erros.length} erro(s)` : ""}` });
+    return NextResponse.json({ simulacao: !doCron, ...r });
+  } catch (e) {
+    if (doCron) await registrarExecucao("lqc-sharepoint", { ok: false, mensagem: e.message });
+    return NextResponse.json({ error: e.message }, { status: 502 });
+  }
 }
 
 export async function POST(req) {
@@ -154,10 +203,11 @@ export async function POST(req) {
   const body = await req.json().catch(() => ({}));
   const ano = Number(body.ano) || new Date().getUTCFullYear();
   try {
-    const r = await processar(ano, true, user);
+    const forcar = Array.isArray(body.forcar) ? body.forcar.map(Number).filter(Boolean) : [];
+    const r = await processar(ano, true, user, { forcar });
     await prisma.auditLog.create({
       data: { userId: user.id, action: "IMPORTAR_LQC_SHAREPOINT", entity: "EstudoFabricacao",
-              entityId: String(ano), diff: { criados: r.criados, atualizados: r.atualizados, erros: r.erros.length } },
+              entityId: String(ano), diff: { criados: r.criados, atualizados: r.atualizados, pulados: r.pulados, erros: r.erros.length, ...(forcar.length ? { forcar } : {}) } },
     }).catch(() => {});
     return NextResponse.json(r);
   } catch (e) {

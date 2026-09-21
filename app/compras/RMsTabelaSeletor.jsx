@@ -1,10 +1,13 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useMemo, useEffect } from "react";
 import { fmtOP } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, AlertCircle, Loader2, Mail, X, FileText, Send, Copy, Check, ExternalLink, CheckCircle2, Truck, Clock, LayoutGrid, List, Plus } from "lucide-react";
 import RMRowActions from "@/components/RMRowActions";
+import BarraFiltrosRM from "./BarraFiltrosRM";
+import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import {
   CATEGORIAS_FORNECEDOR_BUILTIN,
   mergeCategorias,
@@ -42,7 +45,36 @@ function categoriaRM(rm) {
 
 const PRIORIDADE_CAT = { PRONTA: 1, EM_COTACAO: 2, ABERTA: 3 };
 
-export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }) {
+const TH = "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap";
+
+// FUNIL POR COLUNA, como no CMR e na lista de expedição — Matheus (15/09/2026): "ajuste o cabeçalho
+// da listagem das RMs para ter filtros conforme os cabeçalhos que usamos em outras telas".
+//
+// ⚠ Nº RM e Itens ficam SEM funil de propósito. O número da RM é único por linha (o menu teria 100
+// opções de 1 linha cada, que é uma busca, não um filtro) e "10 / 10" é razão calculada — mesma
+// razão de Peças e Peso não terem funil na tela de etiquetas.
+//
+// ⚠ O valor é TEXTO e é o mesmo que a célula mostra. Filtrar por um rótulo que não aparece na
+// tabela ("EM_COTACAO" em vez de "Em cotação") faz o menu parecer de outra tela.
+// ⚠⚠ "OP / Cliente" NÃO TEM FUNIL, e a ausência é a correção. Um funil de coluna só enxerga o que
+// foi carregado — era um segundo caminho para filtrar por obra que continuava mentindo sobre as 100
+// linhas da janela, ao lado de um seletor de OP que agora filtra no banco. Dois filtros de obra na
+// mesma tela, um certo e um errado, é pior que um só: quem usasse o errado veria a lista curta sem
+// nada dizendo por quê. Obra se escolhe no seletor acima da tabela.
+const COLUNAS_FILTRO = [
+  { key: "tipo",        label: "Tipo",         valor: (r) => TIPO_RM_LABELS[r.tipoRM] || r.tipoRM || "—" },
+  { key: "descricao",   label: "Descrição",    valor: (r) => r.descricao || "—" },
+  { key: "solicitante", label: "Solicitante",  valor: (r) => r.createdBy?.name || "—" },
+  { key: "cot",         label: "Cot.",         valor: (r) => String(r._count?.cotacoes ?? 0) },
+  { key: "data",        label: "Data",         valor: (r) => fmtData(r.createdAt) },
+  { key: "status",      label: "Status",       valor: (r) => (STATUS_LABELS[r.status] || STATUS_LABELS.ABERTA).label },
+];
+
+export default function RMsTabelaSeletor({
+  rms, isAdmin, categoriasCustom = [], verArquivadas = false,
+  obras = [], opSelecionada = null, totalNoEscopo = null, truncada = false,
+  limite = 100, basePath = "/compras",
+}) {
   // Lista mesclada (built-in + custom do banco) — passada por toda a arvore
   const todasCategoriasFornecedor = useMemo(
     () => mergeCategorias(categoriasCustom),
@@ -56,36 +88,40 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
   const [filtroCat, setFiltroCat] = useState(null);
   // Toggle entre tabela e kanban
   const [viewMode, setViewMode] = useState("tabela"); // "tabela" | "kanban"
-  const [filtroOp, setFiltroOp] = useState(""); // OP.numero ("" = todas)
+  // ⚠⚠ A OBRA É FILTRADA NO SERVIDOR, PELA URL — não mais aqui dentro. Matheus (16/09/2026):
+  // "existe 7 RMs mas na tela de RMs histórico e filtro por OP-097 só aparece 3". O filtro era um
+  // `rms.filter()` sobre uma lista que o servidor já tinha cortado nas 100 mais recentes: 111 das
+  // 211 RMs do histórico nunca chegavam aqui, e nenhum filtro de navegador alcança o que não veio.
+  // Com a obra na URL, a consulta busca a obra INTEIRA e este componente só exibe o que recebeu.
+  const rmsBase = rms;
 
-  // Base: aplica o filtro de OP (se houver) antes de tudo — cards, lista e seleção.
-  const rmsBase = useMemo(
-    () => (filtroOp ? rms.filter((r) => (r.op?.numero || "") === filtroOp) : rms),
-    [rms, filtroOp]
-  );
-
-  // OPs disponíveis para o filtro (uma por OP, com cliente) — maior número primeiro
-  const opsRM = useMemo(() => {
-    const m = new Map();
-    for (const r of rms) if (r.op?.numero && !m.has(r.op.numero)) m.set(r.op.numero, r.op.cliente || "");
-    const num = (s) => parseInt(String(s).match(/\d+/)?.[0] || "0", 10);
-    return [...m.entries()].sort((a, b) => num(b[0]) - num(a[0]));
-  }, [rms]);
-
-  // Só permite cotar RMs que ainda estão em fluxo ativo
-  const cotaveis = useMemo(
-    () => rmsBase.filter((r) => ["ABERTA", "EM_COTACAO", "COTADA"].includes(r.status)),
-    [rmsBase]
-  );
+  /** Navega mudando só um parâmetro — a aba Ativas/Histórico sobrevive à troca de obra. */
+  const irPara = (op) => {
+    const q = new URLSearchParams();
+    if (verArquivadas) q.set("arquivadas", "1");
+    if (op) q.set("op", op);
+    const s = q.toString();
+    router.push(s ? `${basePath}?${s}` : basePath);
+  };
 
   // KPIs agregados por categoria de ação
+  //
+  // ⚠⚠ O ATRASO É DAS QUE ESTÃO **EM COTAÇÃO**, E SÓ DELAS. O aviso mora embaixo do contador de
+  // "Em cotação", mas contava RM atrasada de QUALQUER categoria — Matheus (16/09/2026) mostrou o
+  // resultado: card marcando "0 · 1 atrasada(s)", com a única RM da tela já COTADA. Cotação que
+  // venceu numa RM já cotada não é pendência: a proposta chegou por outro fornecedor, e o que
+  // aquele não respondeu deixou de importar. Cobrar isso no card manda procurar trabalho que não
+  // existe, e alarme que não procede ensina a ignorar o card.
+  //
+  // ⚠ O número conta RMs; a linha da tabela conta COTAÇÕES ("2 atrasadas" naquela RM). Eram duas
+  // unidades com a mesma palavra na mesma tela — por isso o texto do card agora diz "RM".
   const stats = useMemo(() => {
     const acc = { ABERTA: 0, EM_COTACAO: 0, PRONTA: 0 };
     let atrasadas = 0;
     for (const r of rmsBase) {
       const cat = categoriaRM(r);
       if (acc[cat] != null) acc[cat]++;
-      if ((r.atrasadas || 0) > 0) atrasadas++;
+      if (cat === "EM_COTACAO" && (r.atrasadas || 0) > 0) atrasadas++;
     }
     return { ...acc, atrasadas };
   }, [rmsBase]);
@@ -101,6 +137,24 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [rmsBase, filtroCat]);
+
+  // Os funis do cabeçalho pegam a lista JÁ filtrada pelos cards e pela OP, e valem também no
+  // kanban — senão trocar de visualização "perderia" o filtro sem avisar ninguém.
+  const {
+    filtros, setFiltros, filtradas, opcoesDaColuna,
+    ativos: filtrosColuna, limpar: limparColunas, rotulosAtivos,
+  } = useFiltroColunas(rmsExibidas, COLUNAS_FILTRO);
+  const [colunaAberta, setColunaAberta] = useState(null);
+  // ⚠ `aberta`/`setAberta` são compartilhados por toda a tabela: é o que garante um menu aberto
+  // por vez, em vez de três funis sobrepostos.
+  const propsFiltro = { filtros, setFiltros, opcoesDaColuna, aberta: colunaAberta, setAberta: setColunaAberta };
+
+  // ⚠ "Selecionar todas" marca só o que está À VISTA. Marcando `cotaveis` (a base inteira), o
+  // clique levaria pra cotação consolidada RMs que o filtro tinha acabado de esconder.
+  const cotaveisVisiveis = useMemo(
+    () => filtradas.filter((r) => ["ABERTA", "EM_COTACAO", "COTADA"].includes(r.status)),
+    [filtradas]
+  );
 
   const toggle = (id) => {
     setSelecionadas((prev) => {
@@ -134,7 +188,7 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
           label="Em cotação"
           subtitle="Aguardando proposta"
           value={stats.EM_COTACAO}
-          alerta={stats.atrasadas > 0 ? `${stats.atrasadas} atrasada(s)` : null}
+          alerta={stats.atrasadas > 0 ? `${stats.atrasadas} RM${stats.atrasadas > 1 ? "s" : ""} com prazo vencido` : null}
           color="orange"
           icon={Clock}
           active={filtroCat === "EM_COTACAO"}
@@ -152,51 +206,14 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
         />
       </div>
 
-      {/* Toggle de visualizacao + filtro ativo */}
-      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-        <div className="flex items-center gap-2 text-xs flex-wrap">
-          <select
-            value={filtroOp}
-            onChange={(e) => setFiltroOp(e.target.value)}
-            className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-torg-dark font-medium"
-            title="Filtrar RMs por OP"
-          >
-            <option value="">Todas as OPs</option>
-            {opsRM.map(([num, cliente]) => (
-              <option key={num} value={num}>{fmtOP(num)}{cliente ? ` — ${cliente}` : ""}</option>
-            ))}
-          </select>
-          {(filtroCat || filtroOp) && (
-            <button
-              onClick={() => { setFiltroCat(null); setFiltroOp(""); }}
-              className="text-torg-blue font-medium hover:underline inline-flex items-center gap-1"
-            >
-              <X size={12} /> Limpar filtros
-            </button>
-          )}
-          <span className="text-torg-gray">
-            Mostrando {rmsExibidas.length} de {rmsBase.length} RM{rmsBase.length !== 1 ? "s" : ""}
-          </span>
-        </div>
-        <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
-          <button
-            onClick={() => setViewMode("tabela")}
-            className={`px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1 ${
-              viewMode === "tabela" ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"
-            }`}
-          >
-            <List size={14} /> Tabela
-          </button>
-          <button
-            onClick={() => setViewMode("kanban")}
-            className={`px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1 border-l border-gray-200 ${
-              viewMode === "kanban" ? "bg-torg-blue text-white" : "bg-white text-torg-gray hover:bg-gray-50"
-            }`}
-          >
-            <LayoutGrid size={14} /> Kanban
-          </button>
-        </div>
-      </div>
+      <BarraFiltrosRM
+        obras={obras} opSelecionada={opSelecionada} irPara={irPara}
+        exibidas={filtradas.length} naLista={rmsBase.length}
+        truncada={truncada} totalNoEscopo={totalNoEscopo} limite={limite}
+        filtroCat={filtroCat} setFiltroCat={setFiltroCat}
+        filtrosColuna={filtrosColuna} limparColunas={limparColunas} rotulosAtivos={rotulosAtivos}
+        viewMode={viewMode} setViewMode={setViewMode}
+      />
       {/* Action bar — aparece quando 1+ RM selecionada */}
       {selecionadas.size > 0 && (
         <div className="bg-torg-blue text-white rounded-xl shadow-md px-4 py-3 flex items-center justify-between flex-wrap gap-3 sticky top-2 z-10">
@@ -226,7 +243,7 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
       )}
 
       {viewMode === "kanban" ? (
-        <KanbanView rms={rmsExibidas} isAdmin={isAdmin} />
+        <KanbanView rms={filtradas} isAdmin={isAdmin} />
       ) : (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
@@ -236,29 +253,29 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
                 <th className="px-3 py-3 w-10 text-center">
                   <input
                     type="checkbox"
-                    checked={cotaveis.length > 0 && selecionadas.size === cotaveis.length}
+                    checked={cotaveisVisiveis.length > 0 && cotaveisVisiveis.every((r) => selecionadas.has(r.id))}
                     onChange={(e) => {
-                      if (e.target.checked) setSelecionadas(new Set(cotaveis.map((r) => r.id)));
+                      if (e.target.checked) setSelecionadas(new Set(cotaveisVisiveis.map((r) => r.id)));
                       else limpar();
                     }}
                     className="w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
-                    title="Selecionar todas as RMs ativas"
+                    title="Selecionar todas as RMs ativas da lista"
                   />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Nº RM</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Tipo</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">OP / Cliente</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Descrição</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Solicitante</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Itens</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Cot.</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Data</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className={TH}>Nº RM</th>
+                <ThFiltro col="tipo" label="Tipo" className={TH} {...propsFiltro} />
+                <ThFiltro col="op" label="OP / Cliente" className={TH} {...propsFiltro} />
+                <ThFiltro col="descricao" label="Descrição" className={TH} {...propsFiltro} />
+                <ThFiltro col="solicitante" label="Solicitante" className={TH} {...propsFiltro} />
+                <th className={`${TH} text-center`}>Itens</th>
+                <ThFiltro col="cot" label="Cot." className={`${TH} text-center`} {...propsFiltro} />
+                <ThFiltro col="data" label="Data" className={TH} {...propsFiltro} />
+                <ThFiltro col="status" label="Status" className={TH} {...propsFiltro} />
                 <th className="px-3 py-3 w-10"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {rmsExibidas.map((rm) => {
+              {filtradas.map((rm) => {
                 const s = STATUS_LABELS[rm.status] || STATUS_LABELS.ABERTA;
                 const cat = categoriaRM(rm);
                 const pedidoCount = (rm.itens || []).filter((i) => i.status === "PEDIDO_GERADO").length;
@@ -338,6 +355,36 @@ export default function RMsTabelaSeletor({ rms, isAdmin, categoriasCustom = [] }
                   </tr>
                 );
               })}
+              {/* ⚠ Tabela vazia com o cabeçalho de pé parece tela quebrada. E as duas causas são
+                  diferentes: "não há RM" é o fim da fila; "o filtro escondeu tudo" tem desfazer. */}
+              {filtradas.length === 0 && (
+                <tr>
+                  <td colSpan={11} className="px-6 py-10 text-center text-sm text-torg-gray">
+                    {rmsBase.length === 0 ? (
+                      // ⚠ Diz QUAL lista está vazia: quem clicou em "Histórico" e lê "nenhuma RM
+                      // ativa" acha que clicou errado.
+                      //
+                      // ⚠⚠ E, com obra escolhida, diz que é DAQUELA obra. A obra segue selecionada
+                      // ao alternar Ativas/Histórico (trocar de aba não é trocar de obra), então
+                      // ela pode ter RM numa aba e nenhuma na outra. Voltar sozinho para "todas"
+                      // responderia outra pergunta e escondria o fato.
+                      opSelecionada
+                        ? `A ${fmtOP(opSelecionada)} não tem RM ${verArquivadas ? "no histórico" : "ativa"}.`
+                        : (verArquivadas ? "Nenhuma RM arquivada ainda." : "Nenhuma RM ativa no momento.")
+                    ) : (
+                      <>
+                        Nenhuma RM passa pelos filtros escolhidos.{" "}
+                        <button
+                          onClick={() => { setFiltroCat(null); limparColunas(); if (opSelecionada) irPara(""); }}
+                          className="text-torg-blue font-medium hover:underline"
+                        >
+                          Limpar filtros
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -840,9 +887,8 @@ function ModalEnviarConsolidada({ rms, onClose, onSent, categoriasFornecedor = C
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-torg-dark mb-1">Prazo de resposta</label>
-              <input
-                type="date" value={prazo}
-                onChange={(e) => setPrazo(e.target.value)}
+              <CampoData value={prazo}
+                onChange={(iso) => setPrazo(iso)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
               />
             </div>

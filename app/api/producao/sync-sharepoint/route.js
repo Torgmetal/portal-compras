@@ -14,6 +14,8 @@ import { isoWeekString, semanaInicio, semanaFim, parseSemana } from "@/lib/seman
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { aquecerBanco } from "@/lib/db-retry";
 
+const normalizarTexto = (v) => String(v || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
 function rangeDaSemana(date) {
   const semana = isoWeekString(date);
   const p = parseSemana(semana);
@@ -97,7 +99,11 @@ async function executarSync({ userId = null, mesesAtras = 0 } = {}) {
       const r = res.value;
       criadosTotal += r.criados;
       atualizadosTotal += r.atualizados;
-      sumario.push(`${r.parsed.mes}: ${r.parsed.diasComDado}d/${r.parsed.setoresExtraidos.length}set (${r.criados}+/${r.atualizados}~)`);
+      // ⚠⚠ QUAL ABA FOI LIDA VAI NO RESUMO. `findEapSheetName` cai na PRIMEIRA aba "EAP*" quando não
+      // acha a do mês — um fallback mudo que faria o cron gravar o mês errado todo dia sem ninguém
+      // perceber. É a mesma classe de falha calada que deixou este cron 17 dias fora do ar.
+      const doMes = normalizarTexto(r.parsed.sheet).includes(normalizarTexto(r.parsed.mes));
+      sumario.push(`${r.parsed.mes}: aba "${r.parsed.sheet}"${doMes ? "" : " ⚠ NÃO é a do mês"} · ${r.parsed.diasComDado}d/${r.parsed.setoresExtraidos.length}set (${r.criados}+/${r.atualizados}~)`);
     } else {
       const nomeMes = targetDate.toLocaleString("pt-BR", { month: "long" });
       erros.push(`${nomeMes}: ${res.reason?.message ?? "erro desconhecido"}`);

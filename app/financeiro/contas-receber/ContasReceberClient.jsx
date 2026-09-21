@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useMemo, useEffect } from "react";
 import {
   ArrowUpCircle, RefreshCw, Loader2, AlertCircle, Search,
@@ -253,10 +254,10 @@ export default function ContasReceberClient() {
           </button>
         ))}
         <span className="text-gray-300">|</span>
-        <input type="date" value={de} max={ate} onChange={(e) => { setDe(e.target.value); setPreset(""); }}
+        <CampoData value={de} max={ate} onChange={(iso) => { setDe(iso); setPreset(""); }}
           className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-torg-blue" />
         <span className="text-gray-400 text-sm">até</span>
-        <input type="date" value={ate} min={de} onChange={(e) => { setAte(e.target.value); setPreset(""); }}
+        <CampoData value={ate} min={de} onChange={(iso) => { setAte(iso); setPreset(""); }}
           className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-torg-blue" />
         <button onClick={() => carregar()} disabled={loading}
           className="px-2.5 py-1.5 bg-torg-blue text-white rounded-lg text-sm inline-flex items-center gap-1 hover:opacity-90 disabled:opacity-50">

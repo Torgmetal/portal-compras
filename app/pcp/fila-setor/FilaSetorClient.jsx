@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 // ─── A FILA DE ENTRADA DO ACABAMENTO, DO JATO E DA PINTURA ─────────
 //
 // ⚠⚠ A ENTRADA É AUTOMÁTICA. Vitor (06/09/2026): "o que for ficando pronto da solda já deve
@@ -272,7 +273,7 @@ export default function FilaSetorClient({ setor }) {
                   {dados.bancadas.map((b) => <option key={b.k} value={b.k}>{b.nome}</option>)}
                 </select>
               )}
-              <input type="date" value={dia} onChange={(e) => setDia(e.target.value)}
+              <CampoData value={dia} onChange={(iso) => setDia(iso)}
                      className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-torg-dark tabular-nums" />
               <button
                 onClick={() => mandar(pendentes.map((f) => f.id), bancada)}

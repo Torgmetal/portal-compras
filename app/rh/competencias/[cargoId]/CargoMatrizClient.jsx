@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -360,7 +361,7 @@ export default function CargoMatrizClient({ cargoId }) {
           <Sec title="Controle de revisão" n="5">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <Field label="Revisão nº"><input value={draft.matriz.revisao} onChange={(e) => setM("revisao", e.target.value)} placeholder="00" className="inp" /></Field>
-              <Field label="Revisado em"><input type="date" value={draft.matriz.revisadaEm} onChange={(e) => setM("revisadaEm", e.target.value)} className="inp" /></Field>
+              <Field label="Revisado em"><CampoData value={draft.matriz.revisadaEm} onChange={(iso) => setM("revisadaEm", iso)} className="inp" /></Field>
               <Field label="Situação"><input value={draft.matriz.status} onChange={(e) => setM("status", e.target.value)} placeholder="NOVO / REVISADO" className="inp" /></Field>
               <Field label="Emitido por"><input value={draft.matriz.emitidoPor} onChange={(e) => setM("emitidoPor", e.target.value)} className="inp" /></Field>
               <Field label="Aprovado por"><input value={draft.matriz.aprovadoPor} onChange={(e) => setM("aprovadoPor", e.target.value)} className="inp" /></Field>

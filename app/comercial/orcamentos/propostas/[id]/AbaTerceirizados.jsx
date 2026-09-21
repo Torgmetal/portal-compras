@@ -1,6 +1,8 @@
 "use client";
 import { useState, useMemo } from "react";
 import { Plus, Trash2, Loader2, Save, Factory, X, ChevronDown, ChevronUp } from "lucide-react";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 const SERVICOS = [
   { id: "DOBRA", label: "Dobra", cor: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" },
@@ -293,7 +295,7 @@ function LinhaItem({ item, onUpdate, onDelete, salvando, excluindo }) {
             className="w-full border border-gray-200 rounded px-2 py-1 text-sm" />
         </td>
         <td className="py-2 pr-2">
-          <input type="number" min="0" step="0.01" value={qtd} onChange={(e) => setQtd(parseFloat(e.target.value) || 0)}
+          <CampoDecimal value={qtd} onChange={(txt) => setQtd(numeroBR(txt))}
             className="w-16 border border-gray-200 rounded px-2 py-1 text-sm text-right" />
         </td>
         <td className="py-2 pr-2">
@@ -307,7 +309,7 @@ function LinhaItem({ item, onUpdate, onDelete, salvando, excluindo }) {
             className="w-24 border border-gray-200 rounded px-2 py-1 text-sm text-right" />
         </td>
         <td className="py-2 pr-2">
-          <input type="number" min="0" step="0.01" value={custoUnit} onChange={(e) => setCustoUnit(parseFloat(e.target.value) || 0)}
+          <CampoDecimal value={custoUnit} onChange={(txt) => setCustoUnit(numeroBR(txt))}
             className="w-28 border border-gray-200 rounded px-2 py-1 text-sm text-right" />
         </td>
         <td className="py-2 pr-2 text-right font-medium text-torg-dark text-sm">{fmtMoeda(total)}</td>
@@ -396,7 +398,7 @@ function NovoItemForm({ servico, onSalvar, onCancelar }) {
         </div>
         <div>
           <label className="text-xs text-torg-gray block mb-1">Quantidade</label>
-          <input type="number" min="0" step="0.01" value={qtd} onChange={(e) => setQtd(parseFloat(e.target.value) || 0)}
+          <CampoDecimal value={qtd} onChange={(txt) => setQtd(numeroBR(txt))}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-right focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none" />
         </div>
         <div>
@@ -413,7 +415,7 @@ function NovoItemForm({ servico, onSalvar, onCancelar }) {
         </div>
         <div>
           <label className="text-xs text-torg-gray block mb-1">Custo Unitario</label>
-          <input type="number" min="0" step="0.01" value={custoUnit} onChange={(e) => setCustoUnit(parseFloat(e.target.value) || 0)}
+          <CampoDecimal value={custoUnit} onChange={(txt) => setCustoUnit(numeroBR(txt))}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-right focus:ring-2 focus:ring-torg-blue/20 focus:border-torg-blue outline-none" />
         </div>
         <div>

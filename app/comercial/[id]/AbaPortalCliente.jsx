@@ -107,6 +107,7 @@ export default function AbaPortalCliente({ opId, opNumero }) {
           capaUrl: j.portal.capaUrl || "", logoClienteUrl: j.portal.logoClienteUrl || "",
           fotos: Array.isArray(j.portal.fotos) ? j.portal.fotos : [],
           secoes: j.portal.secoesAtivas || [], mostrarPeso: j.portal.mostrarPeso === true,
+          mostrarRastreio: j.portal.mostrarRastreio === true,
         });
       })
       .catch(() => setErro("Não consegui carregar o portal."));
@@ -419,6 +420,24 @@ export default function AbaPortalCliente({ opId, opNumero }) {
                 {f.mostrarPeso
                   ? "A LPC e a LE saem com a coluna de peso e o total da obra — o cliente consegue calcular o R$/kg."
                   : "As listas saem sem peso. O cliente vê marca, descrição, material e quantidade."}
+              </span>
+            </span>
+          </label>
+        )}
+        {/* ⚠ RASTREABILIDADE É OPCIONAL, POR OBRA. Vitor (15/09/2026): "já informar a rastreabilidade
+            de cada croqui (…) queria deixar essa parte como opcional, pois nem sempre vamos
+            disponibilizar essas informações". O R sai pelos mesmos três caminhos do carimbo do
+            desenho (corte > amarração > material da obra), então portal e desenho nunca discordam. */}
+        {f.secoes.includes("LPC") && (
+          <label className={`flex items-start gap-2.5 border rounded-lg px-3 py-2.5 mb-2 cursor-pointer ${f.mostrarRastreio ? "border-torg-blue/40 bg-torg-blue/5" : "border-gray-200"}`}>
+            <input type="checkbox" checked={!!f.mostrarRastreio} onChange={(e) => set("mostrarRastreio", e.target.checked)}
+              className="mt-0.5 rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
+            <span className="min-w-0">
+              <span className="block text-[13px] font-semibold text-torg-dark">Divulgar a rastreabilidade (R) na LPC</span>
+              <span className="block text-[11px] text-torg-gray">
+                {f.mostrarRastreio
+                  ? "Cada croqui e peça avulsa da LPC sai com o nº R e a corrida do material — na tela e na planilha. Conjunto não leva R: ele é a soma dos croquis."
+                  : "A LPC sai sem rastreabilidade. Ligue quando a obra exigir o R por peça."}
               </span>
             </span>
           </label>

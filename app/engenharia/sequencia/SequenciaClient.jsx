@@ -3,6 +3,8 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Loader2, AlertCircle, ListOrdered, RefreshCw, Search, Lock, CheckCircle2, ExternalLink, PauseCircle, Users } from "lucide-react";
 import { ETAPA_LABEL, ESPERA_DE } from "@/lib/etapa-projeto";
+import { previsaoDaSequencia } from "@/lib/sequencia-previsao";
+import { useStore } from "@/lib/store";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const fmtN = (v) => Number(v || 0).toLocaleString("pt-BR");
@@ -20,6 +22,7 @@ const fmtN = (v) => Number(v || 0).toLocaleString("pt-BR");
  * Só aparece cronograma cujas tarefas o Planejamento ENVIOU. Enquanto não envia, é rascunho.
  */
 export default function SequenciaClient() {
+  const { showToast } = useStore();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -80,9 +83,9 @@ export default function SequenciaClient() {
 
   // ⚠ grava ao SAIR do campo (onBlur), não a cada tecla: digitar "12" dispararia duas gravações,
   // e a primeira ("1") ficaria registrada como estimativa por um instante.
-  async function definirDias(t, valor) {
+  async function definirDias(t, valor, revisar = false) {
     const n = valor === "" ? null : Math.max(0, Math.min(999, parseInt(valor, 10) || 0));
-    if (n === (t.diasParaConcluir ?? null)) return;
+    if (!revisar && n === (t.diasParaConcluir ?? null) && (n === null || t.estimativaEm)) return;
     setSalvandoDias(t.id);
     try {
       const r = await fetch(`/api/planejamento/cronogramas/tarefas/${t.id}`, {
@@ -91,8 +94,15 @@ export default function SequenciaClient() {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao salvar a estimativa");
-      carregar();
-    } catch (e) { alert(e.message); } finally { setSalvandoDias(null); }
+      const atualizada = j.tarefa;
+      setData((prev) => ({ ...prev, tarefas: prev.tarefas.map((item) => item.id !== t.id ? item : {
+        ...item,
+        diasParaConcluir: atualizada.diasParaConcluir,
+        estimativaEm: atualizada.estimativaEm,
+        ...previsaoDaSequencia(atualizada),
+      }) }));
+      showToast(n === null ? "Estimativa removida." : "Previsão salva.", "success");
+    } catch (e) { showToast(e.message, "error"); } finally { setSalvandoDias(null); }
   }
 
   async function definirEsperaDe(t, valor) {
@@ -391,7 +401,7 @@ export default function SequenciaClient() {
                       {t.concluida ? <span className="text-torg-gray-light">—</span> : (
                         <input type="number" min="0" max="999" defaultValue={t.diasParaConcluir ?? ""}
                           onBlur={(e) => definirDias(t, e.target.value)} disabled={salvandoDias === t.id}
-                          placeholder="—" title="Dias úteis que ainda faltam"
+                          placeholder="—" title="Dias úteis a partir de hoje. Ao salvar, a previsão fica fixada."
                           className="w-12 text-[12px] text-center border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-torg-blue disabled:opacity-50" />
                       )}
                     </td>
@@ -408,8 +418,19 @@ export default function SequenciaClient() {
                               ? <span className="text-red-600">{t.atrasada ? "termina" : "vai atrasar"} {t.atrasoPrevisto}d {t.atrasada ? "depois do prazo" : "além do prazo"}</span>
                               : <span className="text-green-700">dentro do prazo</span>}
                           </span>
+                          <span className="block text-[10.5px] text-torg-gray">Previsão fixada em {fmtData(t.estimativaEm)}</span>
+                          <button type="button" disabled={salvandoDias === t.id}
+                            onClick={() => definirDias(t, String(t.diasParaConcluir), true)}
+                            title="Recalcular a partir de hoje com os mesmos dias informados"
+                            className="block text-[11px] text-torg-blue underline disabled:opacity-50">
+                            {salvandoDias === t.id ? "Salvando…" : "Revisar previsão"}
+                          </button>
                           {t.estimativaVelha && <span className="block text-[10.5px] text-amber-700">estimativa de mais de 7 dias — revisar</span>}
                         </>
+                      ) : t.diasParaConcluir != null && !t.concluida ? (
+                        <button type="button" disabled={salvandoDias === t.id}
+                          onClick={() => definirDias(t, String(t.diasParaConcluir), true)}
+                          className="text-torg-blue text-[11px] underline disabled:opacity-50">Fixar previsão</button>
                       ) : <span className="text-torg-gray-light text-[11px]">informe os dias</span>}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">{t.percentual}%</td>

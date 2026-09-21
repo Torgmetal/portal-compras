@@ -1,4 +1,6 @@
 "use client";
+import CampoData from "@/components/CampoData";
+import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useMemo } from "react";
 import { GraduationCap, Search, PlusCircle, Loader2, AlertCircle, X, ChevronDown, FileDown, Send, PenLine, CheckCircle2, Clock, Trash2, Plus } from "lucide-react";
 
@@ -454,19 +456,17 @@ export default function TreinamentosClient() {
                   <label className="block text-sm font-medium text-torg-dark mb-1">
                     Data Início <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="date"
+                  <CampoData
                     value={form.dataInicio}
-                    onChange={(e) => setForm((p) => ({ ...p, dataInicio: e.target.value }))}
+                    onChange={(iso) => setForm((p) => ({ ...p, dataInicio: iso }))}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-torg-dark mb-1">Data Fim</label>
-                  <input
-                    type="date"
+                  <CampoData
                     value={form.dataFim}
-                    onChange={(e) => setForm((p) => ({ ...p, dataFim: e.target.value }))}
+                    onChange={(iso) => setForm((p) => ({ ...p, dataFim: iso }))}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue"
                   />
                 </div>
@@ -474,12 +474,9 @@ export default function TreinamentosClient() {
                   <label className="block text-sm font-medium text-torg-dark mb-1">
                     Carga Horária (h) <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
+                  <CampoDecimal
                     value={form.cargaHoraria}
-                    onChange={(e) => setForm((p) => ({ ...p, cargaHoraria: e.target.value }))}
+                    onChange={(txt) => setForm((p) => ({ ...p, cargaHoraria: txt }))}
                     placeholder="Ex: 8"
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue"
                   />
@@ -521,12 +518,9 @@ export default function TreinamentosClient() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-torg-dark mb-1">Custo (R$)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <CampoDecimal
                     value={form.custo}
-                    onChange={(e) => setForm((p) => ({ ...p, custo: e.target.value }))}
+                    onChange={(txt) => setForm((p) => ({ ...p, custo: txt }))}
                     placeholder="0,00"
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-torg-blue focus:border-torg-blue"
                   />

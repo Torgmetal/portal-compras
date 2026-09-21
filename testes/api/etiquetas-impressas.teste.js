@@ -38,6 +38,9 @@ beforeEach(() => {
   mockPrisma.pecaConjunto.findMany.mockResolvedValue(PECAS);
   mockPrisma.auditLog.groupBy.mockResolvedValue([]);
   mockPrisma.listaExpedicao.findMany.mockResolvedValue([]);
+  // ⚠ Desde 14/09/2026 o modelo PADRÃO também lê esta tabela (a TAG do cliente que sai na
+  // frente da descrição). Sem mapa importado, a obra imprime exatamente como antes.
+  mockPrisma.etiquetaCampoExtra.findMany.mockResolvedValue([]);
 });
 
 describe("GET — o que já saiu impresso", () => {
@@ -131,5 +134,120 @@ describe("POST — registrar a impressão", () => {
     mocks.role.mockRejectedValue(new Error("Forbidden"));
     expect((await post({ opId: "op1", marcas: ["T97A140"] })).status).toBe(403);
     expect(mockPrisma.auditLog.createMany).not.toHaveBeenCalled();
+  });
+});
+
+// ─── A TAG DO CLIENTE NA FRENTE DA DESCRIÇÃO (14/09/2026) ────────────────────
+//
+// ⚠⚠ ETIQUETA SEM TAG PRECISA DE UM "SIM". A obra tem mapa importado e a marca escolhida não está
+// coberta: imprimir assim é legítimo (sai sem prefixo), mas tem de ser escolha de quem está com o
+// rolo na mão — e não um adesivo que aparece sem destino no pátio. Achado do Codex.
+
+const mapaDe = (linhas) => linhas.map(([marca, unidade, tagCliente]) => ({ marca, unidade, tagCliente }));
+
+describe("POST — a cobertura das TAGs é conferida no servidor", () => {
+  it("obra sem mapa importado imprime como sempre", async () => {
+    const r = await post({ opId: "op1", marcas: ["T97A140"] });
+    expect(r.status).toBe(200);
+  });
+
+  it("marca coberta por inteiro imprime sem perguntar, e a peça leva o mapa", async () => {
+    mockPrisma.etiquetaCampoExtra.findMany.mockResolvedValue(mapaDe([["T97A140", 1, "TC 4706"]]));
+    const r = await post({ opId: "op1", marcas: ["T97A140"] });
+    expect(r.status).toBe(200);
+    const [{ pecas }] = mocks.pdf.mock.calls[0];
+    expect(pecas[0].tagsUnidade.get(1)).toBe("TC 4706");
+  });
+
+  // ⚠⚠ A conferência é sobre o que foi ESCOLHIDO: a T97A141 tem 3 peças e o mapa cobre uma.
+  it("marca com peça descoberta é RECUSADA com 409, e nada é desenhado", async () => {
+    mockPrisma.etiquetaCampoExtra.findMany.mockResolvedValue(mapaDe([["T97A141", 1, "TC 4706"]]));
+    const r = await post({ opId: "op1", marcas: ["T97A141"] });
+    expect(r.status).toBe(409);
+    const j = await r.json();
+    expect(j.precisaConfirmar).toBe(true);
+    expect(j.error).toContain("2 etiqueta(s) sairão SEM TAG");
+    expect(mocks.pdf).not.toHaveBeenCalled();
+  });
+
+  it("com o 'sim' explícito, imprime — e as descobertas saem sem prefixo", async () => {
+    mockPrisma.etiquetaCampoExtra.findMany.mockResolvedValue(mapaDe([["T97A141", 1, "TC 4706"]]));
+    const r = await post({ opId: "op1", marcas: ["T97A141"], confirmarSemTag: true });
+    expect(r.status).toBe(200);
+    const [{ pecas }] = mocks.pdf.mock.calls[0];
+    expect(pecas[0].tagsUnidade.get(1)).toBe("TC 4706");
+    expect(pecas[0].tagsUnidade.get(2)).toBeUndefined();
+  });
+
+  // ⚠ O mapa é da obra inteira; a pergunta é só das marcas do lote. Escolher a marca coberta não
+  // pode ser barrado porque OUTRA marca da obra está descoberta.
+  it("a marca descoberta não barra a impressão de outra que está coberta", async () => {
+    mockPrisma.etiquetaCampoExtra.findMany.mockResolvedValue(mapaDe([["T97A140", 1, "TC 4706"]]));
+    expect((await post({ opId: "op1", marcas: ["T97A140"] })).status).toBe(200);
+  });
+});
+
+// ⚠⚠ A COBERTURA CONFERIDA NA IMPRESSÃO É A DO LOTE, NÃO A DA OBRA — e este teste é o que impede a
+// pergunta de aparecer sempre. O mapa tem as 96 marcas da OP e a impressão costuma ser de uma:
+// comparando o mapa inteiro contra a seleção, toda impressão parcial acusaria 95 marcas "fora da
+// lista". Confirmação que sempre aparece é confirmação que ninguém lê.
+describe("POST — a pergunta é sobre o lote, não sobre a obra", () => {
+  it("imprimir UMA marca coberta não é barrado pelas outras marcas do mapa", async () => {
+    mockPrisma.etiquetaCampoExtra.findMany.mockResolvedValue(mapaDe([
+      ["T97A140", 1, "TC 4706"],
+      ["T97A141", 1, "TC 4707"], ["T97A141", 2, "TC 4707"], ["T97A141", 3, "TC 4707"],
+      ["MARCA-DE-OUTRO-LOTE", 1, "TC 4708"],
+    ]));
+    const r = await post({ opId: "op1", marcas: ["T97A140"] });
+    expect(r.status).toBe(200);
+  });
+
+  it("e o lote inteiro coberto também passa direto", async () => {
+    mockPrisma.etiquetaCampoExtra.findMany.mockResolvedValue(mapaDe([
+      ["T97A140", 1, "TC 4706"],
+      ["T97A141", 1, "TC 4707"], ["T97A141", 2, "TC 4707"], ["T97A141", 3, "TC 4707"],
+      ["MARCA-DE-OUTRO-LOTE", 1, "TC 4708"],
+    ]));
+    expect((await post({ opId: "op1", marcas: ["T97A140", "T97A141"] })).status).toBe(200);
+  });
+});
+
+// ⚠⚠ O TETO POR IMPRESSÃO (14/09/2026). Marcar tudo na OP-067 são 60.281 etiquetas: ~12 minutos de
+// função e ~113 MB. A recusa tem de vir ANTES de gerar — e o carimbo de impressão, DEPOIS de saber
+// que o arquivo cabe, senão o portal registra como impressa uma etiqueta que ninguém recebeu.
+describe("POST — o teto de tamanho", () => {
+  it("seleção acima do limite é recusada com 413, sem desenhar nada", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(
+      [{ id: "g", marca: "GIGANTE", descricao: "X", qte: 9999, pesoUnitKg: 1, naLE: true }]);
+    const r = await post({ opId: "op1", marcas: ["GIGANTE"] });
+    expect(r.status).toBe(413);
+    expect(mocks.pdf).not.toHaveBeenCalled();
+    expect(mockPrisma.auditLog.createMany).not.toHaveBeenCalled();
+  });
+
+  it("a recusa diz quantas foram pedidas e qual o limite", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(
+      [{ id: "g", marca: "GIGANTE", descricao: "X", qte: 9999, pesoUnitKg: 1, naLE: true }]);
+    const j = await (await post({ opId: "op1", marcas: ["GIGANTE"] })).json();
+    expect(j.etiquetas).toBe(9999);
+    expect(j.limite).toBe(2000);
+  });
+
+  // ⚠⚠ PDF PESADO DEMAIS NÃO PODE VIRAR HISTÓRICO. A plataforma recusaria a resposta; carimbando
+  // antes, a coluna "Etiqueta" passaria a dizer "já saiu" para um adesivo que ninguém viu.
+  it("PDF acima do limite de bytes é recusado e NÃO vira histórico", async () => {
+    mocks.pdf.mockResolvedValue(new Uint8Array(5_000_000));
+    const r = await post({ opId: "op1", marcas: ["T97A140"] });
+    expect(r.status).toBe(413);
+    expect((await r.json()).bytes).toBe(5_000_000);
+    expect(mockPrisma.auditLog.createMany).not.toHaveBeenCalled();
+  });
+
+  // ⚠ A caixa tira a seleção do limite: 9.999 peças numa caixa são UMA etiqueta.
+  it("marca em caixa passa, mesmo com milhares de peças", async () => {
+    mockPrisma.pecaConjunto.findMany.mockResolvedValue(
+      [{ id: "g", marca: "GIGANTE", descricao: "X", qte: 9999, pesoUnitKg: 1, naLE: true }]);
+    const r = await post({ opId: "op1", marcas: ["GIGANTE"], emCaixa: ["GIGANTE"] });
+    expect(r.status).toBe(200);
   });
 });

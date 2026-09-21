@@ -45,3 +45,25 @@ it('permite tentar novamente um convite que falhou sem duplicar assinantes',asyn
  const segunda=await enviar(req(body),{params:{id:'r'}});expect((await segunda.json()).enviados).toBe(1);
  expect(assinaturas).toHaveLength(1);expect(assinaturas[0].token).toBe(token);
 });
+
+it('memória por OP acompanha criação, salvamento no celular e no computador, sem alterar o relatório anterior',async()=>{
+ const memoria=new Map();
+ mockPrisma.padraoInspecao.findMany.mockImplementation(async({where})=>[...memoria.values()].filter(p=>p.opNumero===where.opNumero&&p.tipo===where.tipo));
+ mockPrisma.padraoInspecao.upsert.mockImplementation(async({create})=>{memoria.set([create.opNumero,create.tipo,create.campo].join(':'),create);return create;});
+ const novo=async(opNumero)=>{const r=await criar(req({opNumero,tipo:'PINTURA',escopo:'AVULSAS',marcas:['P1']}));expect(r.status).toBe(200);return (await r.json()).relatorio;};
+ const primeiro=await novo('106');expect(primeiro.resultados.limpeza).toBe('SA2.5');
+ expect((await salvar(req({condicoes:{limpeza:'SA3'}}),{params:{id:'r'}})).status).toBe(200);
+ const segundo=await novo('106');expect(segundo.resultados.limpeza).toBe('SA3');expect(primeiro.resultados.limpeza).toBe('SA2.5');
+ const {PATCH:salvarPC}=await import('@/app/api/qualidade/inspecoes/[id]/route');
+ expect((await salvarPC(req({resultados:{limpeza:'SA2',demaos:{1:{metodo:'Rolo'}}}}),{params:{id:'r'}})).status).toBe(200);
+ const terceiro=await novo('106');expect(terceiro.resultados.limpeza).toBe('SA2');expect(terceiro.resultados.demaos[1].metodo).toBe('Rolo');
+ expect((await novo('107')).resultados.limpeza).toBe('SA2.5');
+});
+
+it('criação por fotos também aplica os padrões da mesma OP',async()=>{
+ const {criarRelatorio}=await vi.importActual('@/lib/relatorio-inspecao');
+ mockPrisma.padraoInspecao.findMany.mockResolvedValue([{campo:'limpeza',valor:'SA3'}]);
+ mockPrisma.fotoInspecao.findMany.mockResolvedValue([{id:'foto',equipamentos:[]}]);
+ const r=await criarRelatorio({opNumero:'106',tipo:'PINTURA',fotoIds:['foto'],user:{id:'u'}});
+ expect(r.resultados.limpeza).toBe('SA3');expect(r.resultados.prepTAmb).toBeUndefined();
+});

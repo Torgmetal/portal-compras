@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { Truck, Upload, Loader2, X, AlertCircle, CheckCircle2, ChevronRight, ChevronDown, Download } from "lucide-react";
@@ -142,7 +143,7 @@ export default function ResumoLotes({ opId, lotes = [], onChange }) {
                       <td className="px-3 py-2 text-torg-gray">{l.local || "—"}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">
-                          <input type="date" value={l.dataPrevista ? String(l.dataPrevista).slice(0, 10) : ""} onChange={(e) => mudarData(l, e.target.value)} className="text-[12px] border border-gray-200 rounded px-1.5 py-1 focus:border-torg-blue outline-none w-[130px]" title="Data de entrega (Planejamento)" />
+                          <CampoData value={l.dataPrevista ? String(l.dataPrevista).slice(0, 10) : ""} onChange={(iso) => mudarData(l, iso)} className="text-[12px] border border-gray-200 rounded px-1.5 py-1 focus:border-torg-blue outline-none w-[130px]" title="Data de entrega (Planejamento)" />
                           {salvandoData[l.id] && <Loader2 size={11} className="animate-spin text-torg-gray" />}
                         </div>
                       </td>

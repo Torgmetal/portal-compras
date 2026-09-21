@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect } from "react";
 import {
   Loader2, AlertTriangle, CheckCircle2, Clock, Calendar, Send, AlertCircle,
@@ -193,10 +194,9 @@ export default function RespostaCobrancaPage({ params }) {
                     <label className="text-xs text-gray-500 font-medium mb-1 block flex items-center gap-1">
                       <Calendar size={10} /> Nova data prevista
                     </label>
-                    <input
-                      type="date"
+                    <CampoData
                       value={respostas[t.id]?.novaData || ""}
-                      onChange={(e) => setRespostas((prev) => ({ ...prev, [t.id]: { ...prev[t.id], novaData: e.target.value } }))}
+                      onChange={(iso) => setRespostas((prev) => ({ ...prev, [t.id]: { ...prev[t.id], novaData: iso } }))}
                       className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#006EAB] focus:border-transparent outline-none"
                     />
                   </div>

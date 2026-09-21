@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { Save, Loader2, Info, Calculator, Percent, Plus, Trash2, TrendingUp, Shield, AlertTriangle, Banknote, Users, Receipt } from "lucide-react";
+import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 function fmtNum(v, dec = 2) {
   if (!v && v !== 0) return "—";
@@ -16,13 +18,10 @@ function fmtMoeda(v) {
 function InputPerc({ valor, onChange, step = "0.01", disabled = false }) {
   return (
     <div className={`flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-torg-blue/20 focus-within:border-torg-blue transition-all ${disabled ? "opacity-50" : ""}`}>
-      <input
-        type="number"
+      <CampoDecimal
         value={valor ?? ""}
-        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+        onChange={(txt) => onChange(numeroBR(txt))}
         placeholder="0"
-        min="0"
-        max="100"
         step={step}
         disabled={disabled}
         className="w-full px-2.5 py-1.5 text-sm text-right text-torg-dark outline-none bg-transparent disabled:cursor-not-allowed"

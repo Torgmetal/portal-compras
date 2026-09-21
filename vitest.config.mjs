@@ -12,6 +12,11 @@ import { fileURLToPath } from "node:url";
 // ⚠ NENHUM TESTE TOCA O BANCO. O Prisma é mockado em testes/apoio/prisma.js.
 // Um teste que abre conexão com o Neon é um teste que escreve em produção.
 export default defineConfig({
+  // ⚠⚠ JSX AUTOMÁTICO, COMO O NEXT COMPILA. No transform clássico (o padrão do esbuild sem
+  // tsconfig) o JSX vira `React.createElement`/`React.Fragment`, e componente que não importa
+  // `React` — a maioria deles, porque o Next não exige — estoura "React is not defined" só dentro
+  // do teste. Pegou o `CampoData` em 16/09/2026: a tela funcionava, o teste não subia.
+  esbuild: { jsx: "automatic" },
   test: {
     environment: "node",
     include: ["testes/**/*.teste.{js,jsx}"],

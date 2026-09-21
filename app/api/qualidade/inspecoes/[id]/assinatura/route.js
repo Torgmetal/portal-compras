@@ -93,6 +93,10 @@ export async function POST(req, { params }) {
     const envio = await prisma.envioAssinatura.create({
       data: {
         tipo: TIPO_ENVIO, revisao: 0, titulo,
+        // ⚠⚠ `opNumero` NA COLUNA, não só no snapshot. É por ela que o espaço do cliente (/cliente)
+        // pendura o documento na obra — sem ela o RIP-103-002 ficou invisível para o Davi (TMSA),
+        // que via a OP-103 na lista e nenhum documento para assinar (Vitor, 16/09/2026).
+        opNumero: rel.opNumero || null,
         snapshot: { relatorioId: rel.id, codigo: rel.codigo, opNumero: rel.opNumero },
         enviadoPorId: user.id || null,
       },

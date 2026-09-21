@@ -13,10 +13,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { MODELOS, gerarEtiquetasCarregamentoPDF } from "@/lib/etiqueta-carregamento-pdf";
-import { camposExtrasDaOP, juntarCamposExtras } from "@/lib/etiqueta-campos-extras";
+import { camposExtrasDaOP, juntarCamposExtras, juntarTagsCliente, tagsPorUnidade, caixasComDestinosDiferentes } from "@/lib/etiqueta-campos-extras";
+import { conferirCobertura, tagsDaOP } from "@/lib/etiqueta-tag-cliente";
+import { chaveMarca } from "@/lib/itens-expedicao";
+import { contarEtiquetas, recusaPorBytes, recusaPorTamanho } from "@/lib/etiquetas-carregamento-limites";
 import { itensExpediveisDaOP, opsComItensExpediveis } from "@/lib/itens-expedicao";
 import { lerCalibragem } from "@/lib/etiqueta-calibragem";
 import { log } from "@/lib/log";
+import { chaveHistorico, historicoDaMarca, impressoes, registrarImpressao, ultimaTagDaObra }
+  from "@/lib/etiqueta-historico";
 
 const registro = log("api/expedicao/etiquetas");
 const PERFIS = ["ADMIN", "EXPEDICAO", "PRODUCAO", "PCP", "PLANEJAMENTO"];
@@ -24,13 +29,16 @@ const PERFIS = ["ADMIN", "EXPEDICAO", "PRODUCAO", "PCP", "PLANEJAMENTO"];
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 // Um lote grande de etiquetas é muita geração de QR: sai do teto padrão de 10 s da Vercel.
-export const maxDuration = 60;
+// ⚠⚠ 300s, E NÃO 60 (14/09/2026). A OP-105 inteira são 1.793 etiquetas; a função morria em 504
+// antes de terminar. O conserto de verdade foi gerar UM QR por marca em vez de um por etiqueta
+// (29,3s → 3,3s, medido), mas o teto de 60s não tinha folga nenhuma para obra grande — e obra
+// grande aqui chega a dezenas de milhares de adesivos.
+export const maxDuration = 300;
 
 const erroDeAcesso = (e) =>
   NextResponse.json({ success: false, error: e.message },
     { status: e.message === "Unauthorized" ? 401 : 403 });
 
-const ACAO = "IMPRIMIR_ETIQUETA_CARREGAMENTO";
 
 /**
  * A CHAVE DO HISTÓRICO É A MARCA, NÃO O ID DA PEÇA.
@@ -44,69 +52,6 @@ const ACAO = "IMPRIMIR_ETIQUETA_CARREGAMENTO";
  * ⚠ Registros ANTIGOS foram gravados por id (`entity: "PecaConjunto"`). São lidos também, senão a
  * coluna diria "nunca impressa" para etiqueta que saiu — ver `historicoDaMarca`.
  */
-const ENTIDADE = "EtiquetaCarregamento";
-const chaveHistorico = (opNumero, marca) => `${opNumero}|${String(marca).trim().toUpperCase()}`;
-
-/**
- * Quando cada marca saiu impressa, e quantas vezes.
- *
- * ⚠ O HISTÓRICO MORA NO `AuditLog`, NÃO NUMA COLUNA NOVA. "Quem imprimiu e quando" é exatamente o
- * que a tabela de auditoria existe para responder — e o CLAUDE.md manda registrar toda mutação nela
- * de qualquer jeito, então a coluna seria a segunda cópia do mesmo fato. Uma coluna também daria só
- * a ÚLTIMA impressão; aqui ficam todas.
- */
-async function impressoes(chaves, idsLegados) {
-  const onde = [];
-  if (chaves.length) onde.push({ entity: ENTIDADE, entityId: { in: chaves } });
-  if (idsLegados.length) onde.push({ entity: "PecaConjunto", entityId: { in: idsLegados } });
-  if (!onde.length) return new Map();
-
-  const por = await prisma.auditLog.groupBy({
-    by: ["entityId"],
-    where: { action: ACAO, OR: onde },
-    _max: { createdAt: true },
-    _count: { _all: true },
-  });
-  return new Map(por.map((r) => [r.entityId, { em: r._max.createdAt, vezes: r._count._all }]));
-}
-
-/** O histórico de uma marca: a chave nova mais todos os ids antigos daquela marca. */
-function historicoDaMarca(hist, chave, ids) {
-  let em = null, vezes = 0;
-  for (const k of [chave, ...ids]) {
-    const h = hist.get(k);
-    if (!h) continue;
-    vezes += h.vezes;
-    if (!em || (h.em && h.em > em)) em = h.em;
-  }
-  return { em, vezes };
-}
-
-/**
- * A TAG usada na ÚLTIMA impressão desta obra, para a tela já vir preenchida.
- *
- * ⚠⚠ SAI DO `AuditLog`, SEM TABELA NOVA. O carimbo de cada impressão já guarda a TAG no `diff` —
- * perguntar a ele "qual foi a última" é de graça, e evita uma segunda cópia do mesmo fato.
- *
- * ⚠⚠ E EXISTE PARA EVITAR UM ERRO CARO, NÃO POR CONFORTO. A obra é impressa em lotes, ao longo de
- * dias. Se a TAG for digitada do zero a cada lote, mais cedo ou mais tarde um lote sai sem ela — ou
- * com ela errada — e vai para o caminhão misturado com os que saíram certos. Ninguém confere 442
- * adesivos um a um. Vir preenchida com o que foi usado da última vez transforma "lembrar" em
- * "conferir", que é o que dá para fazer com a peça na mão.
- *
- * ⚠ É SUGESTÃO, NÃO TRAVA: quem imprime pode apagar ou trocar. A TAG muda de embarque para
- * embarque, e travar no valor antigo seria pior que não sugerir.
- */
-async function ultimaTagDaObra(opNumero) {
-  const ultimo = await prisma.auditLog.findFirst({
-    where: { action: ACAO, entity: ENTIDADE, entityId: { startsWith: `${opNumero}|` } },
-    orderBy: { createdAt: "desc" },
-    select: { diff: true },
-  }).catch(() => null);
-  const tag = ultimo?.diff?.tagObra;
-  return typeof tag === "string" && tag.trim() ? tag.trim() : null;
-}
-
 async function carregar(opId) {
   // ⚠ QUEM DEFINE A LISTA É A LISTA DE EXPEDIÇÃO — a regra e o porquê moram em
   // `lib/itens-expedicao.js`, a mesma fonte usada pela Conferência de Peça.
@@ -141,6 +86,64 @@ export async function GET(req) {
   const dados = await carregar(opId);
   if (!dados) return NextResponse.json({ success: false, error: "OP não encontrada" }, { status: 404 });
   return NextResponse.json({ success: true, ...dados });
+}
+
+/**
+ * A TAG DO CLIENTE NA FRENTE DA DESCRIÇÃO (Padrão Torg). Obra sem mapa importado segue exatamente
+ * como antes: a consulta devolve vazio e nada muda.
+ *
+ * ⚠⚠ A COBERTURA É CONFERIDA NO SERVIDOR, E NÃO SÓ NA TELA (pedido do Codex). Uma confirmação dada
+ * sobre quatro peças não pode encobrir a quinta que a revisão da L.E. criou depois: a etiqueta dela
+ * sairia sem TAG e ninguém veria. A conferência é só sobre o que foi ESCOLHIDO para imprimir.
+ */
+async function camposDoModelo(op, pecas, modelo, confirmado) {
+  // Só o modelo do cliente lê os campos do QWS — o padrão não faria nada com eles, e a consulta
+  // seria um round-trip ao Neon por impressão sem serventia nenhuma.
+  if (modelo === "qws") return { pecas: juntarCamposExtras(pecas, await camposExtrasDaOP(prisma, op.numero)) };
+
+  const mapa = await tagsDaOP(prisma, op.numero);
+  if (!mapa.length) return { pecas };
+
+  // ⚠⚠ A COBERTURA CONFERIDA AQUI É A DESTE LOTE, não a da obra. O mapa tem as 96 marcas da OP e a
+  // impressão costuma ser de uma; comparando o mapa inteiro contra a seleção, TODA impressão
+  // parcial acusaria 95 marcas "fora da lista" e pediria confirmação sempre — e confirmação que
+  // sempre aparece é confirmação que ninguém lê. Filtrar pelo que foi escolhido é o que faz a
+  // pergunta significar o que ela diz.
+  const escolhidas = new Set(pecas.map((p) => chaveMarca(p.marca)));
+  const doLote = mapa.filter((u) => escolhidas.has(chaveMarca(u.marca)));
+  const cobertura = conferirCobertura(doLote, pecas);
+  const porUnidade = tagsPorUnidade(mapa);
+  // A caixa com peças de dois destinos sai sem TAG — a cobertura não vê isso, porque para ela a
+  // marca está coberta. Ver `caixasComDestinosDiferentes`.
+  const caixas = caixasComDestinosDiferentes(pecas, porUnidade);
+  if ((!cobertura.completa || caixas.length) && !confirmado) {
+    return {
+      recusa: NextResponse.json(
+        { success: false, precisaConfirmar: true, error: frasedaCobertura(cobertura, caixas), cobertura, caixas },
+        { status: 409 }),
+    };
+  }
+  return { pecas: juntarTagsCliente(pecas, porUnidade) };
+}
+
+/** A frase da recusa por cobertura: diz QUANTAS etiquetas sairiam sem TAG, e de quais marcas. */
+function frasedaCobertura({ semTag, foraDaLista }, caixas = []) {
+  const faltando = semTag.reduce((n, m) => n + (m.qte - m.comTag), 0);
+  const quais = semTag.slice(0, 4).map((m) => `${m.marca} (${m.qte - m.comTag} de ${m.qte})`).join(", ");
+  const resto = semTag.length > 4 ? ` e mais ${semTag.length - 4} marca(s)` : "";
+  const fora = foraDaLista.length ? ` A planilha tem ${foraDaLista.length} marca(s) que não estão na Lista de Expedição.` : "";
+  // A caixa misturada é problema DIFERENTE de falta de TAG, e a saída também: ali se separa a
+  // caixa por destino; aqui se completa a planilha. Dizer "sem TAG" nos dois casos confundiria.
+  const caixa = caixas.length
+    ? ` ${caixas.length} caixa(s) levam peças de destinos diferentes e sairão SEM TAG: ` +
+      `${caixas.slice(0, 3).map((c) => `${c.marca} (${c.destinos.join(" e ")})`).join(", ")}.`
+    : "";
+  if (!faltando) {
+    return caixa
+      ? `${caixa.trim()} Separe por destino, ou confirme para imprimir assim.${fora}`
+      : `A planilha de TAGs não bate com esta obra.${fora}`;
+  }
+  return `${faltando} etiqueta(s) sairão SEM TAG: ${quais}${resto}.${fora}${caixa} Confirme para imprimir assim.`;
 }
 
 const erro400 = (msg) => NextResponse.json({ success: false, error: msg }, { status: 400 });
@@ -188,6 +191,22 @@ function resolverDesenho(corpo) {
  * uma rende é decisão do dado. Aceitar um número vindo da tela seria deixar a etiqueta dizer
  * "003/5" para uma marca que tem 2 peças.
  */
+/**
+ * As peças que a tela escolheu, já com o carimbo de caixa.
+ *
+ * ⚠⚠ A TELA MANDA UM SIM/NÃO POR MARCA, NUNCA UM NÚMERO — e a distinção é a regra desta rota.
+ * "A quantidade vem do banco, não do navegador": aceitar um número deixaria a etiqueta dizer "3/5"
+ * para uma marca que tem 2 peças. `emCaixa` só troca a REGRA de contagem (uma etiqueta para o lote,
+ * dizendo "N/N"); o N continua saindo da Lista de Expedição.
+ */
+function pecasEscolhidas(dados, marcas, corpo) {
+  const escolhidas = new Set(marcas.map(String));
+  const emCaixa = new Set((Array.isArray(corpo?.emCaixa) ? corpo.emCaixa : []).map(String));
+  return dados.pecas
+    .filter((p) => escolhidas.has(p.marca))
+    .map((p) => (emCaixa.has(p.marca) ? { ...p, emCaixa: true } : p));
+}
+
 async function selecionar(corpo) {
   const opId = corpo?.opId;
   const marcas = Array.isArray(corpo?.marcas) ? corpo.marcas : [];
@@ -200,46 +219,77 @@ async function selecionar(corpo) {
   const dados = await carregar(opId);
   if (!dados) return { recusa: NextResponse.json({ success: false, error: "OP não encontrada" }, { status: 404 }) };
 
-  const escolhidas = new Set(marcas.map(String));
-  // ⚠⚠ A TELA MANDA UM SIM/NÃO POR MARCA, NUNCA UM NÚMERO — e a distinção é a regra desta rota.
-  // "A quantidade vem do banco, não do navegador": aceitar um número deixaria a etiqueta dizer
-  // "3/5" para uma marca que tem 2 peças. `emCaixa` só troca a REGRA de contagem (uma etiqueta para
-  // o lote, dizendo "N/N"); o N continua saindo da Lista de Expedição.
-  const emCaixa = new Set((Array.isArray(corpo?.emCaixa) ? corpo.emCaixa : []).map(String));
-  let pecas = dados.pecas
-    .filter((p) => escolhidas.has(p.marca))
-    .map((p) => (emCaixa.has(p.marca) ? { ...p, emCaixa: true } : p));
+  const pecas = pecasEscolhidas(dados, marcas, corpo);
   if (!pecas.length) return { recusa: erro400("Nenhuma das marcas enviadas existe nesta OP.") };
 
-  // Só o modelo do cliente lê estes campos — o padrão não faria nada com eles, e a consulta seria
-  // um round-trip ao Neon por impressão sem serventia nenhuma.
-  if (modelo === "qws") {
-    pecas = juntarCamposExtras(pecas, await camposExtrasDaOP(prisma, dados.op.numero));
-  }
-  return { op: dados.op, pecas, modelo, tagObra };
+  const extras = await camposDoModelo(dados.op, pecas, modelo, corpo?.confirmarSemTag === true);
+  if (extras.recusa) return extras;
+  return { op: dados.op, pecas: extras.pecas, modelo, tagObra };
+}
+
+/** O PDF em si — fora do POST só para ele caber no teto de statements. */
+async function desenhar({ op, pecas, modelo, tagObra }) {
+  return gerarEtiquetasCarregamentoPDF({
+    cliente: op.cliente,
+    obra: op.obra,
+    // ⚠⚠ O NÚMERO VAI CRU, e isso é decisão, não descuido.
+    //
+    // Cheguei a usar o `fmtOP` da casa aqui. Está errado para ESTA tela por dois motivos que só
+    // apareceram olhando o dado: (1) o `fmtOP` REMOVE um "T" inicial — decisão do Vitor em
+    // `58bc140e5c`, certa para a exibição no portal, mas aqui apagaria justamente o "T89" que a
+    // etiqueta em uso mostra; (2) ele completa com zeros ("89" -> "089"), e a etiqueta impressa
+    // hoje diz "T89", sem zero à esquerda.
+    //
+    // Hoje nenhuma das 35 OPs tem prefixo — são todas "121", "120". Então o "T89" da etiqueta
+    // antiga foi DIGITADO na planilha do BarTender, não veio do cadastro. Mandar cru faz a
+    // etiqueta mostrar exatamente o que está na OP, seja lá qual for a convenção que ela use.
+    opNumero: op.numero,
+    pecas,
+    modelo,
+    tagObra,
+    // ⚠ Lida a CADA impressão, não cacheada: quem está calibrando imprime, mede, ajusta e
+    // imprime de novo. Um cache de segundos faria a etiqueta seguinte sair com o valor velho e a
+    // pessoa concluir que o ajuste não funciona.
+    calibragem: await lerCalibragem(prisma),
+  });
 }
 
 /**
- * Uma linha de auditoria por MARCA — é a granularidade da pergunta que a tela faz ("esta marca já
- * saiu?"). Um registro só da OP inteira não responderia nada depois da primeira impressão parcial.
+ * Gera, confere o tamanho, carimba e devolve o PDF.
  *
- * ⚠ Não-fatal de propósito: uma falha ao registrar não pode segurar o PDF que já foi gerado. O
- * pior caso é a coluna dizer "—" para uma etiqueta impressa; imprimir de novo custa um adesivo.
+ * ⚠ Fora do POST só para ele caber no teto de statements — a ORDEM aqui dentro é que importa, e
+ * está comentada onde acontece.
  */
-async function registrarImpressao(user, { op, pecas, modelo, tagObra }) {
+async function gerarEResponder(user, { op, pecas, modelo, tagObra }) {
   try {
-    await prisma.auditLog.createMany({
-      data: pecas.map((p) => ({
-        userId: user?.id || null,
-        action: ACAO,
-        entity: ENTIDADE,
-        entityId: chaveHistorico(op.numero, p.marca),
-        diff: { op: op.numero, marca: p.marca, etiquetas: p.emCaixa ? 1 : Math.max(1, p.qte || 1),
-                emCaixa: !!p.emCaixa, modelo, tagObra, por: user?.name || null },
-      })),
+    const pdf = await desenhar({ op, pecas, modelo, tagObra });
+
+    // ⚠⚠ OS BYTES SÃO CONFERIDOS ANTES DA AUDITORIA (pedido do Codex). A plataforma recusa corpo
+    // de resposta acima de ~4,5 MB; carimbando primeiro, o portal registraria como impressa uma
+    // etiqueta que a pessoa NUNCA recebeu — e a coluna "Etiqueta" passaria a mentir.
+    const pesado = recusaPorBytes(pdf.byteLength ?? pdf.length);
+    if (pesado) {
+      registro.info(`OP ${op.numero}: PDF de ${pesado.bytes} bytes recusado (limite ${pesado.limite})`);
+      return NextResponse.json({ success: false, ...pesado }, { status: 413 });
+    }
+
+    // ⚠ SÓ DEPOIS DE O PDF EXISTIR. Carimbar antes marcaria como impressa uma marca cuja geração
+    // falhou — e a tela ficaria dizendo "já saiu" para uma etiqueta que ninguém viu.
+    await registrarImpressao(user, { op, pecas, modelo, tagObra });
+    // ⚠ A CONTA É A DO MÓDULO, NÃO UMA SOMA LOCAL: a que morava aqui ignorava `emCaixa` e contava
+    // 50 etiquetas numa marca que rende 1.
+    registro.info(`OP ${op.numero}: ${pecas.length} marca(s), ${contarEtiquetas(pecas)} etiqueta(s)`);
+
+    return new NextResponse(Buffer.from(pdf), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="etiquetas-OP-${op.numero}.pdf"`,
+        "Cache-Control": "no-store",
+      },
     });
   } catch (e) {
-    registro.erro("falha ao registrar a impressão:", e?.message);
+    registro.erro("falha ao gerar:", e?.message);
+    return NextResponse.json({ success: false, error: "Não consegui gerar as etiquetas: " + e.message }, { status: 500 });
   }
 }
 
@@ -252,45 +302,9 @@ export async function POST(req) {
   const { recusa, op, pecas, modelo, tagObra } = await selecionar(corpo);
   if (recusa) return recusa;
 
-  const dados = { op };
-  const total = pecas.reduce((s, p) => s + Math.max(1, p.qte || 1), 0);
-  try {
-    const pdf = await gerarEtiquetasCarregamentoPDF({
-      cliente: dados.op.cliente,
-      obra: dados.op.obra,
-      // ⚠⚠ O NÚMERO VAI CRU, e isso é decisão, não descuido.
-      //
-      // Cheguei a usar o `fmtOP` da casa aqui. Está errado para ESTA tela por dois motivos que só
-      // apareceram olhando o dado: (1) o `fmtOP` REMOVE um "T" inicial — decisão do Vitor em
-      // `58bc140e5c`, certa para a exibição no portal, mas aqui apagaria justamente o "T89" que a
-      // etiqueta em uso mostra; (2) ele completa com zeros ("89" -> "089"), e a etiqueta impressa
-      // hoje diz "T89", sem zero à esquerda.
-      //
-      // Hoje nenhuma das 35 OPs tem prefixo — são todas "121", "120". Então o "T89" da etiqueta
-      // antiga foi DIGITADO na planilha do BarTender, não veio do cadastro. Mandar cru faz a
-      // etiqueta mostrar exatamente o que está na OP, seja lá qual for a convenção que ela use.
-      opNumero: dados.op.numero,
-      pecas,
-      modelo,
-      tagObra,
-      // ⚠ Lida a CADA impressão, não cacheada: quem está calibrando imprime, mede, ajusta e
-      // imprime de novo. Um cache de segundos faria a etiqueta seguinte sair com o valor velho e a
-      // pessoa concluir que o ajuste não funciona.
-      calibragem: await lerCalibragem(prisma),
-    });
-    // ⚠ SÓ DEPOIS DE O PDF EXISTIR. Carimbar antes marcaria como impressa uma marca cuja geração
-    // falhou — e a tela ficaria dizendo "já saiu" para uma etiqueta que ninguém viu.
-    await registrarImpressao(user, { op: dados.op, pecas, modelo, tagObra });
-    registro.info(`OP ${dados.op.numero}: ${pecas.length} marca(s), ${total} etiqueta(s)`);
-    return new NextResponse(Buffer.from(pdf), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="etiquetas-OP-${dados.op.numero}.pdf"`,
-        "Cache-Control": "no-store",
-      },
-    });
-  } catch (e) {
-    registro.erro("falha ao gerar:", e?.message);
-    return NextResponse.json({ success: false, error: "Não consegui gerar as etiquetas: " + e.message }, { status: 500 });
-  }
+  // ⚠⚠ RECUSA ANTES DE GERAR. Marcar tudo na OP-067 são 60.281 etiquetas: ~12 minutos de função e
+  // ~113 MB. Sem esta barreira, a pessoa espera o tempo inteiro para receber um 504.
+  const grande = recusaPorTamanho(pecas);
+  if (grande) return NextResponse.json({ success: false, ...grande }, { status: 413 });
+  return gerarEResponder(user, { op, pecas, modelo, tagObra });
 }

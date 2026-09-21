@@ -93,9 +93,22 @@ export async function PATCH(req, { params }) {
 
 export async function DELETE(_req, { params }) {
   let user;
-  try { user = await requireRole(["ADMIN", "QUALIDADE"]); }
+  try { user = await requireRole(["ADMIN", "QUALIDADE", "PRODUCAO", "PCP", "ENGENHARIA", "COMERCIAL", "COMPRAS", "RH", "PLANEJAMENTO", "ALMOXARIFADO", "EXPEDICAO", "FINANCEIRO"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
-  await prisma.planoAcao.delete({ where: { id: params.id } });
-  await prisma.auditLog.create({ data: { userId: user.id, action: "EXCLUIR_PLANO_ACAO", entity: "PlanoAcao", entityId: params.id, diff: {} } }).catch(() => {});
+  const plano = await prisma.planoAcao.findUnique({ where: { id: params.id } });
+  if (!plano) return NextResponse.json({ error: "Plano não encontrado" }, { status: 404 });
+  const acesso = user.tipo === "ADMIN" || user.modulos?.includes("QUALIDADE") ||
+    (plano.indicador && user.modulos?.includes(plano.processo));
+  if (!acesso) return NextResponse.json({ error: "Você não pode excluir planos de outro setor." }, { status: 403 });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const rncs = await tx.naoConformidade.findMany({ where: { planoAcaoId: plano.id }, select: { id: true } });
+      const analises = await tx.analiseCriticaProjeto.findMany({ where: { planoAcaoId: plano.id }, select: { id: true } });
+      await tx.naoConformidade.updateMany({ where: { planoAcaoId: plano.id }, data: { planoAcaoId: null } });
+      await tx.analiseCriticaProjeto.updateMany({ where: { planoAcaoId: plano.id }, data: { planoAcaoId: null } });
+      await tx.planoAcao.delete({ where: { id: plano.id } });
+      await tx.auditLog.create({ data: { userId: user.id, action: "EXCLUIR_PLANO_ACAO", entity: "PlanoAcao", entityId: plano.id, diff: { antes: plano, depois: null, vinculosRemovidos: { rncs, analises } } } });
+    });
+  } catch { return NextResponse.json({ error: "Não foi possível excluir o plano. Tente novamente." }, { status: 500 }); }
   return NextResponse.json({ success: true });
 }

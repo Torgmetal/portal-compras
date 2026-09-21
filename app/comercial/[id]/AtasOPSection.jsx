@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect, useRef } from "react";
 import { upload as blobUpload } from "@vercel/blob/client";
 import { FileText, Plus, Loader2, Sparkles, Send, Trash2, CheckCircle2, Clock, Paperclip, X, Eye, FileDown, AlertCircle } from "lucide-react";
@@ -168,7 +169,7 @@ function AtaEditor({ opId, ata, opInfo, onChange, onDelete }) {
 
       <input value={f.titulo} onChange={(e) => setF((v) => ({ ...v, titulo: e.target.value }))} placeholder="Título da reunião" className={inp} disabled={trav} />
       <div className="flex gap-2 flex-wrap">
-        <input type="date" value={f.dataReuniao} onChange={(e) => setF((v) => ({ ...v, dataReuniao: e.target.value }))} className={`${inp} w-40`} disabled={trav} />
+        <CampoData value={f.dataReuniao} onChange={(iso) => setF((v) => ({ ...v, dataReuniao: iso }))} className={`${inp} w-40`} disabled={trav} />
         <input value={f.participantes} onChange={(e) => setF((v) => ({ ...v, participantes: e.target.value }))} placeholder="Participantes" className={`${inp} flex-1 min-w-[160px]`} disabled={trav} />
       </div>
 

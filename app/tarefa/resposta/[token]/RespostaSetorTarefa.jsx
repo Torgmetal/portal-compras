@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 import { useState, useEffect } from "react";
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -95,7 +96,7 @@ export default function RespostaSetorTarefa({ token }) {
             </div>
 
             {acao === "nova_data" && (
-              <input type="date" value={novaData} onChange={(e) => setNovaData(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", fontSize: 14, border: "1px solid #cbd5e1", borderRadius: 8, marginBottom: 12 }} />
+              <CampoData value={novaData} onChange={(iso) => setNovaData(iso)} style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", fontSize: 14, border: "1px solid #cbd5e1", borderRadius: 8, marginBottom: 12 }} />
             )}
             {acao && (
               <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={3} placeholder={acao === "comentario" ? "Escreva seu comentário" : "Comentário (opcional)"} style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", fontSize: 14, border: "1px solid #cbd5e1", borderRadius: 8, marginBottom: 12 }} />

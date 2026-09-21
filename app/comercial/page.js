@@ -182,6 +182,9 @@ export default async function ComercialHome({ searchParams }) {
                       </td>
                       <td className="px-6 py-3 text-torg-dark max-w-[220px]">
                         <div className="truncate" title={op.cliente}>{op.cliente}</div>
+                        {op.aditivos?.length > 0 && (
+                          <span className="mt-0.5 mr-1 inline-flex items-center text-[10px] font-bold text-orange-900 bg-orange-100 border border-orange-300 rounded-full px-1.5 py-0.5" title={`${op.aditivos.length} aditivo(s) nesta obra — ver na aba Obra`}>+{op.aditivos.length} ADITIVO{op.aditivos.length > 1 ? "S" : ""}</span>
+                        )}
                         {opsAguardandoAssinatura.has(op.id) && <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full whitespace-nowrap">⏳ aguardando assinatura</span>}
                       </td>
                       <td className="px-6 py-3 text-torg-gray max-w-[180px] truncate" title={op.obra || ""}>{op.obra || "—"}</td>

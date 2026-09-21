@@ -1,4 +1,5 @@
 "use client";
+import { useComponenteEstavel } from "@/lib/react-estavel";
 import { AlertTriangle, CheckCircle2, Plus, Trash2 } from "lucide-react";
 import {
   TIPOS_PENETRANTE, METODOS, MARCAS, REMOVEDORES, CONDICOES_SUPERFICIE, TIPOS_INDICACAO,
@@ -29,7 +30,7 @@ export default function FormLP({ rel, linhas, res, travado, setLinhas, setResult
 
   const set = (i, k, v) => setLinhas(linhas.map((l, j) => (j === i ? { ...l, [k]: v } : l)));
 
-  const Campo = ({ rot, k, tipo = "text", opcoes = null, dica = null, larg = "" }) => (
+  const Campo = useComponenteEstavel(({ rot, k, tipo = "text", opcoes = null, dica = null, larg = "" }) => (
     <label className={`block ${larg}`}>
       <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
       {opcoes ? (
@@ -44,7 +45,7 @@ export default function FormLP({ rel, linhas, res, travado, setLinhas, setResult
       )}
       {dica && <span className="block text-[10px] text-torg-gray mt-0.5">{dica}</span>}
     </label>
-  );
+  ));
 
   return (
     <div className="space-y-3">

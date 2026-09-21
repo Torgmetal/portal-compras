@@ -1,4 +1,5 @@
 "use client";
+import CampoData from "@/components/CampoData";
 // ─── REPARTIR A FILA DA SOLDA ENTRE AS BANCADAS ───────────────────────────────
 // Espelha o painel da montagem (app/producao/programacao/montagem/PainelBancadas.jsx). O PCP marca
 // os conjuntos, escolhe quantas bancadas vai usar, e o painel divide pelo CUSTO real de cada peça.
@@ -177,7 +178,7 @@ export default function PainelSolda({ conjuntos, filaCompleta = [], onSugerir, o
 
         <div>
           <p className="text-[11px] font-semibold text-torg-gray mb-1">a partir de</p>
-          <input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)}
+          <CampoData value={inicio} onChange={(iso) => setInicio(iso)}
             className="px-2 py-1.5 text-sm border border-gray-200 rounded-lg" />
         </div>
       </div>
