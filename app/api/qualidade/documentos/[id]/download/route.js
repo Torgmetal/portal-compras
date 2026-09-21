@@ -9,6 +9,7 @@ import { isBlobUrlSegura } from "@/lib/blob-url";
 import { baixarDocumento, ehUrlSharePoint } from "@/lib/databook-arquivo";
 import { dispArquivo } from "@/lib/arquivo-http";
 import { pdfDoRelatorio, fonteDeInspecao } from "@/lib/relatorio-pdf-fonte";
+import { fonteDePit, pdfDoPit } from "@/lib/pit-pdf-fonte";
 
 const registroLog = log("api/qualidade/documentos/download");
 
@@ -89,6 +90,21 @@ export async function GET(req, { params }) {
         { error: meu ? e.message : "Não consegui montar o PDF deste relatório." },
         { status: e.status || 502 },
       );
+    }
+  }
+
+  const pit = fonteDePit(doc);
+  if (pit) {
+    try {
+      const pdf = await pdfDoPit(prisma, pit);
+      const h = new Headers();
+      h.set("Content-Type", "application/pdf");
+      h.set("Content-Disposition", dispArquivo(doc.arquivoNome || pdf.nome, inline ? "inline" : "attachment"));
+      h.set("X-Content-Type-Options", "nosniff");
+      h.set("Cache-Control", "private, no-store");
+      return new Response(pdf.bytes, { status: 200, headers: h });
+    } catch (e) {
+      return NextResponse.json({ error: e.status === 404 ? e.message : "Não consegui montar o PDF do PIT." }, { status: e.status || 502 });
     }
   }
 

@@ -27,10 +27,12 @@ vi.mock("@/lib/databook-arquivo", () => ({
   },
 }));
 vi.mock("@/lib/relatorio-pdf-fonte", () => ({ pdfDoRelatorio: vi.fn(), fonteDeInspecao: vi.fn(() => null) }));
+vi.mock("@/lib/pit-pdf-fonte", () => ({ pdfDoPit: vi.fn(), fonteDePit: vi.fn(() => null) }));
 
 import { requireRole } from "@/lib/session";
 import { baixarDocumento } from "@/lib/databook-arquivo";
 import { fonteDeInspecao, pdfDoRelatorio } from "@/lib/relatorio-pdf-fonte";
+import { fonteDePit, pdfDoPit } from "@/lib/pit-pdf-fonte";
 import { GET } from "@/app/api/qualidade/documentos/[id]/download/route";
 
 const req = (qs = "") => new Request(`http://localhost/api/qualidade/documentos/d1/download${qs}`);
@@ -46,6 +48,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   requireRole.mockResolvedValue({ id: "u" });
   fonteDeInspecao.mockReturnValue(null);
+  fonteDePit.mockReturnValue(null);
   baixarDocumento.mockResolvedValue(Buffer.from("%PDF-1.4 conteudo"));
   mockPrisma.documentoQualidade.findUnique.mockResolvedValue(NO_SERVIDOR);
 });
@@ -116,6 +119,16 @@ describe("download de documento da Qualidade", () => {
     const res = await chamar();
     expect(res.status).toBe(200);
     expect(pdfDoRelatorio).toHaveBeenCalledWith("rel1", { revisao: 0, exigirOp: "106" });
+    expect(baixarDocumento).not.toHaveBeenCalled();
+  });
+
+  it("PIT virtual abre como PDF sem passar pelo SharePoint", async () => {
+    fonteDePit.mockReturnValue({ opNumero: "102" });
+    pdfDoPit.mockResolvedValue({ bytes: Buffer.from("%PDF PIT"), nome: "PIT-T102.pdf" });
+    const res = await chamar("?inline=1");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Disposition")).toMatch(/^inline/);
+    expect(pdfDoPit).toHaveBeenCalledWith(mockPrisma, { opNumero: "102" });
     expect(baixarDocumento).not.toHaveBeenCalled();
   });
 

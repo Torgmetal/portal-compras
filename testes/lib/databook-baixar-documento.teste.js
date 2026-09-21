@@ -12,10 +12,12 @@ vi.mock("@/lib/sharepoint", () => ({
 vi.mock("@/lib/prisma", () => ({ prisma: { documentoQualidade: { update: vi.fn(async () => ({})) } } }));
 vi.mock("@/lib/projetos-databook", () => ({ resolveServidorDriveId: vi.fn(async () => "drive-servidor") }));
 vi.mock("@/lib/relatorio-pdf-fonte", () => ({ pdfDoRelatorio: vi.fn(), fonteDeInspecao: vi.fn(() => null) }));
+vi.mock("@/lib/pit-pdf-fonte", () => ({ pdfDoPit: vi.fn(), fonteDePit: vi.fn(() => null) }));
 
 import { downloadRhItem, downloadFileById, downloadSharedFile, procurarArquivoPorNome } from "@/lib/sharepoint";
 import { prisma } from "@/lib/prisma";
 import { fonteDeInspecao, pdfDoRelatorio } from "@/lib/relatorio-pdf-fonte";
+import { fonteDePit, pdfDoPit } from "@/lib/pit-pdf-fonte";
 import { baixarDocumento } from "@/lib/databook-arquivo";
 
 const SP = "https://torgmetal637.sharepoint.com/sites/TorgMetal/SERVIDOR/Almoxarifado/R%20261085.pdf";
@@ -24,6 +26,7 @@ const doc = (extra = {}) => ({ arquivoUrl: SP, sharepointUrl: null, sharepointIt
 beforeEach(() => {
   vi.clearAllMocks();
   fonteDeInspecao.mockReturnValue(null);
+  fonteDePit.mockReturnValue(null);
   globalThis.fetch = vi.fn();
   downloadRhItem.mockResolvedValue({ buffer: Buffer.from("PADRAO") });
   downloadFileById.mockResolvedValue({ buffer: Buffer.from("SERVIDOR") });
@@ -161,5 +164,13 @@ describe("baixarDocumento — a escada, degrau por degrau", () => {
     expect((await baixarDocumento(doc())).toString()).toBe("%PDF");
     expect(downloadRhItem).not.toHaveBeenCalled();
     expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("PIT virtual é montado em memória e não encosta no SharePoint", async () => {
+    fonteDePit.mockReturnValue({ opNumero: "102" });
+    pdfDoPit.mockResolvedValue({ bytes: Buffer.from("%PDF PIT"), nome: "PIT-T102.pdf" });
+    expect((await baixarDocumento(doc())).toString()).toBe("%PDF PIT");
+    expect(pdfDoPit).toHaveBeenCalledWith(prisma, { opNumero: "102" });
+    expect(downloadRhItem).not.toHaveBeenCalled();
   });
 });

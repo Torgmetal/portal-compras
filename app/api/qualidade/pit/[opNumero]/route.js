@@ -15,6 +15,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { PIT_PADROES, PIT_PADRAO } from "@/lib/pit-padroes";
+import { pitDaOpParaDataBook } from "@/lib/databook-pit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,6 +64,51 @@ export async function PUT(req, { params }) {
     where: { id: op.id },
     data: { pitPadrao: padrao || null, pitRevisao: String(revisao ?? "").trim().slice(0, 10) || null },
   });
+
+  // O Data Book e o PIT não são duas verdades: ao escolher o padrão da OP, a seção 10 existente
+  // recebe a mesma tabela. Isso também mantém compatibilidade com telas antigas que liam somente
+  // `conteudoJson`, antes do fallback vivo introduzido no detalhe do Data Book.
+  const dataBook = await prisma.dataBookQualidade.findUnique({
+    where: { opNumero },
+    select: { secoes: { where: { numero: "10" }, select: { id: true, conteudoJson: true }, take: 1 } },
+  });
+  const secaoPit = dataBook?.secoes?.[0];
+  if (secaoPit && padrao) {
+    const revisaoLimpa = String(revisao ?? "").trim().slice(0, 10) || "0";
+    const revisaoNumero = (revisaoLimpa.match(/\d+/) || ["0"])[0].padStart(2, "0");
+    await prisma.dataBookSecao.update({
+      where: { id: secaoPit.id },
+      data: {
+        estado: "ANEXADO",
+        conteudoJson: pitDaOpParaDataBook(padrao, revisaoLimpa),
+      },
+    });
+    const nome = `Plano de Inspeção e Testes T${opNumero}-R${revisaoNumero}`;
+    const dadosDocumento = {
+      nome, categoria: "ANEXO", tipo: "Anexo — PIT/ITP — plano de inspeção e testes",
+      opNumero, numeroDocumento: `PIT T${opNumero}`, origem: "pit_portal",
+      arquivoUrl: `/api/qualidade/planos/${opNumero}/pdf?doc=PIT`,
+      arquivoNome: `PIT-T${opNumero}-R${revisaoNumero}.pdf`, arquivoTipo: "application/pdf",
+      validado: true, ativo: true,
+    };
+    const existente = await prisma.documentoQualidade.findFirst({
+      where: { opNumero, categoria: "ANEXO", tipo: dadosDocumento.tipo, nome },
+      select: { id: true },
+    });
+    const documento = existente
+      ? await prisma.documentoQualidade.update({ where: { id: existente.id }, data: dadosDocumento })
+      : await prisma.documentoQualidade.create({ data: dadosDocumento });
+    await prisma.dataBookSecaoDoc.upsert({
+      where: { secaoId_documentoId: { secaoId: secaoPit.id, documentoId: documento.id } },
+      create: { secaoId: secaoPit.id, documentoId: documento.id },
+      update: {},
+    });
+  } else if (secaoPit?.conteudoJson?.origem === "OP") {
+    await prisma.dataBookSecao.update({
+      where: { id: secaoPit.id },
+      data: { estado: "PENDENTE", conteudoJson: null },
+    });
+  }
   // ⚠ trocar o padrão de PIT muda o que a Qualidade vai inspecionar na obra inteira — fica no log.
   await prisma.auditLog.create({
     data: { userId: user?.id || null, action: "PIT_PADRAO", entity: "OP", entityId: op.id,

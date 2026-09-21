@@ -1,7 +1,12 @@
 {
-  "build": 3297,
-  "gerado": "2026-09-21T16:15:41.520Z",
+  "build": 3298,
+  "gerado": "2026-09-21T16:32:18.011Z",
   "commits": [
+    {
+      "hash": "41a1dae6",
+      "data": "21/09/2026",
+      "titulo": "Corrige PIT do Data Book e limite de fotos"
+    },
     {
       "hash": "abe1be02",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "a837cc02",
       "data": "17/09/2026",
       "titulo": "Liberar frentes também exclui: é lá que o Planejamento vê os croquis órfãos"
-    },
-    {
-      "hash": "2dbd9434",
-      "data": "17/09/2026",
-      "titulo": "Planilha do Syneco: marca duplicada dava o peso da linha antiga"
     }
   ]
 }
