@@ -3,7 +3,7 @@ import CampoData from "@/components/CampoData";
 import { useState, useMemo, useEffect } from "react";
 import { Loader2, AlertCircle, RotateCcw } from "lucide-react";
 import { CATEGORIAS_FORNECEDOR_BUILTIN } from "@/lib/fornecedor-categorias";
-import { montarFornecedoresEnvio } from "../_lib/fornecedores-envio";
+import { montarFornecedoresEnvio } from "@/lib/fornecedores-envio";
 import { FornecedoresPicker } from "./FornecedoresPicker";
 import { SelecaoItensCotacao } from "./SelecaoItensCotacao";
 import { VincularOutrasRMs } from "./VincularOutrasRMs";
@@ -189,19 +189,25 @@ export function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSel
   // Vendor List + (2) avulsos digitados nos campos. Dedupe por email.
   const parsearFornecedores = () =>
     montarFornecedoresEnvio({ fornSelecionadosIds, fornecedoresCadastrados, fornecedoresLinhas });
+  // O e-mail informado na própria linha do picker já foi gravado no cadastro;
+  // aqui só reflete na lista para o checkbox destravar sem recarregar.
+  const onEmailSalvo = (id, email) =>
+    setFornecedoresCadastrados((prev) => prev.map((f) => (f.id === id ? { ...f, email } : f)));
   const submit = async () => {
     setErro("");
-    const parsed = parsearFornecedores();
-    if (parsed.error) return setErro(parsed.error);
-    const fornecedores = parsed.fornecedores;
-    if (fornecedores.length === 0) return setErro("Adicione ao menos 1 fornecedor com nome e email válido.");
-    if (itensSelecionados.size === 0) return setErro("Selecione ao menos 1 item.");
-
-    // Lista de RMs envolvidas: a atual + as extras selecionadas
-    const rmIds = [rm.id, ...Array.from(rmsExtrasIds)];
-
+    // ⚠ Tudo dentro do try, inclusive a montagem da lista: uma exceção antes do
+    // fetch derrubava o clique sem nenhuma mensagem (21/09/2026 — cadastro do
+    // Omie sem e-mail). Erro que a tela não mostra é erro que ninguém relata.
     setSalvando(true);
     try {
+      const parsed = parsearFornecedores();
+      if (parsed.error) throw new Error(parsed.error);
+      const fornecedores = parsed.fornecedores;
+      if (fornecedores.length === 0) throw new Error("Adicione ao menos 1 fornecedor com nome e email válido.");
+      if (itensSelecionados.size === 0) throw new Error("Selecione ao menos 1 item.");
+
+      // Lista de RMs envolvidas: a atual + as extras selecionadas
+      const rmIds = [rm.id, ...Array.from(rmsExtrasIds)];
       const res = await fetch("/api/cotacao/enviar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -213,8 +219,12 @@ export function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSel
           observacaoExtra: observacao.trim() || null,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      // ⚠ Resposta que não é JSON (500/504 da Vercel vem em HTML) virava "The string did not
+      // match the expected pattern" no Safari — mensagem que não diz nada a ninguém.
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) {
+        throw new Error(data?.error || `O servidor respondeu ${res.status} sem detalhes. Tente de novo; se repetir, avise o suporte.`);
+      }
       onSent({ cotacoes: data.cotacoes, emails: data.emails || [], estoque: data.estoque || null });
     } catch (e) {
       setErro(e.message);
@@ -287,6 +297,7 @@ export function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSel
           setFornecedor={setFornecedor}
           addFornecedor={addFornecedor}
           removerFornecedor={removerFornecedor}
+          onEmailSalvo={onEmailSalvo}
           categoriasFornecedor={categoriasFornecedor}
         />
 

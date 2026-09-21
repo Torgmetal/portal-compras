@@ -26,6 +26,24 @@ const schema = z.object({
   observacaoExtra: z.string().optional().nullable(),
 });
 
+// ⚠ `e.message` do Zod é o despejo JSON de todos os issues — foi o que o comprador leu quando um
+// cadastro do Omie veio com dois e-mails no mesmo campo ("a@x.com,b@y.com", 21/09/2026). Quem lê
+// isto está no modal, com a lista na frente: a mensagem tem que dizer QUAL fornecedor e o quê.
+function mensagemDeValidacao(e, bruto) {
+  const issue = e?.issues?.[0];
+  if (!issue) return "Dados inválidos: " + (e?.message || "corpo da requisição não é JSON");
+  const [campo, indice] = issue.path || [];
+  if (campo === "fornecedores" && Number.isInteger(indice)) {
+    const f = bruto?.fornecedores?.[indice];
+    const nome = f?.nome ? ` "${f.nome}"` : ` nº ${indice + 1}`;
+    if (issue.path[2] === "email") {
+      return `E-mail inválido no fornecedor${nome}: "${f?.email ?? ""}". Corrija o e-mail no cadastro (ou digite o fornecedor como avulso).`;
+    }
+    return `Fornecedor${nome}: ${issue.path[2] || "dados"} — ${issue.message}`;
+  }
+  return `Dados inválidos em ${issue.path?.join(".") || "?"}: ${issue.message}`;
+}
+
 export async function POST(req) {
   let user;
   try {
@@ -35,10 +53,12 @@ export async function POST(req) {
   }
 
   let body;
+  let bruto;
   try {
-    body = schema.parse(await req.json());
+    bruto = await req.json();
+    body = schema.parse(bruto);
   } catch (e) {
-    return NextResponse.json({ error: "Dados inválidos: " + e.message }, { status: 400 });
+    return NextResponse.json({ error: mensagemDeValidacao(e, bruto) }, { status: 400 });
   }
 
   // Normaliza rmIds: aceita rmIds[] OU rmId único

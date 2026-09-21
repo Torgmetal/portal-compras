@@ -185,3 +185,26 @@ temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu
   O script `scripts/revisao-codex/consultar.py` continua ausente do clone.
 - **Depende do usuário:** clicar a tarefa em Admin › Manutenção e importar `T105B- LPC_R00.xlsx` em
   Engenharia › Listas.
+
+## 21/09/2026 — Envio de cotação: fornecedor da Vendor List sem e-mail / com dois e-mails (Claude)
+
+- **Relato:** Vitor: "no portal de compras não estamos conseguindo enviar a cotação". Nenhuma
+  `Cotacao` desde 17/09 19:32; itens das RMs T122-001/002 seguem PENDENTE; nada mudou no código do
+  envio desde 16/09. Medido no banco: **435 fornecedores ativos sem e-mail** (GERDAU ACOS LONGOS ×6)
+  e **10 com dois e-mails no mesmo campo** (ARCELORMITTAL) — importação do Omie de 25/08.
+- **Causa:** `montarFornecedoresEnvio` fazia `f.email.toLowerCase()` fora do `try` do `submit` →
+  TypeError no handler, tela sem mensagem; dois e-mails passavam pelo cliente e o servidor devolvia
+  400 com o `e.message` (JSON) do Zod.
+- **Feito:** `lib/fornecedores-envio.js` (`emailPrincipal`, `separarEmails`, erro nomeando o
+  fornecedor; o `RMsTabelaSeletor` deixa de ter cópia própria), `components/compras/LinhaFornecedorPicker.jsx`
+  (chip "sem e-mail", checkbox desligado, "informar e-mail" que faz `PATCH /api/fornecedores/[id]`),
+  `submit` inteiro no `try` nos dois modais + `res.json().catch`, `mensagemDeValidacao` em
+  `/api/cotacao/enviar`, importação do Omie separando e-mails, tarefa de manutenção
+  `fornecedor-email-multiplo`. Testes: `testes/lib/fornecedores-envio`, `testes/lib/fornecedores-email-multiplo`,
+  `testes/api/cotacao-enviar-validacao`, `testes/componentes/linha-fornecedor-picker` (2440 passando).
+- **Para revisar (security/testing):** o `PATCH` de e-mail pela linha do picker usa a rota existente
+  (ADMIN/COMPRAS, Zod `email`, AuditLog `edit_fornecedor`) — conferir se convém restringir o corpo
+  que a linha manda (`{ email }` só). Não validei a tela logado (sem credenciais nesta sessão): a prova
+  é teste de componente + build. `scripts/revisao-codex/consultar.py` segue ausente do clone.
+- **Depende do usuário:** Compras repetir o envio e, se falhar, mandar o texto da tarja; clicar
+  `fornecedor-email-multiplo` em Admin › Manutenção.

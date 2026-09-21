@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { Loader2, X, Plus } from "lucide-react";
-import { CATEGORIAS_FORNECEDOR_BUILTIN, chipCategoriaFornecedor, labelCategoriaFornecedor } from "@/lib/fornecedor-categorias";
+import { CATEGORIAS_FORNECEDOR_BUILTIN, chipCategoriaFornecedor } from "@/lib/fornecedor-categorias";
+import { LinhaFornecedorPicker } from "@/components/compras/LinhaFornecedorPicker";
 
 // FornecedoresPicker — bloco que combina:
 // 1) Lista de fornecedores cadastrados (Vendor List) com checkbox + filtro
@@ -13,6 +14,7 @@ export function FornecedoresPicker({
   fornSelecionadosIds, toggleFornCadastrado,
   filtroCatForn, setFiltroCatForn, buscaForn, setBuscaForn,
   fornecedoresLinhas, setFornecedor, addFornecedor, removerFornecedor,
+  onEmailSalvo,
   categoriasFornecedor = CATEGORIAS_FORNECEDOR_BUILTIN,
 }) {
   const qtdSelCadastrados = fornSelecionadosIds.size;
@@ -86,45 +88,17 @@ export function FornecedoresPicker({
               : "Nenhum fornecedor encontrado com esses filtros."}
           </p>
         ) : (
-          fornFiltrados.map((f) => {
-            const checked = fornSelecionadosIds.has(f.id);
-            return (
-              <label
-                key={f.id}
-                className={`flex items-start gap-2 px-3 py-2 cursor-pointer text-xs hover:bg-gray-50 ${
-                  checked ? "bg-torg-blue-50/40" : ""
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleFornCadastrado(f.id)}
-                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <p className="text-torg-dark font-medium truncate">{f.razaoSocial}</p>
-                    <span className="text-[10px] text-torg-gray">{f.email}</span>
-                  </div>
-                  {(f.categorias || []).length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {f.categorias.map((c) => (
-                        <span
-                          key={c}
-                          className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${chipCategoriaFornecedor(c, categoriasFornecedor)}`}
-                        >
-                          {labelCategoriaFornecedor(c, categoriasFornecedor)}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {f.contato && (
-                    <p className="text-[10px] text-torg-gray mt-0.5 italic">contato: {f.contato}</p>
-                  )}
-                </div>
-              </label>
-            );
-          })
+          fornFiltrados.map((f) => (
+            <LinhaFornecedorPicker
+              key={f.id}
+              fornecedor={f}
+              checked={fornSelecionadosIds.has(f.id)}
+              onToggle={() => toggleFornCadastrado(f.id)}
+              onEmailSalvo={onEmailSalvo}
+              categoriasFornecedor={categoriasFornecedor}
+              mostrarContato
+            />
+          ))
         )}
       </div>
 

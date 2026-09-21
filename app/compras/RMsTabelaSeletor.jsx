@@ -12,8 +12,9 @@ import {
   CATEGORIAS_FORNECEDOR_BUILTIN,
   mergeCategorias,
   chipCategoriaFornecedor,
-  labelCategoriaFornecedor,
 } from "@/lib/fornecedor-categorias";
+import { montarFornecedoresEnvio } from "@/lib/fornecedores-envio";
+import { LinhaFornecedorPicker } from "@/components/compras/LinhaFornecedorPicker";
 
 const STATUS_LABELS = {
   ABERTA:        { label: "Aberta",         className: "bg-torg-blue-50 text-torg-blue" },
@@ -735,42 +736,26 @@ function ModalEnviarConsolidada({ rms, onClose, onSent, categoriasFornecedor = C
     });
   };
 
-  const parsearFornecedores = () => {
-    const out = [];
-    const emailsVistos = new Set();
-    for (const id of fornSelecionadosIds) {
-      const f = fornecedoresCadastrados.find((x) => x.id === id);
-      if (!f) continue;
-      const email = f.email.toLowerCase();
-      if (emailsVistos.has(email)) continue;
-      emailsVistos.add(email);
-      out.push({ fornecedorId: f.id, nome: f.razaoSocial, email, nCodOmie: f.nCodOmie || null, cnpj: f.cnpj || null });
-    }
-    for (const f of fornecedoresLinhas) {
-      const email = String(f.email || "").trim().toLowerCase();
-      const nome = String(f.nome || "").trim();
-      if (!email && !nome) continue;
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return { error: `Email inválido: "${email || "(em branco)"}"${nome ? ` — fornecedor "${nome}"` : ""}` };
-      }
-      if (!nome) return { error: `Preencha o nome pro email "${email}"` };
-      if (emailsVistos.has(email)) continue;
-      emailsVistos.add(email);
-      out.push({ nome, email });
-    }
-    return { fornecedores: out };
-  };
+  // Mesma regra do modal da RM (lib/fornecedores-envio.js): cadastro sem e-mail
+  // vira erro com o nome dele, e campo com dois e-mails usa o primeiro.
+  const parsearFornecedores = () =>
+    montarFornecedoresEnvio({ fornSelecionadosIds, fornecedoresCadastrados, fornecedoresLinhas });
+  // O e-mail informado na própria linha do picker já foi gravado no cadastro;
+  // aqui só reflete na lista para o checkbox destravar sem recarregar.
+  const onEmailSalvo = (id, email) =>
+    setFornecedoresCadastrados((prev) => prev.map((f) => (f.id === id ? { ...f, email } : f)));
 
   const submit = async () => {
     setErro("");
-    const parsed = parsearFornecedores();
-    if (parsed.error) return setErro(parsed.error);
-    const fornecedores = parsed.fornecedores;
-    if (fornecedores.length === 0) return setErro("Adicione ao menos 1 fornecedor com nome e email válido.");
-    if (itensSelecionados.size === 0) return setErro("Selecione ao menos 1 item.");
-
+    // ⚠ Tudo dentro do try, inclusive a montagem da lista: uma exceção antes do
+    // fetch derrubava o clique sem nenhuma mensagem (21/09/2026).
     setSalvando(true);
     try {
+      const parsed = parsearFornecedores();
+      if (parsed.error) throw new Error(parsed.error);
+      const fornecedores = parsed.fornecedores;
+      if (fornecedores.length === 0) throw new Error("Adicione ao menos 1 fornecedor com nome e email válido.");
+      if (itensSelecionados.size === 0) throw new Error("Selecione ao menos 1 item.");
       const res = await fetch("/api/cotacao/enviar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -782,8 +767,12 @@ function ModalEnviarConsolidada({ rms, onClose, onSent, categoriasFornecedor = C
           observacaoExtra: observacao.trim() || null,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      // ⚠ Resposta que não é JSON (500/504 da Vercel vem em HTML) virava "The string did not
+      // match the expected pattern" no Safari — mensagem que não diz nada a ninguém.
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) {
+        throw new Error(data?.error || `O servidor respondeu ${res.status} sem detalhes. Tente de novo; se repetir, avise o suporte.`);
+      }
       onSent({
         cotacoes: data.cotacoes || [],
         rmsNumeros: data.cotacoes?.[0]?.rmsVinculadas || rms.map((r) => r.numero),
@@ -881,6 +870,7 @@ function ModalEnviarConsolidada({ rms, onClose, onSent, categoriasFornecedor = C
             setFornecedor={setFornecedor}
             addFornecedor={addFornecedor}
             removerFornecedor={removerFornecedor}
+            onEmailSalvo={onEmailSalvo}
             categoriasFornecedor={categoriasFornecedor}
           />
 
@@ -1067,6 +1057,7 @@ function FornecedoresPickerConsolidada({
   fornSelecionadosIds, toggleFornCadastrado,
   filtroCatForn, setFiltroCatForn, buscaForn, setBuscaForn,
   fornecedoresLinhas, setFornecedor, addFornecedor, removerFornecedor,
+  onEmailSalvo,
   categoriasFornecedor = CATEGORIAS_FORNECEDOR_BUILTIN,
 }) {
   const qtdSelCadastrados = fornSelecionadosIds.size;
@@ -1131,40 +1122,16 @@ function FornecedoresPickerConsolidada({
               : "Nenhum fornecedor encontrado com esses filtros."}
           </p>
         ) : (
-          fornFiltrados.map((f) => {
-            const checked = fornSelecionadosIds.has(f.id);
-            return (
-              <label
-                key={f.id}
-                className={`flex items-start gap-2 px-3 py-2 cursor-pointer text-xs hover:bg-gray-50 ${checked ? "bg-torg-blue-50/40" : ""}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleFornCadastrado(f.id)}
-                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-torg-blue focus:ring-torg-blue"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <p className="text-torg-dark font-medium truncate">{f.razaoSocial}</p>
-                    <span className="text-[10px] text-torg-gray">{f.email}</span>
-                  </div>
-                  {(f.categorias || []).length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {f.categorias.map((c) => (
-                        <span
-                          key={c}
-                          className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${chipCategoriaFornecedor(c, categoriasFornecedor)}`}
-                        >
-                          {labelCategoriaFornecedor(c, categoriasFornecedor)}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </label>
-            );
-          })
+          fornFiltrados.map((f) => (
+            <LinhaFornecedorPicker
+              key={f.id}
+              fornecedor={f}
+              checked={fornSelecionadosIds.has(f.id)}
+              onToggle={() => toggleFornCadastrado(f.id)}
+              onEmailSalvo={onEmailSalvo}
+              categoriasFornecedor={categoriasFornecedor}
+            />
+          ))
         )}
       </div>
       <details className="bg-amber-50/40 border border-amber-200 rounded-lg" {...(qtdAvulsosValidos > 0 ? { open: true } : {})}>

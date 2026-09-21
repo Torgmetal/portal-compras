@@ -1,7 +1,12 @@
 {
-  "build": 3293,
-  "gerado": "2026-09-21T11:55:49.991Z",
+  "build": 3294,
+  "gerado": "2026-09-21T12:28:54.521Z",
   "commits": [
+    {
+      "hash": "cc377795",
+      "data": "21/09/2026",
+      "titulo": "memória: a limpeza da LPC duplicada da 094 apagou a LE junto — conferir naLE antes de apagar"
+    },
     {
       "hash": "0446a634",
       "data": "20/09/2026",
@@ -146,11 +151,6 @@
       "hash": "972faa2e",
       "data": "17/09/2026",
       "titulo": "Dois crons parados em silêncio: o do PCP há 17 dias, o do CMR há 60 horas"
-    },
-    {
-      "hash": "6659f1e3",
-      "data": "17/09/2026",
-      "titulo": "Permite excluir PIT Torg e anexos do cliente com confirmação"
     }
   ]
 }

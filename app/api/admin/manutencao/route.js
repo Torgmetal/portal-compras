@@ -14,6 +14,7 @@ import { conferirBanco } from "@/lib/banco-esperado";
 import { conferirEtapaPortalXSyneco } from "@/lib/conferencias";
 import { perfisSemMaterialDaOp } from "@/lib/rastreio-sem-material";
 import { checarOp105, aplicarOp105 } from "@/lib/op105-fases-por-tag";
+import { checarEmailsMultiplos, aplicarEmailsMultiplos } from "@/lib/fornecedores-email-multiplo";
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // a manutenção da OP-105 estourou 60 s gravando lista a lista (20/09/2026)
@@ -154,6 +155,16 @@ const TAREFAS = [
       "A fase C entrou sob a chave \"105\" (antes da regra da fase no nome) e não aparece como fase; as duas entregas B têm a mesma letra e as duas treliças A são as mesmas marcas repartidas por TAG. O motor de avanço passa a medir pela lista de peças de cada fase — esta tarefa troca a chave da C, divide a fase A em TC 4706 / TC 4707 e grava as listas. Depois, importe a T105B- LPC_R00.xlsx em Engenharia › Listas.",
     checar: () => checarOp105(prisma),
     aplicar: (user) => aplicarOp105(prisma, user),
+  },
+  {
+    // "Não estamos conseguindo enviar a cotação" (Vitor, 21/09/2026): entre as causas, cadastro
+    // importado do Omie com dois e-mails no mesmo campo — o servidor recusa e-mail inválido.
+    id: "fornecedor-email-multiplo",
+    titulo: "Fornecedores com dois e-mails no mesmo campo (importação do Omie)",
+    porque:
+      "O Omie devolve \"a@x.com,b@y.com\" num campo só e a importação copiou assim. O envio de cotação valida e-mail e recusava esses fornecedores. Esta tarefa deixa o primeiro em \"e-mail\" e move os demais para \"e-mails adicionais\" (que vão em cópia nas cobranças).",
+    checar: () => checarEmailsMultiplos(prisma),
+    aplicar: (user) => aplicarEmailsMultiplos(prisma, user),
   },
 ];
 
