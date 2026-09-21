@@ -1,156 +1,156 @@
 {
-  "build": 3305,
-  "gerado": "2026-09-21T18:53:26.629Z",
+  "build": 3306,
+  "gerado": "2026-09-21T19:11:18.085Z",
   "commits": [
     {
-      "hash": "bc3e12c9",
+      "hash": "a4012125d7",
+      "data": "21/09/2026",
+      "titulo": "Cliente: contatos editáveis na OP e obras liberadas por login"
+    },
+    {
+      "hash": "bc3e12c98d",
       "data": "21/09/2026",
       "titulo": "Cotação: obrigatórios também no servidor, e ICMS/IPI/prazo em massa"
     },
     {
-      "hash": "0239f0a4",
+      "hash": "0239f0a4ee",
       "data": "21/09/2026",
       "titulo": "Mapa: \"NÃO TEM\" no lugar do traço quando o fornecedor recusa o item"
     },
     {
-      "hash": "4df47523",
+      "hash": "4df475230e",
       "data": "21/09/2026",
       "titulo": "Cotação: a observação da RM na cara do fornecedor, e o frete na lista"
     },
     {
-      "hash": "53e38de6",
+      "hash": "53e38de619",
       "data": "21/09/2026",
       "titulo": "Conferência: a planilha do PCP separa o que é DESTA remessa"
     },
     {
-      "hash": "fdbe42ed",
+      "hash": "fdbe42ed1d",
       "data": "21/09/2026",
       "titulo": "Inspeção: o projeto anexado nunca chegava ao relatório — o webhook do blob tomava 401"
     },
     {
-      "hash": "b2e6cf92",
+      "hash": "b2e6cf9264",
       "data": "21/09/2026",
       "titulo": "Pré-montagem: o relatório aceita vários projetos — o servidor barrava o segundo"
     },
     {
-      "hash": "c4b5c6a1",
+      "hash": "c4b5c6a184",
       "data": "21/09/2026",
       "titulo": "Vincula o PDF do PIT ao Data Book"
     },
     {
-      "hash": "41a1dae6",
+      "hash": "41a1dae6b0",
       "data": "21/09/2026",
       "titulo": "Corrige PIT do Data Book e limite de fotos"
     },
     {
-      "hash": "abe1be02",
+      "hash": "abe1be026f",
       "data": "21/09/2026",
       "titulo": "Cotação: os e-mails saem em fila, com pausa — doze de uma vez estouravam o Resend"
     },
     {
-      "hash": "703e2aa5",
+      "hash": "703e2aa5e2",
       "data": "21/09/2026",
       "titulo": "Cotação: a gravação vai em lote — 85 idas e voltas a São Paulo não cabiam nos 5 s da transação"
     },
     {
-      "hash": "3273d9f1",
+      "hash": "3273d9f138",
       "data": "21/09/2026",
       "titulo": "Cotação: fornecedor da Vendor List sem e-mail (ou com dois) parava o envio em silêncio"
     },
     {
-      "hash": "cc377795",
+      "hash": "cc377795f0",
       "data": "21/09/2026",
       "titulo": "memória: a limpeza da LPC duplicada da 094 apagou a LE junto — conferir naLE antes de apagar"
     },
     {
-      "hash": "0446a634",
+      "hash": "0446a634f2",
       "data": "20/09/2026",
       "titulo": "OP-105: a tarefa devolve as linhas de fabricação das fases ao avanço automático"
     },
     {
-      "hash": "55976535",
+      "hash": "5597653539",
       "data": "20/09/2026",
       "titulo": "Manutenção: OP-105 grava as listas em lote; a tela explica o corte por tempo"
     },
     {
-      "hash": "89f4ca6d",
+      "hash": "89f4ca6d77",
       "data": "20/09/2026",
       "titulo": "Cronograma: avanço de fabricação medido pela lista de peças da fase (OP-105 por TAG)"
     },
     {
-      "hash": "22e5ebf0",
+      "hash": "22e5ebf090",
       "data": "20/09/2026",
       "titulo": "memória: OP-122 — o contrato TMSA-1748-2 e o adiamento pedido pela Vale"
     },
     {
-      "hash": "a6dea056",
+      "hash": "a6dea05634",
       "data": "19/09/2026",
       "titulo": "feat: adotar template Torg para data books sem emissão anterior"
     },
     {
-      "hash": "f4c5df4f",
+      "hash": "f4c5df4f24",
       "data": "19/09/2026",
       "titulo": "Amplia campos de RNC e avisa sobre edições não salvas"
     },
     {
-      "hash": "b191d482",
+      "hash": "b191d482b8",
       "data": "19/09/2026",
       "titulo": "Simplifica lista de inspeções com filtros e ações compactas"
     },
     {
-      "hash": "b38de698",
+      "hash": "b38de698ed",
       "data": "18/09/2026",
       "titulo": "Registra o fechamento dos três pendentes da revisão"
     },
     {
-      "hash": "8a14ae62",
+      "hash": "8a14ae626e",
       "data": "18/09/2026",
       "titulo": "Fecha os três pendentes da revisão: Form XObject, teto de escrita e recorte legado"
     },
     {
-      "hash": "c92e64cd",
+      "hash": "c92e64cd32",
       "data": "18/09/2026",
       "titulo": "Registra as duas revisões pedidas à mão e o que ficou pendente"
     },
     {
-      "hash": "b448052a",
+      "hash": "b448052a64",
       "data": "18/09/2026",
       "titulo": "Revisão do Codex: caminho fechado perdia um lado, e a caixa do texto crescia para o lado errado"
     },
     {
-      "hash": "6ca08768",
+      "hash": "6ca087680a",
       "data": "18/09/2026",
       "titulo": "Registra no log de revisão o que foi feito hoje e o que ficou sem confirmar"
     },
     {
-      "hash": "54b49cb9",
+      "hash": "54b49cb9d3",
       "data": "18/09/2026",
       "titulo": "Descrição da cota passa a ser digitável, e sobrevive à renumeração"
     },
     {
-      "hash": "7174e7f0",
+      "hash": "7174e7f0b6",
       "data": "18/09/2026",
       "titulo": "Confere apoios pelo IFC e evita giro automático de carga larga"
     },
     {
-      "hash": "25d2ffbb",
+      "hash": "25d2ffbb93",
       "data": "18/09/2026",
       "titulo": "Desenho da inspeção vinha cortado: a página girada não era tratada"
     },
     {
-      "hash": "20b77e3d",
+      "hash": "20b77e3d9c",
       "data": "18/09/2026",
       "titulo": "Remove o \"Enviar teste para mim\" da cobrança, como combinado"
     },
     {
-      "hash": "572d4d97",
+      "hash": "572d4d97e9",
       "data": "18/09/2026",
       "titulo": "A data que o fornecedor manda agora é proposta — quem decide é Compras"
-    },
-    {
-      "hash": "475c3ca7",
-      "data": "18/09/2026",
-      "titulo": "Quando o fornecedor responde, Compras fica sabendo — e a tela diz de quem é a data"
     }
   ]
 }

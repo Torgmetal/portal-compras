@@ -2,6 +2,7 @@
 import { parseObservacaoCotacao } from "@/lib/cotacao-observacao";
 import BlocoObservacao from "@/components/BlocoObservacao";
 import PreencherEmMassa from "./PreencherEmMassa";
+import AssociarItensPdf from "./AssociarItensPdf";
 import CampoData from "@/components/CampoData";
 import { useState, useMemo, useRef } from "react";
 import { dataBR, dataHoraBR } from "@/lib/data-br";
@@ -76,6 +77,10 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
   // ⚠ Sem padrão: CIF e FOB mudam quem paga o frete e quem vai buscar. Marcar um dos dois de
   // antemão faria a metade dos fornecedores enviar a resposta errada sem perceber.
   const [tipoFrete, setTipoFrete] = useState(cotacao.tipoFrete || "");
+  // ⚠⚠ OS ITENS LIDOS DO PDF QUE NÃO ACHARAM LINHA. Ficam aqui para o fornecedor APONTAR a qual
+  // linha cada um pertence, em vez de redigitar. O portal já tem preço, ICMS e IPI — o que falta
+  // é só o mapa, e quem o conhece é quem fez a proposta.
+  const [sobrasPdf, setSobrasPdf] = useState([]);
   const [observacaoGeral, setObservacaoGeral] = useState(jaEnviou ? obsParsed.observacao : "");
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -121,6 +126,15 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     // "PDF: R$ X" e flagrar em vermelho quando não bate com preço × qtd.
     l.pdfTotalBruto = itPdf.totalBruto != null ? Number(itPdf.totalBruto)
       : (itPdf.total != null ? Number(itPdf.total) : null);
+    // ⚠⚠ A UNIDADE DO PDF VIAJA JUNTO, E NÃO SOBRESCREVE A DA RM (achado do Codex, 21/09/2026).
+    // Até aqui ela era simplesmente descartada: um produto cotado POR BARRA caía numa linha em KG
+    // com o preço da barra, e nem o casamento correto salvava o pedido. Converter seria pior —
+    // exige uma base que o PDF nem sempre traz. Então a divergência fica À VISTA, na linha.
+    l.unidadePdf = itPdf.unidade ? String(itPdf.unidade).trim().toUpperCase() : null;
+    // ⚠ E o aviso que a rota da IA gerou ao CONSERTAR a aritmética (`sanitizeItens` recalcula o
+    // unitário por total÷qtd quando não fecha). Ele existia e morria aqui — o fornecedor via um
+    // preço que ele não digitou, sem nada dizendo que foi o portal que mudou.
+    l.avisoPdf = itPdf._warning || (Array.isArray(itPdf.warnings) ? itPdf.warnings.join(" · ") : null) || null;
   }
 
   // Aplica os itens da IA: 1º pelo rmIndex que ela devolve; os que vieram com
@@ -131,6 +145,10 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     const linhasNovas = [...linhas];
     const idsAuto = new Set();
     const usados = new Set();
+    // ⚠⚠ O QUE NÃO CASOU DEIXA DE SER JOGADO FORA. Até 21/09/2026 os itens lidos do PDF que não
+    // encontrassem linha simplesmente sumiam, e o fornecedor era mandado redigitar tudo — mesmo o
+    // portal já tendo preço, ICMS e IPI na memória. Na T122-001 da SOUFER foram 9 de 9 assim.
+    const aproveitados = new Set();
     let casados = 0;
     const semIndice = [];
     for (const itPdf of itensIA) {
@@ -140,7 +158,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
         continue;
       }
       preencherLinha(linhasNovas[idx], itPdf);
-      usados.add(idx); idsAuto.add(linhasNovas[idx].id); casados++;
+      usados.add(idx); idsAuto.add(linhasNovas[idx].id); casados++; aproveitados.add(itPdf);
     }
     for (const itPdf of semIndice) {
       let melhorIdx = -1, melhorScore = 0.5;
@@ -151,13 +169,13 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
       }
       if (melhorIdx >= 0) {
         preencherLinha(linhasNovas[melhorIdx], itPdf);
-        usados.add(melhorIdx); idsAuto.add(linhasNovas[melhorIdx].id); casados++;
+        usados.add(melhorIdx); idsAuto.add(linhasNovas[melhorIdx].id); casados++; aproveitados.add(itPdf);
       }
     }
     setLinhas(linhasNovas);
     setAutoFilled(idsAuto);
     setRevisado(new Set());
-    return casados;
+    return { casados, sobraram: itensIA.filter((it) => !aproveitados.has(it)) };
   }
 
   // Fallback: casa PDF × RM por tokens. BIDIRECIONAL — pega o maior entre
@@ -182,6 +200,7 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     const linhasNovas = [...linhas];
     const usados = new Set();
     const idsAuto = new Set();
+    const aproveitados = new Set();
     let casados = 0;
     for (const itPdf of itensPdf) {
       let melhorIdx = -1, melhorScore = 0.5;
@@ -191,21 +210,19 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
         if (sc > melhorScore) { melhorScore = sc; melhorIdx = i; }
       }
       if (melhorIdx >= 0) {
-        usados.add(melhorIdx); casados++;
+        usados.add(melhorIdx); casados++; aproveitados.add(itPdf);
         const l = linhasNovas[melhorIdx];
-        if (itPdf.precoUnit) l.precoUnit = String(itPdf.precoUnit);
-        if (itPdf.qtd) l.qtdCotada = itPdf.qtd;
-        if (itPdf.icmsPct != null) l.icmsPct = String(itPdf.icmsPct);
-        if (itPdf.ipiPct != null) l.ipiPct = String(itPdf.ipiPct);
-        l.pdfTotalBruto = itPdf.totalBruto != null ? Number(itPdf.totalBruto)
-          : (itPdf.total != null ? Number(itPdf.total) : null);
+        // ⚠ O MESMO `preencherLinha` do caminho da IA. Este ramo tinha uma cópia própria da
+        // atribuição, e foi por ela que unidade e aviso do PDF não chegavam quando a leitura caía
+        // no regex — duas cópias da mesma regra, a segunda sempre esquecida.
+        preencherLinha(l, itPdf);
         idsAuto.add(l.id);
       }
     }
     setLinhas(linhasNovas);
     setAutoFilled(idsAuto);
     setRevisado(new Set());
-    return casados;
+    return { casados, sobraram: itensPdf.filter((it) => !aproveitados.has(it)) };
   }
 
   // Upload de um arquivo: salva no blob, retorna o anexo criado.
@@ -331,7 +348,9 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
         try {
           const data = await parsePDF(lista[0]);
           const itensExtra = data.itens || [];
-          const casados = data.usouIA ? aplicarItensIA(itensExtra) : aplicarItensFallback(itensExtra);
+          const { casados, sobraram } = data.usouIA ? aplicarItensIA(itensExtra) : aplicarItensFallback(itensExtra);
+          // ⚠ Só sobra o que TEM preço: item lido sem valor não ajuda ninguém a associar.
+          setSobrasPdf((sobraram || []).filter((it) => Number(it.precoUnit) > 0));
           setParseInfo({
             match: casados,
             total: itensExtra.length,
@@ -452,6 +471,29 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     return `Aplicado em ${tocadas} ${tocadas === 1 ? "item" : "itens"}`
       + (recusadas ? ` · ${recusadas} marcado(s) "Não tenho" não foram alterados` : "")
       + ". Ajuste individualmente o que for diferente.";
+  };
+
+  /**
+   * O fornecedor aponta: "este item do meu PDF é esta linha da RM".
+   *
+   * ⚠⚠ QUEM ASSOCIA É QUEM FEZ A PROPOSTA, e é isso que torna esta tela segura. O portal casar
+   * sozinho com pouca evidência é o risco que não vale correr: casar errado põe preço errado no
+   * item errado do pedido, e ninguém percebe — enquanto não casar, o fornecedor vê na hora.
+   *
+   * ⚠ A linha entra como preenchida pelo PDF (`autoFilled`), então continua pedindo a conferência
+   * do valor, como qualquer linha que o portal tocou.
+   */
+  const associarSobra = (itPdf, linhaId) => {
+    if (!linhaId) return;
+    setLinhas((prev) => prev.map((l) => {
+      if (l.id !== linhaId) return l;
+      const copia = { ...l };
+      preencherLinha(copia, itPdf);
+      return copia;
+    }));
+    setAutoFilled((prev) => new Set([...prev, linhaId]));
+    setRevisado((prev) => { const n = new Set(prev); n.delete(linhaId); return n; });
+    setSobrasPdf((prev) => prev.filter((x) => x !== itPdf));
   };
 
   const submit = async (e) => {
@@ -962,7 +1004,7 @@ dataHoraBR(new Date())
                   </div>
                 ) : (
                   <p className="text-torg-orange-700">
-                    ⚠ O PDF foi lido mas não conseguimos casar os itens automaticamente. Preencha os preços abaixo à mão — <strong>e não esqueça de clicar em “Enviar proposta” no final da página</strong>, senão a cotação não chega até nós.
+                    ⚠ O PDF foi lido, mas não conseguimos encaixar os itens sozinhos. Use o quadro abaixo para dizer qual é qual — os valores já estão lidos. <strong>Depois, não esqueça de clicar em “Enviar proposta” no final da página</strong>, senão a cotação não chega até nós.
                     {(parseInfo.motivoIA || parseInfo.avisos?.length > 0) && (
                       <span className="block mt-1 text-[11px] text-torg-gray">
                         {[parseInfo.motivoIA, ...(parseInfo.avisos || [])].filter(Boolean).join(" · ")}
@@ -977,6 +1019,10 @@ dataHoraBR(new Date())
                 )}
               </div>
             )}
+
+            {/* ⚠ FICA JUNTO DO AVISO DE LEITURA, não no fim da página: é a continuação natural de
+                "não conseguimos encaixar" — quem lê a frase precisa ver a saída logo abaixo. */}
+            <AssociarItensPdf sobras={sobrasPdf} linhas={linhas} onAssociar={associarSobra} />
 
             <p className="text-[11px] text-torg-gray mt-3">
               Aceita PDF de até 10MB. O arquivo fica anexado à cotação e os valores são lidos dele. ⚠ Anexar não envia a proposta — confira a tabela abaixo e clique em <strong>Enviar proposta</strong> no final da página.
@@ -1040,6 +1086,25 @@ dataHoraBR(new Date())
                               que escrevemos no item no momento da criação dele. Precisa aparecer
                               pro fornecedor embaixo". Naquele item estava o modelo exato da
                               máquina — sem isso, o fornecedor cota outra. */}
+                          {/* ⚠⚠ UNIDADE DIVERGENTE É ERRO DE PEDIDO, NÃO DETALHE (achado do Codex,
+                              21/09/2026). Produto cotado POR BARRA caindo numa linha em KG passa
+                              pelo casamento certo e ainda gera pedido errado. O portal NÃO
+                              converte — a conversão exige uma base que o PDF nem sempre traz —,
+                              então a divergência fica à vista de quem pode resolvê-la. */}
+                          {l.unidadePdf && l.unidade && l.unidadePdf !== String(l.unidade).toUpperCase() && (
+                            <p className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-1 mt-1">
+                              ⚠ Seu PDF cota em <strong>{l.unidadePdf}</strong> e esta linha é em{" "}
+                              <strong>{l.unidade}</strong>. Confira o preço antes de enviar.
+                            </p>
+                          )}
+                          {/* ⚠ O portal CONSERTOU a aritmética da sua proposta — ele precisa saber.
+                              O aviso era gerado e morria no caminho; o fornecedor via um preço que
+                              não digitou, sem nada dizendo quem o mudou. */}
+                          {l.avisoPdf && (
+                            <p className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-1 mt-1">
+                              ⚠ Ao ler seu PDF: {l.avisoPdf}
+                            </p>
+                          )}
                           {l.observacaoRM && (
                             <p className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded px-1.5 py-1 mt-1 whitespace-pre-wrap break-words">
                               {l.observacaoRM}
