@@ -56,7 +56,34 @@ const schema = z.object({
     message: "Informe se o frete é CIF (entrega do fornecedor) ou FOB (coleta pela Torg).",
   }),
   observacao: z.string().optional().nullable(),
-});
+})
+  // ⚠⚠ AS MESMAS REGRAS DA TELA, TAMBÉM AQUI (Matheus, 21/09/2026: "não deixe o fornecedor
+  // conseguir enviar a proposta sem preencher os campos obrigatórios"). Até 21/09 só o frete
+  // tinha as duas travas; CNPJ, número da proposta, prazo e pagamento eram obrigatórios apenas
+  // no formulário — ou seja, obrigatórios só para quem não tivesse motivo de burlá-los. Aba
+  // velha aberta antes desta versão, reenvio e POST fora da tela passavam.
+  //
+  // ⚠ `superRefine` e campos `.optional()`, NUNCA `z.undefined()`: na v4 do Zod a chave ausente
+  // falha com "expected nonoptional", e a mensagem que chega ao fornecedor vira lixo.
+  //
+  // ⚠ Nada aqui aperta mais que a tela. Envio legítimo já passa pelas seis regras no cliente,
+  // então isto não rejeita nada que funciona hoje.
+  .superRefine((v, ctx) => {
+    const exigir = (campo, ok, message) => {
+      if (!ok) ctx.addIssue({ code: "custom", path: [campo], message });
+    };
+    const doc = String(v.cnpj ?? "").replace(/\D/g, "");
+    exigir("cnpj", doc.length === 14 || doc.length === 11,
+      "Informe o CNPJ (14 dígitos) ou o CPF (11 dígitos) da pessoa física.");
+    exigir("numeroProposta", !!String(v.numeroProposta ?? "").trim(),
+      "Informe o número da proposta.");
+    exigir("prazoEntrega", !!String(v.prazoEntrega ?? "").trim(),
+      "Informe o prazo de entrega.");
+    exigir("condicaoPagamento", !!String(v.condicaoPagamento ?? "").trim(),
+      "Informe a condição de pagamento.");
+    // ⚠ O preço continua sendo checado DEPOIS do schema (linha ~109), contra os itens que são
+    // mesmo desta cotação. Aqui só dá para ver o que o cliente mandou; lá se sabe o que vale.
+  });
 
 export async function POST(req, { params }) {
   const rl = postLimiter(req);

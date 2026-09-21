@@ -20,6 +20,19 @@ import { POST as marcarVencedor } from "@/app/api/cotacao-item/[id]/vencedor/rou
 const req = (url, body) =>
   new Request(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
+// ⚠⚠ OS OBRIGATÓRIOS DA ROTA, em um lugar só. Em 21/09/2026 CNPJ, número da proposta, prazo e
+// condição de pagamento passaram a ser exigidos NO SERVIDOR, não só no formulário (Matheus: "não
+// deixe o fornecedor conseguir enviar a proposta sem preencher os campos obrigatórios"). Os testes
+// abaixo começaram a tomar 400 — sinal certo: o contrato mudou de propósito, como já tinha
+// acontecido com o frete em 17/09.
+const OBRIGATORIOS = {
+  tipoFrete: "CIF",
+  cnpj: "45.987.062/0001-77",
+  numeroProposta: "20250698",
+  prazoEntrega: "3 dias úteis",
+  condicaoPagamento: "28/42/56",
+};
+
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.role.mockResolvedValue({ id: "u1", name: "Comprador" });
@@ -46,9 +59,7 @@ describe("o fornecedor marca 'não tenho' e ainda assim digita preço", () => {
         { cotacaoItemId: "ci-sem", precoUnit: 2, qtdCotada: 109.2, icmsPct: 12, ipiPct: 5, semEstoque: true },
         { cotacaoItemId: "ci-com", precoUnit: 7.8, qtdCotada: 109.2, semEstoque: false },
       ],
-      // ⚠ `tipoFrete` virou OBRIGATÓRIO na rota em 17/09/2026. Este teste não o mandava e passou a
-      // receber 400 — sinal certo: o contrato mudou de propósito, não é regressão.
-      tipoFrete: "CIF",
+      ...OBRIGATORIOS,
     }), { params: { token: "tk" } });
     expect(r.status).toBe(200);
 
@@ -131,8 +142,11 @@ describe("frete obrigatório na submissão", () => {
     mockPrisma.rMItem.updateMany.mockResolvedValue({ count: 0 });
   });
 
+  // ⚠ Traz os demais obrigatórios, para o teste do FRETE medir o frete e não esbarrar no CNPJ.
   const corpo = (extra) => ({
     itens: [{ cotacaoItemId: "ci-com", precoUnit: 7.8, qtdCotada: 109.2, semEstoque: false }],
+    ...OBRIGATORIOS,
+    tipoFrete: undefined,
     ...extra,
   });
 

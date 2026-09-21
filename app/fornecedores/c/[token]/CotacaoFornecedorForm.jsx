@@ -1,6 +1,7 @@
 "use client";
 import { parseObservacaoCotacao } from "@/lib/cotacao-observacao";
 import BlocoObservacao from "@/components/BlocoObservacao";
+import PreencherEmMassa from "./PreencherEmMassa";
 import CampoData from "@/components/CampoData";
 import { useState, useMemo, useRef } from "react";
 import { dataBR, dataHoraBR } from "@/lib/data-br";
@@ -388,6 +389,71 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     [linhas]
   );
 
+  /**
+   * Recusa o envio E LEVA O FORNECEDOR ATÉ O CAMPO.
+   *
+   * ⚠⚠ AVISAR NÃO É O MESMO QUE MOSTRAR ONDE. Medido em 21/09/2026, reproduzindo a tela: o aviso
+   * aparece e a página até rola para o topo — mas ele diz o QUE falta, e o campo pode estar quatro
+   * blocos abaixo. A SOUFER anexou o PDF, esbarrou numa destas regras e foi embora; do lado de cá
+   * ficou uma cotação "Aguardando" com um PDF pendurado, que se lê como proposta recebida.
+   *
+   * ⚠ `campo` é o id do input. Sem id conhecido, degrada para o comportamento antigo (só a
+   * mensagem) em vez de quebrar.
+   */
+  const faltou = (campo, mensagem) => {
+    setErro(mensagem);
+    if (typeof document === "undefined") return;
+    const el = campo && document.getElementById(campo);
+    if (!el) return;
+    // ⚠⚠ DEPOIS DO COMMIT DO REACT, NÃO AGORA (medido em 21/09/2026). `setErro` acima insere a
+    // tarja de erro no TOPO do formulário, e o React só aplica isso no próximo commit. Rolando
+    // aqui, eu media o layout ANTIGO: a tarja entrava em seguida, empurrava tudo para baixo, e o
+    // campo terminava fora da tela — focado num lugar que o fornecedor não enxerga, que é pior
+    // que não rolar. Dois quadros porque o primeiro é o commit e o segundo já tem o layout final.
+    //
+    // ⚠ Instantâneo, não "smooth": a animação não terminava a tempo e dava o mesmo resultado.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      // ⚠ Acha o alvo do foco ANTES de rolar, e rola ATÉ ELE. Centralizar o CONTÊINER deixava o
+      // campo fora da tela quando o contêiner é alto: "falta preço" aponta para a tabela de
+      // itens, e centralizar a tabela põe a primeira linha acima da viewport.
+      // ⚠ Nem todo alvo é focável — a tabela é uma `div`; daí procurar o primeiro editável dentro.
+      const focavel = typeof el.focus === "function" && el.tabIndex >= 0
+        ? el
+        : el.querySelector("input:not([disabled]), select, textarea, button");
+      (focavel || el).scrollIntoView({ behavior: "auto", block: "center" });
+      if (focavel && typeof focavel.focus === "function") focavel.focus({ preventScroll: true });
+    }));
+  };
+
+  /**
+   * Aplica ICMS, IPI e/ou prazo em TODAS as linhas de uma vez. A barra vive em
+   * `PreencherEmMassa`; aqui fica só o efeito sobre as linhas.
+   *
+   * ⚠⚠ SOBRESCREVE O QUE JÁ ESTIVER LÁ, inclusive o que a leitura do PDF preencheu — foi a decisão
+   * combinada: o fluxo é "aplica em todos, depois ajusta os que quiser". Preencher só as vazias
+   * seria mais conservador e menos previsível, porque o resultado do clique dependeria do que o
+   * PDF por acaso tivesse acertado.
+   *
+   * ⚠ NÃO TOCA nas linhas marcadas "Não tenho": elas não têm preço nem prazo, e preencher
+   * contradiria a recusa que o próprio fornecedor acabou de registrar.
+   *
+   * @returns {string} a frase de confirmação que a barra mostra
+   */
+  const aplicarEmMassa = ({ icms, ipi, prazo }) => {
+    const usa = (v) => String(v ?? "").trim() !== "";
+    const recusadas = linhas.filter((l) => l.semEstoque).length;
+    const tocadas = linhas.length - recusadas;
+    setLinhas((prev) => prev.map((l) => (l.semEstoque ? l : {
+      ...l,
+      ...(usa(icms) ? { icmsPct: icms } : {}),
+      ...(usa(ipi) ? { ipiPct: ipi } : {}),
+      ...(usa(prazo) ? { prazoEntrega: prazo } : {}),
+    })));
+    return `Aplicado em ${tocadas} ${tocadas === 1 ? "item" : "itens"}`
+      + (recusadas ? ` · ${recusadas} marcado(s) "Não tenho" não foram alterados` : "")
+      + ". Ajuste individualmente o que for diferente.";
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setErro("");
@@ -405,25 +471,25 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
       .filter((l) => l.precoUnit > 0 || l.semEstoque);
     const itensComPreco = itens.filter((l) => l.precoUnit > 0);
     if (itensComPreco.length === 0) {
-      return setErro("Preencha pelo menos um preco unitario maior que zero.");
+      return faltou("tabela-itens", "Preencha pelo menos um preco unitario maior que zero.");
     }
     const cnpjLimpo = cnpj.replace(/\D/g, "");
     if (cnpjLimpo.length !== 14 && cnpjLimpo.length !== 11) {
-      return setErro("Informe o CNPJ (14 dígitos) ou o CPF (11 dígitos) da pessoa física.");
+      return faltou("campo-cnpj", "Informe o CNPJ (14 dígitos) ou o CPF (11 dígitos) da pessoa física.");
     }
     if (!numeroProposta.trim()) {
-      return setErro("Informe o numero da proposta.");
+      return faltou("campo-numeroProposta", "Informe o numero da proposta.");
     }
     if (!prazoEntrega.trim()) {
-      return setErro("Informe o prazo de entrega.");
+      return faltou("campo-prazoEntrega", "Informe o prazo de entrega.");
     }
     // ⚠ Obrigatório, como prazo e pagamento. Deixar opcional devolveria a maioria das cotações em
     // branco e o comprador continuaria sem saber o que precisa coletar — que é o motivo do campo.
     if (!tipoFrete) {
-      return setErro("Informe se o frete é CIF (entrega do fornecedor) ou FOB (coleta pela Torg).");
+      return faltou("campo-tipoFrete", "Informe se o frete é CIF (entrega do fornecedor) ou FOB (coleta pela Torg).");
     }
     if (!condicaoPagamento.trim()) {
-      return setErro("Informe a condicao de pagamento.");
+      return faltou("campo-condicaoPagamento", "Informe a condicao de pagamento.");
     }
     setEnviando(true);
     setEnviadoAgora(false);
@@ -918,13 +984,17 @@ dataHoraBR(new Date())
           </div>
 
           {/* Itens */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div id="tabela-itens" className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100">
               <h2 className="text-lg font-semibold text-torg-dark">Itens solicitados</h2>
               <p className="text-xs text-torg-gray mt-1">
                 Preencha o preço unitário e ajuste a quantidade se necessário. Itens sem preço serão ignorados.
                 {" "}<strong className="text-red-700">Se você não tem algum item, clique em &quot;Não tenho&quot; na linha dele</strong> — não preencha preço nesse caso.
               </p>
+
+              {/* ⚠ Fica ACIMA da tabela, não abaixo: quem vai preencher precisa ver o atalho
+                  ANTES de começar a digitar linha a linha, senão o descobre quando já não serve. */}
+              {!jaEnviou && <PreencherEmMassa onAplicar={aplicarEmMassa} />}
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -1143,6 +1213,7 @@ dataHoraBR(new Date())
                 <label className="block text-sm font-medium text-torg-dark mb-1">CNPJ ou CPF *</label>
                 <input
                   type="text"
+                  id="campo-cnpj"
                   value={cnpj}
                   onChange={(e) => setCnpj(e.target.value)}
                   placeholder="00.000.000/0001-00"
@@ -1165,6 +1236,7 @@ dataHoraBR(new Date())
                 <input
                   type="text"
                   value={numeroProposta}
+                  id="campo-numeroProposta"
                   onChange={(e) => setNumeroProposta(e.target.value)}
                   placeholder="Ex: PROP-2026-001"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-torg-blue"
@@ -1196,6 +1268,7 @@ dataHoraBR(new Date())
                 <input
                   type="text"
                   value={prazoEntrega}
+                  id="campo-prazoEntrega"
                   onChange={(e) => setPrazoEntrega(e.target.value)}
                   placeholder="Ex: 15 dias uteis"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
@@ -1207,6 +1280,7 @@ dataHoraBR(new Date())
                 <input
                   type="text"
                   value={condicaoPagamento}
+                  id="campo-condicaoPagamento"
                   onChange={(e) => setCondicaoPagamento(e.target.value)}
                   placeholder="Ex: 30 dias / 28 dias com 2% desc."
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue"
@@ -1220,7 +1294,7 @@ dataHoraBR(new Date())
                   o layout, ajuste para ficar alinhado as caixas").
                   ⚠ Continua colado no prazo, que era o pedido original: é a linha seguinte, não
                   outro bloco. Quem responde "quando chega" responde "e chega como" em seguida. */}
-              <div className="sm:col-span-2">
+              <div id="campo-tipoFrete" className="sm:col-span-2">
                 <span className="block text-sm font-medium text-torg-dark mb-1">Frete *</span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {Object.values(FRETES).map((f) => {
