@@ -1,7 +1,12 @@
 {
-  "build": 3302,
-  "gerado": "2026-09-21T17:18:35.209Z",
+  "build": 3303,
+  "gerado": "2026-09-21T17:36:52.011Z",
   "commits": [
+    {
+      "hash": "4df475230e",
+      "data": "21/09/2026",
+      "titulo": "Cotação: a observação da RM na cara do fornecedor, e o frete na lista"
+    },
     {
       "hash": "53e38de619",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "eb12db037a",
       "data": "18/09/2026",
       "titulo": "Prévia da cobrança para quem está logado, para ver antes de o fornecedor ver"
-    },
-    {
-      "hash": "2843fc7e38",
-      "data": "18/09/2026",
-      "titulo": "Cobrar os atrasados: um e-mail por fornecedor, com os pedidos e as RMs dele"
     }
   ]
 }

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { BarChart3, CheckCircle2, AlertCircle, Loader2, Truck, Award, Wand2, X, XCircle, Mail, Send, TrendingDown } from "lucide-react";
 import { labelCategoria } from "@/lib/op-categorias";
 import { numeroBR } from "@/lib/numero-br";
-import { contradicaoDeDisponibilidade } from "@/lib/cotacao-indisponibilidade";
+import { ofertaValida, contradicaoDeDisponibilidade } from "@/lib/cotacao-indisponibilidade";
 
 const fmtMoeda = (v) =>
   v != null && v > 0 ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -203,7 +203,9 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
     const ids = new Set();
     for (const it of itens) {
       for (const cell of it.celulas) {
-        if (cell?.precoUnit > 0) ids.add(cell.cotacaoId);
+        // ⚠ Recusar TODOS os itens é resposta, e quem respondeu merece coluna — senão o fornecedor
+        // que disse "não tenho nada" some da tela e fica igual a quem nunca abriu o link.
+        if (ofertaValida(cell) || cell?.semEstoque) ids.add(cell.cotacaoId);
       }
     }
     return fornecedoresTodos.filter((f) => ids.has(f.cotacaoId));
@@ -366,7 +368,11 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
   }
   for (const it of itensTodos) {
     for (const cell of it.celulas) {
-      if (cell?.vencedor) {
+      // ⚠⚠ `vencedor` SOZINHO NÃO BASTA (achado do Codex, 21/09/2026). A rota pública grava a
+      // indisponibilidade sem limpar a marca, então um item que já era vencedor podia voltar como
+      // "não tenho" e continuar somando — com preço zero. E se o fornecedor dele não estiver na
+      // lista filtrada, o balde abaixo nem existe: `undefined.push` derrubava a tela inteira.
+      if (cell?.vencedor && ofertaValida(cell) && itensPorFornecedor[cell.cotacaoId]) {
         const ipiPct = Number(cell.ipiPct) || 0;
         const qtd = Number(cell.qtdCotada) || 0;
         const precoUnit = Number(cell.precoUnit) || 0;
@@ -417,7 +423,8 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
   }
   const totalAGerarLiquido = Object.values(totaisAGerarLiquidoPorFornecedor).reduce((s, n) => s + n, 0);
   const fornecedoresVencedores = fornecedores.filter((f) => itensPorFornecedor[f.cotacaoId].length > 0);
-  const itensSemVencedor = itens.filter((it) => !it.semCotacao && !it.celulas.some((c) => c?.vencedor));
+  // ⚠ Mesma razão: um vencedor residual sem oferta faria a pendência de decisão SUMIR da tela.
+  const itensSemVencedor = itens.filter((it) => !it.semCotacao && !it.celulas.some((c) => c?.vencedor && ofertaValida(c)));
 
   return (
     <>
@@ -512,7 +519,7 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
                 // Conta itens dessa cotação com preço (potenciais vencedores)
                 const cellsDoForn = itens
                   .map((it) => it.celulas.find((c) => c?.cotacaoId === f.cotacaoId))
-                  .filter((c) => c && c.precoUnit > 0);
+                  .filter((c) => ofertaValida(c));
                 const totalCells = cellsDoForn.length;
                 const vencidos = cellsDoForn.filter((c) => c.vencedor).length;
                 const todosVencedores = totalCells > 0 && vencidos === totalCells;
@@ -562,6 +569,7 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
               // Fat Torg = liquido com credito ICMS).
               const comparacoes = it.celulas
                 .filter(Boolean)
+                .filter((c) => ofertaValida(c))
                 .map((c) => c.precoComparacao || c.precoLiquido || c.precoUnit)
                 .filter((p) => p > 0);
               const menorLiquido = comparacoes.length ? Math.min(...comparacoes) : null;
@@ -623,12 +631,21 @@ export default function MapaCotacaoClient({ op, apiBase: apiBaseProp }) {
                   ) : (
                     fornecedores.map((f) => {
                     const cell = it.celulas.find((c) => c?.cotacaoId === f.cotacaoId);
-                    if (!cell || cell.precoUnit <= 0) {
+                    // ⚠ `ofertaValida` e não `precoUnit <= 0`: item marcado "não tenho" que tenha
+                    // ficado com preço antigo no banco precisa sair como recusa, não como oferta.
+                    if (!ofertaValida(cell)) {
                       return (
                         <td key={f.cotacaoId} className="px-3 py-2 text-center text-xs">
                           {cell?.semEstoque ? (
-                            <span className="text-red-400 font-medium" title="Fornecedor informou que não tem este item">
-                              s/ estoque
+                            // ⚠⚠ "NÃO TEM", NÃO "s/ estoque". Matheus (21/09/2026) pediu com estas
+                            // palavras, e elas são as do próprio botão que o fornecedor aperta
+                            // ("NÃO TENHO") — quem confere a proposta contra a tela dele lê a mesma
+                            // coisa nos dois lados. ⚠ E em vermelho FORTE, com fundo: o "—" do lado
+                            // significa "não respondeu", e a diferença entre os dois é a decisão de
+                            // cobrar o fornecedor ou riscá-lo do item.
+                            <span className="inline-block rounded px-1.5 py-0.5 bg-red-50 text-red-700 font-semibold text-[11px]"
+                              title="O fornecedor respondeu que NÃO TEM este item">
+                              NÃO TEM
                             </span>
                           ) : (
                             <span className="text-torg-gray">—</span>
@@ -1427,7 +1444,10 @@ function ModalResultados({ resultados, onClose }) {
 }
 
 // Constrói matriz: lista de itens (linhas) × fornecedores (colunas)
-function buildMatriz(op) {
+// ⚠ Exportada para o teste. A matriz é onde a recusa do fornecedor vira (ou não vira) célula, e
+// essa regra precisa de prova própria — o componente inteiro tem 1.574 linhas e não se testa de
+// ponta a ponta por um detalhe de uma célula.
+export function buildMatriz(op) {
   const fornMap = new Map(); // cotacaoId -> { cotacaoId, fornecedorNome }
   const itensMap = new Map(); // rmItemId -> { ...item, celulas: [] }
 
@@ -1455,7 +1475,11 @@ function buildMatriz(op) {
       if (cot.status !== "RECEBIDA") continue;
 
       for (const ci of cot.itens) {
-        if (!ci.precoUnit || ci.precoUnit <= 0) continue;
+        // ⚠⚠ A RECUSA EXPLÍCITA TAMBÉM VIRA CÉLULA. Antes, `precoUnit <= 0` descartava tudo — e
+        // quem clicou em "Não tenho" (preço 0) saía da matriz, virando o mesmo "—" de quem não
+        // respondeu. O ramo que desenha "s/ estoque" existia e era CÓDIGO MORTO. Quem separa
+        // oferta de resposta agora é `ofertaValida`, nas contas, não aqui.
+        if (!ci.semEstoque && (!ci.precoUnit || ci.precoUnit <= 0)) continue;
 
         // Pula itens que nao pertencem a essa OP (ex: cotacao consolidada
         // com itens de outra OP, ou cotacao deslocada por outro motivo).

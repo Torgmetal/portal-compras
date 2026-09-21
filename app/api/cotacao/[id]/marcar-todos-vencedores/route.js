@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { ofertaValida } from "@/lib/cotacao-indisponibilidade";
 
 const schema = z.object({ vencedor: z.boolean() });
 
@@ -22,11 +23,14 @@ export async function POST(req, { params }) {
 
   const cotacao = await prisma.cotacao.findUnique({
     where: { id: params.id },
-    include: { itens: { select: { id: true, rmItemId: true, precoUnit: true } } },
+    include: { itens: { select: { id: true, rmItemId: true, precoUnit: true, semEstoque: true } } },
   });
   if (!cotacao) return NextResponse.json({ error: "Cotação não encontrada." }, { status: 404 });
 
-  const itensComPreco = cotacao.itens.filter((it) => it.precoUnit > 0);
+  // ⚠ `ofertaValida` e não só o preço: marcar TODOS não pode arrastar junto o item em que o
+  // fornecedor clicou "Não tenho". A marcação individual já barrava isso
+  // (`app/api/cotacao-item/[id]/vencedor`); em lote, não — e as duas precisam dizer o mesmo.
+  const itensComPreco = cotacao.itens.filter(ofertaValida);
 
   await prisma.$transaction(async (tx) => {
     if (body.vencedor) {

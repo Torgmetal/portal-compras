@@ -157,6 +157,15 @@ export async function POST(req, { params }) {
           ipiPct: it.ipiPct ?? null,
           observacao: it.observacao || null,
           semEstoque: it.semEstoque || false,
+          // ⚠⚠ MARCAR "NÃO TENHO" TIRA A MARCA DE VENCEDOR (achado do Codex, 21/09/2026). O
+          // fornecedor pode reenviar a cotação depois de o comprador já ter escolhido vencedores —
+          // e até aqui a indisponibilidade era gravada por cima SEM mexer em `vencedor`. O item
+          // ficava vencedor com preço zero: entrava no total do fornecedor valendo R$ 0,00 e sumia
+          // da lista de "itens sem vencedor", que é onde o comprador vê o que falta decidir.
+          // ⚠ Só DESMARCA, nunca marca: escolher vencedor é decisão de quem compra, e esta rota é
+          // pública. Medido em 21/09/2026: 0 itens no banco nesse estado — o caminho existia e
+          // ainda não tinha sido percorrido.
+          ...(it.semEstoque ? { vencedor: false } : {}),
           prazoEntrega: it.prazoEntrega ? new Date(it.prazoEntrega) : null,
         },
       })

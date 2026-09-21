@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { ofertaValida } from "@/lib/cotacao-indisponibilidade";
 
 export async function POST(req, { params }) {
   let user;
@@ -64,7 +65,7 @@ export async function POST(req, { params }) {
       ],
     },
     include: {
-      itens: { select: { id: true, rmItemId: true, precoUnit: true, icmsPct: true, ipiPct: true } },
+      itens: { select: { id: true, rmItemId: true, precoUnit: true, semEstoque: true, icmsPct: true, ipiPct: true } },
     },
   });
 
@@ -72,7 +73,9 @@ export async function POST(req, { params }) {
   const cotItensPorRmItem = new Map();
   for (const cot of cotacoes) {
     for (const ci of cot.itens) {
-      if (!ci.precoUnit || ci.precoUnit <= 0) continue;
+      // ⚠ Sugerir o menor preço não pode sugerir item recusado. Hoje a recusa vem com preço 0 e
+      // já cairia fora; a guarda explícita é para o dia em que vier com preço antigo por cima.
+      if (!ofertaValida(ci)) continue;
       if (!cotItensPorRmItem.has(ci.rmItemId)) cotItensPorRmItem.set(ci.rmItemId, []);
       cotItensPorRmItem.get(ci.rmItemId).push(ci);
     }
