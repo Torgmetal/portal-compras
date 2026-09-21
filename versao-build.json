@@ -1,7 +1,12 @@
 {
-  "build": 3307,
-  "gerado": "2026-09-21T19:11:22.627Z",
+  "build": 3308,
+  "gerado": "2026-09-21T19:25:15.001Z",
   "commits": [
+    {
+      "hash": "7ff1cf9b69",
+      "data": "21/09/2026",
+      "titulo": "Conferência: a planilha diz quando cada peça foi conferida, sem abrir as outras"
+    },
     {
       "hash": "1617eebdd2",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "25d2ffbb93",
       "data": "18/09/2026",
       "titulo": "Desenho da inspeção vinha cortado: a página girada não era tratada"
-    },
-    {
-      "hash": "20b77e3d9c",
-      "data": "18/09/2026",
-      "titulo": "Remove o \"Enviar teste para mim\" da cobrança, como combinado"
     }
   ]
 }

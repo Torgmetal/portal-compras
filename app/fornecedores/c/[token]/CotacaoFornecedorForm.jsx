@@ -3,6 +3,7 @@ import { parseObservacaoCotacao } from "@/lib/cotacao-observacao";
 import BlocoObservacao from "@/components/BlocoObservacao";
 import PreencherEmMassa from "./PreencherEmMassa";
 import AssociarItensPdf from "./AssociarItensPdf";
+import { casarItens } from "@/lib/cotacao-matching";
 import CampoData from "@/components/CampoData";
 import { useState, useMemo, useRef } from "react";
 import { dataBR, dataHoraBR } from "@/lib/data-br";
@@ -160,17 +161,16 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
       preencherLinha(linhasNovas[idx], itPdf);
       usados.add(idx); idsAuto.add(linhasNovas[idx].id); casados++; aproveitados.add(itPdf);
     }
-    for (const itPdf of semIndice) {
-      let melhorIdx = -1, melhorScore = 0.5;
-      for (let i = 0; i < linhasNovas.length; i++) {
-        if (usados.has(i)) continue;
-        const sc = scoreMatchTokens(itPdf.descricao, linhasNovas[i].descricao);
-        if (sc > melhorScore) { melhorScore = sc; melhorIdx = i; }
-      }
-      if (melhorIdx >= 0) {
-        preencherLinha(linhasNovas[melhorIdx], itPdf);
-        usados.add(melhorIdx); idsAuto.add(linhasNovas[melhorIdx].id); casados++; aproveitados.add(itPdf);
-      }
+    // ⚠ O que a IA não indexou passa pelo MESMO casamento do caminho regex — assinatura
+    // dimensional, quantidade e palavras. Antes era uma cópia do laço guloso por texto, e os dois
+    // caminhos podiam discordar sobre o mesmo PDF.
+    const restantes = linhasNovas.map((l, i) => ({ ...l, _i: i, precoUnit: usados.has(i) ? "x" : l.precoUnit }));
+    const { pares } = casarItens(semIndice, restantes, { scoreTexto: scoreMatchTokens });
+    for (const par of pares) {
+      const alvo = linhasNovas[restantes[par.idxLinha]._i];
+      preencherLinha(alvo, semIndice[par.idxPdf]);
+      usados.add(restantes[par.idxLinha]._i); idsAuto.add(alvo.id); casados++;
+      aproveitados.add(semIndice[par.idxPdf]);
     }
     setLinhas(linhasNovas);
     setAutoFilled(idsAuto);
@@ -198,26 +198,22 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
   }
   function aplicarItensFallback(itensPdf) {
     const linhasNovas = [...linhas];
-    const usados = new Set();
     const idsAuto = new Set();
     const aproveitados = new Set();
     let casados = 0;
-    for (const itPdf of itensPdf) {
-      let melhorIdx = -1, melhorScore = 0.5;
-      for (let i = 0; i < linhasNovas.length; i++) {
-        if (usados.has(i)) continue;
-        const sc = scoreMatchTokens(itPdf.descricao, linhasNovas[i].descricao);
-        if (sc > melhorScore) { melhorScore = sc; melhorIdx = i; }
-      }
-      if (melhorIdx >= 0) {
-        usados.add(melhorIdx); casados++; aproveitados.add(itPdf);
-        const l = linhasNovas[melhorIdx];
-        // ⚠ O MESMO `preencherLinha` do caminho da IA. Este ramo tinha uma cópia própria da
-        // atribuição, e foi por ela que unidade e aviso do PDF não chegavam quando a leitura caía
-        // no regex — duas cópias da mesma regra, a segunda sempre esquecida.
-        preencherLinha(l, itPdf);
-        idsAuto.add(l.id);
-      }
+    // ⚠⚠ A DECISÃO SAIU DAQUI para `lib/cotacao-matching`. O laço era guloso e na ORDEM DO
+    // ARQUIVO: o primeiro item levava a linha que era claramente de outro, e só comparava
+    // palavras — foi o que deu 0 de 9 na T122-001 da SOUFER.
+    const { pares } = casarItens(itensPdf, linhasNovas, { scoreTexto: scoreMatchTokens });
+    for (const par of pares) {
+      const l = linhasNovas[par.idxLinha];
+      // ⚠ O MESMO `preencherLinha` do caminho da IA. Este ramo tinha uma cópia própria da
+      // atribuição, e foi por ela que unidade e aviso do PDF não chegavam quando a leitura caía
+      // no regex — duas cópias da mesma regra, a segunda sempre esquecida.
+      preencherLinha(l, itensPdf[par.idxPdf]);
+      idsAuto.add(l.id);
+      aproveitados.add(itensPdf[par.idxPdf]);
+      casados++;
     }
     setLinhas(linhasNovas);
     setAutoFilled(idsAuto);
