@@ -1,7 +1,12 @@
 {
-  "build": 3294,
-  "gerado": "2026-09-21T12:28:54.521Z",
+  "build": 3295,
+  "gerado": "2026-09-21T13:09:54.936Z",
   "commits": [
+    {
+      "hash": "3273d9f1",
+      "data": "21/09/2026",
+      "titulo": "Cotação: fornecedor da Vendor List sem e-mail (ou com dois) parava o envio em silêncio"
+    },
     {
       "hash": "cc377795",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "6a4ffe4a",
       "data": "17/09/2026",
       "titulo": "Planejamento pode excluir a marca errada, e a LPC para de duplicar em silêncio"
-    },
-    {
-      "hash": "972faa2e",
-      "data": "17/09/2026",
-      "titulo": "Dois crons parados em silêncio: o do PCP há 17 dias, o do CMR há 60 horas"
     }
   ]
 }

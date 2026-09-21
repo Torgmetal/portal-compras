@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { sendEmail } from "@/lib/email";
 import { calcularAbatimentoEstoque } from "@/lib/cotacao-estoque";
 import { mapearFDPorRM, itemEhFD } from "@/lib/faturamento-direto";
+import { aquecerBanco, withDbRetry } from "@/lib/db-retry";
+import { gravarCotacoes, OPCOES_TX } from "@/lib/cotacao-envio-gravacao";
+import { log } from "@/lib/log";
+
+const registro = log("api/cotacao/enviar");
+
+// ⚠ 7 fornecedores × 9 itens da T122-001 levaram a transação além dos 10 s padrão da função
+// somados aos e-mails (21/09/2026). A gravação agora é em lote, mas o e-mail continua um por
+// fornecedor, e o Resend não tem pressa.
+export const maxDuration = 60;
 
 const fornecedorSchema = z.object({
   fornecedorId: z.string().optional().nullable(), // ID do cadastro unificado
@@ -124,6 +133,10 @@ export async function POST(req) {
   }
 
   const prazo = body.prazoResposta ? new Date(body.prazoResposta) : null;
+  if (prazo && Number.isNaN(prazo.getTime())) {
+    // ⚠ Data inválida entregue ao Prisma vira exceção solta → 500 sem explicação na tela.
+    return NextResponse.json({ error: `Prazo de resposta inválido: "${body.prazoResposta}".` }, { status: 400 });
+  }
 
   // Só as RMs que ainda têm item na cotação após o abatimento: uma RM cujos
   // itens foram todos cobertos pelo estoque não pode virar EM_COTACAO, nem
@@ -142,93 +155,40 @@ export async function POST(req) {
   const algumFD = itensCotaveis.some((it) => itemEhFD(it, fdPorRM));
   const faturamento = algumFD ? "Cliente" : "Torg";
 
-  let cotacoesCriadas = [];
-  await prisma.$transaction(async (tx) => {
-    // Cria todas as cotações (uma por fornecedor) em paralelo
-    cotacoesCriadas = await Promise.all(body.fornecedores.map(async (f) => {
-      const token = randomUUID();
-      const cot = await tx.cotacao.create({
-        data: {
-          rmId: rmPrincipal.id,
-          fornecedorId: f.fornecedorId || null,
-          fornecedorNome: f.nome.trim().toUpperCase(),
-          fornecedorEmail: f.email,
-          cnpj: f.cnpj || null,
-          nCodOmie: f.nCodOmie || null,
+  // ⚠⚠ O NEON SOME POR ALGUNS SEGUNDOS (P1001 "Can't reach database server") — apareceu no log
+  // de produção no mesmo horário do 500 da T122-001 (21/09/2026 09:59). `aquecerBanco` acorda a
+  // compute antes da transação; `withDbRetry` repete a transação INTEIRA se o blip vier no meio —
+  // é seguro porque a anterior foi desfeita por completo (nada commitado, nenhum e-mail enviado).
+  // Qualquer outro erro vira 500 em JSON com a causa: a tela mostra, a pessoa relata.
+  let cotacoesCriadas;
+  try {
+    await aquecerBanco(prisma, { tentativas: 3, esperaMs: 1500 });
+    cotacoesCriadas = await withDbRetry(
+      () => prisma.$transaction(
+        (tx) => gravarCotacoes(tx, {
+          fornecedores: body.fornecedores,
+          itensCotaveis,
+          rmsEnvolvidas,
+          rmPrincipal,
           faturamento,
-          prazoResposta: prazo,
-          observacao: body.observacaoExtra || null,
-          token,
-          status: "PENDENTE",
-          itens: {
-            create: itensCotaveis.map((it) => {
-              const peso = Number(it.peso) || 0;
-              const ab = estoque.porItem.get(it.id);
-              // Sem resposta de estoque: cota a quantidade cheia (peso em KG p/ aço).
-              if (!ab || ab.barrasDisponiveis <= 0) {
-                return { rmItemId: it.id, precoUnit: 0, qtdCotada: peso > 0 ? peso : it.qtd };
-              }
-              return {
-                rmItemId: it.id,
-                precoUnit: 0,
-                qtdCotada: ab.qtdCotada,
-                qtdPecasCotada: ab.barrasACotar,
-                estoqueAbatidoQtd: ab.barrasDisponiveis,
-              };
-            }),
-          },
-        },
-      });
-      // Registra envio nas RMs que de fato têm itens na cotação (paralelo por RM)
-      await Promise.all(rmsEnvolvidas.map((rm) =>
-        tx.envio.create({
-          data: { rmId: rm.id, fornecedorNome: f.nome.trim().toUpperCase(), fornecedorEmail: f.email },
-        })
-      ));
-      return {
-        id: cot.id,
-        token: cot.token,
-        fornecedorNome: f.nome.trim().toUpperCase(),
-        fornecedorEmail: f.email,
-        rmsVinculadas: rmsEnvolvidas.map((r) => r.numero),
-      };
-    }));
-
-    // Marca itens PENDENTES como EM_COTACAO
-    await tx.rMItem.updateMany({
-      where: {
-        id: { in: itensCotaveis.map((i) => i.id) },
-        status: "PENDENTE",
-      },
-      data: { status: "EM_COTACAO" },
-    });
-
-    // Atualiza status das RMs que estavam ABERTA para EM_COTACAO (batch)
-    const rmIdsAberta = rmsEnvolvidas.filter((rm) => rm.status === "ABERTA").map((rm) => rm.id);
-    if (rmIdsAberta.length > 0) {
-      await tx.rM.updateMany({
-        where: { id: { in: rmIdsAberta } },
-        data: { status: "EM_COTACAO" },
-      });
-    }
-
-    await tx.auditLog.create({
-      data: {
-        userId: user.id,
-        action: "enviar_cotacao",
-        entity: "RM",
-        entityId: rmPrincipal.id,
-        diff: {
-          rmsVinculadas: rmsEnvolvidas.map((r) => r.numero),
-          fornecedores: body.fornecedores.length,
-          itens: itensCotaveis.length,
-          prazo: body.prazoResposta || null,
-          estoqueAbatidos: estoque.abatidos.length || undefined,
-          estoqueExcluidos: estoque.excluidos.length || undefined,
-        },
-      },
-    });
-  });
+          prazo,
+          observacao: body.observacaoExtra,
+          estoque,
+          user,
+          prazoTexto: body.prazoResposta,
+        }),
+        OPCOES_TX
+      ),
+      { tentativas: 2, esperaMs: 1500 }
+    );
+  } catch (e) {
+    registro.erro("[enviar] falha ao gravar cotações:", e?.message);
+    const causa = String(e?.message || e || "erro desconhecido").split("\n").filter(Boolean).pop().slice(0, 300);
+    return NextResponse.json(
+      { ok: false, error: `Não consegui gravar a cotação (nada foi enviado): ${causa}. Tente de novo em alguns segundos; se repetir, avise o suporte com esta mensagem.` },
+      { status: 500 }
+    );
+  }
 
   // --- Envio automático de emails via Resend (best-effort, não bloqueia) ---
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `https://${process.env.VERCEL_URL || "workspace.torg.com.br"}`;

@@ -208,3 +208,17 @@ temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu
   é teste de componente + build. `scripts/revisao-codex/consultar.py` segue ausente do clone.
 - **Depende do usuário:** Compras repetir o envio e, se falhar, mandar o texto da tarja; clicar
   `fornecedor-email-multiplo` em Admin › Manutenção.
+
+### 21/09/2026 (10h) — o 500 depois da primeira correção (Claude)
+
+- **Relato:** "O servidor respondeu 500 sem detalhes" na T122-001 (7 fornecedores × 9 itens); nada gravado.
+- **Evidência:** função em `iad1`, Neon em `sa-east-1` (~120 ms/statement); a transação fazia ~85
+  statements (create aninhado por item) contra o teto padrão de 5 s; e o log ao vivo mostrou `P1001`
+  às 09:59:27. Dry-run da rota com os dados reais da T122-001 e escritas interceptadas: 6 statements agora.
+- **Feito:** `lib/cotacao-envio-gravacao.js` (lote + token como chave), rota com `aquecerBanco` +
+  `withDbRetry` + 500 em JSON com a causa + 400 para prazo inválido + `maxDuration 60`. Testes:
+  `testes/api/cotacao-enviar-gravacao` (6). 2446 passando; checar limpo; build ok.
+- **Para revisar (database):** `createManyAndReturn` com `select` no pooler (PgBouncer) — statement
+  único com N linhas; o aviso do `CLAUDE.md` sobre bulk write é para milhares de linhas, aqui são dezenas.
+- **Achado paralelo, não tratado:** `/api/qualidade/plp/[opNumero]` seleciona `indiceR` (inexistente em
+  `DocumentoQualidade`) → 500 desde 22/08.

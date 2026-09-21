@@ -48,3 +48,33 @@ virou obrigatório em 17/09 e nenhum fornecedor submeteu depois disso até 21/09
 evidência de que aquele lado quebrou, mas também não há evidência de que funciona.
 
 Ver [[torg_token_cotacao_no_payload]], [[torg_seguranca_pendencias]] (não regenerar token).
+
+### Segunda causa, no mesmo dia: "O servidor respondeu 500 sem detalhes" (21/09/2026, 09:5x)
+
+Com a tela já mostrando erro, Compras tentou a T122-001 (9 itens, ~7 fornecedores) e tomou 500.
+Nada foi gravado (itens seguiram PENDENTE, nenhuma `Cotacao`). Dois fatos medidos:
+
+- **A função da Vercel roda em `iad1` (Washington); o Neon fica em `sa-east-1` (São Paulo)** —
+  ~120 ms por statement. A transação escrevia LINHA A LINHA (`create` aninhado por cotação = 1
+  INSERT por item, `create` por Envio): 7 × 9 = 63 inserts de item + 7 cotações + 7 envios +
+  status ≈ **85 idas e voltas ≈ 10 s**, contra o teto **padrão de 5 s** da transação interativa do
+  Prisma (`Transaction already closed … expired transaction`).
+- **No mesmo horário o log ao vivo (`npx vercel logs <deployment> --scope torg`) mostrou
+  `P1001 Can't reach database server at ep-…-pooler.sa-east-1`** numa página do Comercial — o
+  Neon some por alguns segundos (ver [[torg-neon-infra]]).
+
+⚠⚠ **Gravação EM LOTE, não linha a linha** (`lib/cotacao-envio-gravacao.js`): `createManyAndReturn`
+das cotações (token gerado ANTES, e é por ele que se casa o que voltou — ordem do RETURNING não é
+garantia), `createMany` dos itens e dos envios, 2 `updateMany`, 1 audit = **6 statements**, qualquer
+tamanho. `OPCOES_TX = { timeout: 30 s, maxWait: 10 s }`; `maxDuration = 60`.
+
+⚠ `aquecerBanco` antes e `withDbRetry` em volta da transação INTEIRA — repetir é seguro porque a
+anterior foi desfeita por completo (nada commitado, nenhum e-mail). Erro que não é de conexão vira
+**500 em JSON com a causa** ("Não consegui gravar a cotação (nada foi enviado): …").
+
+⚠ **Como ler o log de produção quando o MCP da Vercel dá 403**: `npx vercel logs <url-do-deploy>
+--scope torg` em background, escrevendo num arquivo — só mostra o que acontece DEPOIS de ligar
+(não há histórico); ligar ANTES de pedir para a pessoa repetir o erro.
+
+⚠ Visto de passagem no mesmo log: `/api/qualidade/plp/[opNumero]` seleciona `indiceR`, campo que
+NÃO existe em `DocumentoQualidade` — a rota devolve 500 desde 22/08. Pendência separada.
