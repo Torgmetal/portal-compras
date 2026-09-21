@@ -4,20 +4,38 @@
     {
       "name": "Next.js Dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000
     },
     {
       "name": "Next.js Start (produção)",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "start"],
+      "runtimeArgs": [
+        "run",
+        "start"
+      ],
       "port": 3000
     },
     {
       "name": "Prisma Studio",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["prisma", "studio"],
+      "runtimeArgs": [
+        "prisma",
+        "studio"
+      ],
       "port": 5555
+    },
+    {
+      "name": "Next.js Demo (3002, banco torg_demo)",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/vitorcosta/dev/portal-compras-demo && npm run demo"
+      ],
+      "port": 3002
     }
   ]
 }

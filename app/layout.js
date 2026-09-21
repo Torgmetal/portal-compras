@@ -5,6 +5,7 @@ import NextAuthProvider from "@/components/SessionProvider";
 import TorguinhoChat from "@/components/TorguinhoChat";
 import AvisoVideoModal from "@/components/AvisoVideoModal";
 import FaixaSetembroAmarelo from "@/components/FaixaSetembroAmarelo";
+import FaixaDemo from "@/components/FaixaDemo";
 
 export const metadata = {
   title: "Workspace Torg",
@@ -17,6 +18,7 @@ export default function RootLayout({ children }) {
       <body className="bg-torg-blue-50/30">
         <NextAuthProvider>
           <StoreProvider>
+            <FaixaDemo />
             <FaixaSetembroAmarelo />
             {children}
             <Toast />

@@ -1,7 +1,12 @@
 {
-  "build": 3310,
-  "gerado": "2026-09-21T22:41:09.396Z",
+  "build": 3311,
+  "gerado": "2026-09-21T23:11:10.548Z",
   "commits": [
+    {
+      "hash": "6d3ec758",
+      "data": "21/09/2026",
+      "titulo": "Excel: o painel só congela quando o cabeçalho está perto do topo"
+    },
     {
       "hash": "eb18132f",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "6ca08768",
       "data": "18/09/2026",
       "titulo": "Registra no log de revisão o que foi feito hoje e o que ficou sem confirmar"
-    },
-    {
-      "hash": "54b49cb9",
-      "data": "18/09/2026",
-      "titulo": "Descrição da cota passa a ser digitável, e sobrevive à renumeração"
     }
   ]
 }

@@ -257,3 +257,13 @@ temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu
   grava em `OP.clienteContatos` — conferir se Comercial/Planejamento também deveriam poder liberar.
 - **(19h30)** Excel: `refinarPlanilhaExcel` só congela o painel se o cabeçalho da tabela está até a
   linha 10 (`LINHA_MAXIMA_CONGELAR`), com opt-out `_torgSemCongelar`. Teste `excel-congelar-painel` (3).
+
+## 21/09/2026 (noite) — Ambiente de demonstração (Claude)
+
+- **Pedido:** localhost com OP fake da Vale, da abertura à expedição, para apresentar ao cliente.
+- **Feito:** Postgres 17 local + `scripts/demo-banco.sh` (pg_dump → `torg_demo`); `lib/modo-demo.js`
+  (`MODO_DEMO=1`): e-mail não sai, Omie recusa/pedido `DEMO-…`, SharePoint grava em `DEMO/…` (pais
+  criados só em demo); `components/FaixaDemo.jsx`; `npm run demo` (3002) + launch; modelo
+  `docs/env-demo.exemplo`. Teste `modo-demo` (4). 2546 passando; build ok.
+- **Para revisar (security):** fora do modo demo nada muda (flag lida por `process.env`); conferir se
+  vale bloquear `MODO_DEMO=1` em produção (ex.: recusar quando `VERCEL_ENV === "production"`).
