@@ -243,3 +243,15 @@ temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu
   Testes: `inspecoes-desenho-anexo` (7) + `anexar-projeto` (3). 2470 passando; build ok.
   **Para revisar (security):** o `PUT` aceita URL do navegador — restrito ao host do blob e a PDF
   existente; conferir se convém amarrar também ao `tokenPayload` (relatorioId) do upload.
+
+## 21/09/2026 (14h30) — Contatos do cliente editáveis na OP + obras liberadas por login (Claude)
+
+- **Pedido:** "como eu vinculo as OPs para um usuário do cliente?" → "eu não consigo adicionar novos
+  e-mails" → "preciso deixar uma forma de conseguir liberar as OPs que eu quero que ele veja".
+- **Feito:** `PUT /api/comercial/op/[id]/contatos` (lista completa; `atualizarContatosCliente` carrega
+  função/telefones quando vêm), `ModalEditarContatosCliente` na aba Obra; `lib/cliente-obras.js` +
+  `GET/PUT /api/admin/usuarios/[id]/obras` (liberar = e-mail nos contatos da OP; revogar = tirar;
+  idempotente) + `ObrasDoCliente` na página do usuário CLIENTE. Testes: `contatos-cliente` (+1),
+  `op-contatos-editar` (4), `admin-usuario-obras` (7), `contatos-cliente-obra` (3). 2492 passando; build ok.
+- **Para revisar (security):** o `PUT` de obras é `requireAdminDoPortal` (allowlist Vitor/Matheus) e
+  grava em `OP.clienteContatos` — conferir se Comercial/Planejamento também deveriam poder liberar.

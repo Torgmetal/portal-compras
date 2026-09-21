@@ -7,6 +7,7 @@ import PropostaObraConsulta from "@/components/comercial/PropostaObraConsulta";
 import ReferenciasClienteResumo from "@/components/comercial/ReferenciasClienteResumo";
 import ModalReferenciasCliente from "@/components/comercial/ModalReferenciasCliente";
 import ModalContatosCliente from "@/components/comercial/ModalContatosCliente";
+import ModalEditarContatosCliente from "@/components/comercial/ModalEditarContatosCliente";
 import AditivosObra from "@/components/comercial/AditivosObra";
 import { contatoVeFaturamento } from "@/lib/cliente-faturamento";
 
@@ -28,6 +29,7 @@ function Campo({ rotulo, valor, destaque, dica, pre }) {
 export default function AbaObra({ op, podeEditar, onEditar, onAtualizar, onNovoAditivo, onDivulgarAditivo, encerrada = false }) {
   const [editandoRefs, setEditandoRefs] = useState(false);
   const [editandoContatos, setEditandoContatos] = useState(false);
+  const [editandoAgenda, setEditandoAgenda] = useState(false);
   const refsBase = agruparReferencias((op.referencias || []).filter((r) => !r.aditivoId));
   const temRefs = refsBase.projetos.length + refsBase.pedidos.length + refsBase.outros.length > 0;
   const contatos = Array.isArray(op.clienteContatos) ? op.clienteContatos : [];
@@ -42,13 +44,23 @@ export default function AbaObra({ op, podeEditar, onEditar, onAtualizar, onNovoA
       <section className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden" aria-label="Contatos do cliente">
         <div className="px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
           <h3 className="text-base font-semibold text-torg-dark flex items-center gap-2"><Users size={18} className="text-torg-blue" /> Contatos do cliente <span className="text-torg-gray font-normal">({contatos.length})</span></h3>
-          {podeEditar && contatos.length > 0 && (
-            <button onClick={() => setEditandoContatos(true)} className="text-xs text-torg-blue border border-torg-blue-200 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1.5" title="Quem vê Pedidos e faturamento no login do cliente">
-              <Pencil size={12} /> Acessos no portal <span className="text-torg-gray font-normal">({contatos.filter(contatoVeFaturamento).length})</span>
-            </button>
+          {podeEditar && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Vitor (21/09/2026): "eu não consigo adicionar novos e-mails" — a agenda se edita aqui;
+                  o e-mail que entra passa a ver a obra no login dele. */}
+              <button onClick={() => setEditandoAgenda(true)} className="text-xs text-white bg-torg-blue rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1.5 hover:opacity-90" title="Adicionar, corrigir ou remover contatos do cliente">
+                <Pencil size={12} /> {contatos.length ? "Editar contatos" : "Adicionar contato"}
+              </button>
+              {contatos.length > 0 && (
+                <button onClick={() => setEditandoContatos(true)} className="text-xs text-torg-blue border border-torg-blue-200 rounded-lg px-2.5 py-1.5 font-medium inline-flex items-center gap-1.5" title="Quem vê Pedidos e faturamento no login do cliente">
+                  Acessos no portal <span className="text-torg-gray font-normal">({contatos.filter(contatoVeFaturamento).length})</span>
+                </button>
+              )}
+            </div>
           )}
         </div>
         {editandoContatos && <ModalContatosCliente opId={op.id} contatos={contatos} onClose={() => setEditandoContatos(false)} onSaved={() => { setEditandoContatos(false); if (onAtualizar) onAtualizar(); else window.location.reload(); }} />}
+        {editandoAgenda && <ModalEditarContatosCliente opId={op.id} contatos={contatos} onClose={() => setEditandoAgenda(false)} onSaved={() => { setEditandoAgenda(false); if (onAtualizar) onAtualizar(); else window.location.reload(); }} />}
         {contatos.length === 0 ? <p className="px-5 pb-4 text-sm text-torg-gray">Nenhum contato registrado.</p> : (
           <div className="overflow-x-auto" role="region" aria-label="Tabela de contatos do cliente" tabIndex={0}>
             <table className="w-full min-w-[1270px] table-fixed text-sm text-left">

@@ -19,6 +19,7 @@ import {
 import { useStore } from "@/lib/store";
 import ConfirmModal from "@/components/admin/ConfirmModal";
 import AssinaturaUsuario from "./AssinaturaUsuario";
+import ObrasDoCliente from "./ObrasDoCliente";
 import SenhaGeradaModal from "@/components/admin/SenhaGeradaModal";
 import { MODULOS_OPCOES } from "@/lib/modulos";
 
@@ -454,6 +455,10 @@ export default function PageEditarUsuario() {
                 dela". Cadastrada uma vez aqui, vale para todo relatório de inspeção que a pessoa
                 assinar. PIT/PLP ficam de fora de propósito. */}
             <AssinaturaUsuario id={id} tem={form.temAssinatura} onMudar={(v) => setcampo("temAssinatura", v)} />
+
+            {/* Vitor (21/09/2026): "preciso deixar uma forma de conseguir liberar as OPs que eu quero
+                que ele veja" — só para login de CLIENTE; salva na hora, independente do formulário. */}
+            {form.tipo === "CLIENTE" && original?.tipo === "CLIENTE" && <ObrasDoCliente id={id} />}
 
             {/* podeAlterarVerba */}
             <div className={`flex items-start gap-3 py-1 ${proprio ? "opacity-50" : ""}`}>
