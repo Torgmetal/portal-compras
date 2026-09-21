@@ -1,6 +1,7 @@
 "use client";
 import BlocoObservacao from "@/components/BlocoObservacao";
 import { parseObservacaoCotacao, condicaoPagamentoDe } from "@/lib/cotacao-observacao";
+import { freteDe, acaoFrete } from "@/lib/frete-cotacao";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { XCircle, Loader2, Check, Mail, Edit3, Plus, MessageSquareText } from "lucide-react";
@@ -153,22 +154,29 @@ export function CotacoesList({ rm, outrasRMs = [] }) {
                 {(() => {
                   const { prazoEntrega, observacao } = parseObservacaoCotacao(c.observacao);
                   const pagamento = condicaoPagamentoDe(c);
+                  const frete = freteDe(c);
                   // ⚠ `observacoesItens`, não `c.itens`: a página apaga os itens do payload e a
                   // lista que sobra só tem item em status cotável — numa RM já fechada, vazia.
                   const porItem = c.observacoesItens || [];
-                  if (!observacao && !prazoEntrega && !pagamento && !porItem.length) return null;
+                  if (!observacao && !prazoEntrega && !pagamento && !frete && !porItem.length) return null;
                   return (
                     <div className="mt-1.5 space-y-1">
                       {/* ⚠ Os dois na MESMA linha quando cabem: são as duas condições comerciais
                           da proposta e quem compara lê as duas juntas. Empilhados, viram duas
                           linhas de 11px que o olho passa batido. */}
-                      {(prazoEntrega || pagamento) && (
+                      {(prazoEntrega || pagamento || frete) && (
                         <p className="text-[11px] text-torg-gray flex flex-wrap gap-x-3 gap-y-0.5">
                           {prazoEntrega && (
                             <span><b className="font-semibold text-torg-dark">Prazo de entrega:</b> {prazoEntrega}</span>
                           )}
                           {pagamento && (
                             <span><b className="font-semibold text-torg-dark">Pagamento:</b> {pagamento}</span>
+                          )}
+                          {/* ⚠ A SIGLA VEM COM A AÇÃO JUNTO ("FOB · Coletar"), como no resto do
+                              portal: sozinha, ela obriga quem lê a lembrar a convenção — e quem
+                              lê esta linha está decidindo se precisa mandar o caminhão. */}
+                          {frete && (
+                            <span><b className="font-semibold text-torg-dark">Frete:</b> {frete} · {acaoFrete(frete)}</span>
                           )}
                         </p>
                       )}

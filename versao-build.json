@@ -1,7 +1,12 @@
 {
-  "build": 3301,
-  "gerado": "2026-09-21T17:08:06.547Z",
+  "build": 3302,
+  "gerado": "2026-09-21T17:18:35.209Z",
   "commits": [
+    {
+      "hash": "53e38de619",
+      "data": "21/09/2026",
+      "titulo": "Conferência: a planilha do PCP separa o que é DESTA remessa"
+    },
     {
       "hash": "fdbe42ed1d",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2843fc7e38",
       "data": "18/09/2026",
       "titulo": "Cobrar os atrasados: um e-mail por fornecedor, com os pedidos e as RMs dele"
-    },
-    {
-      "hash": "2bb831e083",
-      "data": "18/09/2026",
-      "titulo": "Planilha do Syneco abre no resumo e traz uma aba por setor"
     }
   ]
 }

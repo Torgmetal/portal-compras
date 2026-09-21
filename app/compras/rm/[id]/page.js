@@ -63,6 +63,11 @@ export default async function RMComprasDetail({ params }) {
       // abrir. Comparar duas propostas em 28 dias e à vista sem isso na tela é comparar preço
       // fingindo que o prazo não existe.
       prazoPagamento: true,
+      // ⚠⚠ O FRETE É A TERCEIRA CONDIÇÃO COMERCIAL, e faltava aqui. Matheus (21/09/2026):
+      // "preciso que saia também nessa tela que resposta do fornecedor, se é CIF ou FOB". Com
+      // FOB o frete NÃO está no preço e a coleta é da Torg — comparar uma proposta CIF com uma
+      // FOB só pelo valor é comparar coisas diferentes, e era o que a tela permitia.
+      tipoFrete: true,
       // Itens completos com rmItem details — pra mostrar todos os itens
       // (incluindo de outras RMs) no modal de lancamento manual
       itens: {

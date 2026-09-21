@@ -1,5 +1,6 @@
 "use client";
 import { parseObservacaoCotacao } from "@/lib/cotacao-observacao";
+import BlocoObservacao from "@/components/BlocoObservacao";
 import CampoData from "@/components/CampoData";
 import { useState, useMemo, useRef } from "react";
 import { dataBR, dataHoraBR } from "@/lib/data-br";
@@ -611,9 +612,13 @@ dataHoraBR(new Date())
             Solicitação de Cotação — RM {cotacao.rm.numero}
           </h1>
           <p className="text-sm text-torg-gray mt-2">{cotacao.rm.descricao}</p>
-          {cotacao.rm.observacao && (
-            <p className="text-sm text-torg-gray mt-1">Observação: {cotacao.rm.observacao}</p>
-          )}
+          {/* ⚠⚠ MESMA LIÇÃO DE 16/09/2026, QUE FICOU PELA METADE. A tarja âmbar do
+              `BlocoObservacao` nasceu porque a observação da RM aparecia "em cinza de 12px sem
+              rótulo" e ninguém a via — mas só a tela INTERNA foi corrigida. Aqui seguiu o cinza,
+              e é justamente aqui que ela muda o preço: Matheus (21/09/2026), na T122-002, cuja
+              observação diz "Chapas 19.00, 25.00 e 31.50 devem conter laudo de U.S." — exigência
+              que o fornecedor precisa ler ANTES de formar o preço, não depois de fechar. */}
+          <BlocoObservacao texto={cotacao.rm.observacao} rotulo="Observação da RM" />
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-gray-100 text-sm">
             <div>
               <p className="text-xs text-torg-gray">Itens pra cotar</p>
