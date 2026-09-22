@@ -1,7 +1,12 @@
 {
-  "build": 3369,
-  "gerado": "2026-09-22T11:52:51.025Z",
+  "build": 3370,
+  "gerado": "2026-09-22T12:04:05.972Z",
   "commits": [
+    {
+      "hash": "bf32c164",
+      "data": "22/09/2026",
+      "titulo": "Facilita edição de peças e horários por demão nos relatórios"
+    },
     {
       "hash": "1c34c68d",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "53e38de6",
       "data": "21/09/2026",
       "titulo": "Conferência: a planilha do PCP separa o que é DESTA remessa"
-    },
-    {
-      "hash": "7d6b0df1",
-      "data": "21/09/2026",
-      "titulo": "Registra o plano de subida do MES e o que foi medido"
     }
   ]
 }

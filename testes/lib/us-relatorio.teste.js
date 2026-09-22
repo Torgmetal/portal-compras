@@ -208,3 +208,33 @@ describe("aparelhagem padrão do ultrassom", () => {
     expect(rotulos).toContain(APARELHAGEM_PADRAO_US.cbModelo);
   });
 });
+
+// Vitor (22/09/2026), sobre os campos da junta no RUS: "para o processo de soldagem, deixar o
+// seletor GMAW ou FCAW; o tipo de junta deixar sempre Topo; para o tipo de chanfro deixar seletor
+// para X ou V; na técnica de ensaio pode deixar sempre fixo Direto".
+describe("a junta ensaiada — listas e padrões da casa", () => {
+  it("processo de soldagem: só os dois que a Torg usa", async () => {
+    const { PROCESSOS_SOLDA } = await import("@/lib/us-campos");
+    expect(PROCESSOS_SOLDA).toEqual(["GMAW", "FCAW"]);
+  });
+
+  it("chanfro: X ou V", async () => {
+    const { CHANFROS } = await import("@/lib/us-campos");
+    expect(CHANFROS).toEqual(["X", "V"]);
+  });
+
+  it("junta e técnica nascem preenchidas — Topo e Direto", async () => {
+    const { JUNTA_PADRAO, TECNICA_PADRAO, APARELHAGEM_PADRAO_US } = await import("@/lib/us-campos");
+    expect(JUNTA_PADRAO).toBe("Topo");
+    expect(TECNICA_PADRAO).toBe("Direto");
+    expect(APARELHAGEM_PADRAO_US).toMatchObject({ tipoJunta: "Topo", tecnica: "Direto" });
+  });
+
+  // ⚠ o processo e o chanfro NÃO têm padrão: um é GMAW ou FCAW conforme a solda, o outro X ou V
+  // conforme o chanfro real. Escolher por quem inspeciona seria preencher laudo no lugar dele.
+  it("processo e chanfro ficam em branco até o inspetor escolher", async () => {
+    const { APARELHAGEM_PADRAO_US } = await import("@/lib/us-campos");
+    expect(APARELHAGEM_PADRAO_US.processoSolda).toBeUndefined();
+    expect(APARELHAGEM_PADRAO_US.chanfro).toBeUndefined();
+  });
+});

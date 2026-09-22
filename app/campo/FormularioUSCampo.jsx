@@ -1,6 +1,6 @@
 "use client";
 import { CheckCircle2, AlertCircle } from "lucide-react";
-import { APARELHOS, ACOPLANTES, BLOCOS_PADRAO, TIPOS_CARREGAMENTO, cabecotesPorFabricante } from "@/lib/us-campos";
+import { APARELHOS, ACOPLANTES, BLOCOS_PADRAO, TIPOS_CARREGAMENTO, cabecotesPorFabricante, PROCESSOS_SOLDA, CHANFROS } from "@/lib/us-campos";
 import { camposCabecalhoUS, detalhesCabecoteUS, progressoPreenchimentoUS } from "@/lib/us-relatorio";
 
 const obrigatorio = <span className="text-red-600" aria-label="obrigatório"> *</span>;
@@ -12,6 +12,14 @@ function Select({ rotulo, valor, opcoes = null, grupos = null, mudar }) {
       <option value="">Selecione…</option>{grupos
         ? grupos.map(g => <optgroup key={g.fabricante} label={g.fabricante}>{g.itens.map(i => <option key={`${g.fabricante}-${i.rotulo}`} value={i.rotulo}>{i.rotulo}</option>)}</optgroup>)
         : opcoes.map(o => <option key={o} value={o}>{o}</option>)}
+    </select></label>;
+}
+
+/** Igual ao Select, sem a estrela de obrigatório — para o que a norma não exige. */
+function SelectOpcional({ rotulo, valor, opcoes, mudar }) {
+  return <label className="block"><span className="block text-[12px] font-semibold text-torg-dark mb-1">{rotulo}</span>
+    <select value={valor || ""} onChange={e => mudar(e.target.value)} className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-torg-blue">
+      <option value="">—</option>{opcoes.map(o => <option key={o} value={o}>{o}</option>)}
     </select></label>;
 }
 
@@ -80,10 +88,10 @@ export default function FormularioUSCampo({ rel, cond, setCond }) {
         campo para informar o processo de soldagem"). Opcionais: nem todo ensaio é de junta soldada,
         e o progresso acima continua contando só o que o PI-QUA-003 exige. */}
     <Secao numero="5" titulo="A junta ensaiada" ajuda="Opcional — sai no cabeçalho do relatório.">
-      <Texto rotulo="Processo de soldagem" valor={cond.processoSolda} mudar={mudar("processoSolda")} opcional />
+      <SelectOpcional rotulo="Processo de soldagem" valor={cond.processoSolda} opcoes={PROCESSOS_SOLDA} mudar={mudar("processoSolda")} />
       <Texto rotulo="Metal de adição" valor={cond.metalAdicao} mudar={mudar("metalAdicao")} opcional />
       <Texto rotulo="Tipo de junta" valor={cond.tipoJunta} mudar={mudar("tipoJunta")} opcional />
-      <Texto rotulo="Tipo de chanfro" valor={cond.chanfro} mudar={mudar("chanfro")} opcional />
+      <SelectOpcional rotulo="Tipo de chanfro" valor={cond.chanfro} opcoes={CHANFROS} mudar={mudar("chanfro")} />
       <Texto rotulo="Técnica de ensaio" valor={cond.tecnica} mudar={mudar("tecnica")} opcional />
     </Secao>
   </div>;

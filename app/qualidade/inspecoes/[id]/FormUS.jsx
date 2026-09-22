@@ -5,7 +5,8 @@ import { Plus, Trash2, AlertTriangle } from "lucide-react";
 import {
   APARELHOS, ANGULOS, ACOPLANTES, BLOCOS_PADRAO, FACES, MATERIAL_PADRAO,
   TIPOS_CARREGAMENTO, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL, cabecotesPorFabricante,
-  ESPESSURAS_CHAPA, rotuloEspessura, valorEspessura,
+  ESPESSURAS_CHAPA, rotuloEspessura, valorEspessura, PROCESSOS_SOLDA, CHANFROS,
+  JUNTA_PADRAO, TECNICA_PADRAO,
 } from "@/lib/us-campos";
 import { LAUDOS } from "@/lib/evs-campos";
 
@@ -44,7 +45,10 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
   // ⚠ O metal base nasce preenchido (Vitor, 22/09/2026: "deixe ela pré-setado em aço carbono") —
   // inclusive nos relatórios abertos antes desta versão, que vieram com o campo vazio.
   useEffect(() => {
-    if (!travado && !String(res.material || "").trim()) setResultado("material", MATERIAL_PADRAO);
+    if (travado) return;
+    if (!String(res.material || "").trim()) setResultado("material", MATERIAL_PADRAO);
+    if (!String(res.tipoJunta || "").trim()) setResultado("tipoJunta", JUNTA_PADRAO);
+    if (!String(res.tecnica || "").trim()) setResultado("tecnica", TECNICA_PADRAO);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [travado]);
   const addLinha = () => setLinhas([...linhas, { marca: marcas[0] || "", indicacao: String(linhas.length + 1), laudo: "R" }]);
@@ -118,12 +122,12 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
             sem entrada, o documento saía com as cinco caixas em branco na frente do cliente. */}
         <p className="text-[11px] font-bold text-torg-dark mt-3 mb-1.5">A junta ensaiada</p>
         <div className="grid sm:grid-cols-4 gap-2.5">
-          <Campo rot="Processo de soldagem" k="processoSolda" />
+          <Campo rot="Processo de soldagem" k="processoSolda" opcoes={PROCESSOS_SOLDA} />
           <Campo rot="Metal de adição" k="metalAdicao" />
           {/* ⚠ `tipoJunta` é a chave que o EVS e o LP já usam — duas chaves para a mesma coisa
               fariam o mesmo dado aparecer num relatório e sumir no outro. O PDF do US lê as duas. */}
           <Campo rot="Tipo de junta" k="tipoJunta" />
-          <Campo rot="Tipo de chanfro" k="chanfro" />
+          <Campo rot="Tipo de chanfro" k="chanfro" opcoes={CHANFROS} />
           <Campo rot="Técnica de ensaio" k="tecnica" />
           <Campo rot="Desenho de referência" k="desenho" />
         </div>

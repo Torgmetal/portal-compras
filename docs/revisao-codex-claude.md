@@ -443,4 +443,7 @@ novo, não conserto, e não entra sem o Matheus decidir.
   real, que é medido) e **guarda de valor fora da lista** nos seletores: relatório antigo tem o
   cabeçote com a marca, que não existe mais entre as opções — sem isso o campo abriria vazio e a
   gravação seguinte apagaria o registro.
+- **(22/09, 09h)** Junta ensaiada do RUS conforme a casa: processo de soldagem em lista (GMAW/FCAW),
+  chanfro em lista (X/V), tipo de junta e técnica nascem preenchidos (Topo, Direto). ⚠ Processo e
+  chanfro NÃO têm padrão — são escolha do inspetor, como o ângulo real.
 
