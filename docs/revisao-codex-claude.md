@@ -709,3 +709,30 @@ novo, não conserto, e não entra sem o Matheus decidir.
   numerador e denominador como dois números soltos. **Matheus decidiu seguir sem isso por ora**
   (`codex: aceito`, limite de 2 ciclos atingido). Não é aprovação do Codex — é pendência aberta,
   e o caso é estreito: exige bitola em fração composta E planilha sem certificado dos dois lados.
+- **(22/09, 18h45) Inteligência Fiscal — MVP no ar, e a pendência da fração fechada.**
+  ⚠⚠ **A fração composta do CMR foi corrigida** (a pendência aceita há duas horas): numerador e
+  denominador viravam números soltos, então `1/4` → `1 1/4` passava como "detalhou a descrição".
+  Agora a fração vale um NÚMERO (0,25 × 1,25). ⚠ E a fração MISTA só conta com o inteiro SOLTO —
+  sem isso, `PORCA A563 3/8` leria "563 3/8" como 563,375 e a mesma porca escrita `A563 - 3/8"`
+  viraria troca de material por causa de um hífen.
+  **Módulo fiscal**, Fases 3–9 do briefing: parser da TIPI, sincronização das duas fontes oficiais,
+  consulta, CFOP e tela. Rodado contra produção: TIPI 15.648 linhas / 11.103 NCMs em 5s; NCM do
+  Siscomex 15.156 códigos em 2,9s; segunda execução = "sem mudança" em 0,2s.
+  ⚠⚠ **Três defeitos das FONTES, achados medindo**: (1) 58 posições da TIPI perderam um zero por
+  coerção numérica do Excel (`84.3` é 84.30, `3.03` é 03.03) — e `843` casando como prefixo de
+  `8437` fazia o 8437.90.00 herdar o texto de TERRAPLENAGEM do 84.30; (2) 23% dos NCMs (2.603 de
+  11.103) se descrevem só como "Outros"/"Outras", então indexar a folha dava busca vazia — o GIN
+  passou a indexar o caminho hierárquico inteiro; (3) `to_tsvector` não remove acento e
+  `plainto_tsquery` junta os termos com E, então "construcoes" derrubava a consulta toda.
+  ⚠⚠ **Três contratos do parecer de arquitetura do Codex viraram estrutura, não comentário**:
+  ATIVA ≠ VIGENTE (`vigenciaInicio` nasce nula e a tela diz por quê; a consulta histórica responde
+  "referência histórica indisponível"); Ex desconhecido ≠ geral (a tela mostra a geral e cada Ex
+  lado a lado, nunca elege); campo ausente ≠ conformidade.
+  ⚠ Os verbetes de CFOP são **resumo operacional**, `validado: false`, com tarja na tela — a tabela
+  oficial do CONFAZ segue pendente de conferência da contabilidade.
+  ⚠ **PENDENTE:** o P1 do Vitor em `AbaExpedicao.jsx:617` (avulso ao reabrir romaneio) continua sem
+  toque, por instrução do Matheus. E a auditoria da NF 973 ainda não foi implementada — o
+  apontamento está medido (22 itens sem IPI, R$ 7.026,55 se 3,25% valer para todos), mas quem
+  conclui é a contabilidade.
+  Testes: `fiscal-tipi-planilha` (43) e os 3 novos de fração em `cmr-planilha-manda` (31).
+  **3.155 passando**, checar limpo, tela validada logada sem erro de console.

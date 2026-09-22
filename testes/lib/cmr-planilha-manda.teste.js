@@ -69,6 +69,12 @@ describe("ehOutroMaterial — trocar de dono é diferente de ganhar detalhe", ()
     // NF da primeira.
     ["CANTONEIRA 2 X 2 X 1/4", "CANTONEIRA 2 X 4 X 1/4"],
     ["CHAPA 2000 X 6000", "CHAPA 6000 X 2000 X 2000"],
+    // ⚠⚠ A FRAÇÃO COMPOSTA — terceira rodada sobre o mesmo defeito (Codex, 22/09/2026). Com
+    // numerador e denominador SOLTOS, 1/4 dava […,1,4] e 1.1/4 dava […,1,1,4]: a primeira era
+    // subsequência da segunda, então dobrar a espessura passava como "detalhou a descrição". Com a
+    // fração valendo um número, viram 0,25 e 1,25.
+    ["CANTONEIRA 2 X 2 X 1/4", "CANTONEIRA 2 X 2 X 1 1/4"],
+    ["BARRA REDONDA 1/2", "BARRA REDONDA 1 1/2"],
   ])("%s → %s é troca: as medidas conflitam", (a, b) => expect(ehOutroMaterial(a, b)).toBe(true));
 
   // ⚠⚠ MEDIDA A MAIS É COMPLETAR, NÃO TROCAR. Exigir conjuntos idênticos traria o defeito de volta
@@ -79,6 +85,12 @@ describe("ehOutroMaterial — trocar de dono é diferente de ganhar detalhe", ()
   ])("%s → %s não é troca: a medida só foi detalhada", (a, b) => expect(ehOutroMaterial(a, b)).toBe(false));
 
   // ⚠ A rastreabilidade continua mandando MAIS que o texto — inclusive sobre as medidas.
+  // ⚠⚠ E A FRAÇÃO MISTA SÓ VALE COM O INTEIRO SOLTO: sem isso, `A563 3/8` leria "563 3/8" como
+  // 563,375, e a MESMA porca escrita `A563 - 3/8"` viraria troca de material por causa de um hífen.
+  it("a norma colada no número não vira parte da fração", () => {
+    expect(ehOutroMaterial('PORCA A563 3/8', 'PORCA A563 - 3/8" - GF')).toBe(false);
+  });
+
   it("bitola diferente com o MESMO certificado ainda não é troca", () => {
     expect(ehOutroMaterial("PERFIL W 200X26,6", "PERFIL W 250x25,3",
       { certificadoAntes: "8195", certificadoDepois: "8195" })).toBe(false);

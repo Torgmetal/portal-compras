@@ -1,7 +1,12 @@
 {
-  "build": 3402,
-  "gerado": "2026-09-22T21:33:37.815Z",
+  "build": 3403,
+  "gerado": "2026-09-22T21:46:19.033Z",
   "commits": [
+    {
+      "hash": "7f61f48200",
+      "data": "22/09/2026",
+      "titulo": "Fiscal: a TIPI oficial sincronizada, e dois defeitos do arquivo da Receita"
+    },
     {
       "hash": "a99834901d",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "39d068f6a0",
       "data": "22/09/2026",
       "titulo": "Relatório assinado passa a ser editável — sem revisão, com registro"
-    },
-    {
-      "hash": "5dc7ee83cc",
-      "data": "22/09/2026",
-      "titulo": "MES: a obra deixa de ser uma preferência e vira uma partição"
     }
   ]
 }
