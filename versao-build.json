@@ -1,7 +1,12 @@
 {
-  "build": 3386,
-  "gerado": "2026-09-22T16:39:24.584Z",
+  "build": 3387,
+  "gerado": "2026-09-22T16:46:13.272Z",
   "commits": [
+    {
+      "hash": "3a3643144b",
+      "data": "22/09/2026",
+      "titulo": "CMR: a planilha manda, e o R passa a ser conferido nos dois lados"
+    },
     {
       "hash": "476994019c",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "31d93503c7",
       "data": "21/09/2026",
       "titulo": "MES: schema e cliente próprios, e o passo 2 fechado"
-    },
-    {
-      "hash": "96fff418af",
-      "data": "21/09/2026",
-      "titulo": "MES: DEMO e PROD deixam de ser o mesmo mundo"
     }
   ]
 }

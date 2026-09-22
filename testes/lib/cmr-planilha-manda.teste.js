@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { ehOutroMaterial } from "@/lib/cmr-reconciliar";
+import { ehOutroMaterial, montarPatch } from "@/lib/cmr-reconciliar";
 import { proximoIndiceR } from "@/lib/cmr";
 import { prisma } from "@/lib/prisma";
 
@@ -64,5 +64,64 @@ describe("proximoIndiceR — conta os dois lados", () => {
   it("índice de outro ano não conta", async () => {
     comPortal("260010");
     expect(await proximoIndiceR(2026, ["259999", "251000"])).toBe("260011");
+  });
+});
+
+describe("montarPatch — o que a planilha manda gravar", () => {
+  const PORCA = {
+    nome: 'PORCA A563 - 3/8" - GF', numeroDocumento: "79475", numeroCorrida: "887182294",
+    norma: "NBR 11889", pedidoCompra: "1916", opNumero: "097", fornecedor: "R SIMIONI",
+    nfNumero: "368301", observacao: "Tipo: RC", dataRecebimento: null, pesoKg: null, quantidade: null,
+  };
+
+  // ⚠⚠ O DEFEITO VOLTANDO PELA OUTRA PORTA (achado do Codex, 22/09/2026). "Célula vazia não apaga"
+  // vale enquanto é o MESMO material sendo completado. Quando o índice troca de dono, o certificado
+  // e a corrida que lá estavam são de OUTRA coisa — mantê-los recria o híbrido que se está
+  // consertando: uma CHAPA com o certificado da PORCA.
+  it("troca de material LIMPA o que a planilha não traz", () => {
+    const daPlanilha = {
+      nome: "CHAPA ACO CARBONO A-36 9,50MM", pedidoCompra: "1982", observacao: "Tipo: R",
+      numeroDocumento: "", numeroCorrida: null, norma: "", opNumero: "", fornecedor: null,
+      nfNumero: "", dataRecebimento: null, pesoKg: null, quantidade: null,
+    };
+    const patch = montarPatch(PORCA, daPlanilha, true);
+    expect(patch.nome).toBe("CHAPA ACO CARBONO A-36 9,50MM");
+    expect(patch.numeroDocumento).toBeNull();
+    expect(patch.numeroCorrida).toBeNull();
+    expect(patch.opNumero).toBeNull();
+    expect(patch.fornecedor).toBeNull();
+    expect(patch.nfNumero).toBeNull();
+  });
+
+  // ⚠ Sem troca, célula vazia continua não apagando: "o correto é o que foi lançado na planilha"
+  // fala do que ESTÁ lá, não do que ainda falta.
+  it("MESMO material: célula vazia não apaga", () => {
+    const daPlanilha = { ...PORCA, numeroDocumento: "", pesoKg: 120 };
+    const patch = montarPatch(PORCA, daPlanilha, false);
+    expect(patch.numeroDocumento).toBeUndefined();
+    expect(patch.pesoKg).toBe(120);
+  });
+
+  // ⚠⚠ A SÉRIE ENTROU NA RECONCILIAÇÃO. Sem isso a PORCA virava CHAPA mantendo "Tipo: RC" — o
+  // registro dizia uma coisa no nome e outra na série.
+  it("a série R/RC vem da planilha", () => {
+    const patch = montarPatch(PORCA, { ...PORCA, nome: "CHAPA A-36", observacao: "Tipo: R" }, true);
+    expect(patch.observacao).toBe("Tipo: R");
+  });
+
+  it("nada a fazer quando já está igual", () => {
+    expect(Object.keys(montarPatch(PORCA, { ...PORCA }, false))).toHaveLength(0);
+  });
+
+  // ⚠ O nome nunca é apagado: linha sem descrição não chega a ser reconciliada.
+  it("nome vazio na planilha não apaga o nome", () => {
+    const patch = montarPatch(PORCA, { ...PORCA, nome: "" }, true);
+    expect(patch.nome).toBeUndefined();
+  });
+
+  it("data igual não vira patch", () => {
+    const d = new Date("2026-09-19T12:00:00Z");
+    const patch = montarPatch({ ...PORCA, dataRecebimento: d }, { ...PORCA, dataRecebimento: new Date(d) }, false);
+    expect(patch.dataRecebimento).toBeUndefined();
   });
 });

@@ -162,6 +162,14 @@ do data book (`lib/databook-ficha-r.js`), ou seja, ia para o documento do client
 **O que passou a valer:**
 - **Planilha vence**: valor da planilha **sobrescreve** o do portal. ⚠ Célula **vazia não apaga** —
   "o que foi lançado" fala do que ESTÁ lá, não do que falta.
+- ⚠⚠ **MAS TROCA DE MATERIAL LIMPA O QUE SOBROU DO ANTERIOR** (achado do Codex — o defeito voltando
+  pela outra porta). "Vazio não apaga" vale enquanto é o MESMO material sendo completado aos poucos;
+  quando o índice troca de dono, certificado, corrida, NF e obra que lá estavam são de OUTRA coisa.
+  Mantê-los porque a planilha ainda não preencheu aquela coluna recria exatamente o híbrido.
+- ⚠⚠ **A GRAVAÇÃO E A TRILHA VÃO NUMA TRANSAÇÃO SÓ.** Agora que a planilha sobrescreve, todo patch
+  pode trocar certificado e corrida — auditar só quando o MATERIAL muda (e com `catch` vazio por
+  cima) deixaria certificado trocado sem como reconstruir. Falha de sincronização sai em `falhas`,
+  no retorno, em vez de virar silêncio.
 - **`ehOutroMaterial`**: se a descrição troca de substantivo (PORCA → CHAPA), é **troca de dono do
   índice** — sai em `trocas` e vira `AuditLog` (`CMR_INDICE_TROCOU_DE_MATERIAL`). Casca sendo
   preenchida **não** conta, senão o alerta vira ruído.
