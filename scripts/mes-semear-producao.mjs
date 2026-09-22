@@ -14,6 +14,15 @@
 // como está (`update: {}`), então rodar de novo nunca desfaz uma edição feita pela tela. Para
 // recomeçar do zero, `scripts/mes-zerar.mjs --confirmo`.
 //
+// ⚠⚠ SÓ O QUE ESTÁ NO GANTT (Matheus, 22/09/2026: *"crie somente o que está no Gantt, esqueça o
+// Syneco por hora"*). A primeira versão trazia também os postos que só o histórico do Syneco
+// conhece — ACABAMENTO 1…10, PINTURA AIR-LESS, furadeiras, plasmas, rosqueadeira. Saíram: o MES
+// nasce com o vocabulário de quem PROGRAMA, e quem quiser um posto a mais cadastra pela tela.
+//
+// ⚠ O Syneco continua entrando como RÓTULO nos postos do Gantt (`codigoSyneco`, "40E", "09"),
+// porque é o que permite conferir um contra o outro enquanto os dois rodam. Nenhum posto NASCE
+// dele.
+//
 // ⚠ NÃO SEMEIA MOTIVO DE PARADA. O vocabulário de parada da fábrica não está medido em lugar
 // nenhum do portal — inventá-lo aqui seria plantar uma lista que ninguém escolheu, no lugar onde o
 // operador justifica máquina parada. Fica para a tela.
@@ -50,9 +59,6 @@ const SETOR_DA_FABRICA = {
   Acabamento: "ACABAMENTO", Acabador: "ACABAMENTO", Jato: "JATO", Pintura: "PINTURA",
   "Expedição": "EXPEDICAO",
 };
-/** ⚠⚠ Onde o Gantt planeja em BALDE, o totem precisa do posto FÍSICO — ver o semeador do laboratório. */
-const POSTOS_DO_HISTORICO = new Set(["ACABAMENTO", "PINTURA"]);
-
 const chave = (s) => String(s ?? "").toUpperCase().normalize("NFD")
   .replace(/[̀-ͯ]/g, "").replace(/[^A-Z0-9]/g, "");
 // ⚠⚠ "QUANTOS NASCERAM" É DIFERENÇA DE CONTAGEM, NÃO `createdAt === updatedAt` (corrigido na
@@ -105,7 +111,6 @@ async function semearRecursos(setores) {
 
   for (const gantt of SETORES) {
     const codigoSetor = SETOR_DO_GANTT[gantt] || gantt;
-    if (POSTOS_DO_HISTORICO.has(codigoSetor)) continue;    // do histórico, mais abaixo
     // ⚠ Entradas com `k: null` são o "sem bancada / atribuir" da tela do Gantt — opção de
     // interface, não recurso. Semear isso criaria uma máquina fantasma chamada "sem bancada".
     for (const rec of (RECURSOS[gantt] || []).filter((r) => r.k)) {
@@ -119,32 +124,34 @@ async function semearRecursos(setores) {
     }
   }
 
-  for (const m of vistas.filter((v) => POSTOS_DO_HISTORICO.has(SETOR_DO_SYNECO[v.setor] || ""))) {
-    usadas.add(m.codigoSyneco);
-    feitos.push(await criarRecurso({
-      codigo: chave(m.nome), nome: m.nome, setorId: setores.get(SETOR_DO_SYNECO[m.setor]),
-      codigoSyneco: m.codigoSyneco, tipo: "POSTO",
-    }));
-  }
-
-  // ⚠⚠ SÓ AS MÁQUINAS DA "PREPARAÇÃO" DO SYNECO ENTRAM ALÉM DO GANTT. O Gantt é lista CURADA: o que
-  // não está nela não está por decisão de quem programa (a SOLDA 3, a SOLDA 8 e um terceiro jato
-  // ficaram de fora de propósito). A exceção é a que o Matheus pediu — furadeira, plasma e
-  // rosqueadeira, que apontam de verdade e o Gantt nunca programou.
-  const deFora = vistas.filter((v) => !usadas.has(v.codigoSyneco) && SETOR_DO_SYNECO[v.setor]);
-  const entram = deFora.filter((v) => v.setor === "Preparação");
-  for (const m of entram) {
-    feitos.push(await criarRecurso({
-      codigo: chave(m.nome), nome: m.nome, setorId: setores.get("PREPARACAO"),
-      codigoSyneco: m.codigoSyneco, tipo: "MAQUINA",
-    }));
-  }
-
   console.log(`Postos: ${(await mes.mesRecurso.count({ where: { ambiente: AMB } })) - antes} novo(s), ${feitos.length} conferido(s)`);
-  const ignorados = deFora.filter((v) => v.setor !== "Preparação");
-  if (ignorados.length) {
-    console.log(`  ⚠ ${ignorados.length} máquina(s) do histórico NÃO entraram (não estão na lista do Gantt):`);
-    for (const m of ignorados) console.log(`      ${m.nome} (${m.setor})`);
+  await tirarOsQueNaoSaoDoGantt(feitos.map((r) => r.codigo));
+}
+
+/**
+ * O QUE NÃO É DO GANTT SAI — mas só se nunca tiver sido usado.
+ *
+ * ⚠⚠ APAGAR POSTO COM APONTAMENTO SERIA APAGAR PRODUÇÃO. O `MesEvento` e a `MesSessao` apontam
+ * para o recurso; um posto que já registrou trabalho vira dado histórico, não linha de cadastro.
+ * Por isso a exclusão é CONDICIONADA e o que sobra é RELATADO — desativar ou renomear à mão é
+ * decisão de quem olha, não de um script.
+ */
+async function tirarOsQueNaoSaoDoGantt(doGantt) {
+  const forasteiros = await mes.mesRecurso.findMany({
+    where: { ambiente: AMB, codigo: { notIn: doGantt } },
+    select: { id: true, codigo: true, nome: true, _count: { select: { sessoes: true, eventos: true } } },
+  });
+  if (!forasteiros.length) return;
+
+  const limpos = forasteiros.filter((r) => !r._count.sessoes && !r._count.eventos);
+  const usados = forasteiros.filter((r) => r._count.sessoes || r._count.eventos);
+  if (limpos.length) {
+    await mes.mesRecurso.deleteMany({ where: { id: { in: limpos.map((r) => r.id) } } });
+    console.log(`  ${limpos.length} posto(s) fora do Gantt removido(s): ${limpos.map((r) => r.nome).join(", ")}`);
+  }
+  if (usados.length) {
+    console.log(`  ⚠ ${usados.length} posto(s) fora do Gantt MANTIDO(S) — já têm trabalho registrado:`);
+    for (const r of usados) console.log(`      ${r.nome} (${r._count.sessoes} sessão/ões, ${r._count.eventos} evento(s))`);
   }
 }
 

@@ -1653,35 +1653,42 @@ neste posto" (não abre de novo) × âmbar "está em LASER 1 · toque para traze
 
 ## 17.10 O CADASTRO DA FÁBRICA, SEMEADO EM PRODUÇÃO (22/09/2026)
 
-Matheus: *"crie você mesmo o restante dos cadastros (…) preenche o restante conforme já falamos: os
-setores, máquinas e funcionários da fábrica"*. Feito por `scripts/mes-semear-producao.mjs`, que
-reusa as regras já decididas do laboratório (§11.3, §11.4) e só troca o destino e o `ambiente`.
+Matheus: *"crie você mesmo o restante dos cadastros (…) os setores, máquinas e funcionários da
+fábrica"* e, depois de ver a primeira lista, *"crie somente o que está no GANTT, esqueça o Syneco
+por hora"*. Feito por `scripts/mes-semear-producao.mjs`.
 
-**Contado no banco, não somado das gravações: 7 setores · 40 postos · 37 crachás.**
+**Contado no banco, não somado das gravações: 7 setores · 26 postos · 37 crachás.**
 
-| setor | postos | de onde saíram |
-|---|---|---|
-| Preparação | 10 | 5 do Gantt (lasers, corte manual) + 5 do Syneco (furadeiras, plasmas, rosqueadeira) |
-| Montagem | 9 | Gantt — 5 com nome de gente, 4 sem |
-| Solda | 7 | Gantt — as sete bancadas vivas, todas com nome |
-| Acabamento | 10 | histórico (ACABAMENTO 1…10) |
-| Jato | 2 | Gantt (Turbina, Manual) |
-| Pintura | 2 | histórico (Air-less, Eletrostática) |
-| Expedição | 0 | — |
+| setor | postos |
+|---|---|
+| Preparação | 5 — os quatro lasers e o corte manual |
+| Montagem | 9 — cinco com nome de gente, quatro sem |
+| Solda | 7 — as sete bancadas vivas, todas com nome |
+| Acabamento | 1 |
+| Jato | 2 — Turbina e Manual |
+| Pintura | 2 — Galpão 1 e Galpão 2 |
+| Expedição | 0 |
 
-⚠ **Expedição nasce vazia de propósito.** Ela está na cadeia do Gantt, mas não tem posto de
-apontamento: quem confere carga é a Conferência de Peça, que já existe e é outra tela.
+⚠⚠ **O MES NASCE COM O VOCABULÁRIO DE QUEM PROGRAMA.** A primeira versão trazia também os postos
+que só o histórico do Syneco conhece — ACABAMENTO 1…10, PINTURA AIR-LESS, PINTURA ELETROSTÁTICA,
+duas furadeiras magnéticas, dois plasmas e a rosqueadeira (17 no total). **Saíram por decisão do
+Matheus.** O Gantt é lista curada; quem quiser um posto a mais cadastra pela tela, que é onde essa
+decisão pertence.
 
-⚠⚠ **SETE MÁQUINAS DO HISTÓRICO FICARAM DE FORA, e o script as NOMEIA em vez de omitir.** O Gantt é
-lista curada: o que não está nela não está por decisão de quem programa. As sete, medidas nos
-últimos 60 dias:
+⚠ **O Syneco continua como RÓTULO** (`codigoSyneco`: "40E", "09") nos postos do Gantt que casaram
+por nome — é o que permite conferir um sistema contra o outro enquanto os dois rodam. **Nenhum
+posto nasce dele.**
 
-- **SOLDA 3, 8 e 10** — 2, 2 e 12 apontamentos, contra 77–325 das sete bancadas vivas. A exclusão
-  em `lib/solda-capacidade.js` está certa: são bancadas paradas.
-- **SERRA, POLICORTE, METALEIRA** (setor Corte do Syneco) — último apontamento em 14/01, 13/08 e
-  17/03. Se alguma voltar a ser usada, é cadastro pela tela, não mudança de script.
-- **JATO (60A)** — 8.584 apontamentos, um deles hoje. **Não é buraco**: o Syneco cadastra Turbina e
-  Manual sob um código só, e ali o Gantt é o mais PRECISO dos dois. Os dois jatos existem no MES.
+⚠⚠ **A REMOÇÃO É CONDICIONADA: posto com sessão ou evento NÃO é apagado, é RELATADO.** `MesEvento` e
+`MesSessao` apontam para o recurso — apagar um posto que já registrou trabalho seria apagar
+produção. Na limpeza de 22/09 os 17 estavam zerados; da próxima vez pode não ser assim.
+
+⚠ **O que a granularidade menor custa, medido:** com UM posto de Acabamento não se sabe QUAL das dez
+bancadas produziu — o monitor e o OEE veem um recurso só. O que **não** custa é travar operador: a
+trava é por `(recurso, obra+marca)` desde o multi-marca de 13/09, e a presença é **um crachá ativo
+por pessoa**, não um por posto. Vários acabadores podem bipar no mesmo posto ao mesmo tempo, em
+marcas diferentes. (O comentário do semeador do laboratório, escrito antes daquele redesenho, dizia
+o contrário — ali a trava ainda era uma sessão por recurso.)
 
 ⚠⚠ **UM SOLDADOR NÃO CONSEGUE BIPAR: WILSON LUIZ DE BARROS JUNIOR não tem matrícula no RH** — e é
 o dono da SOLDA 5, que tem 270 apontamentos em 60 dias. O script RELATA em vez de descartar calado,
@@ -1691,8 +1698,9 @@ porque o problema apareceria no totem, no meio do turno. Resolve-se no RH, não 
 nenhum do portal — inventar a lista aqui seria plantar, no lugar onde o operador justifica máquina
 parada, uma classificação que ninguém escolheu.
 
-⚠ **Idempotente, provado**: a segunda execução criou zero. `update: {}` em todo upsert, então
-edição feita pela tela nunca é desfeita. Para recomeçar limpo, `scripts/mes-zerar.mjs --confirmo`.
+⚠ **Idempotente, provado**: a segunda execução criou zero e removeu zero. `update: {}` em todo
+upsert, então edição feita pela tela nunca é desfeita. Para recomeçar limpo,
+`scripts/mes-zerar.mjs --confirmo`.
 
 ⚠ **O carregador de alias dos scripts ganhou duas regras** (`scripts/mes-lab/alias-loader.mjs`):
 import relativo SEM extensão (`./montagem-capacidade` — o bundler aceita, o ESM do node não) e

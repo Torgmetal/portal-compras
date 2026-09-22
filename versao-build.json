@@ -1,7 +1,12 @@
 {
-  "build": 3380,
-  "gerado": "2026-09-22T13:32:17.552Z",
+  "build": 3381,
+  "gerado": "2026-09-22T13:43:06.952Z",
   "commits": [
+    {
+      "hash": "d58df80a3a",
+      "data": "22/09/2026",
+      "titulo": "MES: o cadastro da fábrica inteira, semeado em produção"
+    },
     {
       "hash": "09009caba3",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "8217b22f19",
       "data": "21/09/2026",
       "titulo": "Demo: o exemplo do .env.demo leva o usuário do Mac na URL do Postgres"
-    },
-    {
-      "hash": "4996b94583",
-      "data": "21/09/2026",
-      "titulo": "Ambiente de demonstração: banco local e modo demo que corta e-mail, Omie e SharePoint"
     }
   ]
 }
