@@ -23,6 +23,10 @@ function Dado({ rot, v }) {
 
 function Documento({ d }) {
   const assinado = !!d.assinadoEm;
+  // ⚠⚠ CONSULTA NÃO É PENDÊNCIA. Vitor (22/09/2026): o relatório fechado fica disponível para o
+  // inspetor do cliente LER. Sem esta separação o cartão sairia com a tarja azul "a assinar" e um
+  // botão de assinar que não existe para ele.
+  const consulta = !!d.somenteLeitura;
   return (
     <div className="border border-gray-100 rounded-lg px-3 py-2.5 hover:border-gray-200">
       <div className="flex items-start justify-between gap-3">
@@ -32,11 +36,15 @@ function Documento({ d }) {
             {[
               d.papel,
               d.revisao != null ? `R${String(d.revisao).padStart(2, "0")}` : null,
-              assinado ? `assinado em ${fmtDT(d.assinadoEm)}` : d.enviadoEm ? `enviado em ${fmtDT(d.enviadoEm)}` : null,
+              consulta
+                ? (d.concluidoEm ? `assinado por todos em ${fmtDT(d.concluidoEm)}` : "documento concluído")
+                : assinado ? `assinado em ${fmtDT(d.assinadoEm)}` : d.enviadoEm ? `enviado em ${fmtDT(d.enviadoEm)}` : null,
             ].filter(Boolean).join(" · ")}
           </p>
         </div>
-        {assinado
+        {consulta
+          ? <span className="shrink-0 text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 text-torg-gray inline-flex items-center gap-1"><FileText size={11} /> para consulta</span>
+          : assinado
           ? <span className="shrink-0 text-[10px] font-bold px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 inline-flex items-center gap-1"><CheckCircle2 size={11} /> assinado</span>
           : d.revisaoPedida
             ? <span className="shrink-0 text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-700 inline-flex items-center gap-1"><RotateCcw size={11} /> em revisão</span>
@@ -56,7 +64,7 @@ function Documento({ d }) {
           className="text-[11.5px] font-semibold text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
           <Download size={12} /> baixar
         </a>
-        {!assinado && (
+        {!assinado && !consulta && (
           <a href={d.link} className="text-[11.5px] font-semibold text-torg-blue hover:underline inline-flex items-center gap-1 ml-auto">
             <PenLine size={12} /> abrir para assinar
           </a>
@@ -183,10 +191,10 @@ export default function MeuEspacoClient() {
                   )}
 
                   {!o.documentos.length ? (
-                    <p className="text-[12.5px] text-torg-gray">Nenhum documento seu nesta obra ainda.</p>
+                    <p className="text-[12.5px] text-torg-gray">Nenhum documento seu nesta obra ainda — os relatórios aparecem aqui quando todos assinam.</p>
                   ) : (
                     <div className="space-y-2">
-                      {o.documentos.map((doc) => <Documento key={doc.link} d={doc} />)}
+                      {o.documentos.map((doc) => <Documento key={doc.link || doc.pdf} d={doc} />)}
                     </div>
                   )}
                 </div>

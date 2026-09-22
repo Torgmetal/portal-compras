@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { opsComFaturamentoPara } from "@/lib/cliente-faturamento-servidor";
+import { relatoriosParaConsulta } from "@/lib/cliente-relatorios";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export async function GET() {
       orderBy: { envio: { enviadoEm: "desc" } },
       select: {
         token: true, assinadoEm: true, convidadoEm: true, ordem: true, setor: true, ip: true,
-        envio: { select: { titulo: true, tipo: true, opNumero: true, revisao: true, enviadoEm: true, status: true, snapshot: true } },
+        envio: { select: { id: true, titulo: true, tipo: true, opNumero: true, revisao: true, enviadoEm: true, status: true, snapshot: true } },
       },
       take: 200,
     }),
@@ -84,6 +85,8 @@ export async function GET() {
         select: {
           id: true, numero: true, cliente: true, clienteRazaoSocial: true, obra: true, refCliente: true,
           descricao: true, status: true, clienteCidade: true, clienteUF: true, clienteContato: true,
+          // ⚠ para saber se a obra está LIBERADA para este login — é o que abre os relatórios dela
+          clienteEmail: true, clienteContatos: true,
           dataInicio: true, dataFimPrevista: true, tipoDataBook: true, pitPadrao: true,
         },
       }).catch(() => [])
@@ -146,9 +149,28 @@ export async function GET() {
     });
   }
 
+  // ── RELATÓRIO DE INSPEÇÃO FECHADO: leitura, para quem tem a obra liberada ────────────────────
+  //
+  // Vitor (22/09/2026), sobre o Renato Massano (inspetor de qualidade da TMSA, contato da OP-105):
+  // "vamos manter assim, apenas deixe disponível para ele consultar quando o Davi assinar". Ele via
+  // a obra e uma lista vazia — o único relatório dela foi endereçado ao Davi.
+  //
+  // ⚠ Só obra LIBERADA (contato da OP ou e-mail do cadastro) e só documento com TODAS as
+  // assinaturas colhidas — a regra mora em lib/cliente-relatorios.js.
+  const paraConsulta = await relatoriosParaConsulta(prisma, {
+    ops, email,
+    // os envios em que ELE assina já entraram acima, com o link de assinar — não se repetem aqui
+    ignorarEnvios: new Set(assinaturas.map((a) => a.envio?.id).filter(Boolean)),
+  });
+  for (const { opNumero, doc } of paraConsulta) push(opNumero, doc);
+
+  // ⚠ CONSULTA NÃO É PENDÊNCIA: sem isto a obra diria "1 a assinar" para quem não tem nada a
+  // assinar, e o documento de leitura subiria para o topo da lista, na frente do que espera alguém.
+  const esperaAssinatura = (d) => !d.assinadoEm && !d.somenteLeitura;
+
   const obras = [...nums].sort((a, b) => Number(b) - Number(a)).map((n) => {
     const o = opPor.get(n) || null;
-    const lista = (docs.get(n) || []).sort((a, b) => (a.assinadoEm ? 1 : 0) - (b.assinadoEm ? 1 : 0) || new Date(b.enviadoEm || 0) - new Date(a.enviadoEm || 0));
+    const lista = (docs.get(n) || []).sort((a, b) => (esperaAssinatura(a) ? 0 : 1) - (esperaAssinatura(b) ? 0 : 1) || new Date(b.enviadoEm || 0) - new Date(a.enviadoEm || 0));
     return {
       opNumero: n,
       obra: o?.obra || null,
@@ -165,7 +187,7 @@ export async function GET() {
       status: o?.status || null,
       portal: linkPortal.get(n) || null,
       documentos: lista,
-      pendentes: lista.filter((d) => !d.assinadoEm).length,
+      pendentes: lista.filter(esperaAssinatura).length,
     };
   });
 

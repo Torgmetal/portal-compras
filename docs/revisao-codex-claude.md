@@ -606,3 +606,25 @@ novo, não conserto, e não entra sem o Matheus decidir.
   avanço de todas as obras e merece medição própria.
   Testes: `expedido-por-romaneio` (8) e `lista-expedicao-marcas-parcial` (5), com os dois casos
   vermelhos antes. **3.055 passando**, `checar` limpo, build ok.
+- **(22/09, 15h30) O cliente passa a CONSULTAR o relatório fechado da obra liberada.** Vitor, sobre
+  o Renato Massano (inspetor de qualidade da TMSA, contato da OP-105): *"vamos manter assim, apenas
+  deixe disponível para ele consultar quando o Davi assinar"*. Medido antes: ele via a obra e uma
+  lista vazia — zero `AssinaturaDocumento`, zero data book, fora dos 13 destinatários do portal; o
+  único relatório da OP-105 (RPM-105-002) foi endereçado ao `pinho.davi@tmsa.ind.br`. Não era
+  defeito: o espaço mostra o que foi **enviado para a pessoa assinar**, e essa regra fica.
+  O que entra é leitura, em `lib/cliente-relatorios.js`, usada pela lista e pela rota nova do PDF.
+  ⚠⚠ Três cortes que o desenho precisou fazer: **(a)** só com TODAS as assinaturas — documento em
+  circulação volta para revisão, e mostrá-lo faria o inspetor do cliente conferir versão não
+  fechada; **(b)** o `EnvioAssinatura.status` é best-effort (quem assina grava "CONCLUIDO" num
+  update com `.catch(() => {})`), então quem manda são as assinaturas, com `REVISAO_PEDIDA` vencendo
+  as colhidas; **(c)** só obra LIBERADA (contato da OP ou `clienteEmail`) — quem chegou à obra por
+  ter assinado UM documento continua vendo só o dele.
+  ⚠ Consulta não é pendência: fora do contador "a assinar" e do topo da lista; cartão cinza "para
+  consulta", sem link de assinar. E o envio que ELE assina não aparece duas vezes.
+  ⚠ A rota `/api/cliente/relatorio/[id]/pdf` não tem token: autoriza pela sessão e repassa
+  `exigirOp`, então id trocado não entrega documento de outra obra. `no-store` + `no-referrer`.
+  Testes: `cliente-relatorios` (8), `cliente-relatorio-consulta` (4), `cliente-relatorio-pdf` (5),
+  `cliente-espaco-consulta-tela` (1) — os novos vermelhos antes. **3.078 passando**, checar limpo,
+  build ok.
+  ⚠ Na produção o RPM-105-002 ainda espera o Davi: até ele assinar, o espaço do Renato continua
+  vazio — que é exatamente o combinado.
