@@ -108,4 +108,59 @@ describe("CampoDecimal", () => {
     rerender(<CampoDecimal value={2} onChange={espiao} />);
     expect(espiao).not.toHaveBeenCalled();
   });
+
+  // ─── O resíduo binário do banco não vai para dentro do campo (21/09/2026) ───
+  //
+  // ⚠⚠ MEDIDO NA PRODUÇÃO: `RMItem.peso` e `CotacaoItem.qtdCotada` da RM T122-001 guardam
+  // `861.1199999999999`, e a tela do fornecedor mostrava `861,11999` num campo de 80 px — enquanto
+  // a coluna ao lado, já arredondada, dizia `861.12 KG`.
+  it("número do pai com resíduo binário aparece limpo", () => {
+    render(<CampoDecimal value={861.1199999999999} onChange={() => {}} />);
+    expect(screen.getByRole("textbox").value).toBe("861,12");
+  });
+
+  it("e o zero à direita do arredondamento não sobra", () => {
+    render(<CampoDecimal value={957.6000000000001} onChange={() => {}} />);
+    expect(screen.getByRole("textbox").value).toBe("957,6");
+  });
+
+  it("com casas={2}, o valor do pai chega com 2 casas", () => {
+    render(<CampoDecimal value={6.7439} casas={2} onChange={() => {}} />);
+    expect(screen.getByRole("textbox").value).toBe("6,74");
+  });
+
+  // ⚠⚠ SEM ISTO O CAMPO MOSTRARIA "1e-7" E O VALOR VIRARIA ZERO NA VOLTA — `numeroBR` não lê
+  // expoente (achado do Codex).
+  it("nunca devolve notação científica", () => {
+    render(<CampoDecimal value={0.0000001} onChange={() => {}} />);
+    const v = screen.getByRole("textbox").value;
+    expect(v).not.toMatch(/e/i);
+    expect(v).toBe("0");
+  });
+
+  // ⚠⚠ O CASO QUE O CODEX PEGOU. `limparDecimalDigitado` só capa depois da VÍRGULA, então
+  // "0.1234567" passa inteiro. Se a decisão de trocar o texto usasse o valor ARREDONDADO, o pai
+  // numérico devolveria "0,123457" — número diferente do digitado — e o campo se reescreveria no
+  // meio da digitação. A decisão usa o valor CRU; só o que ENTRA no campo é arredondado.
+  it("digitar com ponto além das casas não faz o campo se reescrever sozinho", () => {
+    render(<PaiNumerico />);
+    const inp = screen.getByRole("textbox");
+    fireEvent.change(inp, { target: { value: "0.1234567" } });
+    expect(inp.value).toBe("0.1234567");
+    expect(screen.getByTestId("estado").textContent).toBe("0.1234567");
+  });
+
+  it("o zero à direita digitado continua protegido do arredondamento", () => {
+    render(<PaiNumerico />);
+    const inp = screen.getByRole("textbox");
+    fireEvent.change(inp, { target: { value: "31,50" } });
+    expect(inp.value).toBe("31,50");
+  });
+
+  // ⚠ O resíduo segue no BANCO: este campo conserta a apresentação, não o dado (achado do Codex).
+  it("não avisa o pai do arredondamento — a gravação não muda sozinha", () => {
+    const onChange = vi.fn();
+    render(<CampoDecimal value={861.1199999999999} onChange={onChange} />);
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

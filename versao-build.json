@@ -1,7 +1,12 @@
 {
-  "build": 3314,
-  "gerado": "2026-09-22T00:36:45.396Z",
+  "build": 3315,
+  "gerado": "2026-09-22T00:45:05.507Z",
   "commits": [
+    {
+      "hash": "ed823f1d1d",
+      "data": "21/09/2026",
+      "titulo": "Cotação: a tela do fornecedor deixa de espremer a descrição do item"
+    },
     {
       "hash": "f3ee410be0",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b38de698ed",
       "data": "18/09/2026",
       "titulo": "Registra o fechamento dos três pendentes da revisão"
-    },
-    {
-      "hash": "8a14ae626e",
-      "data": "18/09/2026",
-      "titulo": "Fecha os três pendentes da revisão: Form XObject, teto de escrita e recorte legado"
     }
   ]
 }
