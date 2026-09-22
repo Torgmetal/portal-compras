@@ -446,4 +446,11 @@ novo, não conserto, e não entra sem o Matheus decidir.
 - **(22/09, 09h)** Junta ensaiada do RUS conforme a casa: processo de soldagem em lista (GMAW/FCAW),
   chanfro em lista (X/V), tipo de junta e técnica nascem preenchidos (Topo, Direto). ⚠ Processo e
   chanfro NÃO têm padrão — são escolha do inspetor, como o ângulo real.
+- **(22/09, 09h15)** Relatório assinado com campos em branco (EVS/LP da OP-102, assinados pelo
+  Geraldo com penetrante, revelador e tempos vazios): a rota `/revisao` passou a aceitar
+  `PERFIS_CAMPO` — quem inspeciona é quem completa, e a revisão continua sendo o único caminho
+  (congela a rodada, sobe o R, exige motivo). A tarja passou a dizer QUEM assinou. Teste
+  `inspecao-revisao-perfil` (3).
+  ⚠ **Para revisar (security):** dar ao `QUALIDADE_CAMPO` o poder de abrir revisão descarta
+  assinaturas de terceiros — está auditado e com motivo obrigatório, mas convém uma segunda leitura.
 

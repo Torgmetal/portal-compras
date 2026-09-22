@@ -82,6 +82,7 @@ export default function RelatorioDetalheClient({ id }) {
   const marcaAtual = marcaVista || desenhos[0]?.marca || "";
   // enviado para assinatura = documento fechado (mesma regra da revisão do data book)
   const travado = !!rel.envioAssinaturaId;
+  const assinaram = (dados.assinaturas || []).filter((a) => a.assinadoEm).map((a) => a.nome || a.email);
 
   const setLinha = (i, campo, v) => {
     setDados((d) => {
@@ -133,7 +134,7 @@ export default function RelatorioDetalheClient({ id }) {
       const r = await fetch(`/api/qualidade/inspecoes/${id}/revisao`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ motivo }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao abrir revisão");
-      alert(`Revisão R${String(j.relatorio.revisao).padStart(2, "0")} aberta. A rodada anterior ficou no histórico com ${j.assinaturasCongeladas} assinatura(s). Edite e envie de novo para assinatura.`);
+      alert(`Revisão R${String(j.relatorio.revisao).padStart(2, "0")} aberta. A rodada anterior ficou no histórico com ${j.assinaturasCongeladas} assinatura(s) e o motivo que você escreveu. Complete o relatório e envie de novo para assinatura.`);
       window.location.reload();
     } catch (e) { alert(e.message); } finally { setSalvando(false); }
   }
@@ -169,11 +170,20 @@ export default function RelatorioDetalheClient({ id }) {
         <div className="flex items-center gap-2">
           {travado ? (
             <>
-              <span className="text-[11px] px-2 py-1 rounded-lg bg-gray-100 text-torg-gray inline-flex items-center gap-1.5">
-                <Lock size={12} /> enviado para assinatura — somente leitura · R{String(rel.revisao ?? 0).padStart(2, "0")}
+              {/* ⚠ O AVISO DIZ QUEM JÁ ASSINOU. Vitor (22/09/2026): "como já está aprovado não
+                  permite a Lais fazer essas alterações" — a tarja só dizia "somente leitura", e
+                  quem precisa completar o relatório não descobria nem por que está travado nem
+                  que o caminho é o botão ao lado. */}
+              <span className="text-[11px] px-2 py-1 rounded-lg bg-gray-100 text-torg-gray inline-flex items-center gap-1.5"
+                title={assinaram.length ? `Já assinaram: ${assinaram.join(", ")}` : "Enviado para assinatura; ninguém assinou ainda"}>
+                <Lock size={12} />
+                {assinaram.length
+                  ? `assinado por ${assinaram.join(", ")} — somente leitura · R${String(rel.revisao ?? 0).padStart(2, "0")}`
+                  : `enviado para assinatura — somente leitura · R${String(rel.revisao ?? 0).padStart(2, "0")}`}
               </span>
               {/* Vitor (11/09/2026): "voltar as assinaturas" = abrir a revisão seguinte; a rodada assinada fica no histórico */}
-              <button onClick={abrirRevisao} disabled={salvando} title="Congela a rodada assinada no histórico, sobe a revisão e libera a edição"
+              <button onClick={abrirRevisao} disabled={salvando}
+                title={`Para completar ou corrigir: congela ${assinaram.length ? `a assinatura de ${assinaram.join(", ")}` : "esta rodada"} no histórico, sobe para R${String((rel.revisao ?? 0) + 1).padStart(2, "0")} e libera a edição`}
                 className="text-[12px] font-semibold text-torg-dark bg-amber-100 hover:bg-amber-200 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50">
                 {salvando ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Abrir revisão
               </button>

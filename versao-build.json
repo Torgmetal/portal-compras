@@ -1,7 +1,12 @@
 {
-  "build": 3370,
-  "gerado": "2026-09-22T12:04:05.972Z",
+  "build": 3371,
+  "gerado": "2026-09-22T12:08:22.214Z",
   "commits": [
+    {
+      "hash": "a1ab1539",
+      "data": "22/09/2026",
+      "titulo": "US: a junta ensaiada com as listas da casa — GMAW/FCAW, chanfro X/V, Topo e Direto"
+    },
     {
       "hash": "bf32c164",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "4df47523",
       "data": "21/09/2026",
       "titulo": "Cotação: a observação da RM na cara do fornecedor, e o frete na lista"
-    },
-    {
-      "hash": "53e38de6",
-      "data": "21/09/2026",
-      "titulo": "Conferência: a planilha do PCP separa o que é DESTA remessa"
     }
   ]
 }

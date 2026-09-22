@@ -8,13 +8,19 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRole } from "@/lib/session";
 import { abrirRevisaoRelatorio } from "@/lib/relatorio-revisao";
+import { PERFIS_CAMPO } from "@/lib/qualidade-campo";
 
 export const runtime = "nodejs";
 const schema = z.object({ motivo: z.string().min(5, "Diga o que vai ser revisto (mínimo 5 letras).").max(1000) });
 
 export async function POST(req, { params }) {
   let user;
-  try { user = await requireRole(["ADMIN", "QUALIDADE"]); }
+  // ⚠ MESMOS PERFIS DE QUEM PREENCHE. Vitor (22/09/2026), sobre os EVS e LP da OP-102 assinados
+  // com campos em branco: "como já está aprovado não permite a Lais fazer essas alterações". Quem
+  // inspeciona é quem completa o relatório; exigir ADMIN/QUALIDADE aqui obrigava a Qualidade a
+  // fazer o trabalho do inspetor. A revisão continua sendo o único caminho — ela congela a rodada
+  // assinada no histórico, sobe o R e pede motivo, que vai a quem já tinha assinado.
+  try { user = await requireRole(PERFIS_CAMPO); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
   let body;
   try { body = schema.parse(await req.json()); }
