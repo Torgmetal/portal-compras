@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { lerTipi, lerAliquota, aliquotasConsultaveis, ALIQUOTA, NIVEL } from "@/lib/fiscal/tipi-planilha";
+import { lerTipi, lerAliquota, aliquotasConsultaveis, comCaminho, codigoNormalizado, textoDeBusca, ALIQUOTA, NIVEL } from "@/lib/fiscal/tipi-planilha";
 
 // ─── A LEITURA DA TIPI OFICIAL ───────────────────────────────────────────────
 //
@@ -175,5 +175,85 @@ describe("os NCMs usados pela TORG atravessam o parser", () => {
     const { aliquotas } = aliquotasConsultaveis(itens);
     expect(aliquotas).toHaveLength(1);
     expect(aliquotas[0]).toMatchObject({ codigo: normalizado, nivel: NIVEL.NCM });
+  });
+});
+
+// ─── O ZERO QUE O EXCEL COMEU NO ARQUIVO OFICIAL ─────────────────────────────
+//
+// ⚠⚠ 58 POSIÇÕES DA TIPI CHEGAM COM UM ZERO A MENOS, e é defeito da FONTE: a célula foi gravada
+// como número em vez de texto. Medido em 22/09/2026 no arquivo real.
+describe("codigoNormalizado — a posição tem sempre 4 dígitos", () => {
+  it.each([
+    ["84.3", "8430"],   // ⚠ o caso que envenenava o capítulo 84 inteiro
+    ["02.1", "0210"],
+    ["04.1", "0410"],
+    ["3.03", "0303"],   // ⚠ este perdeu o zero dos DOIS lados
+  ])('%s é a posição %s', (planilha, esperado) => {
+    expect(codigoNormalizado(planilha)).toBe(esperado);
+  });
+
+  // ⚠ Só o caso de 3 dígitos é tocado — ele é o único inequívoco (3 nunca é nível válido).
+  it.each(["84.37", "8437.8", "8437.90.00", "0101.21.00"])("%s passa intacto", (c) => {
+    expect(codigoNormalizado(c)).toBe(c.replace(/\D/g, ""));
+  });
+});
+
+describe("comCaminho — o significado mora no caminho, não na folha", () => {
+  const arvore = () => lerTipi([
+    ["NCM ", "EX", "DESCRIÇÃO ", "ALÍQUOTA (%)", ""],
+    ["94.06", "", "Construções pré-fabricadas.", "", ""],
+    ["9406.90", "", "- Outras", "", ""],
+    ["9406.90.20", "", "Com estrutura de ferro ou aço", "0", ""],
+  ]).itens;
+
+  // ⚠⚠ BUSCAR "construções pré-fabricadas" NA FOLHA DEVOLVIA ZERO: as palavras estão na POSIÇÃO,
+  // duas linhas acima. E 23% dos NCMs (2.603 de 11.103) se descrevem só como "Outros"/"Outras".
+  it("a folha herda a descrição dos ancestrais", () => {
+    const [, , folha] = comCaminho(arvore());
+    expect(folha.descricaoCompleta).toBe("Construções pré-fabricadas. > Outras > Com estrutura de ferro ou aço");
+  });
+
+  // ⚠ Os travessões são marcação de NÍVEL, não texto — o caminho já representa o nível.
+  it("o travessão do nível não entra no texto", () => {
+    expect(comCaminho(arvore())[2].descricaoCompleta).not.toMatch(/- Outras/);
+  });
+
+  // ⚠⚠ O CASO REAL DO ZERO PERDIDO: sem normalizar, "843" é prefixo de "8437" e o 8437.90.00
+  // herdava "Outras máquinas de TERRAPLENAGEM" (texto do 84.30). Peneira descrita como escavadeira.
+  it("a posição com zero comido não vira ancestral do capítulo inteiro", () => {
+    const itens = comCaminho(lerTipi([
+      ["NCM ", "EX", "DESCRIÇÃO ", "ALÍQUOTA (%)", ""],
+      ["84.3", "", "Outras máquinas e aparelhos de terraplenagem", "", ""],
+      ["8430.10.00", "", "- Bate-estacas", "0", ""],
+      ["84.37", "", "Máquinas para moagem de cereais", "", ""],
+      ["8437.90.00", "", "- Partes", "3.25", ""],
+    ]).itens);
+    const partes = itens.find((i) => i.codigo === "84379000");
+    expect(partes.descricaoCompleta).toBe("Máquinas para moagem de cereais > Partes");
+    expect(partes.descricaoCompleta).not.toMatch(/terraplenagem/i);
+  });
+
+  it("a raiz não inventa ancestral", () => {
+    expect(comCaminho(arvore())[0].caminho).toEqual([]);
+  });
+});
+
+// ⚠⚠ `to_tsvector('portuguese', …)` NÃO REMOVE ACENTO, e isso zerava a busca inteira: quem procura
+// no chão de fábrica digita "construcoes", e `plainto_tsquery` junta os termos com E — um acento
+// faltando derruba a consulta toda.
+describe("textoDeBusca — como o colaborador digita", () => {
+  it.each([
+    ["Construções pré-fabricadas", "construcoes pre-fabricadas"],
+    ["Máquinas de MOAGEM", "maquinas de moagem"],
+    ["Molas e folhas de molas, de ferro ou aço.", "molas e folhas de molas, de ferro ou aco."],
+  ])("%s vira %s", (a, b) => expect(textoDeBusca(a)).toBe(b));
+
+  it("a linha carrega a versão de busca junto da de exibição", () => {
+    const [folha] = comCaminho(lerTipi([
+      ["NCM ", "EX", "DESCRIÇÃO ", "ALÍQUOTA (%)", ""],
+      ["9406.90.20", "", "Construções pré-fabricadas", "0", ""],
+    ]).itens);
+    expect(folha.descricaoCompleta).toBe("Construções pré-fabricadas");
+    expect(folha.busca).toBe("construcoes pre-fabricadas");
   });
 });

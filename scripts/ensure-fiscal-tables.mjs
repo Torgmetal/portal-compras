@@ -74,7 +74,15 @@ const sql = [
   // ⚠⚠ A TRAVA QUE SÓ O SQL EXPRESSA (ver o cabeçalho).
   `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalTipiLinha_ncm_unico" ON "FiscalTipiLinha"("versaoId","codigo","ex") WHERE "nivel" = 'NCM'`,
   // ⚠ Busca por DESCRIÇÃO ("estrutura metálica", "guarda-corpo") sem varrer 11 mil linhas.
-  `CREATE INDEX IF NOT EXISTS "FiscalTipiLinha_descricao_busca" ON "FiscalTipiLinha" USING GIN (to_tsvector('portuguese', "descricao"))`,
+  `ALTER TABLE "FiscalTipiLinha" ADD COLUMN IF NOT EXISTS "descricaoCompleta" TEXT NOT NULL DEFAULT ''`,
+  // ⚠⚠ O GIN VAI NA DESCRIÇÃO COMPLETA, NÃO NA DA FOLHA. Medido: 2.603 dos 11.103 NCMs (23%) são
+  // descritos só como "Outros"/"Outras" — buscar "construções pré-fabricadas" na folha devolvia ZERO,
+  // porque as palavras moram na POSIÇÃO 94.06, duas linhas acima do 9406.90.20.
+  `ALTER TABLE "FiscalTipiLinha" ADD COLUMN IF NOT EXISTS "busca" TEXT NOT NULL DEFAULT ''`,
+  // ⚠⚠ O ÍNDICE VAI NA COLUNA SEM ACENTO. `to_tsvector` não remove acento: indexando o texto com
+  // acento, "construcoes pre-fabricadas" devolvia ZERO, e `plainto_tsquery` junta os termos com E —
+  // um acento faltando derruba a consulta inteira.
+  `CREATE INDEX IF NOT EXISTS "FiscalTipiLinha_busca" ON "FiscalTipiLinha" USING GIN (to_tsvector('portuguese', "busca"))`,
 
   `CREATE TABLE IF NOT EXISTS "FiscalNcmVersao" (
      "id" TEXT PRIMARY KEY,

@@ -1,7 +1,12 @@
 {
-  "build": 3401,
-  "gerado": "2026-09-22T21:22:29.771Z",
+  "build": 3402,
+  "gerado": "2026-09-22T21:33:37.815Z",
   "commits": [
+    {
+      "hash": "a99834901d",
+      "data": "22/09/2026",
+      "titulo": "Fiscal: o modelo de dados, com \"ativa\" separado de \"vigente\""
+    },
     {
       "hash": "7cdb37c5e2",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5dc7ee83cc",
       "data": "22/09/2026",
       "titulo": "MES: a obra deixa de ser uma preferência e vira uma partição"
-    },
-    {
-      "hash": "38bf4ee03e",
-      "data": "22/09/2026",
-      "titulo": "Relatório assinado: quem inspeciona pode abrir a revisão para completá-lo"
     }
   ]
 }

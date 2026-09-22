@@ -6687,25 +6687,32 @@ model FiscalTipiVersao {
 /// alíquota, mas é de onde sai a descrição que a folha de 8 dígitos abrevia ("- Partes" só
 /// significa algo sob "Máquinas para limpeza… de grãos").
 model FiscalTipiLinha {
-  id              String           @id @default(cuid())
-  versao          FiscalTipiVersao @relation(fields: [versaoId], references: [id], onDelete: Cascade)
-  versaoId        String
-  ordem           Int // a ordem do arquivo, que é o que dá sentido à hierarquia
-  nivel           String // NCM | HIERARQUIA
+  id                String           @id @default(cuid())
+  versao            FiscalTipiVersao @relation(fields: [versaoId], references: [id], onDelete: Cascade)
+  versaoId          String
+  ordem             Int // a ordem do arquivo, que é o que dá sentido à hierarquia
+  nivel             String // NCM | HIERARQUIA
   /// Só dígitos. ⚠ STRING, sempre: "01" não é 1, e zero à esquerda é significado.
-  codigo          String
-  codigoFormatado String
+  codigo            String
+  codigoFormatado   String
   /// ⚠⚠ O Ex. Vazio = a alíquota GERAL daquele NCM. Ver o contrato 2 no topo.
-  ex              String           @default("")
-  descricao       String
+  ex                String           @default("")
+  descricao         String
+  /// ⚠⚠ O CAMINHO INTEIRO ("Construções pré-fabricadas > Outras > Com estrutura de ferro ou aço").
+  /// 23% dos NCMs (2.603 de 11.103) são descritos SÓ como "Outros"/"Outras": indexar a folha é
+  /// publicar uma busca que não acha o que o colaborador digita. É esta coluna que o GIN indexa.
+  descricaoCompleta String           @default("")
+  /// ⚠ A mesma coisa sem acento e em minúscula — é ESTA que o GIN indexa. `to_tsvector` não
+  /// remove acento, e sem isso "construcoes pre-fabricadas" não acha "Construções pré-fabricadas".
+  busca             String           @default("")
   /// ⚠⚠ NT, ZERO E AUSÊNCIA SÃO TRÊS COISAS DIFERENTES — por isso o tipo vem separado do valor.
   /// "NT" está FORA do campo de incidência; "0" é alíquota de verdade (6.405 linhas); AUSENTE é a
   /// planilha não ter dito nada. Guardar só o número faria as três virarem zero.
-  aliquotaTipo    String // PERCENTUAL | NT | AUSENTE
-  aliquotaValor   Float?
-  aliquotaBruto   String
+  aliquotaTipo      String // PERCENTUAL | NT | AUSENTE
+  aliquotaValor     Float?
+  aliquotaBruto     String
   /// As linhas do Excel que formaram esta (mais de uma quando a descrição transborda).
-  linhasDeOrigem  Int[]
+  linhasDeOrigem    Int[]
 
   @@unique([versaoId, ordem])
   /// ⚠ A unicidade REAL — (versão, código, ex) só para as linhas NCM — é um índice PARCIAL, que o
