@@ -845,11 +845,27 @@ async function main() {
   const nomes = existentes.map((r) => r.tablename);
   const faltando = ["MesApontamento", "MesSyncLog"].filter((t) => !nomes.includes(t));
 
+  // ⚠ ISTO ERA UM `return`, E O `return` ENGOLIA O RESTO DO ARQUIVO. A intenção era pular só a
+  // CRIAÇÃO das duas tabelas do agente quando elas já existem — mas, como saía da função inteira,
+  // levava junto tudo o que vem depois: o event trigger de proteção nunca era conferido em nenhum
+  // banco onde as tabelas já estavam (ou seja, sempre, em produção). Guarda de bloco, não de
+  // função: o que é condicional é a criação, não o fim do script.
   if (faltando.length === 0) {
     console.log("[ensure-mes-tables] OK — tabelas MesApontamento e MesSyncLog existem.");
-    return;
+  } else {
+    await criarTabelasDoAgente(prisma, faltando);
   }
 
+  await travaDoTrabalhoNoRecurso(prisma);
+  await travaDoCrachaAtivo(prisma);
+  await identificadoresPorAmbiente(prisma);
+
+  // Após criar as tabelas, garante o event trigger de proteção
+  await ensureEventTrigger(prisma);
+}
+
+/** As duas tabelas que o agente do Syneco alimenta (`MesApontamento`, `MesSyncLog`). */
+async function criarTabelasDoAgente(prisma, faltando) {
   console.log(`[ensure-mes-tables] AVISO — tabelas ausentes: ${faltando.join(", ")}. Criando...`);
 
   // SQL idempotente (IF NOT EXISTS) — mesma lógica da migration oficial
@@ -928,9 +944,130 @@ async function main() {
   }
 
   console.log("[ensure-mes-tables] Tabelas MES criadas com sucesso.");
+}
 
-  // Após criar as tabelas, garante o event trigger de proteção
-  await ensureEventTrigger(prisma);
+/**
+ * UMA SESSÃO ABERTA POR RECURSO — o MES próprio (`MesSessao`).
+ *
+ * ⚠⚠ É a MESMA lição da Conferência de Peça, um andar acima: dois totens no mesmo recurso abrem
+ * duas sessões simultâneas e ninguém percebe — os apontamentos se dividem entre as duas e o
+ * monitor mostra a máquina em dois estados ao mesmo tempo. Validar na rota não basta: as duas
+ * aberturas leem o banco antes de qualquer uma gravar, e as duas passam.
+ *
+ * ⚠ Índice PARCIAL, que o Prisma não sabe declarar no `schema.prisma` — por isso mora só aqui,
+ * documentado no model. Sessão ENCERRADA/CANCELADA fica de fora do índice, senão o recurso só
+ * poderia ter uma sessão na vida inteira.
+ *
+ * ⚠ Tolerante à tabela não existir: em produção `MesSessao` ainda não foi criada (o MES próprio
+ * roda por enquanto só no banco de laboratório), e este script é chamado no build — ele não pode
+ * derrubar deploy nenhum por causa de uma tabela que ainda não nasceu.
+ */
+/**
+ * UM CRACHÁ ATIVO POR VEZ — índice PARCIAL, que o Prisma não sabe declarar no schema.
+ *
+ * ⚠⚠ É AQUI QUE A REGRA MORA, não na rota. Matheus (13/09/2026): "quando um crachá estiver ativado
+ * em uma máquina, não pode ser aberto em outro até ele fechar a operação dele na máquina aberta".
+ * A checagem em JS lê um retrato; dois totens bipando o mesmo crachá no mesmo segundo leem os dois
+ * "não há vínculo" e criam dois. Mesma lição da Conferência de Peça e da trava do trabalho.
+ *
+ * ⚠ Tolerante à tabela não existir: em produção `MesPresenca` ainda não foi criada (o MES próprio
+ * roda por enquanto só no banco de laboratório) e este script é chamado no build.
+ */
+/**
+ * O CÓDIGO DO POSTO E O CRACHÁ PASSAM A SER ÚNICOS **POR AMBIENTE**.
+ *
+ * ⚠⚠ ENQUANTO O ÚNICO GLOBAL EXISTIR, O ISOLAMENTO NÃO EXISTE (achado do Codex, 21/09/2026).
+ * Criar o índice composto NÃO derruba a unicidade antiga: "SOLDA 5" continuaria podendo existir
+ * uma vez só no banco inteiro, e o laboratório seguiria disputando a linha — e portanto a trava de
+ * sessão aberta e a de crachá ativo — com a fábrica. A retirada do índice velho é ETAPA EXPLÍCITA.
+ *
+ * ⚠⚠ E ESTA FUNÇÃO NÃO ENGOLE FALHA (pedido do Codex). O padrão do vizinho `travaDoTrabalhoNoRecurso`
+ * — `.then(ok, e => console.warn(...))` — transforma erro em aviso, e uma transição pela metade
+ * (composto criado, global de pé) seria declarada bem-sucedida. Aqui só a TABELA AUSENTE é tolerada
+ * (em produção as tabelas do MES ainda não nasceram e este script roda no build); o resto sobe.
+ *
+ * ⚠ Duplicidade pré-existente impede o índice de nascer. A mensagem diz qual tabela, porque o
+ * conserto é apagar a linha duplicada do laboratório, não repetir o comando.
+ */
+async function identificadoresPorAmbiente(prisma) {
+  const passos = [
+    { tabela: "MesRecurso", coluna: "codigo", antigo: "MesRecurso_codigo_key", novo: "MesRecurso_codigo_ambiente_key" },
+    { tabela: "MesOperador", coluna: "cracha", antigo: "MesOperador_cracha_key", novo: "MesOperador_cracha_ambiente_key" },
+  ];
+  for (const p of passos) {
+    try {
+      // 1. o composto nasce ANTES de o global cair: entre os dois comandos não pode existir
+      //    janela em que nada garante a unicidade.
+      await prisma.$executeRawUnsafe(
+        `CREATE UNIQUE INDEX IF NOT EXISTS "${p.novo}" ON "${p.tabela}"("${p.coluna}", "ambiente")`,
+      );
+      // 2. e só então a unicidade global sai — `DROP CONSTRAINT` porque o Prisma a cria como
+      //    constraint, e `DROP INDEX` sozinho não remove constraint.
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE "${p.tabela}" DROP CONSTRAINT IF EXISTS "${p.antigo}"`,
+      );
+      await prisma.$executeRawUnsafe(`DROP INDEX IF EXISTS "${p.antigo}"`);
+      // 3. conferir a DEFINIÇÃO, não o nome (pedido do Codex): índice com o nome certo e as
+      //    colunas erradas passaria despercebido.
+      const [conf] = await prisma.$queryRawUnsafe(
+        `SELECT indexdef FROM pg_indexes WHERE tablename = $1 AND indexname = $2`, p.tabela, p.novo,
+      );
+      const def = String(conf?.indexdef || "");
+      if (!def.includes(p.coluna) || !def.includes("ambiente")) {
+        throw new Error(`índice "${p.novo}" não ficou com (${p.coluna}, ambiente): ${def || "não existe"}`);
+      }
+      console.log(`[ensure-mes-tables] OK — ${p.tabela}.${p.coluna} agora é único por ambiente.`);
+    } catch (e) {
+      if (e.code === "42P01" || new RegExp(`relation[^\n]*${p.tabela}[^\n]*(does not exist|não existe)`, "i").test(e.message)) {
+        console.log(`[ensure-mes-tables] ${p.tabela} ainda não existe aqui — chave por ambiente adiada.`);
+        continue;
+      }
+      throw new Error(`[ensure-mes-tables] ${p.tabela}: ${e.message}`);
+    }
+  }
+}
+
+async function travaDoCrachaAtivo(prisma) {
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "MesPresenca_operador_ativa_key"
+    ON "MesPresenca"("operadorId") WHERE "status" = 'ABERTA'
+  `).then(
+    () => console.log('[ensure-mes-tables] OK — índice "MesPresenca_operador_ativa_key".'),
+    (e) => {
+      // ⚠⚠ SÓ A TABELA AUSENTE É TOLERADA (achado do Codex). Engolir QUALQUER falha como aviso
+      // esconderia o que importa — falta de permissão, ou linhas duplicadas que impedem o índice
+      // único de nascer. Nos dois casos a trava do crachá simplesmente não existe, e o portal
+      // seguiria dizendo "OK" enquanto o mesmo crachá abre em duas máquinas.
+      // ⚠ O texto só vale para ESTA tabela: um `/does not exist/` solto engoliria também
+      // "column ... does not exist" (42703) de schema desatualizado, e aí a trava não
+      // nasceria e o log diria "adiado" (Codex, 14/09/2026).
+      const tabelaAusente = e.code === "42P01"
+        || /relation[^\n]*MesPresenca[^\n]*(does not exist|não existe)/i.test(e.message);
+      if (tabelaAusente) {
+        console.log("[ensure-mes-tables] MesPresenca ainda não existe aqui — índice do crachá adiado.");
+        return;
+      }
+      console.error("[ensure-mes-tables] ⚠ TRAVA DO CRACHÁ NÃO INSTALADA:", e.message);
+    },
+  );
+}
+
+async function travaDoTrabalhoNoRecurso(prisma) {
+  // ⚠⚠ O ÍNDICE ANTIGO TEM DE CAIR EXPLICITAMENTE (achado do Codex, 13/09/2026). Ele travava UMA
+  // sessão aberta por recurso; agora o que não pode repetir é o TRABALHO (obra+marca), porque o
+  // nesting abre várias marcas de uma vez na mesma máquina. `CREATE INDEX IF NOT EXISTS` com o
+  // mesmo nome NÃO substitui nada — só não faz nada, e a trava velha continuaria barrando a
+  // segunda marca. Nome novo + drop do antigo.
+  await prisma.$executeRawUnsafe(`DROP INDEX IF EXISTS "MesSessao_recursoId_aberta_key"`).then(
+    () => {}, (e) => console.warn("[ensure-mes-tables] drop do índice antigo:", e.message),
+  );
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "MesSessao_recurso_trabalho_aberta_key"
+    ON "MesSessao"("recursoId", "chaveTrabalho") WHERE "status" = 'ABERTA'
+  `).then(
+    () => console.log("[ensure-mes-tables] OK — um trabalho (obra+marca) aberto por recurso."),
+    (e) => console.warn("[ensure-mes-tables] índice de trabalho único por recurso:", e.message),
+  );
 }
 
 async function ensureEventTrigger(prisma) {

@@ -77,6 +77,10 @@ function moduloNegado(path, token) {
   // Módulo Indicadores (visão gerencial consolidada) é só do ADMIN. Cada setor continua
   // vendo os SEUS indicadores pela aba "Indicadores" dentro do próprio módulo.
   if (path.startsWith("/indicadores")) return "ADMIN";
+  // ⚠ MES próprio em construção (ver docs/mes-proprio.md). Fica FORA de todo menu e só o ADMIN
+  // entra — é obra em andamento que vai conviver com o Syneco até virar a chave, e ninguém do
+  // chão de fábrica pode cair aqui por engano achando que é o apontamento de verdade.
+  if (path.startsWith("/mes-lab")) return "ADMIN";
   if (path.startsWith("/financeiro")) return nega("FINANCEIRO");
   if (path.startsWith("/expedicao")) return nega("EXPEDICAO");
   // Consulta de estoque: além da Produção, a Engenharia também acessa (responde às consultas).
