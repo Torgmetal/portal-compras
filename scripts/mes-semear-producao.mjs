@@ -4,6 +4,7 @@
 //        --env-file=.env.local scripts/mes-semear-producao.mjs --confirmo
 //
 //   ... --confirmo --remover=ACABAMENTO01,PINTURAAIRLESS    (tira postos NOMEADOS, se nunca usados)
+//   ... --confirmo --padronizar                              (sobe a caixa dos nomes já gravados)
 //
 // Matheus (22/09/2026): *"crie você mesmo o restante dos cadastros (…) preenche o restante conforme
 // já falamos: os setores, máquinas e funcionários da fábrica"*.
@@ -33,7 +34,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaClient as MesClient } from "../node_modules/.prisma/mes-client/index.js";
 import { urlDoMes } from "@/lib/mes/prisma";
 import { AMBIENTE } from "@/lib/mes/ambiente";
-import { excluirSeLivre } from "@/lib/mes/cadastro";
+import { excluirSeLivre, normalizarNome } from "@/lib/mes/cadastro";
 import { RECURSOS, SETORES, COR_SETOR } from "@/app/pcp/producao/_gantt/recursos";
 
 const AMB = AMBIENTE.PROD;
@@ -71,7 +72,7 @@ async function semearSetores() {
   const criados = [];
   for (const [i, gantt] of SETORES.entries()) {
     const codigo = SETOR_DO_GANTT[gantt] || gantt;
-    const dados = { nome: NOME_DO_SETOR[codigo] || codigo, ordem: (i + 1) * 10, cor: COR_SETOR[gantt] || null };
+    const dados = { nome: normalizarNome(NOME_DO_SETOR[codigo] || codigo), ordem: (i + 1) * 10, cor: COR_SETOR[gantt] || null };
     criados.push(await mes.mesSetor.upsert({ where: { codigo }, update: {}, create: { codigo, ...dados } }));
   }
   console.log(`Setores: ${(await mes.mesSetor.count()) - antes} novo(s), ${criados.length} conferido(s)`);
@@ -98,7 +99,7 @@ async function criarRecurso({ codigo, nome, setorId, codigoSyneco, tipo }) {
   return mes.mesRecurso.upsert({
     where: porAmbiente(codigo),
     update: {},                       // já existe → respeita o que a tela editou
-    create: { codigo, nome, setorId, codigoSyneco: codigoSyneco || null, tipo, ambiente: AMB },
+    create: { codigo, nome: normalizarNome(nome), setorId, codigoSyneco: codigoSyneco || null, tipo, ambiente: AMB },
   });
 }
 
@@ -210,7 +211,7 @@ async function semearOperadores() {
     feitos.push(await mes.mesOperador.upsert({
       where: { cracha_ambiente: { cracha, ambiente: AMB } },
       update: {},
-      create: { cracha, nome: p.nome, funcionarioId: p.id, ambiente: AMB },
+      create: { cracha, nome: normalizarNome(p.nome), funcionarioId: p.id, ambiente: AMB },
     }));
   }
   console.log(`Crachás: ${(await mes.mesOperador.count({ where: { ambiente: AMB } })) - antes} novo(s), ${comCracha.length} com matrícula no RH`);
@@ -230,6 +231,34 @@ function porSetor(pessoas) {
   console.log(`  por setor: ${[...mapa].sort().map(([s, n]) => `${s} ${n}`).join(" · ")}`);
 }
 
+/**
+ * ALINHA A CAIXA DO QUE JÁ ESTÁ GRAVADO.
+ *
+ * ⚠⚠ É A ÚNICA COISA QUE ESTE SCRIPT SOBRESCREVE, e por isso é um passo PEDIDO (`--padronizar`),
+ * não um efeito do semeio. Matheus (22/09/2026): *"deixei tudo em letra maiúscula por padrão os
+ * cadastros"* — os dele nasceram assim, os 23 que o semeador trouxe do Gantt vieram em caixa
+ * mista. Rodar isso dentro do `upsert` quebraria a promessa de que edição feita pela tela nunca é
+ * desfeita; aqui quem desfaz é quem digitou o comando.
+ *
+ * ⚠ Só o NOME. O crachá fica como está — ver o comentário na rota do cadastro.
+ */
+async function padronizarCaixa() {
+  let mexidos = 0;
+  for (const [rotulo, modelo, campo] of [
+    ["setor", mes.mesSetor, "nome"], ["posto", mes.mesRecurso, "nome"],
+    ["crachá", mes.mesOperador, "nome"], ["motivo", mes.mesMotivoParada, "descricao"],
+  ]) {
+    for (const linha of await modelo.findMany()) {
+      const alvo = normalizarNome(linha[campo]);
+      if (alvo === linha[campo]) continue;
+      await modelo.update({ where: { id: linha.id }, data: { [campo]: alvo } });
+      console.log(`  ${rotulo}: ${JSON.stringify(linha[campo])} → ${JSON.stringify(alvo)}`);
+      mexidos += 1;
+    }
+  }
+  console.log(mexidos ? `  ${mexidos} nome(s) em maiúscula.` : "  nada a padronizar.");
+}
+
 /** `--remover=A,B` → ["A","B"] */
 function pedidoDeRemocao() {
   const arg = process.argv.find((a) => a.startsWith("--remover="));
@@ -238,6 +267,11 @@ function pedidoDeRemocao() {
 
 async function main() {
   console.log(`MES de PRODUÇÃO, ambiente ${AMB}\n`);
+  if (process.argv.includes("--padronizar")) {
+    console.log("Padronizando a caixa dos nomes:");
+    await padronizarCaixa();
+    console.log("");
+  }
   const remover = pedidoDeRemocao();
   if (remover.length) {
     console.log(`Removendo ${remover.length} posto(s) nomeado(s):`);

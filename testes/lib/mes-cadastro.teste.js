@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   normalizarCodigo, recusaDoCadastro, recusaDaExclusao, recusaDaTrocaDeCodigo, setoresSemPosto,
-  usosDoCadastro, excluirSeLivre,
+  usosDoCadastro, excluirSeLivre, normalizarNome,
 } from "@/lib/mes/cadastro";
 
 // O CADASTRO DA FÁBRICA — as recusas que impedem cadastro sem sentido de nascer.
@@ -221,5 +221,29 @@ describe("excluirSeLivre — contar e apagar são dois momentos", () => {
       resultados.push(await excluirSeLivre(zerado, "recursos", id, { nomeDoUso: "x", apagar }));
     }
     expect(resultados.map((r) => Boolean(r.excluido))).toEqual([true, false, true]);
+  });
+});
+
+describe("normalizarNome — o cadastro do MES é em maiúscula", () => {
+  // Matheus (22/09/2026): "deixei tudo em letra maiúscula por padrão os cadastros".
+  it("sobe a caixa", () => {
+    expect(normalizarNome("Laser Chapa")).toBe("LASER CHAPA");
+  });
+
+  // ⚠ O ACENTO FICA. Tirá-lo mudaria o nome da coisa, não a caixa dela — e "GALPAO" não é como a
+  // fábrica escreve.
+  it("preserva o acento", () => {
+    expect(normalizarNome("Galpão 1")).toBe("GALPÃO 1");
+    expect(normalizarNome("Édecio Viana")).toBe("ÉDECIO VIANA");
+  });
+
+  // ⚠⚠ ISTO PEGOU UM NOME DE VERDADE: o RH tinha "   ALEX APARECIDO ORSI", com espaços na frente,
+  // e a lista do totem ordena por nome — o espaço o jogava para o topo.
+  it("apara as pontas e junta o espaço repetido", () => {
+    expect(normalizarNome("   ALEX   APARECIDO ORSI ")).toBe("ALEX APARECIDO ORSI");
+  });
+
+  it("aguenta nulo sem quebrar", () => {
+    expect(normalizarNome(null)).toBe("");
   });
 });

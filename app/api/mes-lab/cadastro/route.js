@@ -16,7 +16,7 @@ import { ambientePedido } from "@/lib/mes/ambiente";
 import { mesPrisma as prisma } from "@/lib/mes/prisma";
 import { requireRole } from "@/lib/session";
 import {
-  ehEntidade, normalizarCodigo, recusaDoCadastro, recusaDaExclusao, recusaDaTrocaDeCodigo,
+  ehEntidade, normalizarCodigo, normalizarNome, recusaDoCadastro, recusaDaExclusao, recusaDaTrocaDeCodigo,
   setoresSemPosto, usosDoCadastro, excluirSeLivre,
 } from "@/lib/mes/cadastro";
 
@@ -41,24 +41,28 @@ const NOME_DO_USO = {
 /** Só os campos que cada cadastro aceita — nada do corpo entra por tabela adentro sem passar aqui. */
 const CAMPOS = {
   setores: (d) => ({
-    codigo: normalizarCodigo(d.codigo), nome: String(d.nome).trim(),
+    codigo: normalizarCodigo(d.codigo), nome: normalizarNome(d.nome),
     ordem: Number(d.ordem), cor: d.cor || null, ativo: d.ativo !== false,
   }),
   // ⚠⚠ `ambiente` entra no cadastro porque é ele que separa os dois mundos: o mesmo "SOLDA 5"
   // pode existir em PROD e em DEMO (`@@unique([codigo, ambiente])`), e é a linha — não o código —
   // que carrega a trava de sessão aberta. Ver `lib/mes/ambiente.js`.
   recursos: (d) => ({
-    codigo: normalizarCodigo(d.codigo), nome: String(d.nome).trim(), setorId: d.setorId,
+    codigo: normalizarCodigo(d.codigo), nome: normalizarNome(d.nome), setorId: d.setorId,
     tipo: d.tipo || "MAQUINA", codigoSyneco: d.codigoSyneco?.trim() || null,
     temTerminal: d.temTerminal !== false, ativo: d.ativo !== false,
     ambiente: ambientePedido(d.ambiente),
   }),
   motivos: (d) => ({
-    codigo: normalizarCodigo(d.codigo), descricao: String(d.descricao).trim(),
+    codigo: normalizarCodigo(d.codigo), descricao: normalizarNome(d.descricao),
     planejada: !!d.planejada, cor: d.cor || null, ativo: d.ativo !== false,
   }),
   operadores: (d) => ({
-    cracha: String(d.cracha).trim(), nome: String(d.nome).trim(), ativo: d.ativo !== false,
+    // ⚠⚠ O CRACHÁ NÃO SOBE A CAIXA, SÓ O NOME. Quem procura o operador no totem compara o que o
+    // leitor bipou, sem normalizar (`operadorDoCracha`, em `totem/[codigo]/route.js`): gravar
+    // "A12" para um crachá impresso "a12" faria o bip não achar ninguém — e o operador ficaria
+    // parado na frente da máquina sem entender por quê.
+    cracha: String(d.cracha).trim(), nome: normalizarNome(d.nome), ativo: d.ativo !== false,
     ambiente: ambientePedido(d.ambiente),
   }),
 };

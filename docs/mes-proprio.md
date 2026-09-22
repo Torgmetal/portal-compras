@@ -1724,3 +1724,29 @@ upsert, então edição feita pela tela nunca é desfeita. Para recomeçar limpo
 import relativo SEM extensão (`./montagem-capacidade` — o bundler aceita, o ESM do node não) e
 `.prisma/mes-client`, que não é nome de pacote válido para o node. Sem as duas, qualquer script que
 importe a lista de bancadas ou o cliente do MES morre antes de rodar.
+
+## 17.11 O CADASTRO DO MES É EM MAIÚSCULA (22/09/2026)
+
+Matheus: *"deixei tudo em letra maiúscula por padrão os cadastros"*. Ele criou os dele assim; os
+23 postos que o semeador trouxe do Gantt vinham em caixa mista ("Laser Chapa", "Wilson Barros") —
+duas grafias no mesmo cadastro é o começo de uma lista que ninguém ordena direito.
+
+`normalizarNome` (`lib/mes/cadastro.js`) sobe a caixa, apara as pontas e junta espaço repetido. A
+rota do cadastro aplica em **setor, posto, crachá e motivo**, então a tela mantém o padrão sozinha.
+
+⚠⚠ **A CAIXA SOBE NO MES, NUNCA NA FONTE.** O nome do posto vem do vocabulário do Gantt
+(`nomeDaBancada`, `rotuloPosto`), compartilhado com as telas do PCP — subir a caixa lá deixaria o
+quadro de programação gritando por causa de uma decisão do totem.
+
+⚠⚠ **O CRACHÁ NÃO SOBE A CAIXA, SÓ O NOME.** `operadorDoCracha` compara o que o leitor bipou **sem
+normalizar**: gravar "A12" para um crachá impresso "a12" faria o bip não achar ninguém, e o
+operador ficaria parado na frente da máquina sem entender por quê.
+
+⚠ **O acento fica.** Tirá-lo mudaria o nome da coisa, não a caixa dela — e "GALPAO" não é como a
+fábrica escreve.
+
+⚠ **Padronizar o que já estava gravado é passo PEDIDO** (`--padronizar`), não efeito do semeio:
+dentro do `upsert` quebraria a promessa de que edição feita pela tela nunca é desfeita. Na primeira
+passada foram **30 nomes** — e ela pegou um que ninguém tinha visto: o RH gravou
+`"   ALEX APARECIDO ORSI"`, com espaços na frente, e a lista do totem ordena por nome.
+

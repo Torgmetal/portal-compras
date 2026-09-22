@@ -1,7 +1,12 @@
 {
-  "build": 3383,
-  "gerado": "2026-09-22T13:51:30.034Z",
+  "build": 3384,
+  "gerado": "2026-09-22T14:14:20.684Z",
   "commits": [
+    {
+      "hash": "96abd20f2e",
+      "data": "22/09/2026",
+      "titulo": "MES: a corrida entre contar e apagar vira recusa, não exceção"
+    },
     {
       "hash": "c75aaffd9d",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ef0267fee5",
       "data": "21/09/2026",
       "titulo": "Cotação: o campo de quantidade para de mostrar o resíduo binário do banco"
-    },
-    {
-      "hash": "ed823f1d1d",
-      "data": "21/09/2026",
-      "titulo": "Cotação: a tela do fornecedor deixa de espremer a descrição do item"
     }
   ]
 }
