@@ -1591,3 +1591,62 @@ programada. A busca continua achando qualquer marca — o leitor de código não
 
 ⚠ `TotemClient.jsx` passou de 350 linhas e foi dividido: `Escolher.jsx`, `EscolherMotivo.jsx`,
 `EscolherPlano.jsx`, `Trabalhos.jsx`, `lista-marcas.js`.
+
+## 17.9 ⚠⚠ A MESMA BARRA EM DOIS POSTOS — A POSSE EXCLUSIVA (22/09/2026)
+
+O Codex apontou isto em **três pareceres seguidos**, e nos dois primeiros eu registrei como
+pendência em vez de consertar, porque era desenho novo e não conserto. Matheus autorizou fechar
+("liberdade total"), e o desenho abaixo foi **aprovado pelo Codex antes de eu codar** (consulta
+`architecture`, 22/09).
+
+**O furo.** `abrirLote` travava recurso e crachá, e era idempotente pelo `loteId` — mas nada
+impedia a MESMA barra de ser aberta em dois postos. O teto não dobrava (`comporTeto` conta cada
+unidade uma vez), e é justamente por isso que doía: os dois postos lançavam peças que existem **uma
+vez só**, e o excedente **comia o saldo legítimo de outras barras da mesma marca**. O teto fecha a
+conta; a peça física, não.
+
+**A posse.** `mes."MesUnidadeReserva"`, com **índice parcial único**
+`(unidadeId, ambiente) WHERE "liberadaEm" IS NULL` — a mesma solução da Conferência de Peça, pelo
+mesmo motivo: quem garante é o **banco**, não o `if` da rota. Duas aberturas concorrentes em postos
+diferentes leem "livre" no mesmo instante, porque a trava do MES serializa por RECURSO.
+
+⚠ **Provado contra a produção** (22/09): 1ª posse entra; 2ª do mesmo par recusada; a mesma barra em
+DEMO entra (dois mundos); depois de liberada, outro posto pega. Linhas de prova removidas, tabela
+em zero.
+
+⚠⚠ **A CHAVE NÃO TEM A OPERAÇÃO** (parecer do Codex). A barra é uma coisa física — incluir a etapa
+permitiria dois donos ao mesmo tempo com operações diferentes, que é o que a tabela existe para
+impedir.
+
+⚠⚠ **A LIBERAÇÃO É CENTRALIZADA EM `encerrarNaTransacao`**, não em `encerrarLote`. A tela encerra
+marca a marca; liberar só no caminho do lote deixaria reserva de pé sem nenhuma sessão aberta, e a
+barra ficaria presa a um posto que já terminou. A pergunta é *"sobrou sessão ABERTA nesta barra?"* —
+e não *"este lote acabou"*, porque a mesma barra pode ter sido reaberta no mesmo posto.
+
+⚠⚠ **SEM EXPIRAÇÃO POR TEMPO** (parecer do Codex). Silêncio não prova que a barra parou de ser
+cortada — expirar sozinho tiraria a barra da mão de quem está com ela. Quem solta é o encerramento
+(automático) ou o ADMIN, explicitamente, com motivo.
+
+**A saída legítima: trazer a barra.** `lib/mes/transferencia.js`. Encerra na origem, abre no
+destino, numa transação só, com as duas máquinas e o crachá travados **na mesma chamada** (nunca
+aninhada) e a reserva **relida depois da trava** — entre descobrir a origem e conseguir o lock, ela
+pode ter mudado.
+
+⚠⚠ **O QUE FOI PRODUZIDO NO POSTO ANTIGO FICA NO POSTO ANTIGO.** Nenhuma sessão muda de
+`recursoId`, nenhum apontamento muda de dono. Arrastar a produção falsificaria o OEE dos dois
+postos: o antigo devolveria horas que trabalhou, o novo receberia peças que não cortou.
+
+⚠⚠ **SESSÃO COMPARTILHADA COM OUTRO COMANDO NÃO SE TRANSFERE** (risco levantado pelo Codex). O
+apontamento carrega `sessaoId`, não a barra: se a barra A e a barra B dividem a mesma sessão (a
+mesma marca nas duas), mover A deixaria a sessão aceitando produção por causa de B, sem como dizer
+de qual barra veio a peça. **Recusa explícita** enquanto o apontamento não souber a unidade.
+
+⚠⚠ **O LIMITE, DECLARADO: isto impede a barra ABERTA em dois postos, não a barra REABERTA.** Soltar
+a barra e abri-la de novo depois ainda pode consumir saldo de outra, porque o teto limita a MARCA e
+não a produção por barra. Fechar isso exige **atribuir cada apontamento à UNIDADE** — hoje o
+apontamento conhece a sessão, e a sessão é por marca. É trabalho de outro tamanho e continua aqui,
+escrito, em vez de parecer resolvido.
+
+⚠ **A tela passou a dizer ONDE a barra está.** "Já aberta" sem dono deixava o operador diante de um
+botão morto sem saber se a barra estava nesta máquina ou na do vizinho. Agora: verde "já aberta
+neste posto" (não abre de novo) × âmbar "está em LASER 1 · toque para trazer".

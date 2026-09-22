@@ -23,6 +23,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Neon — o que foi MEDIDO da infra](torg_neon_infra.md) — banco 229MB, mínimo pequeno × máximo enorme = OOM na largada; 2 mudanças de painel pendentes; NÃO temos API key do Neon
 - [Trava entre execuções de cron](torg_trava_entre_execucoes.md) — ⚠ `pg_advisory_lock` NÃO tranca com pooler (provado); usar arrendamento em `CronHeartbeat.travadoAte`
 - [Crons + middleware + monitor](torg_crons.md) — crons morriam por redirect .vercel.app→workspace (308) na edge; corrigido 02/07 (excluir /api/); Vercel MCP=40; 17/09 cmr-reconciliar 55h parado NÃO era redirect nem timeout — Neon intermitente mata o cron E o registro da falha (heartbeat congela em ok=true); mitigado 2×/dia3 use CLI; monitor heartbeat
+- [MES — a barra de nesting tem dono](torg_mes_reserva_barra.md) — índice parcial único `(unidadeId, ambiente) WHERE liberadaEm IS NULL`; liberação centralizada no encerramento; transferir não move produção; ⚠ impede a barra ABERTA em dois postos, não a REABERTA
 - [MES/Syneco](torg_mes_syneco.md) — agente na fábrica (C:\MesSync, 2 datasets: apontamentos + ordens); incidente 01/06; rotacionar MES_SYNC_API_KEY
 - [iCloud apaga arquivos-fonte](torg_icloud_delecao.md) — repo no iCloud remove fontes e cria pastas " 2"; NUNCA `add -A`/`commit -a`; conferir `git status` antes
 

@@ -2,7 +2,8 @@
 //
 // GET  /api/mes-lab/totem/<codigo>            → recurso, sessão aberta, estado, lotes programados
 // GET  /api/mes-lab/totem/<codigo>?buscar=T10 → marcas para o caminho de bipar
-// POST /api/mes-lab/totem/<codigo>            → { acao: entrar|abrir|apontar|parar|produzir|encerrar }
+// POST /api/mes-lab/totem/<codigo>            → { acao: entrar|abrir|apontar|parar|produzir|encerrar
+//                                                       |abrirNesting|encerrarLote|trazerBarra|liberarBarra }
 //
 // ⚠ A REGRA NÃO MORA AQUI. Sessão, travas e idempotência estão em `lib/mes/sessao.js`; o que o PCP
 // programou, em `lib/mes/programado.js`. Esta rota traduz HTTP e nada mais — é o mesmo desenho da
@@ -19,6 +20,7 @@ import { requireRole } from "@/lib/session";
 import { abrirSessao, apontarQuantidade, encerrarSessao, mudarEstado, estadoDoRecurso, ESTADO } from "@/lib/mes/sessao";
 import { saldosDasMarcas } from "@/lib/mes/saldo";
 import { abrirLote, encerrarLote } from "@/lib/mes/lote";
+import { transferirBarra, liberarBarra as liberarBarraDoPosto } from "@/lib/mes/transferencia";
 import { programadoPara, acharMarca, numeroDaObra } from "@/lib/mes/programado";
 import { entrarNoPosto, sairDoPosto, liberarPresenca, passarPosto } from "@/lib/mes/cracha";
 
@@ -188,11 +190,23 @@ async function planosDoPosto(recurso) {
   for (const s of abertas) {
     for (const u of s.nestingUnidades) if (!emCurso.has(u)) emCurso.set(u, s.lotes[0] || null);
   }
+
+  // ⚠⚠ DIZER *ONDE* A BARRA ESTÁ, e não só que está aberta. Desde que a posse é exclusiva
+  // (`lib/mes/unidade-reserva.js`), "já aberta" sem dono deixaria o operador na frente de um botão
+  // morto, sem saber se a barra está nesta máquina ou na do vizinho — e sem caminho nenhum.
+  const posses = await prisma.mesUnidadeReserva.findMany({
+    where: { unidadeId: { in: ids }, ambiente: recurso.ambiente, liberadaEm: null },
+    select: { unidadeId: true, recursoId: true, recurso: { select: { codigo: true, nome: true } } },
+  });
+  const dono = new Map(posses.map((r) => [r.unidadeId, {
+    recursoId: r.recursoId, codigo: r.recurso?.codigo || null, aqui: r.recursoId === recurso.id,
+  }]));
+
   return planos.map((p) => ({
     id: p.id, nome: p.nome, opNumero: p.opNumero, descricao: p.descricao,
     unidades: p.unidades.map((u) => ({
       id: u.id, indice: u.indice, tipo: u.tipo, pecas: u.pecas,
-      marcas: u.itens, loteAberto: emCurso.get(u.id) || null,
+      marcas: u.itens, loteAberto: emCurso.get(u.id) || null, dono: dono.get(u.id) || null,
     })),
   }));
 }
@@ -210,6 +224,39 @@ async function operadorDoCracha(cracha, ambiente) {
   if (!operador || !operador.ativo) return { erro: `Crachá ${limpo} não encontrado.` };
   return { operador };
 }
+
+/**
+ * A BARRA DO PEDIDO, conferida contra o mundo do posto.
+ *
+ * ⚠ `ambiente` do plano entra no select: o nesting é importado por tela, sem passar por recurso
+ * nenhum, então ele é a porta pela qual um plano de um mundo entraria no outro (achado do Codex,
+ * 21/09/2026).
+ */
+async function barraDoPedido(unidadeId, ambiente) {
+  const unidade = await prisma.mesNestingUnidade.findUnique({
+    where: { id: unidadeId || "" },
+    include: { itens: true, nesting: { select: { nome: true, opNumero: true, ambiente: true } } },
+  });
+  if (!unidade) return { erro: "Barra/chapa não encontrada." };
+  if (!unidade.itens.length) return { erro: "Esta barra não tem marca nenhuma." };
+  const cruzado = divergenciaDeAmbiente(ambiente, [{ rotulo: "Este plano de nesting", entidade: unidade.nesting }]);
+  if (cruzado) return { erro: cruzado };
+  return { unidade };
+}
+
+/**
+ * As marcas que a barra abre.
+ *
+ * ⚠ A obra vem do ITEM, que foi casado com `PecaConjunto` na importação — não do nome do arquivo,
+ * que é só pista (§16.2).
+ */
+const marcasDaBarra = (unidade, recurso) => unidade.itens.map((i) => ({
+  marca: i.marca,
+  opNumero: i.opNumero ?? unidade.nesting.opNumero ?? null,
+  pecaId: i.pecaConjuntoId ?? null,
+  operacao: recurso.setor.codigo,
+  planejadoQtd: i.qtd,
+}));
 
 const ACOES = {
   /**
@@ -339,32 +386,42 @@ const ACOES = {
    * uma"*. O que chega é a BARRA (ou a chapa); o que abre são as marcas dela.
    */
   async abrirNesting({ corpo, recurso, operador , presenca, ambiente }) {
-    const unidade = await prisma.mesNestingUnidade.findUnique({
-      where: { id: corpo.unidadeId },
-      // ⚠ `ambiente` do plano entra no select: o nesting é importado por tela, sem passar por
-      // recurso nenhum, então ele é a porta pela qual um plano de um mundo entraria no outro
-      // (achado do Codex, 21/09/2026).
-      include: { itens: true, nesting: { select: { nome: true, opNumero: true, ambiente: true } } },
-    });
-    if (!unidade) return { erro: "Barra/chapa não encontrada." };
-    if (!unidade.itens.length) return { erro: "Esta barra não tem marca nenhuma." };
-    const cruzado = divergenciaDeAmbiente(ambiente, [{ rotulo: "Este plano de nesting", entidade: unidade.nesting }]);
-    if (cruzado) return { erro: cruzado };
+    const { unidade, erro: recusa } = await barraDoPedido(corpo.unidadeId, ambiente);
+    if (recusa) return { erro: recusa };
 
     const r = await abrirLote(prisma, {
       presenca, recursoId: recurso.id, operadorId: operador.id, nestingUnidadeId: unidade.id, ambiente,
       loteId: corpo.chaveOperacao || null,
-      trabalhos: unidade.itens.map((i) => ({
-        marca: i.marca,
-        // ⚠ A obra vem do ITEM, que foi casado com `PecaConjunto` na importação — não do nome do
-        // arquivo, que é só pista (§16.2).
-        opNumero: i.opNumero ?? unidade.nesting.opNumero ?? null,
-        pecaId: i.pecaConjuntoId ?? null,
-        operacao: recurso.setor.codigo,
-        planejadoQtd: i.qtd,
-      })),
+      trabalhos: marcasDaBarra(unidade, recurso),
     });
     return { ...r, plano: unidade.nesting.nome, unidade: unidade.indice };
+  },
+
+  /**
+   * ⚠⚠ TRAZER A BARRA PARA ESTE POSTO. Existe porque a reserva exclusiva passou a IMPEDIR a mesma
+   * barra em dois postos (`lib/mes/unidade-reserva.js`): sem uma saída legítima, máquina quebrada
+   * no meio do corte viraria chamado para o ADMIN. A regra mora em `lib/mes/transferencia.js`.
+   */
+  async trazerBarra({ corpo, recurso, operador, presenca, ambiente, usuario }) {
+    const { unidade, erro: recusa } = await barraDoPedido(corpo.unidadeId, ambiente);
+    if (recusa) return { erro: recusa };
+    return transferirBarra(prisma, {
+      unidadeId: unidade.id, ambiente, paraRecursoId: recurso.id, presenca,
+      operadorId: operador.id, usuario, motivo: corpo.motivo || "",
+      loteId: corpo.chaveOperacao || null,
+      trabalhos: marcasDaBarra(unidade, recurso),
+    });
+  },
+
+  /**
+   * ⚠ A SAÍDA DE EMERGÊNCIA DA BARRA, irmã da de crachá: solta a posse e encerra o trabalho que
+   * ficou aberto lá. Não fabrica apontamento nem move produção — ver `liberarBarra`.
+   */
+  async liberarBarra({ corpo, recurso, ambiente, usuario }) {
+    return liberarBarraDoPosto(prisma, {
+      unidadeId: corpo.unidadeId, ambiente, recursoId: recurso.id,
+      motivo: corpo.motivo || "", usuario,
+    });
   },
 
   async encerrarLote({ corpo, recurso, operador , presenca }) {

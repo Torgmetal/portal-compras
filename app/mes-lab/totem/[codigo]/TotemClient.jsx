@@ -170,6 +170,11 @@ export default function TotemClient({ codigo, ambiente = "PROD" }) {
                            setFeito("");
                            const r = await agir("abrirNesting", { unidadeId: u.id, chaveOperacao: chaveDaAbertura(u) });
                            if (r?.success) setFeito(`Barra ${u.indice} aberta — ${r.sessoes?.length} marcas.`);
+                         }}
+                         aoTrazer={async (u) => {
+                           setFeito("");
+                           const r = await agir("trazerBarra", { unidadeId: u.id, chaveOperacao: chaveDaAbertura(u) });
+                           if (r?.success) setFeito(`Barra ${u.indice} trazida para cá — ${r.sessoes?.length} marcas.`);
                          }} />
         <Escolher dados={dados} codigo={codigo} busca={busca} setBusca={setBusca}
                   ocupado={ocupado}

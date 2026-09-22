@@ -503,3 +503,36 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+
+-- CreateTable — a posse da barra de nesting (ver o model MesUnidadeReserva)
+CREATE TABLE IF NOT EXISTS mes."MesUnidadeReserva" (
+    "id" TEXT NOT NULL,
+    "unidadeId" TEXT NOT NULL,
+    "ambiente" TEXT NOT NULL DEFAULT 'PROD',
+    "recursoId" TEXT NOT NULL,
+    "loteId" TEXT NOT NULL,
+    "operadorId" TEXT,
+    "abertaEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "liberadaEm" TIMESTAMP(3),
+    "liberadaPor" TEXT,
+    "motivo" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "MesUnidadeReserva_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "MesUnidadeReserva_unidadeId_ambiente_idx" ON mes."MesUnidadeReserva"("unidadeId", "ambiente");
+CREATE INDEX IF NOT EXISTS "MesUnidadeReserva_recursoId_liberadaEm_idx" ON mes."MesUnidadeReserva"("recursoId", "liberadaEm");
+
+-- ⚠⚠ A EXCLUSIVIDADE MORA AQUI, e só aqui ela é garantida: uma barra ABERTA (liberadaEm IS NULL)
+-- por ambiente. O Prisma não escreve índice parcial no schema.prisma — por isso ele é SQL.
+CREATE UNIQUE INDEX IF NOT EXISTS "MesUnidadeReserva_aberta_unica"
+    ON mes."MesUnidadeReserva"("unidadeId", "ambiente") WHERE "liberadaEm" IS NULL;
+
+-- AddForeignKey
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace
+                 WHERE n.nspname = 'mes' AND c.conname = 'MesUnidadeReserva_recursoId_fkey') THEN
+    ALTER TABLE mes."MesUnidadeReserva" ADD CONSTRAINT "MesUnidadeReserva_recursoId_fkey" FOREIGN KEY ("recursoId") REFERENCES mes."MesRecurso"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;

@@ -478,3 +478,40 @@ novo, não conserto, e não entra sem o Matheus decidir.
   flake de carga da máquina, ao lado de um teste de 41 s; não é deste trabalho.
   ⚠ **Segue aberto e continua sendo decisão do Matheus:** reserva exclusiva por barra
   (unidade+etapa+ambiente) com transferência explícita entre postos.
+- **(22/09, 09h30)** Matheus autorizou fechar as pendências ("liberdade total") e o Codex aprovou o
+  desenho ANTES do código (consulta `architecture`). Duas do MES fechadas:
+  **(a) tetos separados para sessão legada sem número.** `numeroDaObra` só alcança a abertura nova;
+  o que já estava gravado continuava em dois grupos. `completarNumeroDaObra`, no ensure, preenche o
+  `opNumero` a partir do `opId` (join com `public."OP"`) **e recalcula a `chaveTrabalho`**, que
+  deriva dele — preencher um sem o outro deixaria a trava de "mesma marca duas vezes no mesmo
+  posto" olhando para uma identidade que não existe mais. ⚠ A linha que colidiria com uma sessão
+  ABERTA já existente fica de fora e é CONTADA: juntar duas sessões é decisão humana, não chute de
+  script de build.
+  **(b) a mesma barra em dois postos** — a pendência das três rodadas. `mes."MesUnidadeReserva"`
+  com índice parcial único `(unidadeId, ambiente) WHERE "liberadaEm" IS NULL`; liberação
+  centralizada em `encerrarNaTransacao` (a tela encerra marca a marca); transferência explícita em
+  `lib/mes/transferencia.js`, que **não move produção** e **recusa** sessão compartilhada com outro
+  comando; liberação de emergência do ADMIN, com motivo e auditoria. Sem expiração por tempo.
+  Testes: `mes-reserva-barra` (14, novo) — o fake IMITA o índice parcial, e conferi que 7 deles
+  falham sem a mudança. **2.914 passando.** Tela `/mes-lab/totem` sem erro de console nem 4xx/5xx.
+  Prova contra a produção: 2ª posse recusada pelo banco, DEMO não conflita, liberada→outro pega;
+  linhas de prova removidas (tabela em zero).
+  ⚠⚠ **LIMITE DECLARADO, não resolvido:** isto impede a barra ABERTA em dois postos, não a barra
+  REABERTA depois. Fechar exige o apontamento saber a UNIDADE (hoje ele conhece a sessão, que é por
+  marca). Está escrito em `docs/mes-proprio.md` §17.9.
+- **(22/09) Dois achados do Codex são do trabalho do Vitor, e NÃO foram tocados** — Matheus:
+  *"pendências do Vitor a gente não deve mexer, ignora, deixe para ele ajustar"*. Ficam registrados
+  aqui para ele decidir:
+  **(1) ALTA — o cabeçote Doppler é gravado como Mitech.** `lib/us-campos.js` tem os mesmos rótulos
+  ("angular 20x22 · 45 · 2 MHz") para Mitech e Doppler, e os dois formulários
+  (`app/qualidade/inspecoes/[id]/FormUS.jsx:39`, `app/campo/FormularioUSCampo.jsx:68`) resolvem o
+  fabricante com `find` pelo RÓTULO — que acha Mitech primeiro. O relatório identifica o
+  equipamento errado. Some a isso que `cbFabricante` **não está na lista de campos que o PATCH do
+  Campo persiste** (`app/api/campo/relatorios/[id]/route.js:228`), então o fabricante escolhido é
+  descartado na gravação. Saída sugerida pelo Codex: valor de opção com identidade única
+  (fabricante+modelo), e `cbFabricante` na lista de campos.
+  **(2) ALTA — decisão de acesso.** `app/api/qualidade/inspecoes/[id]/revisao/route.js:23` passou de
+  ADMIN/QUALIDADE para `PERFIS_CAMPO`: todo QUALIDADE_CAMPO pode reabrir QUALQUER relatório já
+  enviado para assinatura, de qualquer inspetor e qualquer OP, reiniciando o ciclo de aprovação. O
+  pedido de origem era pontual (a Lais completar os EVS/LP da OP-102). É decisão do Vitor se a
+  permissão deve ser geral ou limitada ao próprio inspetor.

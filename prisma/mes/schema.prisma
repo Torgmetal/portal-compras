@@ -98,6 +98,7 @@ model MesRecurso {
 
   setor        MesSetor         @relation(fields: [setorId], references: [id])
   sessoes      MesSessao[]
+  reservas     MesUnidadeReserva[]
   eventos      MesEvento[]
   presencas    MesPresenca[]
   dispositivos MesDispositivo[]
@@ -479,4 +480,51 @@ model MesAuditoria {
   @@index([action])
   @@index([createdAt])
   @@index([ambiente])
+}
+
+/// A POSSE DA BARRA — quem está cortando esta unidade agora.
+///
+/// ⚠⚠ ATÉ 22/09/2026 A MESMA BARRA PODIA SER ABERTA EM DOIS POSTOS (achado do Codex, repetido em
+/// três pareceres). O `Set` de `comporTeto` impede que a barra duplicada DOBRE o teto — mas dois
+/// postos cortando a mesma barra lançam peças que existem uma vez só, e o excedente come o saldo
+/// legítimo de OUTRAS barras da mesma marca. O teto fecha a conta; a peça física, não.
+///
+/// ⚠⚠ A CHAVE É `(unidadeId, ambiente)`, SEM A OPERAÇÃO (parecer do Codex, 22/09/2026). A barra é
+/// UMA coisa física: incluir a etapa permitiria dois donos ao mesmo tempo com operações diferentes,
+/// que é exatamente o que esta tabela existe para impedir. O `ambiente` entra porque DEMO e PROD
+/// são dois mundos e um plano de teste não pode travar a barra de quem está produzindo.
+///
+/// ⚠⚠ QUEM GARANTE A EXCLUSIVIDADE É O ÍNDICE PARCIAL ÚNICO, não o `if` da rota — mesma lição da
+/// Conferência de Peça (`ON "ConferenciaPeca"("opId") WHERE status='ABERTA'`). Ele mora em
+/// `scripts/ensure-mes-proprio-tables.mjs` e em `prisma/mes/schema.sql`, porque o Prisma não
+/// escreve índice parcial no schema.
+///
+/// ⚠ NÃO HÁ FK PARA `MesNestingUnidade` de propósito: `MesSessao.nestingUnidades` também é lista
+/// solta, e apagar um plano de nesting no meio de um corte não pode apagar a prova de quem estava
+/// com a barra. A reconciliação é por dado, não por cascade.
+///
+/// ⚠ SEM EXPIRAÇÃO POR TEMPO (parecer do Codex). Silêncio não prova que a barra parou de ser
+/// cortada — liberar sozinho tiraria a barra da mão de quem está com ela. Quem libera é o
+/// encerramento (automático, quando não sobra sessão) ou o ADMIN, explicitamente.
+model MesUnidadeReserva {
+  id         String    @id @default(cuid())
+  unidadeId  String
+  ambiente   String    @default("PROD")
+  recursoId  String
+  /// O lote PROPRIETÁRIO — o comando que abriu a barra. Não é lista: a posse é de um comando só.
+  loteId     String
+  operadorId String?
+  abertaEm   DateTime  @default(now())
+  liberadaEm DateTime?
+  liberadaPor String?
+  motivo     String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  /// ⚠ O POSTO tem FK (ele existe e não se apaga por baixo); a UNIDADE não, porque apagar um plano
+  /// de nesting no meio de um corte não pode apagar a prova de quem estava com a barra.
+  recurso MesRecurso @relation(fields: [recursoId], references: [id])
+
+  @@index([unidadeId, ambiente])
+  @@index([recursoId, liberadaEm])
 }

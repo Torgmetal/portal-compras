@@ -32,7 +32,17 @@ const SQL = path.join(AQUI, "..", "prisma", "mes", "schema.sql");
 const TABELAS = [
   "MesSetor", "MesRecurso", "MesOperador", "MesMotivoParada", "MesPresenca", "MesSessao",
   "MesEvento", "MesApontamentoQtd", "MesDispositivo", "MesCorrecao", "MesNesting",
-  "MesNestingUnidade", "MesNestingItem", "MesAuditoria",
+  "MesNestingUnidade", "MesNestingItem", "MesAuditoria", "MesUnidadeReserva",
+];
+
+/**
+ * Índices PARCIAIS que o Prisma não escreve no schema — e que são a garantia de verdade.
+ *
+ * ⚠⚠ CONFERIR A DEFINIÇÃO, NÃO O NOME. Um índice com o nome certo e o `WHERE` errado passaria por
+ * existente e deixaria a exclusividade solta — foi a lição dos índices da programação.
+ */
+const INDICES_PARCIAIS = [
+  ["MesUnidadeReserva_aberta_unica", "MesUnidadeReserva", '"liberadaEm" IS NULL'],
 ];
 
 /**
@@ -83,6 +93,56 @@ function comandos(sql) {
 const COLUNAS = [
   ["MesSessao", "planejadoManual", "DOUBLE PRECISION NOT NULL DEFAULT 0"],
 ];
+
+/**
+ * O NÚMERO DA OBRA NAS SESSÕES QUE NASCERAM SÓ COM `opId`.
+ *
+ * ⚠⚠ DUAS FORMAS DA MESMA OBRA = DOIS TETOS (achado do Codex, 22/09/2026). No MES a identidade da
+ * obra é o NÚMERO (`daObra`, em `lib/mes/saldo.js`, e `chaveDoTrabalho`). Uma sessão gravada só com
+ * `opId` cai num grupo próprio: a mesma marca da mesma obra ganha um teto a mais, e a produção
+ * anterior não entra na conta. A porta de entrada já completa o número (`numeroDaObra`), mas isso
+ * não alcança o que já está gravado — este UPDATE alcança.
+ *
+ * ⚠⚠ A `chaveTrabalho` É RECALCULADA JUNTO, porque ela deriva do número (`?|MARCA` vira
+ * `89|MARCA`). Preencher o número e deixar a chave velha manteria a trava de "a mesma marca aberta
+ * duas vezes no mesmo posto" olhando para uma identidade que não existe mais.
+ *
+ * ⚠ A linha que COLIDIRIA com uma sessão aberta já existente fica de fora e é CONTADA: ali há duas
+ * sessões abertas para a mesma obra+marca no mesmo posto, que é exatamente o que o índice parcial
+ * impede — juntar as duas é decisão humana, não chute de script de build.
+ */
+const CHAVE_NOVA = `CASE
+  WHEN coalesce(s.marca, '') = '' THEN s."chaveTrabalho"
+  WHEN nullif(ltrim(regexp_replace(o.numero, '\\D', '', 'g'), '0'), '') IS NULL
+    THEN '?|' || upper(btrim(s.marca))
+  ELSE ltrim(regexp_replace(o.numero, '\\D', '', 'g'), '0') || '|' || upper(btrim(s.marca))
+END`;
+
+async function completarNumeroDaObra(prisma) {
+  const conflita = `EXISTS (
+    SELECT 1 FROM mes."MesSessao" outra
+     WHERE outra.id <> s.id AND outra.status = 'ABERTA' AND s.status = 'ABERTA'
+       AND outra."recursoId" = s."recursoId" AND outra."chaveTrabalho" = ${CHAVE_NOVA}
+  )`;
+  const movidas = await prisma.$executeRawUnsafe(`
+    UPDATE mes."MesSessao" s
+       SET "opNumero" = o.numero, "chaveTrabalho" = ${CHAVE_NOVA}
+      FROM public."OP" o
+     WHERE s."opNumero" IS NULL AND s."opId" = o.id AND NOT ${conflita}
+  `);
+  if (movidas) console.log(`[ensure-mes-proprio] ${movidas} sessão(ões) com o número da obra completado.`);
+
+  const [presas] = await prisma.$queryRawUnsafe(`
+    SELECT count(*)::int AS n FROM mes."MesSessao" s JOIN public."OP" o ON o.id = s."opId"
+     WHERE s."opNumero" IS NULL AND ${conflita}
+  `);
+  if (presas?.n) {
+    console.warn(
+      `[ensure-mes-proprio] ⚠ ${presas.n} sessão(ões) sem número ficaram como estão: completá-las ` +
+      "colidiria com outra sessão ABERTA da mesma obra+marca no mesmo posto. Junte as duas à mão.",
+    );
+  }
+}
 
 /**
  * O PLANEJAMENTO DAS SESSÕES ANTIGAS, QUE O `DEFAULT 0` APAGARIA.
@@ -144,7 +204,18 @@ async function main() {
       );
     }
 
+    for (const [nome, tabela, filtro] of INDICES_PARCIAIS) {
+      const [achado] = await prisma.$queryRawUnsafe(
+        `SELECT indexdef FROM pg_indexes WHERE schemaname = 'mes' AND indexname = '${nome}'`,
+      );
+      if (!achado) throw new Error(`índice parcial "${nome}" não existe em mes."${tabela}"`);
+      if (!achado.indexdef.includes(filtro) || !/UNIQUE/i.test(achado.indexdef)) {
+        throw new Error(`índice "${nome}" existe mas não é o esperado: ${achado.indexdef}`);
+      }
+    }
+
     await transportarPlanejadoManual(prisma);
+    await completarNumeroDaObra(prisma);
 
     // ⚠⚠ A CONFERÊNCIA É O PONTO DO SCRIPT. Sem ela, "rodou sem erro" e "as tabelas existem no
     // schema certo" seriam a mesma frase — e não são.
