@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, ChevronDown } from "lucide-react";
+import { Search, ChevronDown, CheckCircle2 } from "lucide-react";
 import { ordenarLotes, visiveis, QUANTAS } from "./lista-marcas";
 
 // ─── ESCOLHER O TRABALHO: A LISTA DO PCP, OU BIPAR ───────────────────────────
