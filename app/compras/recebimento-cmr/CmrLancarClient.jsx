@@ -311,6 +311,12 @@ export default function CmrLancarClient() {
       if (j.importados) partes.push(`${j.importados} novo(s) do Excel`);
       if (j.completados) partes.push(`${j.completados} completado(s)`);
       if (j.enviados) partes.push(`${j.enviados} enviado(s) ao Excel`);
+      // ⚠⚠ MEIA SINCRONIZAÇÃO SE ANUNCIA. A rodada tem teto para não morrer no meio do caminho —
+      // sem esta linha, quem apertou o botão leria "sincronizada" com centenas de linhas ainda por
+      // acertar, e o número na tela continuaria diferente da planilha sem explicação.
+      if (j.restantes) partes.push(`faltam ${j.restantes} — sincronize de novo`);
+      if (j.falhas?.length) partes.push(`${j.falhas.length} com falha`);
+      if (j.trocas?.length) partes.push(`⚠ ${j.trocas.length} índice(s) trocaram de material`);
       showToast(partes.length ? `Planilha sincronizada — ${partes.join(", ")}` : "Planilha já estava em dia", "success");
       if (j.importados || j.completados) carregar();
     } catch (e) { showToast(e.message, "erro"); } finally { setReconciliando(false); }

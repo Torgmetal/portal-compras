@@ -8,7 +8,11 @@ import { reconciliarCmr } from "@/lib/cmr-reconciliar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// ⚠⚠ 180 s, E O MOTIVO ESTÁ MEDIDO (22/09/2026): quando a planilha passou a mandar, a primeira
+// rodada tinha centenas de linhas para acertar de uma vez — a sincronização morreu no meio, com 68
+// gravadas e nenhuma conclusão. O teto por rodada (`TETO_POR_RODADA`) é a trava real; isto é a
+// folga para ela caber. Mesmo número da sincronização de prazos, pelo mesmo motivo.
+export const maxDuration = 180;
 const ROLES = ["ADMIN", "ALMOXARIFADO", "COMPRAS", "PCP", "PLANEJAMENTO", "QUALIDADE"];
 
 const schema = z.object({ ano: z.number().int().optional() });

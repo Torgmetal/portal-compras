@@ -1,7 +1,12 @@
 {
-  "build": 3387,
-  "gerado": "2026-09-22T16:46:13.272Z",
+  "build": 3388,
+  "gerado": "2026-09-22T16:57:39.145Z",
   "commits": [
+    {
+      "hash": "8bceb8ffec",
+      "data": "22/09/2026",
+      "titulo": "CMR: troca de material limpa o que sobrou do anterior, e toda sobrescrita deixa trilha"
+    },
     {
       "hash": "3a3643144b",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "caa1021f45",
       "data": "21/09/2026",
       "titulo": "Merge branch 'matheus/mes-subir'"
-    },
-    {
-      "hash": "31d93503c7",
-      "data": "21/09/2026",
-      "titulo": "MES: schema e cliente próprios, e o passo 2 fechado"
     }
   ]
 }
