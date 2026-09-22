@@ -15,7 +15,7 @@ import { reservarUnidade, reconciliarUnidades } from "@/lib/mes/unidade-reserva"
 // `if` da rota funciona — e o `if` não é a garantia: duas aberturas concorrentes em postos
 // diferentes leem "livre" no mesmo instante, porque a trava do MES serializa por RECURSO.
 
-function bancoFalso({ abertas = [], recursos = {} } = {}) {
+function bancoFalso({ abertas = [], recursos = {}, estadoDoPosto = null } = {}) {
   const reservas = [];
   const sessoes = [...abertas];
   const eventos = [];
@@ -68,7 +68,7 @@ function bancoFalso({ abertas = [], recursos = {} } = {}) {
         && (!where.id?.not || s.id !== where.id.not)).length),
     },
     mesEvento: {
-      findFirst: vi.fn(async () => null),
+      findFirst: vi.fn(async () => (estadoDoPosto ? { tipo: estadoDoPosto } : null)),
       create: vi.fn(async ({ data }) => { eventos.push(data); return data; }),
       upsert: vi.fn(async ({ create }) => { eventos.push(create); return create; }),
     },
@@ -215,6 +215,33 @@ describe("trazer a barra para outro posto", () => {
       unidadeId: "u1", ambiente: "PROD", paraRecursoId: "r2", trabalhos: MARCAS, operadorId: "op2",
     });
     expect(r.erro).toMatch(/divide marcas/i);
+  });
+
+  // ⚠⚠ TRAZER A BARRA NÃO TIRA A MÁQUINA DA PARADA (achado do Codex, 22/09/2026). `abrirLote` já
+  // perguntava o estado do posto antes de gravar PRODUCAO; a transferência gravava direto — e o
+  // tempo de uma PARADA, MANUTENÇÃO ou SETUP no destino parava de ser contado no OEE. A regra
+  // agora é uma só, em `lib/mes/evento-posto.js`.
+  it.each(["PARADA", "MANUTENCAO", "FORA_TURNO", "SETUP"])(
+    "posto em %s recebe a barra SEM perder o estado", async (estadoDoPosto) => {
+      const { prisma, reservas, eventos } = bancoFalso({ estadoDoPosto });
+      await abrir(prisma, "r1", "lote-1");
+      const r = await transferirBarra(prisma, {
+        unidadeId: "u1", ambiente: "PROD", paraRecursoId: "r2", trabalhos: MARCAS, operadorId: "op2",
+      });
+      // a posse muda…
+      expect(reservas.find((x) => !x.liberadaEm)).toMatchObject({ recursoId: "r2" });
+      expect(r.estadoPreservado).toBe(estadoDoPosto);
+      // …e nenhum PRODUCAO é inventado no destino
+      expect(eventos.filter((e) => e.recursoId === "r2" && e.tipo === "PRODUCAO")).toHaveLength(0);
+    });
+
+  it("posto livre recebe a barra e volta a PRODUCAO", async () => {
+    const { prisma, eventos } = bancoFalso();
+    await abrir(prisma, "r1", "lote-1");
+    await transferirBarra(prisma, {
+      unidadeId: "u1", ambiente: "PROD", paraRecursoId: "r2", trabalhos: MARCAS, operadorId: "op2",
+    });
+    expect(eventos.filter((e) => e.recursoId === "r2" && e.tipo === "PRODUCAO")).toHaveLength(1);
   });
 
   it("barra que não está aberta em posto nenhum manda abrir, não transferir", async () => {

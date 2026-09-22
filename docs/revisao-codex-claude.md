@@ -515,3 +515,24 @@ novo, não conserto, e não entra sem o Matheus decidir.
   enviado para assinatura, de qualquer inspetor e qualquer OP, reiniciando o ciclo de aprovação. O
   pedido de origem era pontual (a Lais completar os EVS/LP da OP-102). É decisão do Vitor se a
   permissão deve ser geral ou limitada ao próprio inspetor.
+- **(22/09, 09h50) Dois ciclos de correção sobre a reserva de barra, quatro achados, todos meus:**
+  **(1) ALTA — transação abortada não aceita consulta.** A reserva entrava com `create` e um `catch`
+  do `P2002` que ia perguntar ao banco quem era a dona — dentro de uma transação que o Postgres já
+  tinha matado por causa do próprio erro. A recusa de negócio viraria **500** na cara do operador, e
+  o fake do teste não mostrava porque fake nenhum aborta transação. Mesma lição do `deleteMany` da
+  exclusão de RNC. Agora: `INSERT ... ON CONFLICT DO NOTHING` e a dona perguntada depois, com a
+  transação viva. O fake passou a imitar o `ON CONFLICT` (zero linhas, nunca exceção).
+  **(2) ALTA — a dona relida depois da trava** na liberação do ADMIN: as chaves travadas saíam da
+  leitura feita ANTES, e uma transferência concorrente faria este código encerrar as sessões do
+  posto NOVO sem nunca ter travado a máquina dele.
+  **(3) MÉDIA — motivo em branco.** Eu tinha escrito que a liberação "exige motivo" e substituído a
+  ausência por um texto genérico; a auditoria gravava `motivo: null`. Agora recusa antes de mutar.
+  **(4) MÉDIA — trazer a barra apagava a PARADA do destino.** `abrirLote` já perguntava o estado do
+  posto antes de gravar PRODUCAO; a transferência gravava direto, e o tempo de PARADA/MANUTENÇÃO/
+  FORA_TURNO/SETUP parava de ser contado no OEE. É o achado que o próprio lote pagou para aprender,
+  reaparecendo por outra porta — **porque eu repeti a regra em vez de reusá-la**. Virou
+  `lib/mes/evento-posto.js`, usado pelos dois (`comecarNoPosto`, `encerrarPostoSeVazio`).
+  Testes `mes-reserva-barra` (23), com os 4 estados protegidos cobertos; conferido que falham sem a
+  correção. **2.926 passando.**
+  ⚠ **Não provado:** duas transações concorrentes de verdade no Postgres (o teste é fake) e o
+  `ON CONFLICT` contra o banco real — o ciclo pedia para não fazer operação em produção.

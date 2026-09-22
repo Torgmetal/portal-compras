@@ -1,7 +1,12 @@
 {
-  "build": 3375,
-  "gerado": "2026-09-22T12:45:03.012Z",
+  "build": 3376,
+  "gerado": "2026-09-22T12:52:30.531Z",
   "commits": [
+    {
+      "hash": "15cc0b1f50",
+      "data": "22/09/2026",
+      "titulo": "MES: os três achados da revisão da reserva de barra"
+    },
     {
       "hash": "ff0c28a8bd",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7ff1cf9b69",
       "data": "21/09/2026",
       "titulo": "Conferência: a planilha diz quando cada peça foi conferida, sem abrir as outras"
-    },
-    {
-      "hash": "1617eebdd2",
-      "data": "21/09/2026",
-      "titulo": "Cotação: o que o PDF leu e não casou deixa de ser jogado fora"
     }
   ]
 }
