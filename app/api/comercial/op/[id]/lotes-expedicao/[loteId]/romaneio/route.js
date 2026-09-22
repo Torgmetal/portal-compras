@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarRomaneioForm22 } from "@/lib/romaneio-form22";
 import { salvarRomaneioNoServidor } from "@/lib/sharepoint-lista";
+import { itensDeObra } from "@/lib/expedido-por-romaneio";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,7 +21,15 @@ const schema = z.object({
   contato: z.string().max(100).nullable().optional(),
   data: z.string().nullable().optional(),
   marcas: z.array(z.string()).optional(), // (legado) subconjunto de marcas — sem quantidade
-  itensSel: z.array(z.object({ marca: z.string().min(1), qtd: z.number().min(0) })).optional(), // marcas + quantidade
+  // marcas + quantidade. ⚠ `avulso` é o item que NÃO é peça da obra (tinta de retoque, um item
+  // específico): ele não existe na Lista de Expedição nem no prévio, então se descreve aqui.
+  itensSel: z.array(z.object({
+    marca: z.string().min(1), qtd: z.number().min(0),
+    avulso: z.boolean().optional(),
+    descricao: z.string().max(300).nullable().optional(),
+    unidade: z.string().max(10).nullable().optional(),
+    pesoKg: z.number().min(0).nullable().optional(),
+  })).optional(),
   mudanca: z.string().max(2000).nullable().optional(), // o que mudou (obrigatório na revisão)
   previa: z.boolean().optional(), // true = só gera pra conferir (não salva, não emite)
 });
@@ -84,6 +93,19 @@ export async function POST(req, { params }) {
     for (const m of marcasPrevio) if (m?.marca) doPrevio.set(String(m.marca).trim().toUpperCase(), m);
     itens = body.itensSel
       .map((s) => {
+        // ⚠⚠ ITEM AVULSO NÃO SE PROCURA — ele é o que a pessoa digitou. Vitor (22/09/2026):
+        // "acontece o caso de enviar tinta para retoque, algum item específico, e precisamos
+        // colocar na mão". Ele fica SÓ na carga: a Lista de Expedição continua espelho do arquivo
+        // ("o caminho vai ser reimportar"), e nenhuma conta de peso da obra o enxerga.
+        if (s.avulso) {
+          const nome = String(s.marca || "").trim(), desc = String(s.descricao || "").trim();
+          // ⚠ linha de romaneio sem dizer O QUE É não serve para conferir carga nenhuma
+          if (!nome || !desc) return { erro: "avulso" };
+          const qtd = Number(s.qtd) || 0;
+          return { marca: nome, descricao: desc, frente: null, avulso: true,
+            unidade: String(s.unidade || "").trim().toUpperCase() || "UN",
+            qtd, qte: qtd, pesoKg: Number(s.pesoKg) || 0, pesoTotal: Number(s.pesoKg) || 0 };
+        }
         const k = String(s.marca).trim().toUpperCase();
         const pv = doPrevio.get(k), lst = daLista.get(k);
         const base = pv || lst;
@@ -102,6 +124,9 @@ export async function POST(req, { params }) {
         return { marca: base.marca, descricao: base.descricao || lst?.descricao || null, frente: base.frente || lst?.frente || null, qtd, qte: qtd, pesoKg: pesoUnit * qtd, pesoTotal: pesoUnit * qtd };
       })
       .filter(Boolean);
+    if (itens.some((it) => it.erro === "avulso")) {
+      return NextResponse.json({ error: "Item avulso precisa de nome e descrição — é o que identifica a linha no romaneio." }, { status: 400 });
+    }
     // ⚠⚠ ITEM SEM QUANTIDADE NÃO SOME CALADO. Ele era descartado aqui mesmo — e o prévio é
     // REESCRITO com o que foi emitido (mais abaixo), então a marca sumia do romaneio E da carga,
     // sem nada na tela. Agora ela volta nomeada, para quem emitiu saber o que ficou de fora.
@@ -176,7 +201,11 @@ export async function POST(req, { params }) {
   // Guarda a URL do arquivo no SharePoint (quando salvou) — o Fiscal usa pra abrir o FORM 22.
   // Salva os ITENS realmente emitidos (incluir/tirar peça na revisão) + o peso real,
   // pra a lista de expedição (expedido/pendente) e o peso do card baterem com a realidade.
-  const pesoKgReal = itens.reduce((s, it) => s + (Number(it.pesoKg ?? it.pesoTotal) || 0), 0);
+  // ⚠⚠ O PESO DA CARGA QUE A OBRA MEDE É SÓ O DAS PEÇAS. `RomaneioPrevio.pesoKg` alimenta o
+  // "expedido" da obra (lib/expedido-mes.js, status-obra) e o card da carga; somar a tinta de
+  // retoque aqui inflaria o embarcado contra um contratado que não a tem. O peso dela sai impresso
+  // na linha do FORM 22, que é onde ela precisa aparecer.
+  const pesoKgReal = itensDeObra(itens).reduce((s, it) => s + (Number(it.pesoKg ?? it.pesoTotal) || 0), 0);
   await prisma.romaneioPrevio.update({
     where: { id: previo.id },
     data: {

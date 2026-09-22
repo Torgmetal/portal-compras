@@ -163,6 +163,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Painel /admin + alerta de cron = allowlist](torg_admin_portal_allowlist.md) — Vitor e Matheus; os outros 3 ADMINs seguem full, sem painel
 - [Status da obra / Listas de Expedição](torg_status_obra.md) — Lista Avançada Expedição.xlsm em SharePoint `OP/4. Expedição`; aba PROJETO (marcas+expedido/faltante); falta cruzar romaneios + cron
 - [Expedido parcial por marca](torg_expedido_parcial_marca.md) — quanto saiu vem POR ROMANEIO (lib/expedido-por-romaneio.js); booleano sumia com marca pela metade; reimportar a lista por obra
+- [Item avulso no romaneio](torg_romaneio_item_avulso.md) — tinta de retoque e afins vivem só na carga (FORM 22 coluna Unid.); `itensDeObra` mantém o avulso fora de toda conta de peso da obra
 - [Importar romaneios da pasta](torg_import_romaneios.md) — FORM 22 do SharePoint → portal (só obra antiga); ⚠ romaneio EMITIDO ≠ embarcado: escolher quais saíram
 - [Expedição → baixa no cronograma](torg_expedicao_cronograma.md) — linha "Expedição" alinha c/ expedido das listas (FORM-22); % da ESTRUTURA em kg, itens fora editáveis em /planejamento/config-expedicao; avança só
 - [Romaneio a partir da carga + FORM 22](torg_romaneio_carga.md) — romaneio da carga (PlanejamentoCarga); tirar peça exige motivo; gera FORM 22 (.xlsm base64, exceljs) em 4.2 Romaneios; A4 scale=20 era o bug

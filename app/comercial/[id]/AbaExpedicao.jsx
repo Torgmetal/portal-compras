@@ -558,6 +558,9 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
   // Todas as marcas da OP (pra INCLUIR peça que não está no romaneio). pendente = total − expedido.
   const [opMarcas, setOpMarcas] = useState([]);
   const [buscaAdd, setBuscaAdd] = useState("");
+  // ⚠ item que NÃO é peça da obra (tinta de retoque, item específico). Vive só na carga: não entra
+  // na Lista de Expedição nem em conta de peso da obra — ver lib/expedido-por-romaneio.js.
+  const [avulso, setAvulso] = useState(null); // null = formulário fechado
   useEffect(() => {
     fetch(`/api/comercial/op/${opId}/lista-expedicao/marcas`).then((r) => r.json())
       .then((j) => setOpMarcas((j.frentes || []).flatMap((fr) => (fr.marcas || []).map((m) => ({
@@ -578,6 +581,20 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
     setQtds((q) => ({ ...q, [m.marca]: m.pendente > 0 ? m.pendente : (m.qtd || 1) }));
     setBuscaAdd("");
   };
+  function acrescentarAvulso() {
+    const nome = String(avulso?.marca || "").trim().toUpperCase();
+    const desc = String(avulso?.descricao || "").trim();
+    const qtd = Number(avulso?.qtd) || 0;
+    if (!nome || !desc || !(qtd > 0)) { setErro("Item avulso precisa de nome, descrição e quantidade."); return; }
+    if ((marcas || []).some((m) => String(m.marca).toUpperCase() === nome)) { setErro(`"${nome}" já está na carga.`); return; }
+    setErro("");
+    const peso = Number(avulso?.pesoKg) || 0;
+    setMarcas((cur) => [...(cur || []), { marca: nome, descricao: desc, qtd, pesoTotalKg: peso, avulso: true, unidade: String(avulso?.unidade || "UN").trim().toUpperCase() }]);
+    setSel((s2) => new Set(s2).add(nome));
+    setQtds((q) => ({ ...q, [nome]: qtd }));
+    setAvulso(null);
+  }
+
   const removerMarca = (marca) => {
     setMarcas((cur) => (cur || []).filter((x) => x.marca !== marca));
     setSel((s) => { const n = new Set(s); n.delete(marca); return n; });
@@ -596,6 +613,11 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
   }, [opId, lote.id]);
 
   const toggle = (m) => setSel((s) => { const n = new Set(s); n.has(m) ? n.delete(m) : n.add(m); return n; });
+  // ⚠ o avulso não existe na Lista de Expedição nem no prévio: ele se descreve no próprio envio.
+  const itemSel = (m) => ({
+    marca: m.marca, qtd: Number(qtds[m.marca]) || 0,
+    ...(m.avulso ? { avulso: true, descricao: m.descricao || "", unidade: m.unidade || "UN", pesoKg: Number(m.pesoTotalKg) || 0 } : {}),
+  });
   // Peso proporcional à quantidade escolhida (o prévio traz o peso da qtd cheia).
   const pesoAjustado = (m) => {
     const q = Number(qtds[m.marca]);
@@ -621,7 +643,7 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
         body: JSON.stringify({
           transportadora: f.transportadora.trim() || null, motorista: f.motorista.trim() || null,
           placa: f.placa.trim() || null, placaCarreta: f.placaCarreta.trim() || null, contato: f.contato.trim() || null, data: f.data || null,
-          itensSel: selecionadas.map((m) => ({ marca: m.marca, qtd: Number(qtds[m.marca]) || 0 })),
+          itensSel: selecionadas.map(itemSel),
           mudanca: emitido ? f.mudanca.trim() : undefined,
         }),
       });
@@ -647,7 +669,7 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
         body: JSON.stringify({
           transportadora: f.transportadora.trim() || null, motorista: f.motorista.trim() || null,
           placa: f.placa.trim() || null, placaCarreta: f.placaCarreta.trim() || null, contato: f.contato.trim() || null, data: f.data || null,
-          itensSel: selecionadas.map((m) => ({ marca: m.marca, qtd: Number(qtds[m.marca]) || 0 })),
+          itensSel: selecionadas.map(itemSel),
           previa: true,
         }),
       });
@@ -714,7 +736,10 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
                     <div key={m.marca} className="flex items-center gap-2 px-2 py-1 text-[12px] hover:bg-gray-50 border-b border-gray-50 last:border-0">
                       <input type="checkbox" checked={sel.has(m.marca)} onChange={() => toggle(m.marca)} className="accent-torg-blue" />
                       <span className="font-mono text-torg-dark w-20 shrink-0 truncate">{m.marca}</span>
-                      <span className="text-torg-gray truncate flex-1">{m.descricao || ""}</span>
+                      <span className="text-torg-gray truncate flex-1">
+                        {m.avulso && <span className="text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 rounded px-1 py-0.5 mr-1">avulso {m.unidade || "UN"}</span>}
+                        {m.descricao || ""}
+                      </span>
                       <CampoDecimal value={qtds[m.marca] ?? ""} onChange={(txt) => setQtds((q) => ({ ...q, [m.marca]: txt === "" ? "" : numeroBR(txt) }))} disabled={!sel.has(m.marca)} title="Quantidade"
                         className={`w-16 text-right text-[12px] border rounded px-1.5 py-0.5 disabled:bg-gray-100 disabled:text-gray-400 outline-none focus:border-torg-blue ${sel.has(m.marca) && !(Number(qtds[m.marca]) > 0) ? "border-red-400 bg-red-50 text-red-700" : "border-gray-300"}`} />
                       <span className="text-torg-gray tabular-nums whitespace-nowrap w-16 text-right">{m.pesoTotalKg != null ? fmtKg(pesoAjustado(m)) : ""}</span>
@@ -727,6 +752,39 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
               {semQuantidade.length > 0 && (
                 <p className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5">{avisoSemQuantidade(semQuantidade)}</p>
               )}
+
+              {/* ── ITEM AVULSO ────────────────────────────────────────────────────
+                  Vitor (22/09/2026): "acontece o caso de enviar tinta para retoque, algum item
+                  específico, e precisamos colocar na mão". Ele fica SÓ nesta carga: a Lista de
+                  Expedição continua espelho do arquivo, e nenhuma conta de peso da obra o soma. */}
+              <div className="border-t border-gray-100 pt-2">
+                {!avulso ? (
+                  <button onClick={() => setAvulso({ marca: "", descricao: "", qtd: 1, unidade: "UN", pesoKg: "" })}
+                    className="text-[11px] font-semibold text-torg-blue hover:underline inline-flex items-center gap-1">
+                    <Plus size={12} /> Incluir item avulso (tinta, material de retoque…)
+                  </button>
+                ) : (
+                  <div className="space-y-1.5 bg-amber-50/50 border border-amber-200 rounded-lg p-2">
+                    <p className="text-[11px] font-semibold text-amber-900">Item avulso — vai neste romaneio, sem entrar na Lista de Expedição da obra</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <input value={avulso.marca} onChange={(e) => setAvulso((a2) => ({ ...a2, marca: e.target.value }))} placeholder="Nome (sai na coluna Marca)" className={inp} />
+                      <input value={avulso.descricao} onChange={(e) => setAvulso((a2) => ({ ...a2, descricao: e.target.value }))} placeholder="Descrição" className={inp} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <CampoDecimal value={avulso.qtd} onChange={(txt) => setAvulso((a2) => ({ ...a2, qtd: txt === "" ? "" : numeroBR(txt) }))} placeholder="Qtd" className={inp} />
+                      <select value={avulso.unidade} onChange={(e) => setAvulso((a2) => ({ ...a2, unidade: e.target.value }))} className={inp}>
+                        {["UN", "PÇ", "GL", "L", "KG", "CX", "M", "M²", "RL"].map((u) => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                      <CampoDecimal value={avulso.pesoKg} onChange={(txt) => setAvulso((a2) => ({ ...a2, pesoKg: txt === "" ? "" : numeroBR(txt) }))} placeholder="Peso total (kg)" className={inp} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={acrescentarAvulso} className="px-2.5 py-1 bg-torg-blue text-white text-[11px] rounded-lg font-medium">Acrescentar à carga</button>
+                      <button onClick={() => { setAvulso(null); setErro(""); }} className="text-[11px] text-torg-gray hover:text-torg-dark">cancelar</button>
+                      <span className="text-[10px] text-torg-gray ml-auto">o peso sai na linha do romaneio, mas não conta como peça expedida da obra</span>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="border-t border-gray-100 pt-2">
                 <span className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Incluir peça</span>

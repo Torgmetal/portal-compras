@@ -14,6 +14,7 @@ import { hashItens } from "@/lib/carga/hash-itens";
 import { PERFIS, perfilDaLqc } from "@/lib/carga/premissas";
 import { aplicarEdicaoMontagem, edicoesDaMontagem } from "@/lib/carga/montagem-manual";
 import { catalogoDeVeiculos } from "@/lib/carga/config-carga";
+import { itensDeObra } from "@/lib/expedido-por-romaneio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +34,8 @@ export async function GET(_req, { params }) {
   try { user = await requireRole(ROLES); } catch (e) { return negar(e); }
   const { id, previoId } = await params;
   const { op, previo, erro } = await carregar(id, previoId); if (erro) return erro;
-  const itens = Array.isArray(previo.itens) ? previo.itens : [];
+  // ⚠ o avulso não entra na simulação: galão de tinta não é peça para empilhar no caminhão
+  const itens = itensDeObra(previo.itens);
   // ⚠ kg por peça = pesoTotal ÷ qte do próprio romaneio (o que a Expedição vai pesar), não o cadastro
   const lista = itens.map((i) => ({ marca: String(i.marca || "").toUpperCase(), desc: i.descricao || "", qtd: Math.max(1, Number(i.qte) || 1), kgUn: Number(i.pesoTotal) > 0 ? Number(i.pesoTotal) / Math.max(1, Number(i.qte) || 1) : 0 }));
   // nível de embalagem da LQC da obra → perfil do simulador

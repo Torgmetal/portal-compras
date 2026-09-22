@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  numeroDoRomaneio, acumularRomaneio, totalExpedido, fundirExpedido,
+  numeroDoRomaneio, acumularRomaneio, totalExpedido, fundirExpedido, itensDeObra,
 } from "@/lib/expedido-por-romaneio";
 
 // QUANTO DE CADA MARCA JÁ EMBARCOU — por romaneio, não por sim/não.
@@ -70,5 +70,20 @@ describe("fundir o que veio do arquivo com o que o portal emitiu", () => {
     expect(totalExpedido(fundirExpedido({ 24: 1 }, null))).toBe(1);
     expect(totalExpedido(fundirExpedido(null, { 27: 2 }))).toBe(2);
     expect(totalExpedido(fundirExpedido(null, null))).toBe(0);
+  });
+});
+
+describe("o item avulso não é peça da obra", () => {
+  it("fica de fora de toda soma de peso expedido", () => {
+    const itens = [
+      { marca: "T67F13", qte: 3, pesoTotal: 30 },
+      { marca: "TINTA RETOQUE", qte: 2, pesoTotal: 9, avulso: true },
+    ];
+    expect(itensDeObra(itens).map((i) => i.marca)).toEqual(["T67F13"]);
+    expect(itensDeObra(itens).reduce((s, i) => s + i.pesoTotal, 0)).toBe(30);
+  });
+  it("aguenta lista vazia, nula e item nulo", () => {
+    expect(itensDeObra(null)).toEqual([]);
+    expect(itensDeObra([null, { marca: "A" }])).toEqual([{ marca: "A" }]);
   });
 });

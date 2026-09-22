@@ -1,7 +1,12 @@
 {
-  "build": 3395,
-  "gerado": "2026-09-22T19:18:57.445Z",
+  "build": 3396,
+  "gerado": "2026-09-22T19:44:32.579Z",
   "commits": [
+    {
+      "hash": "d2aa9477",
+      "data": "22/09/2026",
+      "titulo": "Romaneio: a peça sem quantidade parava de sumir calada, e volta a pesar"
+    },
     {
       "hash": "fd3bd59c",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2db38b5c",
       "data": "22/09/2026",
       "titulo": "MES totem: importa o CheckCircle2 que a marca produzida usa"
-    },
-    {
-      "hash": "d0ae17d0",
-      "data": "22/09/2026",
-      "titulo": "MES: a obra passa a ter uma definição só, e o DEMO sai da tela"
     }
   ]
 }

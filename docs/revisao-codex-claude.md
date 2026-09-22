@@ -658,3 +658,17 @@ novo, não conserto, e não entra sem o Matheus decidir.
   Testes: `romaneio-item-zero` (4), três vermelhos antes. **3.082 passando**, checar limpo, build ok.
   ⚠ A reimportação da lista da OP-067 continua pendente (escrita no banco de produção, recusada pela
   trava desta sessão): sem ela as 33 marcas parciais seguem invisíveis na seleção.
+- **(22/09, 16h40) Item avulso na carga — e a decisão de NÃO mexer na Lista de Expedição.** Vitor
+  pediu uma forma de pôr item na mão ("enviar tinta para retoque"); sobre gravar peça nova na LE,
+  decidiu: *"meu medo é de quebrar alguma lógica e ficar pior, acho que o caminho vai ser
+  reimportar"*. Ficou só a parte contida: o avulso vive em `RomaneioPrevio.itens` + FORM 22.
+  ⚠⚠ O acoplamento que a leitura do código revelou ANTES de escrever: `status-obra/route.js:48`
+  soma o peso de TODOS os itens dos prévios emitidos como "expedido real" — a tinta entraria contra
+  um contratado que não a tem. Daí `itensDeObra` (`lib/expedido-por-romaneio.js`), usada no
+  `pesoKg` gravado na emissão, no status da obra e na simulação de carga. Romaneio sem avulso sai
+  idêntico ao de antes.
+  ⚠ O FORM 22 já tinha coluna **F = Unid.** e **G = código**: o avulso sai como "2 GL" sem tocar no
+  modelo do Excel. Nome e descrição são obrigatórios — linha de romaneio que não diz o que é não
+  serve para conferir carga.
+  Testes: `romaneio-item-avulso` (5) e `itensDeObra` em `expedido-por-romaneio` (2), vermelhos antes.
+  **3.089 passando**, checar limpo, build ok.

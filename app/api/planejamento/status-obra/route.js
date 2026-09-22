@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { descobrirListas } from "@/lib/lista-avancada-sharepoint";
+import { itensDeObra } from "@/lib/expedido-por-romaneio";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -45,7 +46,9 @@ export async function GET(req) {
   const previos = await prisma.romaneioPrevio.findMany({ where: { emitidoEm: { not: null } }, select: { opNumero: true, itens: true } });
   const expFrente = new Map(); // padOp|FRENTE -> peso
   const expOp = new Map();      // padOp -> peso
-  for (const r of previos) for (const it of (Array.isArray(r.itens) ? r.itens : [])) {
+  // ⚠ `itensDeObra`: o item avulso (tinta de retoque e afins) sai no romaneio mas não é peça da
+  // obra — contá-lo aqui faria o expedido crescer contra um contratado que não o tem.
+  for (const r of previos) for (const it of itensDeObra(r.itens)) {
     const peso = Number(it.pesoTotal ?? it.pesoKg) || 0;
     const op = padOp(r.opNumero);
     expFrente.set(`${op}|${k(it.frente)}`, (expFrente.get(`${op}|${k(it.frente)}`) || 0) + peso);
