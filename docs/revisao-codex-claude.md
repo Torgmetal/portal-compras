@@ -701,3 +701,11 @@ novo, não conserto, e não entra sem o Matheus decidir.
   ⚠ A chave **(série, índice)** do CMR segue aberta — Matheus mandou pular por ora.
   Testes: `cmr-reconciliar-falhas` (3) e `modal-lancar-manual-conversao` (2), novos e vermelhos
   antes; `cmr-planilha-manda` 21 → 28; `cotacao-conversao-unidade` 8 → 15.
+  ⚠⚠ **(22/09, 18h10) PENDÊNCIA ACEITA POR MATHEUS — fração composta.** Terceira rodada sobre o
+  mesmo defeito: `CANTONEIRA 2 X 2 X 1/4` dá `[2,2,1,4]` e `CANTONEIRA 2 X 2 X 1 1/4` dá
+  `[2,2,1,1,4]` — a primeira É subsequência da segunda, então a espessura mudando de 1/4 para
+  1 1/4 ainda é lida como "detalhou a descrição", e a peça nova herda certificado, corrida e NF da
+  anterior. A saída é parsear a fração como VALOR (`1/4` → 0,25; `1 1/4` → 1,25) em vez de tratar
+  numerador e denominador como dois números soltos. **Matheus decidiu seguir sem isso por ora**
+  (`codex: aceito`, limite de 2 ciclos atingido). Não é aprovação do Codex — é pendência aberta,
+  e o caso é estreito: exige bitola em fração composta E planilha sem certificado dos dois lados.
