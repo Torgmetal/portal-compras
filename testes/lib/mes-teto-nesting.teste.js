@@ -198,3 +198,73 @@ describe("manual e nesting na mesma obra — as duas contas batem", () => {
     expect(contas.get("barra").planejado).toBe(0);
   });
 });
+
+describe("a obra escrita de duas maneiras — com o filtro do banco valendo", () => {
+  // ⚠⚠ O ESPELHO DO DEFEITO ANTERIOR (achado do Codex, 22/09/2026, terceira vez na mesma linha).
+  // `{ opId }` solto na busca não particiona nada: a sessão aberta SÓ por id varria também as que
+  // têm id E número, mas o agrupamento separava as duas. A={opId:"op1"} e B={opId:"op1",
+  // opNumero:"107"}, ambas com planejadoManual 10 e 2 boas em B → a tela de A dizia saldo 10 e a
+  // gravação calculava 8.
+  //
+  // ⚠⚠ O FAKE APLICA O `where` DE VERDADE, e é isso que dá valor ao teste (pedido do parecer). Um
+  // mock que devolve a lista inteira prova só que as duas funções somam igual; o que precisa ser
+  // provado é que elas escolhem as MESMAS irmãs.
+  const casa = (w, s) =>
+    Object.entries(w).every(([k, v]) => (v === null ? (s[k] ?? null) === null : s[k] === v));
+  const tx = (sessoes) => ({
+    mesSessao: {
+      findMany: vi.fn(async ({ where }) => sessoes.filter((s) =>
+        where.OR ? where.OR.some((w) => casa(w, s)) : casa(where, s))),
+    },
+    mesNestingItem: { groupBy: vi.fn(async () => []) },
+    mesApontamentoQtd: {
+      aggregate: vi.fn(async ({ where }) => ({
+        _sum: { boas: sessoes.filter((s) => where.sessaoId.in.includes(s.id))
+          .reduce((t, s) => t + (s.boas || 0), 0) },
+      })),
+      groupBy: vi.fn(async ({ where }) => sessoes.filter((s) => where.sessaoId.in.includes(s.id))
+        .map((s) => ({ sessaoId: s.id, _sum: { boas: s.boas || 0 } }))),
+    },
+  });
+  const base = {
+    marca: "T107A-P3", ambiente: "PROD", operacao: "PREPARACAO",
+    planejadoQtd: 10, planejadoManual: 10, nestingUnidades: [], boas: 0,
+  };
+  const SO_ID = { ...base, id: "a", opId: "op1", opNumero: null };
+  const COM_NUMERO = { ...base, id: "b", opId: "op1", opNumero: "107", boas: 2 };
+
+  it("a sessão só com id: tela e gravação devolvem o MESMO saldo", async () => {
+    const sessoes = [SO_ID, COM_NUMERO];
+    const naGravacao = await saldoDaMarca(tx(sessoes), SO_ID);
+    const naTela = (await saldosDasMarcas(tx(sessoes), [SO_ID])).get("a");
+    expect(naGravacao.saldo).toBe(naTela.saldo);
+    expect(naGravacao.planejado).toBe(naTela.planejado);
+  });
+
+  it("e a sessão com número também — nos dois sentidos", async () => {
+    const sessoes = [SO_ID, COM_NUMERO];
+    const naGravacao = await saldoDaMarca(tx(sessoes), COM_NUMERO);
+    const naTela = (await saldosDasMarcas(tx(sessoes), [COM_NUMERO])).get("b");
+    expect(naGravacao).toMatchObject({ planejado: 10, boas: 2, saldo: 8 });
+    expect(naTela).toMatchObject({ planejado: 10, boas: 2, saldo: 8 });
+  });
+
+  // ⚠ "Ser irmã" virou relação de EQUIVALÊNCIA: quem eu vejo me vê, e o grupo é o mesmo dos dois
+  // lados. Era exatamente o que faltava — a busca antiga era assimétrica.
+  it("ser irmã é simétrico: as duas, juntas na tela, não discordam entre si", async () => {
+    const sessoes = [SO_ID, COM_NUMERO];
+    const contas = await saldosDasMarcas(tx(sessoes), [SO_ID, COM_NUMERO]);
+    expect(contas.get("a").planejado).toBe(10);
+    expect(contas.get("b")).toMatchObject({ boas: 2, saldo: 8 });
+    // ⚠ Sem número, a obra é `{opNumero: null, opId}` — as duas condições juntas. A sessão só com
+    // id NÃO arrasta a que tem número, senão a assimetria voltava por outro caminho.
+    expect(contas.get("a").boas).toBe(0);
+  });
+
+  // ⚠ Duas sessões sem número nenhum continuam separadas por obra — o id ainda identifica.
+  it("sem número, o id ainda separa obras diferentes", async () => {
+    const outra = { ...SO_ID, id: "c", opId: "op2", boas: 5 };
+    const contas = await saldosDasMarcas(tx([SO_ID, outra]), [SO_ID]);
+    expect(contas.get("a").boas).toBe(0);
+  });
+});

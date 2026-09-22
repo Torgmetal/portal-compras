@@ -454,3 +454,21 @@ novo, não conserto, e não entra sem o Matheus decidir.
   ⚠ **Para revisar (security):** dar ao `QUALIDADE_CAMPO` o poder de abrir revisão descarta
   assinaturas de terceiros — está auditado e com motivo obrigatório, mas convém uma segunda leitura.
 
+- **(22/09, 09h)** Mesma linha, terceira rodada — o ESPELHO do defeito anterior. `{ opId }` solto na
+  busca não particiona nada: a sessão aberta SÓ por id varria também as que têm id E número, e o
+  agrupamento separava as duas. Medido pelo parecer: `A={opId:"op1", opNumero:null}` e
+  `B={opId:"op1", opNumero:"107"}`, ambas com `planejadoManual` 10 e 2 boas em B → tela de A dizia
+  saldo 10, gravação calculava 8. **`daObra` ficou ESTRITO**: sem número, a obra é
+  `{ opNumero: null, opId }` — as duas condições juntas. Aí "ser irmã" é relação de equivalência e a
+  chave do grupo é literalmente a mesma pergunta que o `where` faz.
+  ⚠ O preço de partição estrita é a obra existir em duas formas (uma sessão só com id, outra com
+  id e número) e ganhar dois tetos. Por isso a PORTA passou a completar o número quando só vem o id:
+  `numeroDaObra` (`lib/mes/programado.js`, cross-banco como o resto da lib) chamado no `abrir` da
+  rota do totem. Não achar a OP não impede abrir — seria trocar teto duplicado por operador parado.
+  Testes `mes-teto-nesting` (+4, agora 20), **com fake que aplica o `where`** — pedido do parecer:
+  mock que devolve a lista inteira prova só que as duas funções somam igual, não que escolhem as
+  mesmas irmãs. Conferido que o teste FALHA no código anterior (saldo 10 × 8). **2.873 passando.**
+  ⚠ `testes/lib/carga-simular.teste.js` estourou 5 s na suíte completa e passa sozinho (25/25) —
+  flake de carga da máquina, ao lado de um teste de 41 s; não é deste trabalho.
+  ⚠ **Segue aberto e continua sendo decisão do Matheus:** reserva exclusiva por barra
+  (unidade+etapa+ambiente) com transferência explícita entre postos.

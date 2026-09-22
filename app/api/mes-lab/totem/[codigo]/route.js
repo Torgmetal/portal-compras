@@ -19,7 +19,7 @@ import { requireRole } from "@/lib/session";
 import { abrirSessao, apontarQuantidade, encerrarSessao, mudarEstado, estadoDoRecurso, ESTADO } from "@/lib/mes/sessao";
 import { saldosDasMarcas } from "@/lib/mes/saldo";
 import { abrirLote, encerrarLote } from "@/lib/mes/lote";
-import { programadoPara, acharMarca } from "@/lib/mes/programado";
+import { programadoPara, acharMarca, numeroDaObra } from "@/lib/mes/programado";
 import { entrarNoPosto, sairDoPosto, liberarPresenca, passarPosto } from "@/lib/mes/cracha";
 
 export const runtime = "nodejs";
@@ -291,10 +291,17 @@ const ACOES = {
     return liberarPresenca(prisma, { operadorId: alvo.id, porQuem: operador.nome });
   },
 
+  /**
+   * ⚠⚠ O NÚMERO DA OBRA É COMPLETADO AQUI quando só vem o id (achado do Codex, 22/09/2026). No MES
+   * a identidade da obra é o NÚMERO; sessão sem ele vira um grupo à parte, e a mesma marca da mesma
+   * obra passaria a ter DOIS tetos. A tela manda os dois campos — isto é a porta fechando para
+   * quem chama a API direto.
+   */
   async abrir({ corpo, recurso, operador , presenca, ambiente }) {
+    const opNumero = corpo.opNumero ?? (corpo.opId ? await numeroDaObra(corpo.opId) : null);
     return abrirSessao(prisma, {
       presenca, recursoId: recurso.id, operadorId: operador.id, ambiente,
-      opId: corpo.opId ?? null, opNumero: corpo.opNumero ?? null,
+      opId: corpo.opId ?? null, opNumero,
       marca: corpo.marca ?? null, operacao: recurso.setor.codigo,
       planejadoQtd: corpo.planejadoQtd,
     });
