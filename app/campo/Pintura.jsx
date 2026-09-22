@@ -164,7 +164,7 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
           <Sel rot="Grau de intemperismo" v={cond.intemperismo} onMudar={(v) => set("intemperismo", v)}
             opcoes={GRAUS_INTEMPERISMO.map((g) => ({ v: g, t: g }))} />
           <div className="grid grid-cols-3 gap-2">
-            <Txt rot="Data" tipo="date" v={cond.prepData} onMudar={(v) => set("prepData", v)} />
+            <Txt rot="Data do preparo" tipo="date" v={cond.prepData} onMudar={(v) => set("prepData", v)} />
             <Txt rot="Início" tipo="time" v={cond.prepIni} onMudar={(v) => set("prepIni", v)} />
             <Txt rot="Fim" tipo="time" v={cond.prepFim} onMudar={(v) => set("prepFim", v)} />
           </div>
@@ -229,7 +229,7 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
         {/* uma demão por vez: as três lado a lado no celular viram tabela ilegível */}
         <div className="flex gap-1.5 mb-2">
           {DEMAOS.map((d) => (
-            <button key={d} onClick={() => setAba(d)}
+            <button key={d} type="button" aria-pressed={aba === d} onClick={() => setAba(d)}
               className={`flex-1 rounded-xl py-2.5 text-[14px] font-semibold border-2 ${
                 aba === d ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-dark border-gray-200"}`}>
               {d}ª demão
@@ -238,6 +238,15 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
         </div>
 
         <div className="space-y-2.5">
+          <fieldset className="rounded-xl border-2 border-torg-blue/20 bg-torg-blue/5 p-3">
+            <legend className="px-1 text-[13px] font-semibold text-torg-dark">Data e horários da {aba}ª demão</legend>
+            <p className="text-[12px] text-torg-gray mb-2">Registre a aplicação desta demão. Cada aba guarda sua própria data e horários.</p>
+            <Txt rot="Data de aplicação" tipo="date" v={dem[aba]?.data} onMudar={(v) => setDem(aba, "data", v)} />
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <Txt rot="Horário inicial" tipo="time" v={dem[aba]?.hIni} onMudar={(v) => setDem(aba, "hIni", v)} />
+              <Txt rot="Horário final" tipo="time" v={dem[aba]?.hFim} onMudar={(v) => setDem(aba, "hFim", v)} />
+            </div>
+          </fieldset>
           <SelLote rot="Tinta (base) — lote" campo="loteA" campoVal="valA" comp="A" />
           <SelLote rot="Endurecedor — lote" campo="loteB" campoVal="valB" comp="B" />
           <SelLote rot="Diluente — lote" campo="loteD" campoVal="valD" comp="D" />
@@ -251,10 +260,6 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
                 opcoes={cores.map((c) => ({ v: c, t: c }))} />
             : <Txt rot="Cor aplicada" v={dem[aba]?.cor} onMudar={(v) => setDem(aba, "cor", v)} />}
 
-          <div className="grid grid-cols-2 gap-2">
-            <Txt rot="Data de aplicação" tipo="date" v={dem[aba]?.data} onMudar={(v) => setDem(aba, "data", v)} />
-            <Txt rot="Horário" tipo="time" v={dem[aba]?.hIni} onMudar={(v) => setDem(aba, "hIni", v)} />
-          </div>
 
           <div>
             <p className="text-[12px] text-torg-gray mb-1">

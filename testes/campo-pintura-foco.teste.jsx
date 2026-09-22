@@ -42,3 +42,31 @@ it("relatório de pintura do campo: o lote da tinta digitado aguenta a segunda t
   fireEvent.change(depois, { target: { value: "L7" } });
   expect(screen.getAllByPlaceholderText("lote 1 · lote 2")[0].value).toBe("L7");
 });
+
+
+it("mantém data, início e fim independentes nas três demãos e ao reabrir", () => {
+  let salvo;
+  function Tela({ inicial = { prepData: "2026-09-19", demaos: {} } }) {
+    const [cond, setCond] = React.useState(inicial);
+    salvo = cond;
+    return <Pintura cond={cond} setCond={setCond} />;
+  }
+  const tela = render(<Tela />);
+  for (const n of [1, 2, 3]) {
+    fireEvent.click(screen.getByRole("button", { name: `${n}ª demão` }));
+    expect(screen.getByLabelText("Data de aplicação").value).toBe("");
+    fireEvent.change(screen.getByLabelText("Data de aplicação"), { target: { value: `2026-09-${19+n}` } });
+    fireEvent.change(screen.getByLabelText("Horário inicial"), { target: { value: `0${n+6}:15` } });
+    fireEvent.change(screen.getByLabelText("Horário final"), { target: { value: `1${n}:45` } });
+  }
+  const persistido = JSON.parse(JSON.stringify(salvo));
+  tela.unmount();
+  render(<Tela inicial={persistido} />);
+  for (const n of [1, 2, 3]) {
+    fireEvent.click(screen.getByRole("button", { name: `${n}ª demão` }));
+    expect(screen.getByLabelText("Data de aplicação").value).toBe(`2026-09-${19+n}`);
+    expect(screen.getByLabelText("Horário inicial").value).toBe(`0${n+6}:15`);
+    expect(screen.getByLabelText("Horário final").value).toBe(`1${n}:45`);
+  }
+  expect(salvo.prepData).toBe("2026-09-19");
+});

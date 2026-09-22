@@ -9,7 +9,7 @@ import LeitorQR from "./LeitorQR";
 import VistaCotas from "./VistaCotas";
 import { marcaDoQR, TIPOS_RELATORIO, usaCotas } from "@/lib/qualidade-campo";
 import {useStore} from "@/lib/store";
-import QuantidadesPecas from "./QuantidadesPecas";
+import PecasInformadasEditor from "../qualidade/inspecoes/[id]/PecasInformadasEditor";
 import {usaQuantidadeInspecao, pecasDoRelatorio, pecasInformadasSchema} from "@/lib/inspecao-pecas";
 import Pintura from "./Pintura";
 import { ParametrosLP, IndicacaoLP } from "./Lp";
@@ -223,6 +223,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   const {showToast}=useStore();
   const [rel, setRel] = useState(null);
   const [pecasQuantidades, setPecasQuantidades] = useState([]);
+  const [quantidadesLista, setQuantidadesLista] = useState({});
   const [erro, setErro] = useState("");
   const [linhas, setLinhas] = useState([]);
   const [equipamentos, setEquipamentos] = useState([]);
@@ -261,6 +262,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       .then((j) => {
         setRel(j.relatorio);
         setPecasQuantidades(pecasDoRelatorio(j.relatorio,j.quantidadesLista));
+        setQuantidadesLista(j.quantidadesLista || {});
         setResultado(j.relatorio.resultadoInspecao || null);
         setLinhas(Array.isArray(j.relatorio.linhas) ? j.relatorio.linhas : []);
         setEquipamentos(Array.isArray(j.relatorio.equipamentos) ? j.relatorio.equipamentos : []);
@@ -424,7 +426,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
 
   async function salvar() {
     let pecasInformadas;
-    if(usaQuantidadeInspecao(rel.tipo) && pecasQuantidades.length){
+    if(usaQuantidadeInspecao(rel.tipo)){
       const v=pecasInformadasSchema.safeParse(pecasQuantidades.map(p=>({...p,quantidade:Number(p.quantidade)})));
       if(!v.success){showToast(v.error.issues[0].message,"error");return;}
       pecasInformadas=v.data;
@@ -496,7 +498,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         <FormularioUSCampo rel={rel} cond={cond} setCond={setCond} />
       )}
 
-      {usaQuantidadeInspecao(rel.tipo) && pecasQuantidades.length > 0 && <QuantidadesPecas pecas={pecasQuantidades} onChange={setPecasQuantidades} disabled={salvando} />}
+      {usaQuantidadeInspecao(rel.tipo) && <section className="my-3" aria-label="Peças do relatório"><h2 className="text-sm font-semibold text-torg-dark">Peças do relatório</h2><PecasInformadasEditor pecas={pecasQuantidades} quantidadesLista={quantidadesLista} onChange={setPecasQuantidades} disabled={salvando} /></section>}
       {ehPintura && <Pintura cond={cond} setCond={setCond} tintas={tintas} plp={plp} />}
 
       {ehLp && <ParametrosLP cond={cond} setCond={setCond} />}

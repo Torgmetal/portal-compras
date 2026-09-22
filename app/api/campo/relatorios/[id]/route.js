@@ -46,7 +46,7 @@ export async function GET(_req, { params }) {
   let quantidadesLista = {};
   if (usaQuantidadeInspecao(rel.tipo)) {
     const opId=rel.opId || (await prisma.oP.findFirst({where:{numero:rel.opNumero},select:{id:true}}))?.id;
-    if(opId) quantidadesLista=quantidadesPorMarca(await prisma.pecaConjunto.findMany({where:{opId,marca:{in:rel.marcas || []}},select:{marca:true,qte:true}}));
+    if(opId) quantidadesLista=quantidadesPorMarca(await prisma.pecaConjunto.findMany({where:{opId,OR:[{tipoPeca:"CONJUNTO"},{tipoPeca:null}]},select:{marca:true,qte:true}}));
   }
   return NextResponse.json({
     quantidadesLista,
@@ -283,7 +283,18 @@ export async function PATCH(req, { params }) {
     const v=pecasInformadasSchema.safeParse(body.pecasInformadas);
     if(!v.success) return NextResponse.json({error:v.error.issues[0].message},{status:400});
     const marcas=(rel.marcas || []).map(m=>m.trim().toUpperCase());
-    if(v.data.length!==marcas.length || v.data.some(p=>!marcas.includes(p.marca))) return NextResponse.json({error:"As quantidades devem corresponder às peças deste relatório."},{status:400});
+    const novas = v.data.filter(p => !marcas.includes(p.marca));
+    if (novas.length) {
+      const opId = rel.opId || (await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { id: true } }))?.id;
+      const daOp = opId ? await prisma.pecaConjunto.findMany({ where: { opId, marca: { in: novas.map(p => p.marca) }, OR: [{ tipoPeca: "CONJUNTO" }, { tipoPeca: null }] }, select: { marca: true } }) : [];
+      const permitidas = new Set((daOp || []).map(p => p.marca.trim().toUpperCase()));
+      if (novas.some(p => !permitidas.has(p.marca))) return NextResponse.json({error:"Adicione somente peças da lista desta OP."},{status:400});
+    }
+    const escolhidas = new Set(v.data.map(p => p.marca));
+    if (linhas.some(l => l.marca && marcas.includes(l.marca.trim().toUpperCase()) && !escolhidas.has(l.marca.trim().toUpperCase()))) {
+      return NextResponse.json({error:"Há medições vinculadas à peça retirada. Ajuste essas medições na tela de Qualidade antes de retirar a peça."},{status:409});
+    }
+    dados.marcas = v.data.map(p => p.marca);
     dados.resultados=resultadosComPecas(dados.resultados || rel.resultados, v.data);
   }
 
@@ -319,7 +330,7 @@ export async function PATCH(req, { params }) {
   await prisma.auditLog.create({
     data: {
       userId: user.id, action: "MEDIR_RELATORIO_CAMPO", entity: "RelatorioInspecao", entityId: id,
-      diff: { codigo: rel.codigo, medidas: medidas.length, equipamentos: dados.equipamentos?.length ?? null, ...(body.pecasInformadas ? {antes:{pecasInformadas:rel.resultados?.pecasInformadas ?? null},depois:{pecasInformadas:dados.resultados.pecasInformadas}} : {}) },
+      diff: { codigo: rel.codigo, medidas: medidas.length, equipamentos: dados.equipamentos?.length ?? null, ...(body.pecasInformadas ? {antes:{marcas:rel.marcas,pecasInformadas:rel.resultados?.pecasInformadas ?? null},depois:{marcas:dados.marcas,pecasInformadas:dados.resultados.pecasInformadas}} : {}) },
     },
   }).catch(() => {});
 

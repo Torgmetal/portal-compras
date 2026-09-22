@@ -156,7 +156,7 @@ export default function RelatorioDetalheClient({ id }) {
           </p>
           {/* Peças informadas editáveis — Vitor (11/09/2026): "editar as peças informadas, pois isso também não consigo fazer no portal" */}
           {!travado && (
-            <details className="mt-1.5">
+            <details open className="mt-1.5">
               <summary className="text-[12px] text-torg-blue cursor-pointer select-none">Editar peças informadas ({Array.isArray(rel.marcas) ? rel.marcas.length : 0})</summary>
               {usaQuantidadeInspecao(rel.tipo) ? (
               <PecasInformadasEditor pecas={pecasEditadas ?? pecasDoRelatorio(rel, dados.quantidadesLista)} quantidadesLista={{ ...dados.quantidadesLista, ...res.qtdPeca }} onChange={setPecasEditadas} disabled={salvando} />

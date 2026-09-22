@@ -1,7 +1,12 @@
 {
-  "build": 3368,
-  "gerado": "2026-09-22T11:47:10.117Z",
+  "build": 3369,
+  "gerado": "2026-09-22T11:52:51.025Z",
   "commits": [
+    {
+      "hash": "1c34c68d",
+      "data": "22/09/2026",
+      "titulo": "US: espessura de chapa em lista, aparelhagem da casa já preenchida"
+    },
     {
       "hash": "752e0987",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7d6b0df1",
       "data": "21/09/2026",
       "titulo": "Registra o plano de subida do MES e o que foi medido"
-    },
-    {
-      "hash": "7f65b9f4",
-      "data": "21/09/2026",
-      "titulo": "Realinha o número do build depois do merge"
     }
   ]
 }
