@@ -186,3 +186,27 @@ a chave virar **(série, índice)**, com migração dos ~1.589 registros de 2026
 ⚠ **Dois índices duplicados no portal** (`261392` com três linhas, `261401` com duas), do import
 manual recriando o que já existia. O data book já desempata preferindo a linha da OP — a
 ambiguidade era conhecida e nunca foi fechada.
+
+### O que a primeira sincronização completa mostrou (22/09/2026, 17h11)
+
+`completados: 881 · restantes: 0 · falhas: 0 · importados: 0` — planilha 1.621 × portal 1.589.
+
+⚠ **As 32 linhas de diferença são CASCA** (R reservado sem descrição), e isso é dedutível do código:
+toda linha do Excel COM descrição vira registro, e não houve falha. Se algum setor precisar VER o
+número reservado antes de o material chegar, é a regra da casca que muda — decisão de quem usa.
+
+⚠⚠ **AS DUAS PRIMEIRAS "TROCAS DE MATERIAL" FORAM ALARME FALSO**, e isso quase custou caro:
+- `261367` "ITEM A CONFIRMAR COM COMPRAS" → "QUADRADO LAM. 1.1/2 X 6MTS" — placeholder resolvido;
+- `260954` "CHAPA A-36 ESPESSURA 4,75MM" → "PERFIL DOBRADO UDCE 150x60x20x4,75" — **mesmo
+  certificado, mesma corrida, mesma NF**: o almoxarifado corrigiu a descrição do mesmo material.
+
+Como troca de material **limpa** os campos que a planilha não traz, chamar correção de "troca"
+apagaria o certificado de um material que está certo — o defeito original com o sinal invertido.
+**O certificado passou a desempatar**: número de certificado ou corrida iguais dos dois lados
+querem dizer a mesma coisa física com outro nome. E "A CONFIRMAR"/"A DEFINIR" é casca com texto.
+
+⚠ **Os 3 registros duplicados foram desativados** (`261392` tinha 3 linhas, `261401` tinha 2),
+mantendo a de rastreabilidade mais completa — em `261401` a que ficou é a que TEM certificado, e a
+apagada era a do lançamento manual, sem. Soft delete com `invalidadoMotivo` e `AuditLog`
+(`CMR_DESATIVAR_DUPLICATA`). **1.586 ativos, 1.586 índices distintos, zero duplicados.**
+

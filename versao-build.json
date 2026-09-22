@@ -1,156 +1,156 @@
 {
-  "build": 3391,
-  "gerado": "2026-09-22T17:23:48.524Z",
+  "build": 3392,
+  "gerado": "2026-09-22T17:44:47.694Z",
   "commits": [
     {
-      "hash": "5cf07621",
+      "hash": "e8f6844850",
+      "data": "22/09/2026",
+      "titulo": "Expedição: marca pela metade volta a aparecer na próxima carga"
+    },
+    {
+      "hash": "5cf0762129",
       "data": "22/09/2026",
       "titulo": "CMR: criar os R que faltam vem antes de remendar observação"
     },
     {
-      "hash": "e6e684f6",
+      "hash": "e6e684f662",
       "data": "22/09/2026",
       "titulo": "Cotação: converter a unidade em que o fornecedor cotou"
     },
     {
-      "hash": "631f70bd",
+      "hash": "631f70bd36",
       "data": "22/09/2026",
       "titulo": "CMR: a sincronização parou de morrer no meio do caminho"
     },
     {
-      "hash": "8bceb8ff",
+      "hash": "8bceb8ffec",
       "data": "22/09/2026",
       "titulo": "CMR: troca de material limpa o que sobrou do anterior, e toda sobrescrita deixa trilha"
     },
     {
-      "hash": "3a364314",
+      "hash": "3a3643144b",
       "data": "22/09/2026",
       "titulo": "CMR: a planilha manda, e o R passa a ser conferido nos dois lados"
     },
     {
-      "hash": "47699401",
+      "hash": "476994019c",
       "data": "22/09/2026",
       "titulo": "Compras: a conversão de unidade da cotação — a regra e as colunas (nada aplicado ainda)"
     },
     {
-      "hash": "f1533a43",
+      "hash": "f1533a4328",
       "data": "22/09/2026",
       "titulo": "MES: o cadastro passa a ser em maiúscula, como Matheus padronizou"
     },
     {
-      "hash": "96abd20f",
+      "hash": "96abd20f2e",
       "data": "22/09/2026",
       "titulo": "MES: a corrida entre contar e apagar vira recusa, não exceção"
     },
     {
-      "hash": "c75aaffd",
+      "hash": "c75aaffd9d",
       "data": "22/09/2026",
       "titulo": "MES: semear deixa de apagar, e \"nunca usado\" passa a contar todas as relações"
     },
     {
-      "hash": "81393b1d",
+      "hash": "81393b1df2",
       "data": "22/09/2026",
       "titulo": "MES: o cadastro passa a ser só o que está no Gantt"
     },
     {
-      "hash": "d58df80a",
+      "hash": "d58df80a3a",
       "data": "22/09/2026",
       "titulo": "MES: o cadastro da fábrica inteira, semeado em produção"
     },
     {
-      "hash": "09009cab",
+      "hash": "09009caba3",
       "data": "22/09/2026",
       "titulo": "US: o cabeçote Doppler era gravado como Mitech"
     },
     {
-      "hash": "d60fb1a6",
+      "hash": "d60fb1a607",
       "data": "22/09/2026",
       "titulo": "Pintura: a foto ganha número e cada etapa, a sua condição ambiental"
     },
     {
-      "hash": "f471f43a",
+      "hash": "f471f43ade",
       "data": "22/09/2026",
       "titulo": "Registra a decisão sobre as propostas em PDF da GERDAU"
     },
     {
-      "hash": "20cca289",
+      "hash": "20cca28918",
       "data": "22/09/2026",
       "titulo": "MES: trazer a barra para um posto parado deixa de apagar a parada"
     },
     {
-      "hash": "15cc0b1f",
+      "hash": "15cc0b1f50",
       "data": "22/09/2026",
       "titulo": "MES: os três achados da revisão da reserva de barra"
     },
     {
-      "hash": "ff0c28a8",
+      "hash": "ff0c28a8bd",
       "data": "22/09/2026",
       "titulo": "MES: a barra de nesting passa a ter dono, e a obra legada ganha o número de volta"
     },
     {
-      "hash": "39d068f6",
+      "hash": "39d068f6a0",
       "data": "22/09/2026",
       "titulo": "Relatório assinado passa a ser editável — sem revisão, com registro"
     },
     {
-      "hash": "5dc7ee83",
+      "hash": "5dc7ee83cc",
       "data": "22/09/2026",
       "titulo": "MES: a obra deixa de ser uma preferência e vira uma partição"
     },
     {
-      "hash": "38bf4ee0",
+      "hash": "38bf4ee03e",
       "data": "22/09/2026",
       "titulo": "Relatório assinado: quem inspeciona pode abrir a revisão para completá-lo"
     },
     {
-      "hash": "a1ab1539",
+      "hash": "a1ab15393f",
       "data": "22/09/2026",
       "titulo": "US: a junta ensaiada com as listas da casa — GMAW/FCAW, chanfro X/V, Topo e Direto"
     },
     {
-      "hash": "bf32c164",
+      "hash": "bf32c164e0",
       "data": "22/09/2026",
       "titulo": "Facilita edição de peças e horários por demão nos relatórios"
     },
     {
-      "hash": "1c34c68d",
+      "hash": "1c34c68d0d",
       "data": "22/09/2026",
       "titulo": "US: espessura de chapa em lista, aparelhagem da casa já preenchida"
     },
     {
-      "hash": "752e0987",
+      "hash": "752e098706",
       "data": "22/09/2026",
       "titulo": "Relatório de US: cabeçote sem a marca, material padrão e os campos da junta soldada"
     },
     {
-      "hash": "2db38b5c",
+      "hash": "2db38b5ccb",
       "data": "22/09/2026",
       "titulo": "MES totem: importa o CheckCircle2 que a marca produzida usa"
     },
     {
-      "hash": "d0ae17d0",
+      "hash": "d0ae17d0bb",
       "data": "22/09/2026",
       "titulo": "MES: a obra passa a ter uma definição só, e o DEMO sai da tela"
     },
     {
-      "hash": "ac22f9f3",
+      "hash": "ac22f9f345",
       "data": "22/09/2026",
       "titulo": "Organiza preenchimento do ultrassom no Campo"
     },
     {
-      "hash": "07cfd7ec",
+      "hash": "07cfd7ec6d",
       "data": "22/09/2026",
       "titulo": "Corrige: a trava do modo demo tirava a barra inicial e derrubou o SharePoint em produção"
     },
     {
-      "hash": "0c1e3bbd",
+      "hash": "0c1e3bbd57",
       "data": "22/09/2026",
       "titulo": "Corrige relatório de ultrassom e mantém emitidos no Campo"
-    },
-    {
-      "hash": "f9f98b75",
-      "data": "21/09/2026",
-      "titulo": "MES: a coluna nova não apaga teto antigo, e a tela para de prometer o que o servidor nega"
     }
   ]
 }

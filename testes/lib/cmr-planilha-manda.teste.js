@@ -15,6 +15,34 @@ describe("ehOutroMaterial — trocar de dono é diferente de ganhar detalhe", ()
     expect(ehOutroMaterial("PORCA A563 - 3/8\" - GF", "CHAPA ACO CARBONO LAMINADO A-36 9,50MM")).toBe(true);
   });
 
+  // ⚠⚠ AS DUAS PRIMEIRAS "TROCAS" REAIS FORAM ALARME FALSO (medido em 22/09/2026). Isto importa
+  // porque troca de material LIMPA os campos que a planilha não traz: chamar uma correção de
+  // descrição de "troca" apagaria o certificado de um material que está certo.
+  it("mesmo certificado = descrição corrigida, não troca (caso 260954)", () => {
+    expect(ehOutroMaterial(
+      "CHAPA ACO CARBONO LAMINADO A-36 ESPESSURA 4,75MM",
+      "PERFIL DOBRADO UDCE 150x60x20x4,75",
+      { certificadoAntes: "8195", certificadoDepois: "8195" },
+    )).toBe(false);
+  });
+
+  it("mesma corrida também desempata", () => {
+    expect(ehOutroMaterial("CHAPA A-36", "PERFIL UDCE",
+      { corridaAntes: "2816092232", corridaDepois: "2816092232" })).toBe(false);
+  });
+
+  // ⚠ Dois vazios não provam nada — aí vale o texto.
+  it("sem certificado dos dois lados, quem decide é o nome", () => {
+    expect(ehOutroMaterial("PORCA A563", "CHAPA A-36",
+      { certificadoAntes: "", certificadoDepois: "" })).toBe(true);
+  });
+
+  // ⚠ "A CONFIRMAR" é casca com texto: o almoxarifado reserva o R antes de saber o que chegou.
+  it.each(["ITEM A CONFIRMAR COM COMPRAS", "MATERIAL A DEFINIR"])(
+    "%s sendo preenchido não é troca", (antes) => {
+      expect(ehOutroMaterial(antes, "QUADRADO LAM. 1.1/2 X 6MTS")).toBe(false);
+    });
+
   // ⚠ Preencher a casca é o fluxo NORMAL — tratar como troca encheria o alerta de ruído, e alarme
   // cheio de ruído ninguém lê.
   it("casca sendo preenchida não é troca", () => {
