@@ -80,9 +80,14 @@ export default function RelatorioDetalheClient({ id }) {
   const res = rel.resultados || {};
   const desenhos = Array.isArray(rel.desenhos) ? rel.desenhos : [];
   const marcaAtual = marcaVista || desenhos[0]?.marca || "";
-  // enviado para assinatura = documento fechado (mesma regra da revisão do data book)
-  const travado = !!rel.envioAssinaturaId;
+  // ⚠⚠ ENVIADO PARA ASSINATURA NÃO TRAVA MAIS A EDIÇÃO. Vitor (22/09/2026), sobre os EVS e LP da
+  // OP-102 assinados com o ensaio em branco: "não precisa gerar revisão, pode apenas alterar as
+  // informações". O que fica: a tarja dizendo quem assinou, o aviso de que a alteração é
+  // registrada, e a auditoria (`editadoAposAssinatura`) — a revisão segue disponível no botão,
+  // para o documento que já saiu para o cliente.
+  const assinado = !!rel.envioAssinaturaId;
   const assinaram = (dados.assinaturas || []).filter((a) => a.assinadoEm).map((a) => a.nome || a.email);
+  const travado = false;
 
   const setLinha = (i, campo, v) => {
     setDados((d) => {
@@ -168,7 +173,7 @@ export default function RelatorioDetalheClient({ id }) {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {travado ? (
+          {assinado ? (
             <>
               {/* ⚠ O AVISO DIZ QUEM JÁ ASSINOU. Vitor (22/09/2026): "como já está aprovado não
                   permite a Lais fazer essas alterações" — a tarja só dizia "somente leitura", e
@@ -178,9 +183,13 @@ export default function RelatorioDetalheClient({ id }) {
                 title={assinaram.length ? `Já assinaram: ${assinaram.join(", ")}` : "Enviado para assinatura; ninguém assinou ainda"}>
                 <Lock size={12} />
                 {assinaram.length
-                  ? `assinado por ${assinaram.join(", ")} — somente leitura · R${String(rel.revisao ?? 0).padStart(2, "0")}`
-                  : `enviado para assinatura — somente leitura · R${String(rel.revisao ?? 0).padStart(2, "0")}`}
+                  ? `assinado por ${assinaram.join(", ")} · R${String(rel.revisao ?? 0).padStart(2, "0")} — alterações ficam registradas`
+                  : `enviado para assinatura · R${String(rel.revisao ?? 0).padStart(2, "0")} — alterações ficam registradas`}
               </span>
+              <button onClick={salvar} disabled={salvando}
+                className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50">
+                {salvando ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Salvar
+              </button>
               {/* Vitor (11/09/2026): "voltar as assinaturas" = abrir a revisão seguinte; a rodada assinada fica no histórico */}
               <button onClick={abrirRevisao} disabled={salvando}
                 title={`Para completar ou corrigir: congela ${assinaram.length ? `a assinatura de ${assinaram.join(", ")}` : "esta rodada"} no histórico, sobe para R${String((rel.revisao ?? 0) + 1).padStart(2, "0")} e libera a edição`}

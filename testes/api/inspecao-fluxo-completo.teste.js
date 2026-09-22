@@ -29,7 +29,10 @@ it.each(['PINTURA','VISUAL_SOLDA'])('cria, preenche, reabre, gera PDF e coleta t
  expect(reaberto.resultados).toMatchObject({quantidade:'216',poeira:'N/A',salinidade:'N/A',pullOffValor:'7'});
  const pdf=await gerarPDFdoRelatorio({rel:reaberto});expect((await extractText(new Uint8Array(pdf),{mergePages:true})).text).toContain('216');
  expect((await enviar(req({destinatarios:[{nome:'Inspetor Teste',email:'inspetor@example.test'},{nome:'Cliente Teste',email:'cliente@example.test'}]}),{params:{id:'r'}})).status).toBe(200);
- expect((await salvar(req({pecasInformadas}),{params:{id:'r'}})).status).toBe(409);
+ // ⚠ desde 22/09/2026 o relatório enviado para assinatura CONTINUA editável (Vitor: "não precisa
+ // gerar revisão, pode apenas alterar as informações"); o que muda é a auditoria, que marca
+ // `editadoAposAssinatura`. Ver testes/api/inspecao-editar-assinado.
+ expect((await salvar(req({pecasInformadas}),{params:{id:'r'}})).status).toBe(200);
  expect((await assinar(req({}),{params:{token:assinaturas[0].token}})).status).toBe(200);
  expect(envio.status).not.toBe('CONCLUIDO');
  expect((await assinar(req({}),{params:{token:assinaturas[1].token}})).status).toBe(200);

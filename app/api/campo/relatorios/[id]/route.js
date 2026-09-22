@@ -41,7 +41,6 @@ export async function GET(_req, { params }) {
     },
   });
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado." }, { status: 404 });
-  if (rel.envioAssinaturaId) return NextResponse.json({ error: "Este relatório já foi enviado para assinatura." }, { status: 409 });
 
   let quantidadesLista = {};
   if (usaQuantidadeInspecao(rel.tipo)) {
@@ -80,7 +79,12 @@ export async function PATCH(req, { params }) {
     },
   });
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado." }, { status: 404 });
-  if (rel.envioAssinaturaId) return NextResponse.json({ error: "Este relatório já foi enviado para assinatura." }, { status: 409 });
+  // ⚠ relatório já enviado para assinatura CONTINUA editável (Vitor, 22/09/2026: "não precisa gerar
+  // revisão, pode apenas alterar as informações"); a auditoria abaixo registra que veio depois.
+  const assinaturasVigentes = rel.envioAssinaturaId
+    ? (await prisma.assinaturaDocumento.findMany({ where: { envioId: rel.envioAssinaturaId, assinadoEm: { not: null } }, select: { nome: true, email: true, assinadoEm: true } }).catch(() => []))
+        .filter((a) => a.assinadoEm).map((a) => a.nome || a.email)
+    : [];
 
   const body = await req.json().catch(() => ({}));
 
@@ -330,7 +334,7 @@ export async function PATCH(req, { params }) {
   await prisma.auditLog.create({
     data: {
       userId: user.id, action: "MEDIR_RELATORIO_CAMPO", entity: "RelatorioInspecao", entityId: id,
-      diff: { codigo: rel.codigo, medidas: medidas.length, equipamentos: dados.equipamentos?.length ?? null, ...(body.pecasInformadas ? {antes:{marcas:rel.marcas,pecasInformadas:rel.resultados?.pecasInformadas ?? null},depois:{marcas:dados.marcas,pecasInformadas:dados.resultados.pecasInformadas}} : {}) },
+      diff: { codigo: rel.codigo, ...(assinaturasVigentes.length ? { editadoAposAssinatura: true, assinaturasVigentes } : {}), medidas: medidas.length, equipamentos: dados.equipamentos?.length ?? null, ...(body.pecasInformadas ? {antes:{marcas:rel.marcas,pecasInformadas:rel.resultados?.pecasInformadas ?? null},depois:{marcas:dados.marcas,pecasInformadas:dados.resultados.pecasInformadas}} : {}) },
     },
   }).catch(() => {});
 

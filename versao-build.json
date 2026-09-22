@@ -1,156 +1,156 @@
 {
-  "build": 3372,
-  "gerado": "2026-09-22T12:18:46.946Z",
+  "build": 3373,
+  "gerado": "2026-09-22T12:22:27.112Z",
   "commits": [
     {
-      "hash": "38bf4ee03e",
+      "hash": "5dc7ee83",
+      "data": "22/09/2026",
+      "titulo": "MES: a obra deixa de ser uma preferência e vira uma partição"
+    },
+    {
+      "hash": "38bf4ee0",
       "data": "22/09/2026",
       "titulo": "Relatório assinado: quem inspeciona pode abrir a revisão para completá-lo"
     },
     {
-      "hash": "a1ab15393f",
+      "hash": "a1ab1539",
       "data": "22/09/2026",
       "titulo": "US: a junta ensaiada com as listas da casa — GMAW/FCAW, chanfro X/V, Topo e Direto"
     },
     {
-      "hash": "bf32c164e0",
+      "hash": "bf32c164",
       "data": "22/09/2026",
       "titulo": "Facilita edição de peças e horários por demão nos relatórios"
     },
     {
-      "hash": "1c34c68d0d",
+      "hash": "1c34c68d",
       "data": "22/09/2026",
       "titulo": "US: espessura de chapa em lista, aparelhagem da casa já preenchida"
     },
     {
-      "hash": "752e098706",
+      "hash": "752e0987",
       "data": "22/09/2026",
       "titulo": "Relatório de US: cabeçote sem a marca, material padrão e os campos da junta soldada"
     },
     {
-      "hash": "2db38b5ccb",
+      "hash": "2db38b5c",
       "data": "22/09/2026",
       "titulo": "MES totem: importa o CheckCircle2 que a marca produzida usa"
     },
     {
-      "hash": "d0ae17d0bb",
+      "hash": "d0ae17d0",
       "data": "22/09/2026",
       "titulo": "MES: a obra passa a ter uma definição só, e o DEMO sai da tela"
     },
     {
-      "hash": "ac22f9f345",
+      "hash": "ac22f9f3",
       "data": "22/09/2026",
       "titulo": "Organiza preenchimento do ultrassom no Campo"
     },
     {
-      "hash": "07cfd7ec6d",
+      "hash": "07cfd7ec",
       "data": "22/09/2026",
       "titulo": "Corrige: a trava do modo demo tirava a barra inicial e derrubou o SharePoint em produção"
     },
     {
-      "hash": "0c1e3bbd57",
+      "hash": "0c1e3bbd",
       "data": "22/09/2026",
       "titulo": "Corrige relatório de ultrassom e mantém emitidos no Campo"
     },
     {
-      "hash": "f9f98b75b0",
+      "hash": "f9f98b75",
       "data": "21/09/2026",
       "titulo": "MES: a coluna nova não apaga teto antigo, e a tela para de prometer o que o servidor nega"
     },
     {
-      "hash": "e36e035fe8",
+      "hash": "e36e035f",
       "data": "21/09/2026",
       "titulo": "MES: o teto da marca passa a ser derivado das barras, não da sessão"
     },
     {
-      "hash": "b72f5c5953",
+      "hash": "b72f5c59",
       "data": "21/09/2026",
       "titulo": "MES: os cinco achados da revisão — saldo por etapa, teto do nesting, encerramento e ambiente nas telas"
     },
     {
-      "hash": "caa1021f45",
+      "hash": "caa1021f",
       "data": "21/09/2026",
       "titulo": "Merge branch 'matheus/mes-subir'"
     },
     {
-      "hash": "31d93503c7",
+      "hash": "31d93503",
       "data": "21/09/2026",
       "titulo": "MES: schema e cliente próprios, e o passo 2 fechado"
     },
     {
-      "hash": "96fff418af",
+      "hash": "96fff418",
       "data": "21/09/2026",
       "titulo": "MES: DEMO e PROD deixam de ser o mesmo mundo"
     },
     {
-      "hash": "2daa8d6e53",
+      "hash": "2daa8d6e",
       "data": "21/09/2026",
       "titulo": "Qualidade: apagar uma RNC passa a guardar o que foi apagado"
     },
     {
-      "hash": "ef0267fee5",
+      "hash": "ef0267fe",
       "data": "21/09/2026",
       "titulo": "Cotação: o campo de quantidade para de mostrar o resíduo binário do banco"
     },
     {
-      "hash": "ed823f1d1d",
+      "hash": "ed823f1d",
       "data": "21/09/2026",
       "titulo": "Cotação: a tela do fornecedor deixa de espremer a descrição do item"
     },
     {
-      "hash": "f3ee410be0",
+      "hash": "f3ee410b",
       "data": "21/09/2026",
       "titulo": "Cotação: o aviso \"PDF: R$ X\" para de acusar a linha que está certa"
     },
     {
-      "hash": "8217b22f19",
+      "hash": "8217b22f",
       "data": "21/09/2026",
       "titulo": "Demo: o exemplo do .env.demo leva o usuário do Mac na URL do Postgres"
     },
     {
-      "hash": "4996b94583",
+      "hash": "4996b945",
       "data": "21/09/2026",
       "titulo": "Ambiente de demonstração: banco local e modo demo que corta e-mail, Omie e SharePoint"
     },
     {
-      "hash": "6d3ec75817",
+      "hash": "6d3ec758",
       "data": "21/09/2026",
       "titulo": "Excel: o painel só congela quando o cabeçalho está perto do topo"
     },
     {
-      "hash": "eb18132fde",
+      "hash": "eb18132f",
       "data": "21/09/2026",
       "titulo": "Atualiza relatórios LP e EVS ao modelo revisado"
     },
     {
-      "hash": "96041359f5",
+      "hash": "96041359",
       "data": "21/09/2026",
       "titulo": "Cotação: o casamento PDF × RM passa a entender a peça, não só as palavras"
     },
     {
-      "hash": "7ff1cf9b69",
+      "hash": "7ff1cf9b",
       "data": "21/09/2026",
       "titulo": "Conferência: a planilha diz quando cada peça foi conferida, sem abrir as outras"
     },
     {
-      "hash": "1617eebdd2",
+      "hash": "1617eebd",
       "data": "21/09/2026",
       "titulo": "Cotação: o que o PDF leu e não casou deixa de ser jogado fora"
     },
     {
-      "hash": "a4012125d7",
+      "hash": "a4012125",
       "data": "21/09/2026",
       "titulo": "Cliente: contatos editáveis na OP e obras liberadas por login"
     },
     {
-      "hash": "bc3e12c98d",
+      "hash": "bc3e12c9",
       "data": "21/09/2026",
       "titulo": "Cotação: obrigatórios também no servidor, e ICMS/IPI/prazo em massa"
-    },
-    {
-      "hash": "0239f0a4ee",
-      "data": "21/09/2026",
-      "titulo": "Mapa: \"NÃO TEM\" no lugar do traço quando o fornecedor recusa o item"
     }
   ]
 }

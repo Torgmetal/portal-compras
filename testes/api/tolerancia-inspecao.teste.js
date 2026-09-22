@@ -12,6 +12,12 @@ it.each(['DIMENSIONAL','PRE_MONTAGEM'])('salva e reabre a tolerância no relató
  const linhas=rel.linhas.map(l=>({...l,tolerancia:'± 5'}));const r=await PATCH(new Request('http://localhost/api/qualidade/inspecoes/r',{method:'PATCH',body:JSON.stringify({linhas})}),{params:{id:'r'}});expect(r.status).toBe(200);
  const reaberto=await GET(null,{params:{id:'r'}});expect((await reaberto.json()).relatorio.linhas[0]).toMatchObject({tolerancia:'± 5',projetoMm:100,encontradoMm:104,ax:10,bx:30});
 });
-it('mantém o bloqueio de relatórios enviados para assinatura',async()=>{
- mockPrisma.relatorioInspecao.findUnique.mockResolvedValue({id:'r',envioAssinaturaId:'assinado'});const r=await PATCH(new Request('http://localhost',{method:'PATCH',body:JSON.stringify({linhas:[{tolerancia:'± 5'}]})}),{params:{id:'r'}});expect(r.status).toBe(409);expect(mockPrisma.relatorioInspecao.update).not.toHaveBeenCalled();
+// ⚠ A REGRA MUDOU EM 22/09/2026. Vitor, sobre os EVS e LP da OP-102 assinados com o ensaio em
+// branco: "não precisa gerar revisão, pode apenas alterar as informações". O relatório enviado para
+// assinatura continua editável; o que o portal garante é o REGISTRO (`editadoAposAssinatura` na
+// auditoria) e a tarja dizendo quem assinou. Ver testes/api/inspecao-editar-assinado.
+it('relatório enviado para assinatura continua editável',async()=>{
+ mockPrisma.relatorioInspecao.findUnique.mockResolvedValue({id:'r',tipo:'DIMENSIONAL',linhas:[],equipamentos:[],resultados:{},envioAssinaturaId:'assinado'});
+ mockPrisma.assinaturaDocumento.findMany.mockResolvedValue([]);
+ const r=await PATCH(new Request('http://localhost',{method:'PATCH',body:JSON.stringify({linhas:[{tolerancia:'± 5'}]})}),{params:{id:'r'}});expect(r.status).toBe(200);
 });

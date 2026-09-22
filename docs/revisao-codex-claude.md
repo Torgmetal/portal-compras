@@ -453,6 +453,12 @@ novo, não conserto, e não entra sem o Matheus decidir.
   `inspecao-revisao-perfil` (3).
   ⚠ **Para revisar (security):** dar ao `QUALIDADE_CAMPO` o poder de abrir revisão descarta
   assinaturas de terceiros — está auditado e com motivo obrigatório, mas convém uma segunda leitura.
+- **(22/09, 09h20)** Vitor: "não precisa gerar revisão, pode apenas alterar as informações". O 409 de
+  relatório enviado para assinatura saiu (computador e celular); entrou `editadoAposAssinatura` +
+  `assinaturasVigentes` na auditoria e a tarja com quem assinou. Três testes que afirmavam o bloqueio
+  foram reescritos para a regra nova; `inspecao-editar-assinado` (3) cobre o registro. 2899 passando.
+  ⚠ **Para revisar (security/processo):** a proteção agora é registro, não trava — conferir se o
+  data book (que é entregue) continua exigindo revisão, como deve.
 
 - **(22/09, 09h)** Mesma linha, terceira rodada — o ESPELHO do defeito anterior. `{ opId }` solto na
   busca não particiona nada: a sessão aberta SÓ por id varria também as que têm id E número, e o

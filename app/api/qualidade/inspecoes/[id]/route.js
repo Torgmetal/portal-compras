@@ -85,12 +85,22 @@ export async function PATCH(req, { params }) {
   const rel = await prisma.relatorioInspecao.findUnique({ where: { id } });
   if (!rel) return NextResponse.json({ error: "Relatório não encontrado" }, { status: 404 });
 
-  // ⚠ relatório JÁ ENVIADO para assinatura não se edita. Quem assinou validou um conteúdo; mudar
-  // por baixo faz a assinatura valer para um documento que a pessoa não viu — o mesmo raciocínio
-  // da revisão do data book.
-  if (rel.envioAssinaturaId) {
-    return NextResponse.json({ error: "Este relatório já foi enviado para assinatura e não pode mais ser alterado." }, { status: 409 });
-  }
+  // ⚠⚠ EDITAR DEPOIS DE ASSINADO É PERMITIDO — E FICA REGISTRADO. Até 22/09/2026 a rota recusava
+  // com 409 ("quem assinou validou um conteúdo"), e a saída era abrir revisão. Vitor (22/09/2026),
+  // sobre os EVS e LP da OP-102 assinados com o ensaio em branco: "não precisa gerar revisão, pode
+  // apenas alterar as informações". É a operação real da casa — o relatório é assinado internamente
+  // antes de estar completo, e subir revisão de um documento que nunca saiu da Torg só encheria o
+  // histórico.
+  //
+  // ⚠ O que NÃO se abre mão: a auditoria diz que a edição veio DEPOIS da assinatura e de quem era a
+  // assinatura vigente. Numa auditoria ISO é isso que responde "este documento mudou depois de
+  // assinado?". A revisão continua existindo para o documento que já saiu para o cliente.
+  const assinaturasVigentes = rel.envioAssinaturaId
+    ? (await prisma.assinaturaDocumento.findMany({
+        where: { envioId: rel.envioAssinaturaId, assinadoEm: { not: null } },
+        select: { nome: true, email: true, assinadoEm: true },
+      }).catch(() => [])).filter((a) => a.assinadoEm).map((a) => a.nome || a.email)
+    : [];
 
   const body = await req.json().catch(() => ({}));
   const dados = {};
@@ -349,7 +359,7 @@ export async function PATCH(req, { params }) {
   }
 
   await prisma.auditLog.create({
-    data: { userId: user.id, action: "EDITAR_RELATORIO_INSPECAO", entity: "RelatorioInspecao", entityId: id, diff: { campos: Object.keys(dados), ...(body.pecasInformadas !== undefined ? { antes: { marcas: rel.marcas, pecasInformadas: rel.resultados?.pecasInformadas ?? null }, depois: { marcas: dados.marcas, pecasInformadas: dados.resultados.pecasInformadas } } : {}) } },
+    data: { userId: user.id, action: "EDITAR_RELATORIO_INSPECAO", entity: "RelatorioInspecao", entityId: id, diff: { campos: Object.keys(dados), ...(assinaturasVigentes.length ? { editadoAposAssinatura: true, assinaturasVigentes } : {}), ...(body.pecasInformadas !== undefined ? { antes: { marcas: rel.marcas, pecasInformadas: rel.resultados?.pecasInformadas ?? null }, depois: { marcas: dados.marcas, pecasInformadas: dados.resultados.pecasInformadas } } : {}) } },
   }).catch(() => {});
 
   return NextResponse.json({ ok: true, relatorio: atualizado, arquivo });
