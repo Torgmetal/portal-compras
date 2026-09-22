@@ -1,7 +1,12 @@
 {
-  "build": 3400,
-  "gerado": "2026-09-22T21:12:12.423Z",
+  "build": 3401,
+  "gerado": "2026-09-22T21:22:29.771Z",
   "commits": [
+    {
+      "hash": "7cdb37c5e2",
+      "data": "22/09/2026",
+      "titulo": "Fiscal: a leitura da TIPI oficial, medida contra o arquivo da Receita"
+    },
     {
       "hash": "49e1adda25",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "38bf4ee03e",
       "data": "22/09/2026",
       "titulo": "Relatório assinado: quem inspeciona pode abrir a revisão para completá-lo"
-    },
-    {
-      "hash": "a1ab15393f",
-      "data": "22/09/2026",
-      "titulo": "US: a junta ensaiada com as listas da casa — GMAW/FCAW, chanfro X/V, Topo e Direto"
     }
   ]
 }

@@ -126,7 +126,7 @@ model UserModulo {
 }
 
 model OP {
-  fasesReferencias      Json? // {empresas:[], fases:[{fase,descricao,referencias:[]}]} — ordem = prioridade
+  fasesReferencias     Json? // {empresas:[], fases:[{fase,descricao,referencias:[]}]} — ordem = prioridade
   id                   String               @id @default(cuid())
   numero               String               @unique
   /**
@@ -1101,7 +1101,7 @@ model Cotacao {
   // separadas por " | " (prazo, pagamento e o texto do fornecedor) e cada leitor precisa de um
   // parser. O frete é uma escolha entre DUAS opções e vira filtro/etiqueta na tela de Prazos —
   // texto livre dentro de outro texto seria um erro anunciado. Ver `lib/frete-cotacao.js`.
-  tipoFrete            String?
+  tipoFrete              String?
   observacao             String?
   total                  Float         @default(0)
   prazoResposta          DateTime?
@@ -2060,17 +2060,17 @@ model AvaliacaoCalibracao {
 // Uma por OP, com as 20 seções (template em lib/databook-secoes). Seções de
 // fonte "modulo1" puxam documentos do Controle de Documentos pelo vínculo de OP.
 model DataBookQualidade {
-  templateVisual String @default("TORG_2026") // Persistido: LEGADO ou TORG_2026; revisão nunca troca.
-  id          String  @id @default(cuid())
-  opNumero    String  @unique
-  opId        String?
-  cliente     String?
-  obra        String?
-  pesoTotalKg Float?
-  pecas       Int?
-  tipo        String? // herda de OP.tipoDataBook: PADRAO_TORG | SNQC | RELATORIO_ACOMPANHAMENTO
-  observacao  String?
-  status      String  @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO | EM_ASSINATURA | ENVIADO_CLIENTE | ACEITO
+  templateVisual String  @default("TORG_2026") // Persistido: LEGADO ou TORG_2026; revisão nunca troca.
+  id             String  @id @default(cuid())
+  opNumero       String  @unique
+  opId           String?
+  cliente        String?
+  obra           String?
+  pesoTotalKg    Float?
+  pecas          Int?
+  tipo           String? // herda de OP.tipoDataBook: PADRAO_TORG | SNQC | RELATORIO_ACOMPANHAMENTO
+  observacao     String?
+  status         String  @default("EM_MONTAGEM") // EM_MONTAGEM | EMITIDO | EM_ASSINATURA | ENVIADO_CLIENTE | ACEITO
 
   // ── AVALIAÇÃO DO CLIENTE, ANTES DA ASSINATURA ───────────────────────────────────────────────
   // Vitor (31/08/2026): "antes de enviar para assinatura, teria como disponibilizar no portal do
@@ -5389,17 +5389,17 @@ model PcpCarteiraObraBaixa {
 // O cron "monitor" lê isto e alerta (e-mail) se algum cron não roda há tempo
 // demais ou falhou. Guarda-corpo contra cron morrer silenciosamente.
 model CronHeartbeat {
-  job       String    @id // ex.: "sync-entregas", "estoque-produtos"
+  job        String    @id // ex.: "sync-entregas", "estoque-produtos"
   // ⚠⚠ ARRENDAMENTO (lease) PARA UM CRON NÃO ATROPELAR A SI MESMO. Quem segura a vez grava aqui
   // até quando pretende segurar; outra execução do MESMO job só entra se este instante já passou.
   // Ver `lib/cron-trava.js` — e por que `pg_advisory_lock` NÃO serve aqui.
   travadoAte DateTime?
-  lastRunAt DateTime  @default(now())
-  lastOkAt  DateTime?
-  ok        Boolean   @default(true)
-  mensagem  String?
-  duracaoMs Int?
-  updatedAt DateTime  @updatedAt
+  lastRunAt  DateTime  @default(now())
+  lastOkAt   DateTime?
+  ok         Boolean   @default(true)
+  mensagem   String?
+  duracaoMs  Int?
+  updatedAt  DateTime  @updatedAt
 }
 
 // ── Romaneios Terceirizados (Expedição) ───────────────────────────────────────
@@ -6606,4 +6606,166 @@ model PadraoInspecao {
   updatedAt   DateTime @updatedAt
 
   @@unique([opNumero, tipo, campo])
+}
+
+// ─── INTELIGÊNCIA FISCAL ─────────────────────────────────────────────────────
+//
+// Consulta de NCM/TIPI/CFOP e auditoria das notas que a TORG emite. A fonte da tributação é
+// ESTRUTURADA e RASTREÁVEL — a IA pode explicar, nunca inventar alíquota.
+//
+// ⚠⚠ TRÊS CONTRATOS, FIXADOS NO PARECER DE ARQUITETURA DO CODEX (22/09/2026), que valem para tudo
+// o que se apoiar nestes modelos:
+//   1. ATIVA NÃO SIGNIFICA VIGENTE. A TIPI não declara vigência dentro do arquivo — o decreto do
+//      cabeçalho é proveniência, não cronologia. Resolver "qual era o IPI em tal data" pela data de
+//      IMPORTAÇÃO fabrica uma conclusão temporal sem fundamento. Por isso as três datas são
+//      separadas e `vigenciaInicio` nasce NULA: sem cobertura comprovada, a consulta histórica
+//      responde "referência histórica indisponível", não um número.
+//   2. Ex DESCONHECIDO NÃO SIGNIFICA GERAL. Com o NCM sozinho não dá para escolher entre a alíquota
+//      geral e a do Ex — o 1211.20.00 é "NT" na geral e 0% no Ex 01. Fica explícito.
+//   3. CAMPO AUSENTE PRODUZ ANÁLISE INCONCLUSIVA. Comparar o IPI destacado com a TIPI não basta
+//      para declarar erro: é DIVERGÊNCIA A INVESTIGAR. Ausência de CST/cEnq não é conformidade.
+
+/// O arquivo oficial como ele chegou — a evidência imutável.
+/// ⚠ Sem guardar o arquivo e o hash, um apontamento de ontem não é reproduzível: a Receita
+/// republica o XLSX e ninguém consegue dizer contra o quê a conclusão foi tirada.
+model FiscalFonteArquivo {
+  id           String   @id @default(cuid())
+  fonte        String // TIPI | NCM
+  /// ⚠ A URL EFETIVA, não a do briefing: o gov.br é Plone e o `.xlsx` puro devolve 403 — o
+  /// download real sai em `.../tipi.xlsx/@@download/file`.
+  url          String
+  sha256       String
+  bytes        Int
+  contentType  String?
+  /// O que a fonte disse sobre si mesma (o ato do cabeçalho da TIPI, o `Ato` do JSON da NCM).
+  atoDeclarado String?
+  baixadoEm    DateTime @default(now())
+
+  tipiVersoes FiscalTipiVersao[]
+  ncmVersoes  FiscalNcmVersao[]
+
+  @@unique([fonte, sha256])
+  @@index([fonte, baixadoEm])
+}
+
+/// Uma importação da TIPI. ⚠⚠ Só nasce quando o CONTEÚDO muda — mesmo SHA reaproveita o artefato.
+/// Uma versão por execução diária seriam ~4 milhões de linhas por ano sem necessidade.
+model FiscalTipiVersao {
+  id           String             @id @default(cuid())
+  arquivo      FiscalFonteArquivo @relation(fields: [arquivoId], references: [id])
+  arquivoId    String
+  /// ⚠ A versão do PARSER entra na identidade: o mesmo arquivo lido por outro código pode dar outra
+  /// leitura, e sem isso um resultado antigo não se reproduz.
+  parserVersao String
+  status       String             @default("IMPORTANDO") // IMPORTANDO | VALIDADA | ATIVA | REJEITADA | SUBSTITUIDA
+  problemas    Json? // o que a validação recusou, linha a linha
+
+  // ── As TRÊS datas do contrato 1, deliberadamente separadas ──
+  /// Quando o portal VIU este conteúdo.
+  observadoEm        DateTime  @default(now())
+  /// Quando um humano aprovou usá-lo como referência operacional. Nada é servido sem isto.
+  aprovadoEm         DateTime?
+  aprovadoPorId      String?
+  /// ⚠⚠ A validade NORMATIVA. Nasce NULA e só é preenchida com fundamento explícito em
+  /// `vigenciaFundamento` — nunca derivada da data de publicação ou de download.
+  vigenciaInicio     DateTime?
+  vigenciaFim        DateTime?
+  vigenciaFundamento String?
+
+  totalLinhas     Int @default(0)
+  totalNcm        Int @default(0)
+  totalHierarquia Int @default(0)
+
+  linhas    FiscalTipiLinha[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([status, observadoEm])
+}
+
+/// Uma linha da TIPI. Guarda NCM e hierarquia juntos — a hierarquia não é consultável como
+/// alíquota, mas é de onde sai a descrição que a folha de 8 dígitos abrevia ("- Partes" só
+/// significa algo sob "Máquinas para limpeza… de grãos").
+model FiscalTipiLinha {
+  id              String           @id @default(cuid())
+  versao          FiscalTipiVersao @relation(fields: [versaoId], references: [id], onDelete: Cascade)
+  versaoId        String
+  ordem           Int // a ordem do arquivo, que é o que dá sentido à hierarquia
+  nivel           String // NCM | HIERARQUIA
+  /// Só dígitos. ⚠ STRING, sempre: "01" não é 1, e zero à esquerda é significado.
+  codigo          String
+  codigoFormatado String
+  /// ⚠⚠ O Ex. Vazio = a alíquota GERAL daquele NCM. Ver o contrato 2 no topo.
+  ex              String           @default("")
+  descricao       String
+  /// ⚠⚠ NT, ZERO E AUSÊNCIA SÃO TRÊS COISAS DIFERENTES — por isso o tipo vem separado do valor.
+  /// "NT" está FORA do campo de incidência; "0" é alíquota de verdade (6.405 linhas); AUSENTE é a
+  /// planilha não ter dito nada. Guardar só o número faria as três virarem zero.
+  aliquotaTipo    String // PERCENTUAL | NT | AUSENTE
+  aliquotaValor   Float?
+  aliquotaBruto   String
+  /// As linhas do Excel que formaram esta (mais de uma quando a descrição transborda).
+  linhasDeOrigem  Int[]
+
+  @@unique([versaoId, ordem])
+  /// ⚠ A unicidade REAL — (versão, código, ex) só para as linhas NCM — é um índice PARCIAL, que o
+  /// Prisma não sabe declarar. Ele mora em `scripts/ensure-fiscal-tables.mjs`.
+  @@index([versaoId, codigo])
+  @@index([codigo, ex])
+}
+
+/// A tabela NCM do Siscomex. ⚠ Diferente da TIPI, ELA DECLARA VIGÊNCIA (`Data_Inicio`/`Data_Fim`)
+/// por código — e essa vigência é DELA, nunca transferida para a alíquota de IPI.
+model FiscalNcmVersao {
+  id           String             @id @default(cuid())
+  arquivo      FiscalFonteArquivo @relation(fields: [arquivoId], references: [id])
+  arquivoId    String
+  parserVersao String
+  status       String             @default("IMPORTANDO")
+  atoDeclarado String? // "Resolução Gecex nº 926/2026"
+  observadoEm  DateTime           @default(now())
+  aprovadoEm   DateTime?
+  totalCodigos Int                @default(0)
+
+  codigos   FiscalNcmCodigo[]
+  createdAt DateTime          @default(now())
+
+  @@index([status, observadoEm])
+}
+
+model FiscalNcmCodigo {
+  id              String          @id @default(cuid())
+  versao          FiscalNcmVersao @relation(fields: [versaoId], references: [id], onDelete: Cascade)
+  versaoId        String
+  /// Só dígitos (2, 4, 6 ou 8) — o Siscomex traz os níveis junto das folhas.
+  codigo          String
+  codigoFormatado String
+  descricao       String
+  vigenciaInicio  DateTime?
+  vigenciaFim     DateTime?
+  atoTipo         String?
+  atoNumero       String?
+  atoAno          String?
+
+  @@unique([versaoId, codigo])
+  @@index([codigo])
+}
+
+/// Cada execução da sincronização — a que roda no cron e a do botão do ADMIN.
+/// ⚠⚠ FALHA NÃO APAGA A REFERÊNCIA ANTERIOR: ela continua servindo, e a tela diz desde quando não
+/// se consegue verificar. O que não pode é apresentar a versão antiga como comprovadamente atual.
+model FiscalSincronizacao {
+  id             String    @id @default(cuid())
+  fonte          String // TIPI | NCM
+  disparo        String // CRON | MANUAL
+  status         String    @default("RODANDO") // RODANDO | SEM_MUDANCA | IMPORTADA | FALHOU
+  iniciadaEm     DateTime  @default(now())
+  terminadaEm    DateTime?
+  /// Preenchido mesmo quando nada mudou — é a prova de que a verificação aconteceu.
+  sha256Visto    String?
+  versaoId       String?
+  mensagem       String?
+  disparadaPorId String?
+
+  @@index([fonte, iniciadaEm])
 }
