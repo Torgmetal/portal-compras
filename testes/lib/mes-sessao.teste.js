@@ -19,12 +19,20 @@ import { validarQuantidade, mudarEstado, apontarQuantidade, abrirSessao, saldoDa
  * `saldoDaMarca` vai ler para decidir se ainda cabe.
  */
 function prismaFalso({ sessao = null, recurso = "r1", jaBoas = 0, jaGravado = null } = {}) {
+  // ⚠⚠ AS IRMÃS CARREGAM O PLANEJAMENTO (22/09/2026). O teto deixou de sair da sessão passada por
+  // parâmetro: ele é COMPOSTO a partir das irmãs (`comporTeto`) — `planejadoManual` quando a marca
+  // foi digitada, as barras do nesting quando veio de plano. Irmã sem esses campos é irmã sem
+  // planejamento, e o teto some.
+  const irmas = [
+    { id: "s1", ...(sessao || {}), nestingUnidades: [] },
+    { id: "s-ontem", ...(sessao || {}), nestingUnidades: [] },
+  ];
   const tx = {
     $executeRaw: vi.fn().mockResolvedValue(1),
     mesSessao: {
       findUnique: vi.fn().mockResolvedValue(sessao),
       findFirst: vi.fn().mockResolvedValue(null),
-      findMany: vi.fn().mockResolvedValue([{ id: "s1" }, { id: "s-ontem" }]),
+      findMany: vi.fn().mockResolvedValue(irmas),
       create: vi.fn().mockImplementation(({ data }) => ({ id: "s1", ...data })),
       update: vi.fn().mockImplementation(({ data }) => ({ ...sessao, ...data })),
     },
@@ -149,7 +157,7 @@ describe("apontarQuantidade", () => {
 // Matheus (11/09/2026): "quando lançar é importante que ele trave a quantidade que dá para lançar
 // comparando na quantidade planejada". Trava que RECUSA — quem corrige o planejado é o PCP.
 
-const PLANEJADA = { ...ABERTA, marca: "T82A-P25", opId: "op-82", planejadoQtd: 7 };
+const PLANEJADA = { ...ABERTA, marca: "T82A-P25", opId: "op-82", planejadoQtd: 7, planejadoManual: 7 };
 
 describe("saldoDaMarca — o teto é da marca, não da sessão", () => {
   it("desconta o que JÁ foi lançado em outras sessões da mesma marca", async () => {

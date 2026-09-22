@@ -219,6 +219,15 @@ model MesSessao {
   lotes           String[]
   nestingUnidades String[]
   planejadoQtd    Float     @default(0)
+  /// ⚠⚠ O TOTAL DA MARCA QUANDO ELE FOI DIGITADO — e por que ele mora à parte (Codex, 22/09/2026).
+  /// `planejadoQtd` quer dizer coisas DIFERENTES nos dois caminhos: no manual é o total da marca,
+  /// no nesting é a quantidade daquela BARRA. Uma sessão aberta à mão com total 10 que depois
+  /// recebe uma barra de 2 passaria a ter `nestingUnidades` preenchido — e o teto derivado das
+  /// unidades desabaria de 10 para 2, bloqueando 8 peças legítimas. Guardando o número digitado
+  /// num campo próprio, ele sobrevive à chegada das barras.
+  ///
+  /// ⚠ Zero em sessão de nesting não é "sem planejamento": lá o teto vem das unidades.
+  planejadoManual Float     @default(0)
   status          String    @default("ABERTA") // ABERTA | ENCERRADA | CANCELADA
   abertaEm        DateTime  @default(now())
   encerradaEm     DateTime?

@@ -15,7 +15,7 @@ describe("uma etapa não come o saldo da seguinte", () => {
       mesApontamentoQtd: { aggregate: vi.fn(async () => ({ _sum: { boas: 0 } })) },
     };
     await saldoDaMarca(tx, {
-      planejadoQtd: 10, marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "MONTAGEM",
+      planejadoQtd: 10, planejadoManual: 10, marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "MONTAGEM",
     });
     expect(tx.mesSessao.findMany.mock.calls[0][0].where).toMatchObject({ operacao: "MONTAGEM" });
   });
@@ -24,27 +24,27 @@ describe("uma etapa não come o saldo da seguinte", () => {
   // dividem um teto só, que é o que a peça física permite.
   it("mas continua somando os postos da MESMA etapa", async () => {
     const irmas = [
-      { id: "a", marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "ACABAMENTO" },
-      { id: "b", marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "ACABAMENTO" },
+      { id: "a", marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "ACABAMENTO", planejadoManual: 10, nestingUnidades: [] },
+      { id: "b", marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "ACABAMENTO", planejadoManual: 10, nestingUnidades: [] },
     ];
     const contas = await saldosDasMarcas({
       mesSessao: { findMany: vi.fn(async () => irmas) },
       mesApontamentoQtd: { groupBy: vi.fn(async () => [
         { sessaoId: "a", _sum: { boas: 3 } }, { sessaoId: "b", _sum: { boas: 2 } },
       ]) },
-    }, [{ id: "a", marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "ACABAMENTO", planejadoQtd: 10 }]);
+    }, [{ id: "a", marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "ACABAMENTO", planejadoQtd: 1, planejadoManual: 10 }]);
     expect(contas.get("a")).toMatchObject({ boas: 5, saldo: 5 });
   });
 
   it("e não soma a sessão de outra etapa", async () => {
     const irmas = [
-      { id: "a", marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "MONTAGEM" },
-      { id: "corte", marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "PREPARACAO" },
+      { id: "a", marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "MONTAGEM", planejadoManual: 10, nestingUnidades: [] },
+      { id: "corte", marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "PREPARACAO", planejadoManual: 10, nestingUnidades: [] },
     ];
     const contas = await saldosDasMarcas({
       mesSessao: { findMany: vi.fn(async () => irmas) },
       mesApontamentoQtd: { groupBy: vi.fn(async () => [{ sessaoId: "corte", _sum: { boas: 10 } }]) },
-    }, [{ id: "a", marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "MONTAGEM", planejadoQtd: 10 }]);
+    }, [{ id: "a", marca: "T89A10", opId: "op1", ambiente: "PROD", operacao: "MONTAGEM", planejadoQtd: 1, planejadoManual: 10 }]);
     expect(contas.get("a")).toMatchObject({ boas: 0, saldo: 10 });
   });
 });
@@ -96,7 +96,7 @@ describe("encerrar uma marca não encerra o posto", () => {
   });
 });
 
-describe("a mesma marca em barras diferentes do nesting", () => {
+describe("o vínculo da barra com a sessão aberta", () => {
   const aberta = { id: "s1", lotes: ["lote-1"], nestingUnidades: ["u1"], planejadoQtd: 2 };
   const tx = () => ({
     mesSessao: {
@@ -106,12 +106,10 @@ describe("a mesma marca em barras diferentes do nesting", () => {
     },
   });
 
-  // ⚠⚠ A SEGUNDA BARRA NASCIA BLOQUEADA (achado do Codex, 22/09/2026). `planejadoQtd` vem da
-  // quantidade daquela UNIDADE do nesting, mas o saldo desconta TODAS as sessões da obra, marca e
-  // operação. Duas barras com 2 peças da mesma marca ficavam com teto 2 em vez de 4: o operador
-  // cortava as 2 primeiras e o portal recusava as 2 legítimas seguintes, dizendo que a marca
-  // estava completa.
-  it("a barra nova SOMA ao teto, em vez de ele ficar no da primeira", async () => {
+  // ⚠ A barra nova entra na lista da sessão e soma no número QUE A TELA MOSTRA. O TETO não sai
+  // mais daqui — ele é derivado das unidades (`comporTeto`), porque acumular no campo só
+  // consertava a sessão ainda ABERTA (3ª rodada do Codex, 22/09/2026).
+  it("a barra nova entra na sessão e soma no número da tela", async () => {
     const t = tx();
     await abrirNaTransacao(t, {
       recursoId: "r1", ambiente: "PROD", marca: "T107A-P3", opNumero: "T107A",
@@ -122,7 +120,7 @@ describe("a mesma marca em barras diferentes do nesting", () => {
     expect(dados.nestingUnidades).toEqual({ push: "u2" });
   });
 
-  // ⚠⚠ REENVIO NÃO INFLA O TETO, e a chave é a UNIDADE — não o lote. O mesmo corte reenviado com
+  // ⚠⚠ REENVIO NÃO INFLA NADA, e a chave é a UNIDADE — não o lote. O mesmo corte reenviado com
   // outro id de lote acrescentaria peça que não existe.
   it("a mesma unidade reenviada com outro lote não soma de novo", async () => {
     const t = tx();
@@ -133,9 +131,8 @@ describe("a mesma marca em barras diferentes do nesting", () => {
     expect(t.mesSessao.update.mock.calls[0][0].data.planejadoQtd).toBeUndefined();
   });
 
-  // ⚠ O caminho MANUAL (sem unidade de nesting) não acumula: lá reabrir a marca é reabrir a mesma,
-  // não acrescentar peça nenhuma.
-  it("reabrir a marca à mão não mexe no teto", async () => {
+  // ⚠ O caminho MANUAL não mexe em nada: reabrir a marca é reabrir a mesma.
+  it("reabrir a marca à mão não mexe na sessão", async () => {
     const t = tx();
     await abrirNaTransacao(t, {
       recursoId: "r1", ambiente: "PROD", marca: "T107A-P3", opNumero: "T107A",

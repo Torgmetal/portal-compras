@@ -1,7 +1,12 @@
 {
-  "build": 3359,
-  "gerado": "2026-09-22T02:07:22.210Z",
+  "build": 3360,
+  "gerado": "2026-09-22T02:31:59.593Z",
   "commits": [
+    {
+      "hash": "b72f5c5953",
+      "data": "21/09/2026",
+      "titulo": "MES: os cinco achados da revisão — saldo por etapa, teto do nesting, encerramento e ambiente nas telas"
+    },
     {
       "hash": "caa1021f45",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "3273d9f138",
       "data": "21/09/2026",
       "titulo": "Cotação: fornecedor da Vendor List sem e-mail (ou com dois) parava o envio em silêncio"
-    },
-    {
-      "hash": "cc377795f0",
-      "data": "21/09/2026",
-      "titulo": "memória: a limpeza da LPC duplicada da 094 apagou a LE junto — conferir naLE antes de apagar"
     }
   ]
 }

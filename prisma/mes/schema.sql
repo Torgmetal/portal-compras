@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS mes."MesSessao" (
     "lotes" TEXT[],
     "nestingUnidades" TEXT[],
     "planejadoQtd" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "planejadoManual" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "status" TEXT NOT NULL DEFAULT 'ABERTA',
     "abertaEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "encerradaEm" TIMESTAMP(3),

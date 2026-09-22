@@ -343,3 +343,49 @@ existem como `btree (codigo, ambiente)` e `btree (cracha, ambiente)`.
 ⚠ **NÃO empurrei nem escrevi em produção** — a rodada de correção proíbe. A prova de banco do
 achado 4 (dois recursos de mesmo código em DEMO e PROD coexistindo) exige INSERT e ficou de fora;
 o que dá para afirmar sem escrever é a definição dos índices, acima.
+
+## 22/09/2026 (3ª rodada) — o teto do nesting, que eu tinha corrigido pela metade (Claude)
+
+O Codex reprovou de novo, com razão: o meu `increment` só cobria a sessão ainda **ABERTA**.
+
+> Após produzir as 2 peças da primeira barra, o frontend encerra a sessão automaticamente. Abrir a
+> segunda barra cria outra sessão com planejadoQtd=2, enquanto saldoDaMarca desconta as 2 peças da
+> sessão anterior: saldo zero para duas peças legítimas. Em outro posto, também não ocorre
+> reutilização.
+
+⚠⚠ **A RAIZ: `planejadoQtd` QUER DIZER COISAS DIFERENTES NOS DOIS CAMINHOS.** No manual é o total
+da MARCA; no nesting é a quantidade daquela BARRA. O saldo soma as BOAS de todas as irmãs mas
+tomava o planejado de UMA sessão.
+
+**O teto passou a ser DERIVADO** (`comporTeto`, `lib/mes/saldo.js`): as barras distintas entre as
+irmãs (`Set`, cada uma contada uma vez) e o total digitado à parte, em `planejadoManual`.
+`Math.max` entre os dois — o digitado é o total da marca e as barras são um recorte dele; somar
+inflaria.
+
+Quatro achados do parecer `database` que o meu desenho não cobria:
+
+1. **Origem do planejamento perdida.** Sessão manual (total 10) que depois recebe uma barra passa a
+   ter `nestingUnidades` — e o filtro "sem unidades" a tirava do manual: teto desabava de 10 para
+   2. Por isso o total digitado ganhou **coluna própria**, que o nesting não toca.
+2. **Atalhos `planejadoQtd <= 0 → semTeto`** nas duas funções: sessão com zero pode ter irmãs com
+   teto válido — e era por ali que a segunda barra escapava da conta.
+3. **Identidade da obra na agregação**: `MesNestingItem` tem `opNumero`, e unidade+marca não
+   garante obra única. Entrou no filtro.
+4. **Referência quebrada virando "sem teto"**: plano apagado/reimportado faz a soma voltar zero, e
+   zero quer dizer ILIMITADO. Agora é recusa com mensagem própria.
+
+⚠ No lote, `groupBy` por unidade e repartição **por grupo (obra+marca+etapa+ambiente)** — agrupar
+só por marca misturaria contextos.
+
+**Testes:** `mes-teto-nesting` (10, novo) cobrindo simultâneo, sequencial, postos diferentes, mesma
+barra em duas sessões, manual→nesting, nesting acima do manual e referência quebrada.
+**2.854 passando.** Telas do MES sem erro de console nem 4xx/5xx.
+
+**Prova de banco** (autorizada pelo Matheus): `PROVA 1` e crachá `PROVA-9999` criados nos DOIS
+ambientes com ids distintos; duplicata no MESMO ambiente recusada com `P2002`; linhas removidas ao
+fim (0 recursos, 0 setores).
+
+⚠ **Fica pendente, explicitamente não feito:** o Codex apontou que a mesma barra aberta em dois
+postos não é impedida — o `Set` evita dobrar o TETO, mas não detecta produção duplicada. A saída
+seria uma reserva exclusiva por unidade+etapa+ambiente, com transferência explícita. É desenho
+novo, não conserto, e não entra sem o Matheus decidir.

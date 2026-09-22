@@ -61,11 +61,11 @@ describe("o saldo da marca não atravessa os mundos", () => {
   // verdade ouviria "já foram lançadas" por causa de um teste.
   it("só soma sessões do MESMO ambiente da sessão", async () => {
     const tx = {
-      mesSessao: { findMany: vi.fn(async () => [{ id: "s1" }]) },
+      mesSessao: { findMany: vi.fn(async () => [{ id: "s1", planejadoManual: 10, nestingUnidades: [] }]) },
       mesApontamentoQtd: { aggregate: vi.fn(async () => ({ _sum: { boas: 4 } })) },
     };
     const conta = await saldoDaMarca(tx, {
-      planejadoQtd: 10, marca: "T89A10", opId: "op1", ambiente: "DEMO",
+      planejadoQtd: 10, planejadoManual: 10, marca: "T89A10", opId: "op1", ambiente: "DEMO",
     });
     expect(tx.mesSessao.findMany.mock.calls[0][0].where).toMatchObject({ ambiente: "DEMO" });
     expect(conta).toMatchObject({ planejado: 10, boas: 4, saldo: 6 });
@@ -77,9 +77,9 @@ describe("os saldos de várias marcas em duas consultas", () => {
   // `saldoDaMarca` PARA CADA marca aberta. Desde o nesting o posto abre a barra inteira, e com
   // ~30 terminais o dia todo isso deixa de ser custo de tela e vira carga de banco.
   const sessoes = [
-    { id: "s1", marca: "T89A10", opId: "op1", ambiente: "PROD", planejadoQtd: 10 },
-    { id: "s2", marca: "T89A11", opId: "op1", ambiente: "PROD", planejadoQtd: 4 },
-    { id: "s3", marca: "T89A12", opId: "op1", ambiente: "PROD", planejadoQtd: 0 },
+    { id: "s1", marca: "T89A10", opId: "op1", ambiente: "PROD", planejadoQtd: 1, planejadoManual: 10 },
+    { id: "s2", marca: "T89A11", opId: "op1", ambiente: "PROD", planejadoQtd: 4, planejadoManual: 4 },
+    { id: "s3", marca: "T89A12", opId: "op1", ambiente: "PROD", planejadoQtd: 0, planejadoManual: 0 },
   ];
 
   const tx = (irmas, somas) => ({
@@ -107,7 +107,7 @@ describe("os saldos de várias marcas em duas consultas", () => {
 
   // ⚠⚠ O MESMO ISOLAMENTO DO `saldoDaMarca`: sessão de outro mundo não entra na conta.
   it("não soma sessão de outro ambiente", async () => {
-    const irmas = [sessoes[0], { id: "sx", marca: "T89A10", opId: "op1", ambiente: "DEMO" }];
+    const irmas = [sessoes[0], { id: "sx", marca: "T89A10", opId: "op1", ambiente: "DEMO", planejadoManual: 10, nestingUnidades: [] }];
     const contas = await saldosDasMarcas(
       tx(irmas, [{ sessaoId: "sx", _sum: { boas: 99 } }]),
       [sessoes[0]],

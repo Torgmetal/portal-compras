@@ -74,6 +74,16 @@ function comandos(sql) {
   return juntos.map((c) => c.trim()).filter(Boolean);
 }
 
+/**
+ * Colunas acrescentadas DEPOIS que a tabela nasceu.
+ *
+ * ⚠ `planejadoManual` (22/09/2026): o total da marca quando foi DIGITADO, separado do
+ * `planejadoQtd`, que no caminho do nesting é a quantidade da BARRA. Ver o comentário no model.
+ */
+const COLUNAS = [
+  ["MesSessao", "planejadoManual", "DOUBLE PRECISION NOT NULL DEFAULT 0"],
+];
+
 async function main() {
   // ⚠ O cliente do PORTAL, de propósito: este script CRIA o schema `mes`, então não pode depender
   // de uma conexão que já precise dele para funcionar.
@@ -83,6 +93,15 @@ async function main() {
     const lista = comandos(sql);
     for (const cmd of lista) await prisma.$executeRawUnsafe(cmd);
     console.log(`[ensure-mes-proprio] ${lista.length} comando(s) aplicados.`);
+
+    // ⚠⚠ COLUNA NOVA NÃO NASCE DE `CREATE TABLE IF NOT EXISTS` (regra da casa, e a razão de
+    // `scripts/ensure-*.mjs` existirem). Num banco onde a tabela JÁ existe, o create é no-op e a
+    // coluna nunca apareceria — o `schema.sql` acima só serve para banco novo.
+    for (const [tabela, coluna, tipo] of COLUNAS) {
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE mes."${tabela}" ADD COLUMN IF NOT EXISTS "${coluna}" ${tipo}`,
+      );
+    }
 
     // ⚠⚠ A CONFERÊNCIA É O PONTO DO SCRIPT. Sem ela, "rodou sem erro" e "as tabelas existem no
     // schema certo" seriam a mesma frase — e não são.
