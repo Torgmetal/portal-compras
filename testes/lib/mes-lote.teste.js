@@ -27,6 +27,9 @@ function bancoFalso({ eventoAtual = null, abertas = [], loteExistente = null } =
       upsert: vi.fn(async ({ create }) => { eventos.push(create); return create; }),
     },
     mesApontamentoQtd: { aggregate: vi.fn(async () => ({ _sum: { boas: 0 } })) },
+    // ⚠ O evento "fim do trabalho no posto" é do RECURSO, e pega o ambiente dele — não de uma
+    // sessão, que a essa altura já não existe nenhuma (21/09/2026).
+    mesRecurso: { findUnique: vi.fn(async () => ({ ambiente: "PROD" })) },
   };
   const prisma = { $transaction: (fn) => fn(tx), ...tx };
   return { prisma, tx, criadas, eventos };
@@ -41,7 +44,7 @@ const TRABALHOS = [
 describe("abrirLote", () => {
   it("abre todas as marcas da barra de uma vez", async () => {
     const { prisma, criadas } = bancoFalso();
-    const r = await abrirLote(prisma, { recursoId: "r1", operadorId: "op1", trabalhos: TRABALHOS });
+    const r = await abrirLote(prisma, { recursoId: "r1", operadorId: "op1", trabalhos: TRABALHOS, ambiente: "PROD" });
     expect(r.sessoes).toHaveLength(3);
     expect(criadas.map((s) => s.marca)).toEqual(["T107A-P3", "T107A-P12", "T107A-P28"]);
   });
@@ -50,7 +53,7 @@ describe("abrirLote", () => {
   // T97A16 da obra 097 com a da 102, e uma impediria a outra de abrir.
   it("cada sessão nasce com a chave do trabalho, com a obra dentro", async () => {
     const { prisma, criadas } = bancoFalso();
-    await abrirLote(prisma, { recursoId: "r1", trabalhos: [{ marca: "T97A16", opNumero: "097" }] });
+    await abrirLote(prisma, { recursoId: "r1", trabalhos: [{ marca: "T97A16", opNumero: "097" }], ambiente: "PROD" });
     expect(criadas[0].chaveTrabalho).toBe("97|T97A16");
   });
 
@@ -58,7 +61,7 @@ describe("abrirLote", () => {
   // tempo do recurso N vezes; e evento preso a uma sessão faria o monitor ignorar as outras.
   it("grava UM evento, do recurso, não um por marca", async () => {
     const { prisma, eventos } = bancoFalso();
-    await abrirLote(prisma, { recursoId: "r1", trabalhos: TRABALHOS });
+    await abrirLote(prisma, { recursoId: "r1", trabalhos: TRABALHOS, ambiente: "PROD" });
     expect(eventos).toHaveLength(1);
     expect(eventos[0]).toMatchObject({ recursoId: "r1", sessaoId: null, tipo: "PRODUCAO" });
   });
@@ -68,7 +71,7 @@ describe("abrirLote", () => {
   // parada em curso, levando junto o Pareto e a Disponibilidade.
   it("não apaga uma PARADA em curso", async () => {
     const { prisma, eventos } = bancoFalso({ eventoAtual: "PARADA" });
-    const r = await abrirLote(prisma, { recursoId: "r1", trabalhos: TRABALHOS });
+    const r = await abrirLote(prisma, { recursoId: "r1", trabalhos: TRABALHOS, ambiente: "PROD" });
     expect(eventos).toHaveLength(0);
     expect(r.estadoPreservado).toBe("PARADA");
   });
@@ -76,7 +79,7 @@ describe("abrirLote", () => {
   it("também não desfaz MANUTENCAO nem SETUP", async () => {
     for (const estado of ["MANUTENCAO", "SETUP", "FORA_TURNO"]) {
       const { prisma, eventos } = bancoFalso({ eventoAtual: estado });
-      await abrirLote(prisma, { recursoId: "r1", trabalhos: TRABALHOS });
+      await abrirLote(prisma, { recursoId: "r1", trabalhos: TRABALHOS, ambiente: "PROD" });
       expect(eventos).toHaveLength(0);
     }
   });
@@ -84,15 +87,15 @@ describe("abrirLote", () => {
   // ⚠ Reenvio depois de uma resposta perdida não pode abrir o lote duas vezes.
   it("o mesmo lote reenviado devolve o que já existe", async () => {
     const { prisma, criadas } = bancoFalso({ loteExistente: true });
-    const r = await abrirLote(prisma, { recursoId: "r1", trabalhos: TRABALHOS, loteId: "lote-1" });
+    const r = await abrirLote(prisma, { recursoId: "r1", trabalhos: TRABALHOS, loteId: "lote-1", ambiente: "PROD" });
     expect(r.jaExistia).toBe(true);
     expect(criadas).toHaveLength(0);
   });
 
   it("recusa lote sem recurso e lote vazio", async () => {
     const { prisma } = bancoFalso();
-    expect((await abrirLote(prisma, { trabalhos: TRABALHOS })).erro).toMatch(/recurso/i);
-    expect((await abrirLote(prisma, { recursoId: "r1", trabalhos: [] })).erro).toMatch(/Nenhuma marca/);
+    expect((await abrirLote(prisma, { trabalhos: TRABALHOS, ambiente: "PROD" })).erro).toMatch(/recurso/i);
+    expect((await abrirLote(prisma, { recursoId: "r1", trabalhos: [], ambiente: "PROD" })).erro).toMatch(/Nenhuma marca/);
   });
 
   // ⚠⚠ TUDO NUMA TRANSAÇÃO SÓ (pedido do Codex): N chamadas a `abrirSessao` dariam N transações, e
@@ -100,7 +103,7 @@ describe("abrirLote", () => {
   it("abre o lote inteiro numa transação só", async () => {
     const { prisma } = bancoFalso();
     const espia = vi.spyOn(prisma, "$transaction");
-    await abrirLote(prisma, { recursoId: "r1", trabalhos: TRABALHOS });
+    await abrirLote(prisma, { recursoId: "r1", trabalhos: TRABALHOS, ambiente: "PROD" });
     expect(espia).toHaveBeenCalledTimes(1);
   });
 });

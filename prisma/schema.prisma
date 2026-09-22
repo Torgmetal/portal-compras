@@ -6213,7 +6213,10 @@ model MesRecurso {
   /// ⚠⚠ A CHAVE É A DO GANTT, NÃO A DO SYNECO. "SOLDA 5", "MONTAGEM 1", "LASER_CHAPA" — é o que
   /// `PecaConjunto.soldaBancada`/`montagemBancada`/`maquina` já gravam, então é por aqui que o
   /// totem acha o que o PCP programou. O Syneco chamaria esta mesma bancada de "40E".
-  codigo       String   @unique
+  /// ⚠⚠ ÚNICO POR AMBIENTE, NÃO GLOBAL (21/09/2026). Com `@unique` solto, "SOLDA 5" só podia
+  /// existir uma vez no banco inteiro — e DEMO e PROD disputavam a mesma linha, a mesma trava de
+  /// sessão aberta e o mesmo crachá. Ver `@@unique([codigo, ambiente])` no fim do model.
+  codigo       String
   /// Como a fábrica chama: "Wilson Barros", "Jurandir", "Laser Chapa". Vitor batizou as bancadas
   /// com o nome de quem senta nelas — quem distribui trabalho fala em pessoa, não em código.
   nome         String
@@ -6234,6 +6237,7 @@ model MesRecurso {
   presencas    MesPresenca[]
   dispositivos MesDispositivo[]
 
+  @@unique([codigo, ambiente])
   @@index([setorId])
   @@index([ativo])
   @@index([ambiente])
@@ -6242,7 +6246,10 @@ model MesRecurso {
 
 model MesOperador {
   id            String   @id @default(cuid())
-  cracha        String   @unique // o que o leitor bipa
+  /// ⚠⚠ ÚNICO POR AMBIENTE — mesmo motivo do código do recurso. Global, o mesmo crachá não podia
+  /// existir no laboratório e na fábrica, e a trava "um crachá ativo por vez" era compartilhada:
+  /// simular a entrada de um operador o expulsaria do posto real.
+  cracha        String // o que o leitor bipa
   nome          String // desnormalizado: o histórico não pode mudar se o cadastro mudar
   funcionarioId String? // -> Funcionario.id (sem FK, ver cabeçalho)
   ativo         Boolean  @default(true)
@@ -6254,6 +6261,7 @@ model MesOperador {
   eventos   MesEvento[]
   presencas MesPresenca[]
 
+  @@unique([cracha, ambiente])
   @@index([ativo])
   @@index([funcionarioId])
 }

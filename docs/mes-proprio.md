@@ -89,6 +89,54 @@ juntos. Fila durável, lote limitado, recuo com jitter.
 3 validar · 4 laboratório novo (`public` + `mes`) · 5 rodar o ensure DUAS vezes ·
 6 validar no dev apontado ao laboratório · 7 push, cadastro pela tela.
 
+### Passo 2 — parte 1 feita: o isolamento DEMO × PROD (21/09/2026)
+
+Matheus decidiu: **separados**. Ele vai simular o operador em postos que já estão produzindo de
+verdade enquanto o Syneco segue como sistema oficial.
+
+⚠⚠ **O MODO SOMBRA EXISTIA NO SCHEMA E NÃO ISOLAVA NADA.** `ambiente` estava declarado em 8 models
+de fato, mas **nenhuma rota o passava**: todas as funções de `lib/mes/*` tinham `ambiente = "PROD"`
+como default de parâmetro e ninguém sobrescrevia; uma delas gravava `ambiente: "PROD"` literal.
+
+**A fronteira é o RECURSO** (`lib/mes/ambiente.js`). A requisição **seleciona** o recurso
+(`?ambiente=DEMO` + código); ela nunca **carimba** o ambiente do fato. Deixar a requisição carimbar
+faria o mesmo recurso receber fato dos dois mundos, e as travas parciais — que são por `recursoId` —
+voltariam a ser compartilhadas.
+
+| O que mudou | Por quê |
+|---|---|
+| `MesRecurso`: `codigo @unique` → `@@unique([codigo, ambiente])` | "SOLDA 5" só podia existir uma vez no banco inteiro |
+| `MesOperador`: `cracha @unique` → `@@unique([cracha, ambiente])` | simular a entrada de um operador o expulsaria do posto real |
+| `lib/mes/*`: acabou o default `"PROD"` | quem grava fato diz de qual mundo ele é, ou toma recusa |
+| `saldo.js` e `programado.js` filtram por ambiente | **ver abaixo** |
+| Totem confere sessão, nesting e crachá | id de um mundo não entra em comando do outro |
+
+⚠⚠ **OS ÍNDICES PARCIAIS CONTINUAM COMO ESTÃO, E ISSO É DE PROPÓSITO.** `MesSessao_recurso_trabalho_aberta_key`
+e `MesPresenca_operador_ativa_key` chaveiam por `recursoId`/`operadorId` — e um recurso DEMO é uma
+LINHA diferente, com id diferente. Pôr `ambiente` neles não corrigiria vínculo errado e ainda
+permitiria duas presenças abertas para o mesmo `operadorId` com rótulos diferentes (Codex).
+
+⚠⚠ **DOIS VAZAMENTOS DE ALTA QUE O RACIOCÍNIO "O ID JÁ CARREGA O MUNDO" NÃO COBRIA** (achados do
+Codex): `saldoDaMarca` e `produzidoPorMarca` casam por obra+**MARCA**, que são strings, não por
+recurso. Uma simulação lançando 10 peças de T89A10 consumiria o saldo real, e o operador de verdade
+ouviria "já foram lançadas" por causa de um teste.
+
+⚠⚠ **CRIAR O ÍNDICE COMPOSTO NÃO DERRUBA A UNICIDADE ANTIGA.** `identificadoresPorAmbiente` em
+`scripts/ensure-mes-tables.mjs` cria o composto, **depois** dropa a constraint global e **confere a
+definição** (não só o nome). E, ao contrário do vizinho, **não engole falha**: só a tabela ausente é
+tolerada — transição pela metade não pode ser declarada bem-sucedida.
+
+⚠ `MesSetor` e `MesMotivoParada` seguem **compartilhados**: a cadeia física da fábrica e o catálogo
+de paradas são um só. O Codex avisou que mudar `ordem` ou desativar setor pelo laboratório
+interfere nos dois mundos — se testar isso virar necessidade, esses catálogos se separam depois.
+
+⚠ **Não validei em tela.** As tabelas do MES **não existem em produção** (`P2021`, conferido em
+21/09) e o dev local aponta para lá. A prova está nos 2.655 testes; a validação de tela só sai no
+laboratório, que é o passo 4.
+
+**Falta do passo 2:** cliente Prisma próprio, `MesAuditoria`, e o desempenho (matar o `4 + 2N` do
+GET do totem e criar índice em `*DiaProgramado`).
+
 **← RETOMA-SE NO PASSO 2.** O passo 1 está feito na branch `matheus/mes-subir`:
 main trazida (184 commits, 2 conflitos), `prisma validate` limpo, **2.647 testes passando**,
 eslint 0 erros.

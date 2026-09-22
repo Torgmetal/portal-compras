@@ -13,6 +13,7 @@
 // cobre PÁGINA, não API — por isso `requireRole` aqui também (§7.4, pedido do Codex).
 
 import { NextResponse } from "next/server";
+import { ambientePedido } from "@/lib/mes/ambiente";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { lerPlano } from "@/lib/mes/nesting/ler-arquivos";
@@ -27,10 +28,16 @@ const erroDeAcesso = (e) =>
   NextResponse.json({ success: false, error: e.message },
     { status: e.message === "Unauthorized" ? 401 : 403 });
 
-export async function GET() {
+export async function GET(req) {
   try { await requireRole(["ADMIN"]); } catch (e) { return erroDeAcesso(e); }
 
+  // ⚠ A listagem também é por mundo (achado do Codex, 21/09/2026): sem filtro, o laboratório via
+  // os planos reais na mesma lista e podia abrir um deles num posto de teste.
+  const ambiente = ambientePedido(new URL(req.url).searchParams.get("ambiente"));
+  if (!ambiente) return erro("Ambiente inválido — use PROD ou DEMO.");
+
   const planos = await prisma.mesNesting.findMany({
+    where: { ambiente },
     orderBy: { createdAt: "desc" },
     take: 50,
     include: { unidades: { select: { id: true, indice: true, pecas: true }, orderBy: { indice: "asc" } } },
@@ -52,6 +59,12 @@ export async function POST(req) {
   }
   if (!arquivos.length) return erro("Mande os arquivos do plano.");
 
+  // ⚠⚠ O NESTING É IMPORTADO POR TELA, SEM PASSAR POR RECURSO NENHUM (achado do Codex,
+  // 21/09/2026) — é a porta pela qual um plano de um mundo entraria no outro. Por isso ele
+  // carrega ambiente explícito, e o totem confere antes de abrir a barra.
+  const ambiente = ambientePedido(new URL(req.url).searchParams.get("ambiente"));
+  if (!ambiente) return erro("Ambiente inválido — use PROD ou DEMO.");
+
   const lido = await lerPlano(arquivos);
   if (lido.erro) return erro(lido.erro);
 
@@ -63,7 +76,7 @@ export async function POST(req) {
   if (new URL(req.url).searchParams.get("gravar") !== "1") {
     return NextResponse.json({ success: true, previa });
   }
-  return gravar(lido, unidades, pendentes, sessao);
+  return gravar(lido, unidades, pendentes, sessao, ambiente);
 }
 
 /**
@@ -79,11 +92,13 @@ async function casarNoBanco(marcas, opNumero) {
   return casarComOPortal(marcas, pecas, opNumero);
 }
 
-async function gravar(lido, unidades, pendentes, sessao) {
+async function gravar(lido, unidades, pendentes, sessao, ambiente) {
   // ⚠⚠ REPLANO É PLANO NOVO, E O HASH É QUEM DIZ (§12.3). O mesmo nome com conteúdo diferente não
   // pode sobrescrever o anterior em silêncio; o mesmo conteúdo não pode entrar duas vezes.
   const jaExiste = await prisma.mesNesting.findFirst({
-    where: { hashRelatorio: lido.hashRelatorio, ambiente: "PROD" },
+    // ⚠ A deduplicação é DENTRO do mundo: o mesmo plano pode ser importado no laboratório sem
+    // bloquear a importação real, e vice-versa (`@@unique([hashRelatorio, ambiente])`).
+    where: { hashRelatorio: lido.hashRelatorio, ambiente },
     select: { id: true, nome: true, createdAt: true },
   });
   if (jaExiste) {
@@ -96,7 +111,7 @@ async function gravar(lido, unidades, pendentes, sessao) {
       descricao: lido.descricao ?? null, material: lido.material ?? null,
       espessuraMm: lido.espessuraMm ?? null, opNumero: lido.opNumero ?? null,
       arquivoRelatorio: lido.arquivoRelatorio, arquivoMaquina: lido.arquivoMaquina,
-      hashRelatorio: lido.hashRelatorio, hashMaquina: lido.hashMaquina,
+      hashRelatorio: lido.hashRelatorio, hashMaquina: lido.hashMaquina, ambiente,
       // O recibo do que foi mostrado na prévia — congelado, não recalculado depois.
       divergencias: { avisos: lido.divergencias || [], pendentes },
       criadoPor: sessao?.user?.email ?? null,

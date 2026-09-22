@@ -274,7 +274,7 @@ describe("abrirSessao", () => {
   it("devolve a sessão que já está aberta no recurso, sem criar outra", async () => {
     const { prisma, tx } = prismaFalso();
     tx.mesSessao.findFirst.mockResolvedValue(ABERTA);
-    const r = await abrirSessao(prisma, { recursoId: "r1" });
+    const r = await abrirSessao(prisma, { recursoId: "r1", ambiente: "PROD" });
     expect(r.jaExistia).toBe(true);
     expect(r.sessao.id).toBe("s1");
     expect(tx.mesSessao.create).not.toHaveBeenCalled();
@@ -282,7 +282,7 @@ describe("abrirSessao", () => {
 
   it("abre a primeira sessão já em PRODUÇÃO — o operador foi ao totem para produzir", async () => {
     const { prisma, tx } = prismaFalso();
-    const r = await abrirSessao(prisma, { recursoId: "r1", marca: "T102A1" });
+    const r = await abrirSessao(prisma, { recursoId: "r1", marca: "T102A1", ambiente: "PROD" });
     expect(r.jaExistia).toBe(false);
     expect(r.sessao.status).toBe(STATUS.ABERTA);
     expect(tx.mesEvento.create.mock.calls[0][0].data.tipo).toBe(ESTADO.PRODUCAO);

@@ -12,6 +12,7 @@
 // PÁGINA, não API — por isso `requireRole` aqui também (§7.4, pedido do Codex).
 
 import { NextResponse } from "next/server";
+import { ambientePedido } from "@/lib/mes/ambiente";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import {
@@ -60,10 +61,14 @@ const CAMPOS = {
     codigo: normalizarCodigo(d.codigo), nome: String(d.nome).trim(),
     ordem: Number(d.ordem), cor: d.cor || null, ativo: d.ativo !== false,
   }),
+  // ⚠⚠ `ambiente` entra no cadastro porque é ele que separa os dois mundos: o mesmo "SOLDA 5"
+  // pode existir em PROD e em DEMO (`@@unique([codigo, ambiente])`), e é a linha — não o código —
+  // que carrega a trava de sessão aberta. Ver `lib/mes/ambiente.js`.
   recursos: (d) => ({
     codigo: normalizarCodigo(d.codigo), nome: String(d.nome).trim(), setorId: d.setorId,
     tipo: d.tipo || "MAQUINA", codigoSyneco: d.codigoSyneco?.trim() || null,
     temTerminal: d.temTerminal !== false, ativo: d.ativo !== false,
+    ambiente: ambientePedido(d.ambiente),
   }),
   motivos: (d) => ({
     codigo: normalizarCodigo(d.codigo), descricao: String(d.descricao).trim(),
@@ -71,6 +76,7 @@ const CAMPOS = {
   }),
   operadores: (d) => ({
     cracha: String(d.cracha).trim(), nome: String(d.nome).trim(), ativo: d.ativo !== false,
+    ambiente: ambientePedido(d.ambiente),
   }),
 };
 
@@ -98,7 +104,14 @@ export async function GET(req) {
   const tipo = new URL(req.url).searchParams.get("tipo") || "recursos";
   if (!ehEntidade(tipo)) return erro(`Cadastro desconhecido: ${tipo}`);
 
+  // ⚠ Recurso e operador são POR MUNDO; setor e motivo são catálogo comum da fábrica (a cadeia
+  // física e as paradas são uma só) — por isso o filtro só se aplica aos dois primeiros.
+  const ambiente = ambientePedido(new URL(req.url).searchParams.get("ambiente"));
+  if (!ambiente) return erro("Ambiente inválido — use PROD ou DEMO.");
+  const porAmbiente = tipo === "recursos" || tipo === "operadores" ? { where: { ambiente } } : {};
+
   const lista = await MODELO[tipo]().findMany({
+    ...porAmbiente,
     orderBy: ORDEM[tipo],
     ...(tipo === "recursos" ? { include: { setor: { select: { codigo: true, nome: true } } } } : {}),
   });
@@ -125,6 +138,10 @@ export async function POST(req) {
 
   const recusa = recusaDoCadastro(tipo, corpo);
   if (recusa) return erro(recusa);
+
+  // ⚠ Antes de `CAMPOS`, porque `ambientePedido` devolve `null` no valor fora do domínio — e null
+  // numa coluna NOT NULL vira 500 em vez da recusa que a pessoa precisa ler.
+  if (!ambientePedido(corpo.ambiente)) return erro("Ambiente inválido — use PROD ou DEMO.");
 
   try {
     const criado = await MODELO[tipo]().create({ data: CAMPOS[tipo](corpo) });

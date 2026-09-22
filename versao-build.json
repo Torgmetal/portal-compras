@@ -1,7 +1,12 @@
 {
-  "build": 3324,
-  "gerado": "2026-09-21T16:58:31.469Z",
+  "build": 3325,
+  "gerado": "2026-09-22T01:26:47.459Z",
   "commits": [
+    {
+      "hash": "7d6b0df1bb",
+      "data": "21/09/2026",
+      "titulo": "Registra o plano de subida do MES e o que foi medido"
+    },
     {
       "hash": "7f65b9f4e4",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7521e51164",
       "data": "17/09/2026",
       "titulo": "Conferência finalizada manda a planilha ao PCP, com peso e observações por marca"
-    },
-    {
-      "hash": "b19909227a",
-      "data": "17/09/2026",
-      "titulo": "feat: PIT compacto com seletor e anexos do cliente restritos"
     }
   ]
 }

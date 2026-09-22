@@ -53,7 +53,7 @@ const presencaEm = (recursoId, id = "p-0", operadorId = "op-jurandir") => ({ id,
 describe("entrar no posto", () => {
   it("sem vínculo nenhum, o crachá entra", async () => {
     const { prisma, estado } = bancoFalso();
-    const r = await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: LASER.id });
+    const r = await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: LASER.id, ambiente: "PROD" });
     expect(r.erro).toBeUndefined();
     expect(r.jaEstava).toBe(false);
     expect(estado.presencas).toHaveLength(1);
@@ -62,7 +62,7 @@ describe("entrar no posto", () => {
   // ⚠ Bipar de novo no mesmo posto é o gesto natural (o operador volta do almoço), não um erro.
   it("bipar de novo no mesmo posto devolve o mesmo vínculo, sem criar outro", async () => {
     const { prisma, tx } = bancoFalso({ presencas: [presencaEm(LASER.id)] });
-    const r = await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: LASER.id });
+    const r = await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: LASER.id, ambiente: "PROD" });
     expect(r.jaEstava).toBe(true);
     expect(tx.mesPresenca.create).not.toHaveBeenCalled();
   });
@@ -70,7 +70,7 @@ describe("entrar no posto", () => {
   // ⚠⚠ O PEDIDO, EM UMA LINHA.
   it("com marca aberta em outro posto, recusa — e diz onde e quantas", async () => {
     const { prisma } = bancoFalso({ presencas: [presencaEm(LASER.id)], sessoesAbertas: { [LASER.id]: 6 } });
-    const r = await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: SOLDA.id });
+    const r = await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: SOLDA.id, ambiente: "PROD" });
     expect(r.erro).toContain("Laser Cantoneira");
     expect(r.erro).toContain("6 marca(s)");
     expect(r.ocupadoEm).toEqual({ codigo: LASER.codigo, nome: LASER.nome, marcas: 6 });
@@ -80,7 +80,7 @@ describe("entrar no posto", () => {
   // no dia seguinte, e o conserto exigiria voltar fisicamente até lá.
   it("posto antigo sem marca nenhuma libera sozinho e o crachá entra no novo", async () => {
     const { prisma, estado } = bancoFalso({ presencas: [presencaEm(LASER.id)], sessoesAbertas: { [LASER.id]: 0 } });
-    const r = await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: SOLDA.id });
+    const r = await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: SOLDA.id, ambiente: "PROD" });
     expect(r.erro).toBeUndefined();
     expect(r.liberou).toBe("Laser Cantoneira");
     expect(estado.presencas[0]).toMatchObject({ status: "ENCERRADA", motivoFim: "posto ocioso" });
@@ -227,7 +227,7 @@ describe("a transferência trava o posto de origem", () => {
       // num tagged template, a[0] são os pedaços de SQL e a[1] em diante os valores
       $transaction: (fn) => fn({ ...base.tx, $executeRaw: (...a) => pedidos.push(a[1]) }),
     };
-    await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: SOLDA.id });
+    await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: SOLDA.id, ambiente: "PROD" });
 
     expect(pedidos).toContain(idDaChave(LASER.id));                        // a ORIGEM
     expect(pedidos).toContain(idDaChave(SOLDA.id));                        // o destino
@@ -258,7 +258,7 @@ describe("a transferência trava o posto de origem", () => {
         mesSessao: { count: async () => 0 },
       }),
     };
-    const r = await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: "r-terceiro" });
+    const r = await entrarNoPosto(prisma, { operadorId: "op-jurandir", recursoId: "r-terceiro", ambiente: "PROD" });
     expect(r.erro).toContain("Bipe de novo");
   });
 });

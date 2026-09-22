@@ -7,6 +7,7 @@
 // mais sabe de nada.
 
 import { NextResponse } from "next/server";
+import { ambientePedido, divergenciaDeAmbiente } from "@/lib/mes/ambiente";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { programadoPara } from "@/lib/mes/programado";
@@ -30,15 +31,24 @@ export async function GET(req, { params }) {
   const codigo = searchParams.get("recurso");
   if (!codigo) return erro("Diga em qual máquina este plano vai rodar.");
 
+  // ⚠ O código da máquina deixou de identificar sozinho: "SOLDA 5" existe em PROD e em DEMO
+  // (`@@unique([codigo, ambiente])`). Ver `lib/mes/ambiente.js`.
+  const ambiente = ambientePedido(searchParams.get("ambiente"));
+  if (!ambiente) return erro("Ambiente inválido — use PROD ou DEMO.");
+
   const [plano, recurso] = await Promise.all([
     prisma.mesNesting.findUnique({
       where: { id },
       include: { unidades: { include: { itens: true }, orderBy: { indice: "asc" } } },
     }),
-    prisma.mesRecurso.findUnique({ where: { codigo }, include: { setor: true } }),
+    prisma.mesRecurso.findUnique({ where: { codigo_ambiente: { codigo, ambiente } }, include: { setor: true } }),
   ]);
   if (!plano) return erro("Plano não encontrado.", 404);
-  if (!recurso) return erro("Máquina não encontrada.", 404);
+  if (!recurso) return erro("Máquina não encontrada neste ambiente.", 404);
+  // ⚠ Simular um plano real numa máquina de teste (ou o contrário) daria um Gantt que não
+  // corresponde a nada — e ele é o que decide a ordem de corte.
+  const cruzado = divergenciaDeAmbiente(ambiente, [{ rotulo: "Este plano", entidade: plano }]);
+  if (cruzado) return erro(cruzado, 409);
 
   const dia = searchParams.get("dia") ? new Date(`${searchParams.get("dia")}T12:00:00`) : new Date();
   const programado = await programadoPara(prisma, recurso, dia);

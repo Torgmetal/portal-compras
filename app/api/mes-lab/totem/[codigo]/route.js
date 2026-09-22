@@ -13,6 +13,7 @@
 // (§7.4): "o gate precisa cobrir API, tempo real e exportação, não só a página".
 
 import { NextResponse } from "next/server";
+import { ambientePedido, divergenciaDeAmbiente } from "@/lib/mes/ambiente";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { abrirSessao, apontarQuantidade, encerrarSessao, mudarEstado, estadoDoRecurso, saldoDaMarca, ESTADO } from "@/lib/mes/sessao";
@@ -30,14 +31,54 @@ const erroDeAcesso = (e) =>
     { status: e.message === "Unauthorized" ? 401 : 403 });
 const erro = (msg, status = 400) => NextResponse.json({ success: false, error: msg }, { status });
 
-const recursoPorCodigo = (codigo) =>
-  prisma.mesRecurso.findUnique({ where: { codigo: decodeURIComponent(codigo) }, include: { setor: true } });
+/**
+ * O POSTO DESTE TERMINAL — e o mundo dele.
+ *
+ * ⚠⚠ O CÓDIGO SOZINHO DEIXOU DE IDENTIFICAR O RECURSO (21/09/2026). Desde que "SOLDA 5" pode
+ * existir em PROD e em DEMO, `findUnique({ codigo })` é ambíguo. O ambiente vem da URL
+ * (`?ambiente=DEMO`) e SELECIONA o recurso — nunca carimba o ambiente do fato (achado do Codex):
+ * quem diz de que mundo é o apontamento é o posto, não a requisição.
+ */
+const recursoPorCodigo = (codigo, ambiente) =>
+  prisma.mesRecurso.findUnique({
+    where: { codigo_ambiente: { codigo: decodeURIComponent(codigo), ambiente } },
+    include: { setor: true },
+  });
+
+/**
+ * A SESSÃO DO COMANDO É DESTE POSTO? — a recusa pronta, ou `null`.
+ *
+ * ⚠⚠ ACHADO DO CODEX (21/09/2026). `apontar`, `parar`, `produzir` e `encerrar` recebem um
+ * `sessaoId` do CORPO, e as libs herdam o ambiente da SESSÃO. Sem esta conferência, o totem de um
+ * mundo comandaria a sessão do outro — e o fato sairia carimbado corretamente, o que é pior:
+ * ninguém veria.
+ */
+async function sessaoDeOutroPosto(sessaoId, recurso, ambiente) {
+  if (!sessaoId) return null;
+  const dona = await prisma.mesSessao.findUnique({
+    where: { id: sessaoId }, select: { recursoId: true, ambiente: true },
+  });
+  if (!dona) return erro("Sessão não encontrada.", 404);
+  if (dona.recursoId !== recurso.id) return erro("Esta sessão é de outro posto.", 409);
+  const cruzada = divergenciaDeAmbiente(ambiente, [{ rotulo: "Esta sessão", entidade: dona }]);
+  return cruzada ? erro(cruzada, 409) : null;
+}
+
+/** O recurso e o ambiente pedido, ou a recusa pronta. */
+async function postoDaRequisicao(req, params) {
+  const ambiente = ambientePedido(new URL(req.url).searchParams.get("ambiente"));
+  if (!ambiente) return { erro: erro("Ambiente inválido — use PROD ou DEMO.") };
+  const recurso = await recursoPorCodigo(params.codigo, ambiente);
+  if (!recurso) return { erro: erro(`Recurso não encontrado neste ambiente (${ambiente}).`, 404) };
+  return { recurso, ambiente };
+}
 
 export async function GET(req, { params }) {
   try { await requireRole(PERFIS); } catch (e) { return erroDeAcesso(e); }
 
-  const recurso = await recursoPorCodigo(params.codigo);
-  if (!recurso) return erro("Recurso não encontrado.", 404);
+  const posto = await postoDaRequisicao(req, params);
+  if (posto.erro) return posto.erro;
+  const { recurso } = posto;
 
   const buscar = new URL(req.url).searchParams.get("buscar");
   if (buscar) return NextResponse.json({ success: true, marcas: await acharMarca(prisma, buscar) });
@@ -140,11 +181,16 @@ async function planosDoPosto(recurso) {
   }));
 }
 
-/** O crachá é a porta de entrada: sem operador reconhecido, nada acontece. */
-async function operadorDoCracha(cracha) {
+/**
+ * O crachá é a porta de entrada: sem operador reconhecido, nada acontece.
+ *
+ * ⚠ O crachá é único POR AMBIENTE, então o mesmo número pode existir nos dois mundos — e quem
+ * decide qual deles é o posto, não quem bipou. Ver `lib/mes/ambiente.js`.
+ */
+async function operadorDoCracha(cracha, ambiente) {
   const limpo = String(cracha ?? "").trim();
   if (!limpo) return { erro: "Bipe ou digite o crachá." };
-  const operador = await prisma.mesOperador.findUnique({ where: { cracha: limpo } });
+  const operador = await prisma.mesOperador.findUnique({ where: { cracha_ambiente: { cracha: limpo, ambiente } } });
   if (!operador || !operador.ativo) return { erro: `Crachá ${limpo} não encontrado.` };
   return { operador };
 }
@@ -184,8 +230,9 @@ const ACOES = {
    *
    * ⚠ Não encerra marca nem grava evento: a barra não para porque o turno virou.
    */
-  async entregarPosto({ corpo, recurso, operador, presenca, usuario }) {
-    const quemAssume = await prisma.mesOperador.findUnique({ where: { cracha: String(corpo.crachaAlvo || "").trim() } });
+  async entregarPosto({ corpo, recurso, operador, presenca, usuario, ambiente }) {
+    // ⚠ Quem assume tem de ser do MESMO mundo do posto — o crachá é único por ambiente.
+    const quemAssume = await prisma.mesOperador.findUnique({ where: { cracha_ambiente: { cracha: String(corpo.crachaAlvo || "").trim(), ambiente } } });
     if (!quemAssume || !quemAssume.ativo) return { erro: `Crachá ${corpo.crachaAlvo} não encontrado.` };
     // ⚠ Quem executa a ENTREGA é quem sai — e é o contexto dele que o porteiro confere.
     // A trilha vai junto, dentro da mesma transação da passagem — ver `carimbarNaTx`.
@@ -222,15 +269,15 @@ const ACOES = {
    * que ninguém viveu no chão de fábrica envenena o OEE com tempo que não existiu (pedido do
    * Codex). O trabalho segue aberto onde está, para quem estiver lá resolver.
    */
-  async liberarCracha({ corpo, operador }) {
-    const alvo = await prisma.mesOperador.findUnique({ where: { cracha: String(corpo.crachaAlvo || "").trim() } });
+  async liberarCracha({ corpo, operador, ambiente }) {
+    const alvo = await prisma.mesOperador.findUnique({ where: { cracha_ambiente: { cracha: String(corpo.crachaAlvo || "").trim(), ambiente } } });
     if (!alvo) return { erro: `Crachá ${corpo.crachaAlvo} não encontrado.` };
     return liberarPresenca(prisma, { operadorId: alvo.id, porQuem: operador.nome });
   },
 
-  async abrir({ corpo, recurso, operador , presenca }) {
+  async abrir({ corpo, recurso, operador , presenca, ambiente }) {
     return abrirSessao(prisma, {
-      presenca, recursoId: recurso.id, operadorId: operador.id,
+      presenca, recursoId: recurso.id, operadorId: operador.id, ambiente,
       opId: corpo.opId ?? null, opNumero: corpo.opNumero ?? null,
       marca: corpo.marca ?? null, operacao: recurso.setor.codigo,
       planejadoQtd: corpo.planejadoQtd,
@@ -268,16 +315,21 @@ const ACOES = {
    * abrir todas as marcas e iniciar a produção delas sem que o operador precise abrir uma por
    * uma"*. O que chega é a BARRA (ou a chapa); o que abre são as marcas dela.
    */
-  async abrirNesting({ corpo, recurso, operador , presenca }) {
+  async abrirNesting({ corpo, recurso, operador , presenca, ambiente }) {
     const unidade = await prisma.mesNestingUnidade.findUnique({
       where: { id: corpo.unidadeId },
-      include: { itens: true, nesting: { select: { nome: true, opNumero: true } } },
+      // ⚠ `ambiente` do plano entra no select: o nesting é importado por tela, sem passar por
+      // recurso nenhum, então ele é a porta pela qual um plano de um mundo entraria no outro
+      // (achado do Codex, 21/09/2026).
+      include: { itens: true, nesting: { select: { nome: true, opNumero: true, ambiente: true } } },
     });
     if (!unidade) return { erro: "Barra/chapa não encontrada." };
     if (!unidade.itens.length) return { erro: "Esta barra não tem marca nenhuma." };
+    const cruzado = divergenciaDeAmbiente(ambiente, [{ rotulo: "Este plano de nesting", entidade: unidade.nesting }]);
+    if (cruzado) return { erro: cruzado };
 
     const r = await abrirLote(prisma, {
-      presenca, recursoId: recurso.id, operadorId: operador.id, nestingUnidadeId: unidade.id,
+      presenca, recursoId: recurso.id, operadorId: operador.id, nestingUnidadeId: unidade.id, ambiente,
       loteId: corpo.chaveOperacao || null,
       trabalhos: unidade.itens.map((i) => ({
         marca: i.marca,
@@ -307,10 +359,12 @@ export async function POST(req, { params }) {
   const executar = ACOES[corpo?.acao];
   if (!executar) return erro(`Ação desconhecida: ${corpo?.acao}`);
 
-  const recurso = await recursoPorCodigo(params.codigo);
-  if (!recurso) return erro("Recurso não encontrado.", 404);
+  const { recurso, ambiente, erro: semPosto } = await postoDaRequisicao(req, params);
+  if (semPosto) return semPosto;
 
-  const { operador, erro: semCracha } = await operadorDoCracha(corpo.cracha);
+  // ⚠ O operador é buscado DENTRO do ambiente do posto — o crachá é único por ambiente, então o
+  // mesmo número pode existir nos dois mundos e quem desempata é o posto, não quem bipou.
+  const { operador, erro: semCracha } = await operadorDoCracha(corpo.cracha, ambiente);
   if (semCracha) return erro(semCracha, 403);
 
   // ⚠⚠ O CONTEXTO DE PRESENÇA VAI EM TODA AÇÃO, não só na entrada. O totem guarda o crachá em
@@ -324,7 +378,10 @@ export async function POST(req, { params }) {
   // tende a não mandar. Scripts e importações usam as libs sem contexto de presença, que é um
   // caminho explícito e não se confunde com um comando de gente.
   const presenca = { operadorId: operador.id, presencaId: corpo.presencaId ?? null, exigirId: true };
-  const r = await executar({ corpo, recurso, operador, presenca, usuario });
+  const forasteira = await sessaoDeOutroPosto(corpo.sessaoId, recurso, ambiente);
+  if (forasteira) return forasteira;
+
+  const r = await executar({ corpo, recurso, operador, presenca, usuario, ambiente });
   if (r?.erro) return erro(r.erro, 409);
   return NextResponse.json({ success: true, ...r, operador: { id: operador.id, nome: operador.nome, cracha: operador.cracha } });
 }

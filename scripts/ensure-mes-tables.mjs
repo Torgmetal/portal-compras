@@ -858,6 +858,7 @@ async function main() {
 
   await travaDoTrabalhoNoRecurso(prisma);
   await travaDoCrachaAtivo(prisma);
+  await identificadoresPorAmbiente(prisma);
 
   // Após criar as tabelas, garante o event trigger de proteção
   await ensureEventTrigger(prisma);
@@ -972,6 +973,60 @@ async function criarTabelasDoAgente(prisma, faltando) {
  * ⚠ Tolerante à tabela não existir: em produção `MesPresenca` ainda não foi criada (o MES próprio
  * roda por enquanto só no banco de laboratório) e este script é chamado no build.
  */
+/**
+ * O CÓDIGO DO POSTO E O CRACHÁ PASSAM A SER ÚNICOS **POR AMBIENTE**.
+ *
+ * ⚠⚠ ENQUANTO O ÚNICO GLOBAL EXISTIR, O ISOLAMENTO NÃO EXISTE (achado do Codex, 21/09/2026).
+ * Criar o índice composto NÃO derruba a unicidade antiga: "SOLDA 5" continuaria podendo existir
+ * uma vez só no banco inteiro, e o laboratório seguiria disputando a linha — e portanto a trava de
+ * sessão aberta e a de crachá ativo — com a fábrica. A retirada do índice velho é ETAPA EXPLÍCITA.
+ *
+ * ⚠⚠ E ESTA FUNÇÃO NÃO ENGOLE FALHA (pedido do Codex). O padrão do vizinho `travaDoTrabalhoNoRecurso`
+ * — `.then(ok, e => console.warn(...))` — transforma erro em aviso, e uma transição pela metade
+ * (composto criado, global de pé) seria declarada bem-sucedida. Aqui só a TABELA AUSENTE é tolerada
+ * (em produção as tabelas do MES ainda não nasceram e este script roda no build); o resto sobe.
+ *
+ * ⚠ Duplicidade pré-existente impede o índice de nascer. A mensagem diz qual tabela, porque o
+ * conserto é apagar a linha duplicada do laboratório, não repetir o comando.
+ */
+async function identificadoresPorAmbiente(prisma) {
+  const passos = [
+    { tabela: "MesRecurso", coluna: "codigo", antigo: "MesRecurso_codigo_key", novo: "MesRecurso_codigo_ambiente_key" },
+    { tabela: "MesOperador", coluna: "cracha", antigo: "MesOperador_cracha_key", novo: "MesOperador_cracha_ambiente_key" },
+  ];
+  for (const p of passos) {
+    try {
+      // 1. o composto nasce ANTES de o global cair: entre os dois comandos não pode existir
+      //    janela em que nada garante a unicidade.
+      await prisma.$executeRawUnsafe(
+        `CREATE UNIQUE INDEX IF NOT EXISTS "${p.novo}" ON "${p.tabela}"("${p.coluna}", "ambiente")`,
+      );
+      // 2. e só então a unicidade global sai — `DROP CONSTRAINT` porque o Prisma a cria como
+      //    constraint, e `DROP INDEX` sozinho não remove constraint.
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE "${p.tabela}" DROP CONSTRAINT IF EXISTS "${p.antigo}"`,
+      );
+      await prisma.$executeRawUnsafe(`DROP INDEX IF EXISTS "${p.antigo}"`);
+      // 3. conferir a DEFINIÇÃO, não o nome (pedido do Codex): índice com o nome certo e as
+      //    colunas erradas passaria despercebido.
+      const [conf] = await prisma.$queryRawUnsafe(
+        `SELECT indexdef FROM pg_indexes WHERE tablename = $1 AND indexname = $2`, p.tabela, p.novo,
+      );
+      const def = String(conf?.indexdef || "");
+      if (!def.includes(p.coluna) || !def.includes("ambiente")) {
+        throw new Error(`índice "${p.novo}" não ficou com (${p.coluna}, ambiente): ${def || "não existe"}`);
+      }
+      console.log(`[ensure-mes-tables] OK — ${p.tabela}.${p.coluna} agora é único por ambiente.`);
+    } catch (e) {
+      if (e.code === "42P01" || new RegExp(`relation[^\n]*${p.tabela}[^\n]*(does not exist|não existe)`, "i").test(e.message)) {
+        console.log(`[ensure-mes-tables] ${p.tabela} ainda não existe aqui — chave por ambiente adiada.`);
+        continue;
+      }
+      throw new Error(`[ensure-mes-tables] ${p.tabela}: ${e.message}`);
+    }
+  }
+}
+
 async function travaDoCrachaAtivo(prisma) {
   await prisma.$executeRawUnsafe(`
     CREATE UNIQUE INDEX IF NOT EXISTS "MesPresenca_operador_ativa_key"
