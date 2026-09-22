@@ -1,7 +1,12 @@
 {
-  "build": 3389,
-  "gerado": "2026-09-22T17:01:34.148Z",
+  "build": 3390,
+  "gerado": "2026-09-22T17:09:03.093Z",
   "commits": [
+    {
+      "hash": "e6e684f662",
+      "data": "22/09/2026",
+      "titulo": "Cotação: converter a unidade em que o fornecedor cotou"
+    },
     {
       "hash": "631f70bd36",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e36e035fe8",
       "data": "21/09/2026",
       "titulo": "MES: o teto da marca passa a ser derivado das barras, não da sessão"
-    },
-    {
-      "hash": "b72f5c5953",
-      "data": "21/09/2026",
-      "titulo": "MES: os cinco achados da revisão — saldo por etapa, teto do nesting, encerramento e ambiente nas telas"
     }
   ]
 }
