@@ -1692,9 +1692,14 @@ sessão e evento, `MesRecurso` é apontado por **presença, dispositivo e reserv
 dessas FKs tem cascade. Um posto onde alguém só bipou o crachá passava por "nunca usado": o `delete`
 estourava violação de chave estrangeira, e quem estava na tela via erro de banco no lugar da frase
 que explica o que fazer. A conta virou `usosDoCadastro` (`lib/mes/cadastro.js`), **uma só**, usada
-pela tela de exclusão, pela trava de troca de código e pelo script. ⚠ A elegibilidade é reconferida
-no próprio `delete` (`sessoes: { none: {} }` e as outras): entre contar e apagar, alguém pode ter
-bipado o crachá ali.
+pela tela de exclusão, pela trava de troca de código e pelo script.
+
+⚠⚠ **E CONTAR NÃO BASTA: CONTAR E APAGAR SÃO DOIS MOMENTOS.** O filtro não enxerga uma inserção
+ainda não confirmada — se ela confirmar enquanto o `delete` espera, o Postgres recusa por chave
+estrangeira. Isso subia como exceção: no script, derrubava a execução **antes de semear os
+crachás**; na tela, entregava erro de banco a quem tentou excluir. `excluirSeLivre` transforma o
+`P2003` em RECUSA e deixa qualquer outro erro subir — engolir o resto viraria defeito disfarçado de
+"não deu para excluir".
 
 ⚠ **O que a granularidade menor custa, medido:** com UM posto de Acabamento não se sabe QUAL das dez
 bancadas produziu — o monitor e o OEE veem um recurso só. O que **não** custa é travar operador: a

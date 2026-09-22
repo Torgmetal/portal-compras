@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   normalizarCodigo, recusaDoCadastro, recusaDaExclusao, recusaDaTrocaDeCodigo, setoresSemPosto,
-  usosDoCadastro,
+  usosDoCadastro, excluirSeLivre,
 } from "@/lib/mes/cadastro";
 
 // O CADASTRO DA FÁBRICA — as recusas que impedem cadastro sem sentido de nascer.
@@ -171,5 +171,55 @@ describe("usosDoCadastro — o que segura um cadastro", () => {
 
   it("setor é segurado pelos postos dentro dele", async () => {
     expect(await usosDoCadastro(contador({ recursos: 5 }), "setores", "s1")).toBe(5);
+  });
+});
+
+describe("excluirSeLivre — contar e apagar são dois momentos", () => {
+  const zerado = {
+    mesRecurso: { count: vi.fn(async () => 0) }, mesEvento: { count: vi.fn(async () => 0) },
+    mesSessao: { count: vi.fn(async () => 0) }, mesPresenca: { count: vi.fn(async () => 0) },
+    mesDispositivo: { count: vi.fn(async () => 0) }, mesUnidadeReserva: { count: vi.fn(async () => 0) },
+  };
+  const P2003 = () => Object.assign(new Error("Foreign key constraint failed"), { code: "P2003" });
+
+  it("apaga o que ninguém segura", async () => {
+    const apagar = vi.fn(async () => {});
+    expect(await excluirSeLivre(zerado, "recursos", "r1", { nomeDoUso: "x", apagar })).toEqual({ excluido: true });
+    expect(apagar).toHaveBeenCalled();
+  });
+
+  it("nem tenta apagar o que já tem histórico", async () => {
+    const comUso = { ...zerado, mesSessao: { count: vi.fn(async () => 3) } };
+    const apagar = vi.fn(async () => {});
+    const r = await excluirSeLivre(comUso, "recursos", "r1", { nomeDoUso: "apontamentos", apagar });
+    expect(r.recusa).toMatch(/Desative/);
+    expect(apagar).not.toHaveBeenCalled();
+  });
+
+  // ⚠⚠ A CORRIDA: o filtro não enxerga inserção ainda não confirmada. Se ela confirmar enquanto o
+  // delete espera, o Postgres recusa por chave estrangeira — e isso é RECUSA, não exceção. No
+  // script, subindo como erro, derrubava a execução antes de semear os crachás.
+  it("alguém passou a usar entre a contagem e o delete: recusa, não exceção", async () => {
+    const apagar = vi.fn(async () => { throw P2003(); });
+    const r = await excluirSeLivre(zerado, "recursos", "r1", { nomeDoUso: "x", apagar });
+    expect(r.recusa).toMatch(/agora mesmo/i);
+    expect(r.excluido).toBeUndefined();
+  });
+
+  // ⚠ Só o P2003 vira recusa. Engolir o resto transformaria defeito em "não deu para excluir".
+  it("qualquer outro erro SOBE", async () => {
+    const apagar = vi.fn(async () => { throw Object.assign(new Error("timeout"), { code: "P1008" }); });
+    await expect(excluirSeLivre(zerado, "recursos", "r1", { nomeDoUso: "x", apagar })).rejects.toThrow(/timeout/);
+  });
+
+  // ⚠ Um posto preso não pode derrubar a remoção dos outros — é o que o laço do script espera.
+  it("a recusa de um não impede o próximo", async () => {
+    const presos = ["a", "b", "c"];
+    const resultados = [];
+    for (const id of presos) {
+      const apagar = vi.fn(async () => { if (id === "b") throw P2003(); });
+      resultados.push(await excluirSeLivre(zerado, "recursos", id, { nomeDoUso: "x", apagar }));
+    }
+    expect(resultados.map((r) => Boolean(r.excluido))).toEqual([true, false, true]);
   });
 });

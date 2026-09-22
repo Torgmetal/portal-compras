@@ -33,7 +33,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaClient as MesClient } from "../node_modules/.prisma/mes-client/index.js";
 import { urlDoMes } from "@/lib/mes/prisma";
 import { AMBIENTE } from "@/lib/mes/ambiente";
-import { usosDoCadastro } from "@/lib/mes/cadastro";
+import { excluirSeLivre } from "@/lib/mes/cadastro";
 import { RECURSOS, SETORES, COR_SETOR } from "@/app/pcp/producao/_gantt/recursos";
 
 const AMB = AMBIENTE.PROD;
@@ -171,19 +171,15 @@ async function removerPostos(codigos) {
   for (const c of codigos.filter((c) => !achados.has(c))) console.log(`  ⚠ ${c}: não existe neste ambiente.`);
 
   for (const r of alvos) {
-    const usos = await usosDoCadastro(mes, "recursos", r.id);
-    if (usos) {
-      console.log(`  ⚠ ${r.nome} (${r.codigo}) MANTIDO — ${usos} registro(s) ligado(s) a ele. Desative pela tela.`);
-      continue;
-    }
-    const { count } = await mes.mesRecurso.deleteMany({
-      where: {
-        id: r.id,
-        sessoes: { none: {} }, eventos: { none: {} }, presencas: { none: {} },
-        dispositivos: { none: {} }, reservas: { none: {} },
-      },
+    // ⚠⚠ UM POSTO PRESO NÃO DERRUBA OS OUTROS NEM O SEMEIO (achado do Codex, 22/09/2026). A recusa
+    // por vínculo — inclusive a que só aparece no delete, quando alguém bipa o crachá entre a
+    // contagem e a exclusão — é resultado, não exceção. `excluirSeLivre` deixa qualquer outro erro
+    // subir, que é o que ainda deve interromper tudo.
+    const { recusa } = await excluirSeLivre(mes, "recursos", r.id, {
+      nomeDoUso: "registro(s) ligado(s) a ele",
+      apagar: () => mes.mesRecurso.delete({ where: { id: r.id } }),
     });
-    console.log(count ? `  ${r.nome} (${r.codigo}) removido.` : `  ⚠ ${r.nome}: passou a ser usado agora mesmo — mantido.`);
+    console.log(recusa ? `  ⚠ ${r.nome} (${r.codigo}) MANTIDO — ${recusa}` : `  ${r.nome} (${r.codigo}) removido.`);
   }
 }
 

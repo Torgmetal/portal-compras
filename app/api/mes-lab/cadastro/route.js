@@ -17,7 +17,7 @@ import { mesPrisma as prisma } from "@/lib/mes/prisma";
 import { requireRole } from "@/lib/session";
 import {
   ehEntidade, normalizarCodigo, recusaDoCadastro, recusaDaExclusao, recusaDaTrocaDeCodigo,
-  setoresSemPosto, usosDoCadastro,
+  setoresSemPosto, usosDoCadastro, excluirSeLivre,
 } from "@/lib/mes/cadastro";
 
 export const runtime = "nodejs";
@@ -178,11 +178,13 @@ export async function DELETE(req) {
   if (!ehEntidade(tipo)) return erro(`Cadastro desconhecido: ${tipo}`);
   if (!id) return erro("Informe qual registro excluir.");
 
-  const usos = await usosDoCadastro(prisma, tipo, id);
-  const recusa = recusaDaExclusao(usos, NOME_DO_USO[tipo]);
+  // ⚠ A recusa cobre os dois casos: o cadastro já tem histórico, ou alguém passou a usá-lo entre a
+  // contagem e o delete. O segundo chegava aqui como erro de banco (achado do Codex, 22/09/2026).
+  const { recusa } = await excluirSeLivre(prisma, tipo, id, {
+    nomeDoUso: NOME_DO_USO[tipo],
+    apagar: () => MODELO[tipo]().delete({ where: { id } }),
+  });
   if (recusa) return erro(recusa, 409);
-
-  await MODELO[tipo]().delete({ where: { id } });
   return NextResponse.json({ success: true });
 }
 

@@ -1,7 +1,12 @@
 {
-  "build": 3382,
-  "gerado": "2026-09-22T13:48:05.586Z",
+  "build": 3383,
+  "gerado": "2026-09-22T13:51:30.034Z",
   "commits": [
+    {
+      "hash": "c75aaffd9d",
+      "data": "22/09/2026",
+      "titulo": "MES: semear deixa de apagar, e \"nunca usado\" passa a contar todas as relações"
+    },
     {
       "hash": "81393b1df2",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ed823f1d1d",
       "data": "21/09/2026",
       "titulo": "Cotação: a tela do fornecedor deixa de espremer a descrição do item"
-    },
-    {
-      "hash": "f3ee410be0",
-      "data": "21/09/2026",
-      "titulo": "Cotação: o aviso \"PDF: R$ X\" para de acusar a linha que está certa"
     }
   ]
 }
