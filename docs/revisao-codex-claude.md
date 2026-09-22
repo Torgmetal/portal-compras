@@ -267,3 +267,35 @@ temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu
   `docs/env-demo.exemplo`. Teste `modo-demo` (4). 2546 passando; build ok.
 - **Para revisar (security):** fora do modo demo nada muda (flag lida por `process.env`); conferir se
   vale bloquear `MODO_DEMO=1` em produção (ex.: recusar quando `VERCEL_ENV === "production"`).
+
+## 21/09/2026 (21h) — O "PDF: R$ X" acendia vermelho em linha certa (Claude)
+
+- **Pedido:** validar na tela o casamento PDF × RM (pendência aprovada em "Subir 1 e 2"). Feito com
+  Playwright interceptando **só** `/api/cotacao/anexar/*` — a única rota do fluxo que grava —, com o
+  parse e o casamento rodando de verdade. **Zero escrita em produção**, 1 tentativa bloqueada por
+  rodada. Medido: **T122-001 8 de 9** e **T122-002 7 de 8**, com as duas sobras sendo recusas
+  corretas.
+- **Defeito que a validação achou:** as 7 linhas casadas da T122-002 saíram TODAS com o aviso
+  vermelho `⚠ PDF: R$ …`, e as 7 estavam certas. A tela comparava `preço × qtd` (líquido) contra o
+  `total` do parser, que no layout SOUFER é **com IPI** (3,25% naquele documento). Não é regressão:
+  só ficou visível porque antes nada casava e nada era comparado.
+- **Medição (não dedução):** os dois PDFs reais da SOUFER, 17 linhas somadas, fecham em
+  `qtd × preço × (1 + IPI/100)` com erro de **0,000%** em todas.
+- **Parecer do Codex (`architecture`):** favorável a normalizar na fonte, **condicionado a
+  confirmar o layout** — apontou que uma linha de exemplo do próprio `SOUFER_RE` não fecha (é
+  comentário errado, conferido no PDF real), que o regex GERDAU descarta uma terceira coluna de
+  porcentagem, e que `totalBruto = null` não desliga a comparação (cai no `total`). E classificou
+  como **risco ALTO** a reescrita de preço em `sanitizeItens`. Tudo tratado abaixo.
+- **Feito:** `lib/cotacao-total-pdf.js` (`BASE_TOTAL`, `divergeDoPdf`, `ehTotalComImposto`); o parser
+  carimba a base (SOUFER `COM_IPI` medido; **GERDAU sem carimbo de propósito** → aceita as duas
+  leituras, sem falso positivo e sem perder a checagem); `sanitizeItens` saiu para
+  `lib/cotacao-itens-ia.js` (a rota passava de 410 linhas, agora 339) com a guarda que **impede a
+  reescrita do preço** quando o total é o com imposto. O número exibido continua o **impresso no
+  PDF** — converter para líquido mostraria valor que não está em documento nenhum.
+- **Provado na tela:** 7 de 7 vermelhos viraram cinza; o documento de IPI zero segue igual.
+  Testes novos: `cotacao-total-pdf` (12) + `cotacao-itens-ia` (7). **2554 passando; lint sem erro.**
+- **Para revisar (testing):** o caminho da IA **não é testável na tela aqui** — sem
+  `ANTHROPIC_API_KEY` no `.env.local` a rota dá 500 e o fluxo cai no regex. A guarda está coberta só
+  por teste de unidade; vale conferir em produção qual base a IA devolve de fato nestes PDFs.
+- **Pendência registrada:** GERDAU sem PDF real para medir a base, e a terceira coluna de
+  porcentagem do `GERDAU_RE` continua descartada.

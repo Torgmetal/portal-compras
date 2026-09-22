@@ -4,6 +4,7 @@ import BlocoObservacao from "@/components/BlocoObservacao";
 import PreencherEmMassa from "./PreencherEmMassa";
 import AssociarItensPdf from "./AssociarItensPdf";
 import { casarItens } from "@/lib/cotacao-matching";
+import { divergeDoPdf } from "@/lib/cotacao-total-pdf";
 import CampoData from "@/components/CampoData";
 import { useState, useMemo, useRef } from "react";
 import { dataBR, dataHoraBR } from "@/lib/data-br";
@@ -127,6 +128,10 @@ export default function CotacaoFornecedorForm({ cotacao, anexos = [], anexosCota
     // "PDF: R$ X" e flagrar em vermelho quando não bate com preço × qtd.
     l.pdfTotalBruto = itPdf.totalBruto != null ? Number(itPdf.totalBruto)
       : (itPdf.total != null ? Number(itPdf.total) : null);
+    // ⚠⚠ E A BASE EM QUE ESSE TOTAL ESTÁ. Sem ela a tela comparava o total COM IPI do PDF contra
+    // o `preço × qtd` LÍQUIDO da linha, e acendia vermelho em todas as linhas certas de qualquer
+    // proposta com IPI — 7 de 7 na T122-002 (21/09/2026). Ver `lib/cotacao-total-pdf.js`.
+    l.pdfBaseTotal = itPdf.baseTotal || null;
     // ⚠⚠ A UNIDADE DO PDF VIAJA JUNTO, E NÃO SOBRESCREVE A DA RM (achado do Codex, 21/09/2026).
     // Até aqui ela era simplesmente descartada: um produto cotado POR BARRA caía numa linha em KG
     // com o preço da barra, e nem o casamento correto salvava o pedido. Converter seria pior —
@@ -1065,8 +1070,10 @@ dataHoraBR(new Date())
                     const isRevisado = revisado.has(l.id);
                     // Total que a IA leu no PDF p/ esta linha (referência de conferência)
                     const pdfTotal = l.pdfTotalBruto != null ? Number(l.pdfTotalBruto) : null;
-                    const divergePdf = isAuto && pdfTotal != null && pdfTotal > 0 && totalBruto > 0 &&
-                      Math.abs(pdfTotal - totalBruto) > Math.max(pdfTotal * 0.01, 0.5);
+                    const divergePdf = isAuto && divergeDoPdf({
+                      pdfTotal, precoUnit: numeroBR(l.precoUnit), qtd: numeroBR(l.qtdCotada),
+                      ipiPct: numeroBR(l.ipiPct), baseTotal: l.pdfBaseTotal,
+                    });
                     const inputCls = isAuto
                       ? "border-torg-orange-300 bg-torg-orange-50/40"
                       : isRevisado

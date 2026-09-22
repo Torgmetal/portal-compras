@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sanitizeItens } from "@/lib/cotacao-itens-ia";
 import Anthropic from "@anthropic-ai/sdk";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 import { extrairJson, recuperarJsonTruncado, motivoDaFalhaIA } from "@/lib/ia-json";
@@ -148,78 +149,6 @@ Devolva APENAS um JSON válido envolvido em <json></json>, sem comentários adic
 }
 </json>`;
 
-// Arredonda pra N casas decimais — evita problemas com inputs step="0.01"
-// e bate com a precisao mostrada nas propostas (PDF, Omie, etc).
-function round2(n) {
-  if (n == null || isNaN(n)) return n;
-  return Math.round(Number(n) * 100) / 100;
-}
-
-function sanitizeItens(itens, rmCount) {
-  return (itens || []).map((it) => {
-    const precoUnit = Number(it.precoUnit) || 0;
-    const qtd = Number(it.qtd) || 0;
-    const totalDeclarado = it.totalBruto != null ? Number(it.totalBruto) : null;
-    const warnings = [];
-    let safePrec = precoUnit;
-
-    // 1. Reject precos absurdos (> R$ 10.000 por unidade — improvavel pra aco)
-    if (precoUnit > 10000) {
-      warnings.push(`Preco unitario R$ ${precoUnit.toFixed(2)} suspeito (>10k/un)`);
-      safePrec = 0;
-    }
-
-    // 2. VALIDA ARITMETICA: se tem qtd, preco e total, todos > 0,
-    //    o preco x qtd deve bater com o total (tolerancia 1%).
-    if (qtd > 0 && safePrec > 0 && totalDeclarado != null && totalDeclarado > 0) {
-      const calculado = safePrec * qtd;
-      const diff = Math.abs(calculado - totalDeclarado);
-      const tolerancia = Math.max(totalDeclarado * 0.01, 0.5); // 1% ou 50 centavos
-      if (diff > tolerancia) {
-        // O preco nao bate. Tenta corrigir: o "preco unit" extraido provavelmente e
-        // o TOTAL da linha. Recalcula como total/qtd.
-        const sugerido = totalDeclarado / qtd;
-        if (sugerido > 0 && sugerido < 10000) {
-          warnings.push(
-            `Preco corrigido: ${precoUnit.toFixed(2)} -> ${sugerido.toFixed(4)} ` +
-            `(${precoUnit} parecia ser o total; total/qtd = ${sugerido.toFixed(4)})`
-          );
-          safePrec = sugerido;
-        } else {
-          warnings.push(
-            `Preco e total nao batem: ${precoUnit} x ${qtd} = ${calculado.toFixed(2)} ` +
-            `mas total declarado e ${totalDeclarado.toFixed(2)}`
-          );
-        }
-      }
-    }
-
-    // rmIndex valido?
-    let rmIndex = it.rmIndex;
-    if (rmIndex != null && (typeof rmIndex !== "number" || rmIndex < 0 || rmIndex >= rmCount)) {
-      rmIndex = null;
-    }
-
-    // Arredonda tudo pra 2 casas — o input do form tem step="0.01" e rejeita
-    // valores com mais casas (ex: 6.4823). E nem o PDF nem o Omie usam mais
-    // que 2 casas, entao a precisao extra so atrapalha.
-    const qtdRound = round2(qtd);
-    return {
-      rmIndex,
-      descricao: String(it.descricao || ""),
-      qtd: qtdRound,
-      qtdCotada: qtdRound,
-      unidade: String(it.unidade || "").toUpperCase(),
-      precoUnit: round2(safePrec),
-      icmsPct: it.icmsPct != null ? round2(Number(it.icmsPct)) : null,
-      ipiPct: it.ipiPct != null ? round2(Number(it.ipiPct)) : null,
-      totalBruto: round2(totalDeclarado != null ? totalDeclarado : safePrec * qtd),
-      prazoEntrega: it.prazoEntrega || "",
-      observacao: it.observacao || "",
-      _warning: warnings.length > 0 ? warnings.join(" | ") : null,
-    };
-  });
-}
 
 export async function POST(request) {
   const rl = limiter(request);
