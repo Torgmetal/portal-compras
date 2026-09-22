@@ -704,7 +704,7 @@ dataHoraBR(new Date())
     <div className="min-h-screen bg-torg-blue-50/30">
       {/* Header */}
       <header className="bg-white border-b border-torg-blue-100 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-[1500px] mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
             <TorgLogo size="sm" />
             <span className="text-xs text-torg-gray hidden sm:inline">Portal de Cotações</span>
@@ -713,7 +713,14 @@ dataHoraBR(new Date())
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+      {/* ⚠⚠ A TELA INTEIRA ERA `max-w-5xl` (1024 px), E A TABELA DE ITENS NÃO CABIA NELA. Matheus
+          (21/09/2026): "está muito espremido e está quebrando muitas linhas dos produtos com nomes
+          grandes". Com dez colunas de largura fixa (não tenho, qtds, preço, ICMS, IPI, prazo,
+          total) sobravam ~100 px para a descrição — e "CANTONEIRA ACO CARBONO LAMINADA A-36 DN.
+          3/16 X 1.3/4POL" saía em seis linhas, com a linha inteira crescendo junto.
+          ⚠ O corpo dos cartões de texto continua limitado por dentro (`max-w-3xl` na leitura), para
+          a tela larga não virar parágrafo de 200 caracteres por linha. */}
+      <div className="max-w-[1500px] mx-auto px-6 py-8 space-y-6">
         {/* Boas-vindas + dados da RM */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <p className="text-sm text-torg-gray">Olá, <strong className="text-torg-dark">{cotacao.fornecedorNome}</strong></p>
@@ -1048,12 +1055,14 @@ dataHoraBR(new Date())
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                    {/* ⚠ É a coluna que ABSORVE a sobra: sem o piso, a largura nova ia para as
+                        colunas de número, que já tinham o que precisavam. */}
+                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase min-w-[320px]">Descrição</th>
                     {/* ⚠ "Não tenho", não "Sem estoque". Matheus (11/09/2026), depois da
                         T67-011-R00: o fornecedor não achou este botão e digitou "SEM
                         DISPONIBILIDADE" no campo de prazo, com R$ 2,00 no preço — o texto ninguém
                         lia e o preço ganhou. O rótulo agora é a frase que ele ia escrever. */}
-                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase w-[110px]">Não tenho</th>
+                    <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase w-[132px]">Não tenho</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd RM</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qtd cotada *</th>
                     <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço unit. *</th>
@@ -1166,7 +1175,7 @@ dataHoraBR(new Date())
                             type="button"
                             onClick={() => setLinha(l.id, "semEstoque", !l.semEstoque)}
                             aria-pressed={!!l.semEstoque}
-                            className={`w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-[11px] font-semibold border transition-colors ${
+                            className={`w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-[11px] font-semibold border transition-colors whitespace-nowrap ${
                               l.semEstoque
                                 ? "bg-red-600 text-white border-red-600 hover:bg-red-700"
                                 : "bg-white text-red-700 border-red-300 hover:bg-red-50"
