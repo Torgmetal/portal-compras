@@ -12,7 +12,7 @@
 
 import fs from "fs";
 import path from "path";
-import { pathToFileURL } from "url";
+import { pathToFileURL, fileURLToPath } from "url";
 
 const RAIZ = process.cwd();
 
@@ -34,6 +34,25 @@ export function resolve(especificador, contexto, proximo) {
   if (especificador.startsWith("@/")) {
     const alvo = arquivoDe(path.join(RAIZ, especificador.slice(2)));
     if (alvo) return proximo(pathToFileURL(alvo).href, contexto);
+  }
+  // ⚠ O CLIENTE PRÓPRIO DO MES mora em `node_modules/.prisma/mes-client`, e `.prisma/...` não é
+  // nome de pacote válido para o ESM do node (o bundler resolve; o node recusa). Sem isto,
+  // qualquer script que importe `lib/mes/prisma.js` morre antes de rodar.
+  if (especificador.startsWith(".prisma/")) {
+    const alvo = arquivoDe(path.join(RAIZ, "node_modules", especificador));
+    if (alvo) return proximo(pathToFileURL(alvo).href, contexto);
+  }
+  // ⚠⚠ RELATIVO SEM EXTENSÃO TAMBÉM PRECISA DISTO (22/09/2026). O bundler aceita
+  // `import "./montagem-capacidade"`; o ESM do node, não — e `lib/postos-operador.js` passou a
+  // usar essa forma, derrubando qualquer script que importasse a lista de bancadas com um
+  // `ERR_MODULE_NOT_FOUND` que parecia arquivo faltando. Resolver só o `@/` era meia solução:
+  // basta um módulo do projeto importar o vizinho sem `.js` para o alias não bastar.
+  if (especificador.startsWith(".") && contexto.parentURL?.startsWith("file:")) {
+    const base = path.resolve(path.dirname(fileURLToPath(contexto.parentURL)), especificador);
+    if (!path.extname(base)) {
+      const alvo = arquivoDe(base);
+      if (alvo) return proximo(pathToFileURL(alvo).href, contexto);
+    }
   }
   return proximo(especificador, contexto);
 }
