@@ -1138,6 +1138,20 @@ model CotacaoItem {
   rmItemId          String
   precoUnit         Float
   qtdCotada         Float
+  /// ⚠⚠ A UNIDADE QUE O FORNECEDOR USOU NO DOCUMENTO, e o fator para a da RM. Matheus (22/09/2026):
+  /// "orçamos em unidades, tipo 2500 parafusos, e os fornecedores mandam a cotação em CT".
+  ///
+  /// ⚠⚠ `qtdCotada` E `precoUnit` CONTINUAM NA UNIDADE DA RM — é o que mantém o resto do portal
+  /// certo sem tocar em nada: o mapa compara preço, `sugerir-vencedores` escolhe o menor e
+  /// `pedido-itens` monta o pedido, todos já na mesma base. Guardar "25 CT" aqui obrigaria seis
+  /// consumidores a lembrar da conversão, e o primeiro que esquecesse erraria por 100×, calado.
+  ///
+  /// ⚠ Estes dois campos são a TRILHA: com eles a tela mostra de volta o que estava no papel
+  /// ("25 CT a R$ 50,00"), e o PDF do fornecedor segue anexado à cotação.
+  /// ⚠ `fatorParaRM` = quantas unidades da RM cabem em UMA unidade cotada (1 CT = 100 UN → 100).
+  /// Nulo quer dizer "não houve conversão", não "fator 1 desconhecido".
+  unidadeCotada     String?
+  fatorParaRM       Float?
   qtdProposta       Float?
   // Abatimento por estoque (consulta respondida pela Produção/Engenharia em barras):
   // qtdPecasCotada = nº de barras/peças LÍQUIDO enviado ao fornecedor;

@@ -1,7 +1,12 @@
 {
-  "build": 3384,
-  "gerado": "2026-09-22T14:14:20.684Z",
+  "build": 3385,
+  "gerado": "2026-09-22T14:43:05.649Z",
   "commits": [
+    {
+      "hash": "f1533a4328",
+      "data": "22/09/2026",
+      "titulo": "MES: o cadastro passa a ser em maiúscula, como Matheus padronizou"
+    },
     {
       "hash": "96abd20f2e",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2daa8d6e53",
       "data": "21/09/2026",
       "titulo": "Qualidade: apagar uma RNC passa a guardar o que foi apagado"
-    },
-    {
-      "hash": "ef0267fee5",
-      "data": "21/09/2026",
-      "titulo": "Cotação: o campo de quantidade para de mostrar o resíduo binário do banco"
     }
   ]
 }
