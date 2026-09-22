@@ -84,6 +84,47 @@ const COLUNAS = [
   ["MesSessao", "planejadoManual", "DOUBLE PRECISION NOT NULL DEFAULT 0"],
 ];
 
+/**
+ * O PLANEJAMENTO DAS SESSÕES ANTIGAS, QUE O `DEFAULT 0` APAGARIA.
+ *
+ * ⚠⚠ COLUNA NOVA COM DEFAULT ZERO É PERDA DE DADO QUANDO O ZERO SIGNIFICA ALGO (achado do Codex,
+ * 22/09/2026). `planejadoManual` nasce 0, e `comporTeto` não olha mais `planejadoQtd`: uma sessão
+ * antiga aberta à mão com total 10 e nenhuma barra viraria `semTeto` — teto nenhum, apontamento
+ * livre acima do planejado. Acrescentar a coluna sem transportar o valor seria soltar a trava.
+ *
+ * ⚠ SÓ AS PURAMENTE MANUAIS são transportadas (`cardinality("nestingUnidades") = 0`): ali
+ * `planejadoQtd` é, com certeza, o total da marca.
+ *
+ * ⚠⚠ AS MISTAS NÃO SÃO ADIVINHADAS. Numa sessão que abriu à mão e DEPOIS recebeu barras,
+ * `planejadoQtd` virou uma soma de origens diferentes e não dá para separar o que foi digitado.
+ * Chutar ali seria inventar um teto — o script CONTA e AVISA, e a reconciliação é decisão humana
+ * (foi o que o parecer pediu).
+ *
+ * ⚠ `planejadoManual = 0` na condição, e não `IS NULL`: rodar duas vezes não desfaz um ajuste que
+ * alguém tenha feito à mão depois.
+ */
+async function transportarPlanejadoManual(prisma) {
+  const movidas = await prisma.$executeRawUnsafe(`
+    UPDATE mes."MesSessao"
+       SET "planejadoManual" = "planejadoQtd"
+     WHERE "planejadoManual" = 0
+       AND "planejadoQtd" > 0
+       AND cardinality("nestingUnidades") = 0
+  `);
+  if (movidas) console.log(`[ensure-mes-proprio] ${movidas} sessão(ões) manual(is) com o planejado transportado.`);
+
+  const [mistas] = await prisma.$queryRawUnsafe(`
+    SELECT count(*)::int AS n FROM mes."MesSessao"
+     WHERE "planejadoManual" = 0 AND "planejadoQtd" > 0 AND cardinality("nestingUnidades") > 0
+  `);
+  if (mistas?.n) {
+    console.warn(
+      `[ensure-mes-proprio] ⚠ ${mistas.n} sessão(ões) MISTA(S) (manual + nesting) sem planejado manual. ` +
+      "O teto delas passa a sair só das barras — confira com o PCP antes de apontar nelas.",
+    );
+  }
+}
+
 async function main() {
   // ⚠ O cliente do PORTAL, de propósito: este script CRIA o schema `mes`, então não pode depender
   // de uma conexão que já precise dele para funcionar.
@@ -102,6 +143,8 @@ async function main() {
         `ALTER TABLE mes."${tabela}" ADD COLUMN IF NOT EXISTS "${coluna}" ${tipo}`,
       );
     }
+
+    await transportarPlanejadoManual(prisma);
 
     // ⚠⚠ A CONFERÊNCIA É O PONTO DO SCRIPT. Sem ela, "rodou sem erro" e "as tabelas existem no
     // schema certo" seriam a mesma frase — e não são.

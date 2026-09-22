@@ -1,7 +1,12 @@
 {
-  "build": 3360,
-  "gerado": "2026-09-22T02:31:59.593Z",
+  "build": 3361,
+  "gerado": "2026-09-22T02:38:49.146Z",
   "commits": [
+    {
+      "hash": "e36e035fe8",
+      "data": "21/09/2026",
+      "titulo": "MES: o teto da marca passa a ser derivado das barras, não da sessão"
+    },
     {
       "hash": "b72f5c5953",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "703e2aa5e2",
       "data": "21/09/2026",
       "titulo": "Cotação: a gravação vai em lote — 85 idas e voltas a São Paulo não cabiam nos 5 s da transação"
-    },
-    {
-      "hash": "3273d9f138",
-      "data": "21/09/2026",
-      "titulo": "Cotação: fornecedor da Vendor List sem e-mail (ou com dois) parava o envio em silêncio"
     }
   ]
 }

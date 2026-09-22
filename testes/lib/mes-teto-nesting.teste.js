@@ -104,3 +104,44 @@ describe("as duas barras, de ponta a ponta", () => {
     expect(contas.get("a").planejado).toBe(2);
   });
 });
+
+describe("a obra do item da barra — leitura e gravação respondem igual", () => {
+  // ⚠⚠ ERA O PIOR TIPO DE DIVERGÊNCIA (achado do Codex, 22/09/2026): a TELA dizia que cabia e a
+  // GRAVAÇÃO recusava. A leitura em lote aceitava o item com `opNumero` nulo; a individual exigia
+  // igualdade e o excluía — soma zero, "referência quebrada", apontamento legítimo negado.
+  //
+  // ⚠ Item sem obra HERDA a do plano, que é como `abrirNesting` já resolvia
+  // (`i.opNumero ?? unidade.nesting.opNumero`). Abertura, leitura e gravação, a mesma resposta.
+  const sessao = {
+    id: "a", marca: "T107A-P3", opNumero: "T107A", ambiente: "PROD", operacao: "PREPARACAO",
+    planejadoQtd: 0, planejadoManual: 0, nestingUnidades: ["u1"],
+  };
+  const SEM_OBRA = [{ unidadeId: "u1", marca: "T107A-P3", opNumero: null, _sum: { qtd: 3 } }];
+  const tx = () => ({
+    mesSessao: { findMany: vi.fn(async () => [sessao]) },
+    mesNestingItem: { groupBy: vi.fn(async () => SEM_OBRA) },
+    mesApontamentoQtd: {
+      aggregate: vi.fn(async () => ({ _sum: { boas: 0 } })),
+      groupBy: vi.fn(async () => []),
+    },
+  });
+
+  it("a gravação conta o item sem obra, em vez de chamar de referência quebrada", async () => {
+    const conta = await saldoDaMarca(tx(), sessao);
+    expect(conta).toMatchObject({ planejado: 3, saldo: 3, semTeto: false });
+    expect(conta.referenciaQuebrada).toBe(false);
+  });
+
+  it("e a tela devolve o MESMO teto", async () => {
+    const contas = await saldosDasMarcas(tx(), [sessao]);
+    expect(contas.get("a")).toMatchObject({ planejado: 3, saldo: 3 });
+  });
+
+  // ⚠ Mas item de OUTRA obra continua fora — aceitar o nulo não é aceitar qualquer um.
+  it("item de outra obra continua fora das duas contas", async () => {
+    const outra = [{ unidadeId: "u1", marca: "T107A-P3", opNumero: "T999", _sum: { qtd: 99 } }];
+    const t = { ...tx(), mesNestingItem: { groupBy: vi.fn(async () => outra) } };
+    expect((await saldoDaMarca(t, sessao)).referenciaQuebrada).toBe(true);
+    expect((await saldosDasMarcas(t, [sessao])).get("a").referenciaQuebrada).toBe(true);
+  });
+});

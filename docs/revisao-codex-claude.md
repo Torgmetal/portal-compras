@@ -389,3 +389,19 @@ fim (0 recursos, 0 setores).
 postos não é impedida — o `Set` evita dobrar o TETO, mas não detecta produção duplicada. A saída
 seria uma reserva exclusiva por unidade+etapa+ambiente, com transferência explícita. É desenho
 novo, não conserto, e não entra sem o Matheus decidir.
+- **(23h40, 4ª rodada)** Dois defeitos a mais, ambos ALTA, ambos conferidos e corrigidos:
+  **(a) coluna nova com DEFAULT 0 apagando planejamento.** `planejadoManual` nascia 0 e
+  `comporTeto` não olha mais `planejadoQtd`: sessão antiga manual com total 10 viraria `semTeto` —
+  trava solta. `transportarPlanejadoManual` no ensure transporta as PURAMENTE manuais
+  (`cardinality("nestingUnidades") = 0`) e **conta e avisa** as mistas, sem adivinhar: ali
+  `planejadoQtd` virou soma de origens diferentes e chutar seria inventar teto. ⚠ Em produção o
+  efeito é zero (as tabelas estão vazias); o conserto é para o dia em que não estiverem.
+  **(b) leitura e gravação discordando sobre a obra do item.** `abrirNesting` resolve
+  `i.opNumero ?? unidade.nesting.opNumero`; a leitura em lote aceitava item com `opNumero` nulo e a
+  individual o excluía — a tela mostrava saldo e o apontamento era recusado como "referência
+  quebrada". Agora as duas passam pelo mesmo `itemContaPara`/`somarItens`, e a individual usa
+  `groupBy` em vez de `aggregate` justamente para a regra não virar `where` em SQL de um lado só.
+  Testes: `mes-teto-nesting` (+3, agora 13). **2.857 passando.**
+  Novo: `scripts/mes-zerar.mjs` — apaga o MES inteiro (ou só o movimento, com `--manter-cadastro`),
+  numa transação, só com `--confirmo`, e conferindo que sobrou zero. Não alcança o portal por
+  construção: só nomeia tabelas do schema `mes`.
