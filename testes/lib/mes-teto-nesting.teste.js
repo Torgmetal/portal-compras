@@ -145,3 +145,56 @@ describe("a obra do item da barra — leitura e gravação respondem igual", () 
     expect((await saldosDasMarcas(t, [sessao])).get("a").referenciaQuebrada).toBe(true);
   });
 });
+
+describe("manual e nesting na mesma obra — as duas contas batem", () => {
+  // ⚠⚠ O EXEMPLO DO PARECER (achado do Codex, 22/09/2026): sessão manual encerrada com planejado
+  // 10 e 2 boas, depois um nesting de 2 peças da MESMA marca, obra e etapa. A tela dizia teto 2 e
+  // saldo 2; a gravação dizia teto 10 e saldo 8 — o operador vê um número e recebe outro.
+  //
+  // ⚠ A causa: `abrirNesting` manda só `opNumero`, a abertura pelo Gantt manda `opId` também. A
+  // busca preferia `opId` (e varria a obra pelo número), o agrupamento particionava por `opId` —
+  // e separava justamente as sessões que a busca tinha juntado.
+  const MANUAL = {
+    id: "manual", marca: "T107A-P3", opId: "op-107", opNumero: "T107A",
+    ambiente: "PROD", operacao: "PREPARACAO", planejadoQtd: 10, planejadoManual: 10,
+    nestingUnidades: [],
+  };
+  const NESTING = {
+    id: "barra", marca: "T107A-P3", opId: null, opNumero: "T107A",
+    ambiente: "PROD", operacao: "PREPARACAO", planejadoQtd: 2, planejadoManual: 0,
+    nestingUnidades: ["u1"],
+  };
+  const tx = () => ({
+    mesSessao: { findMany: vi.fn(async () => [MANUAL, NESTING]) },
+    mesNestingItem: {
+      groupBy: vi.fn(async () => [{ unidadeId: "u1", marca: "T107A-P3", opNumero: "T107A", _sum: { qtd: 2 } }]),
+    },
+    mesApontamentoQtd: {
+      aggregate: vi.fn(async () => ({ _sum: { boas: 2 } })),
+      groupBy: vi.fn(async () => [{ sessaoId: "manual", _sum: { boas: 2 } }, { sessaoId: "barra", _sum: { boas: 0 } }]),
+    },
+  });
+
+  it("a gravação e a tela devolvem o MESMO teto e o MESMO saldo", async () => {
+    const naGravacao = await saldoDaMarca(tx(), NESTING);
+    const naTela = (await saldosDasMarcas(tx(), [NESTING])).get("barra");
+    expect(naGravacao).toMatchObject({ planejado: 10, boas: 2, saldo: 8 });
+    expect(naTela).toMatchObject({ planejado: 10, boas: 2, saldo: 8 });
+  });
+
+  // ⚠ E no sentido contrário: partindo da sessão MANUAL, a barra do nesting entra na mesma conta.
+  it("partindo da manual, a barra do nesting entra na mesma conta", async () => {
+    const naGravacao = await saldoDaMarca(tx(), MANUAL);
+    const naTela = (await saldosDasMarcas(tx(), [MANUAL])).get("manual");
+    expect(naGravacao.planejado).toBe(naTela.planejado);
+    expect(naGravacao.saldo).toBe(naTela.saldo);
+  });
+
+  // ⚠ Obra diferente continua separada — juntar tudo pelo número não pode virar juntar tudo.
+  it("obra diferente não entra", async () => {
+    const outra = { ...NESTING, id: "outra", opNumero: "T999" };
+    const t = { ...tx(), mesSessao: { findMany: vi.fn(async () => [outra]) } };
+    const contas = await saldosDasMarcas(t, [NESTING]);
+    expect(contas.get("barra").planejado).toBe(0);
+  });
+});

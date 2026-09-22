@@ -210,6 +210,25 @@ console nem 4xx/5xx. 2.659 testes, eslint sem erro.
 **Próximo:** cadastrar setores, postos e crachás pela tela (`/mes-lab/cadastro`) e começar a testar
 com OPs reais. O apontamento de verdade segue no Syneco.
 
+### O DEMO saiu da tela (22/09/2026)
+
+Matheus: *"não sei se compensa ter DEMO e produção no MES, se ele já está fora de tudo eu posso ir
+testando em produção e depois zerar tudo para iniciar do zero"*.
+
+⚠⚠ **ELE TEM RAZÃO, E O CUSTO FOI MEDIDO.** O MES já está fora de tudo — schema próprio, cliente
+próprio, ADMIN-only, fora do menu, e **nenhuma escrita em tabela do portal**. Não há dado real para
+o DEMO proteger enquanto a fábrica está no Syneco. E das **cinco falhas da 2ª rodada de revisão,
+DUAS eram do `ambiente`**: o isolamento que não chegava às telas, e os planos de nesting disputando
+dez posições na lista. Complexidade guardando casa vazia, e que erra enquanto guarda.
+
+**Saiu só a ENTRADA** — o seletor Produção/Simulação. A maquinaria fica: a coluna, os índices
+`@@unique([codigo, ambiente])` e `@@unique([cracha, ambiente])` (provados no banco em 21/09) e os
+filtros das rotas. Tudo inerte com um mundo só. O dia em que houver produção de verdade no MES e
+alguém quiser um laboratório ao lado, é recolocar dois links.
+
+**Para recomeçar do zero:** `node scripts/mes-zerar.mjs --confirmo` (ou `--manter-cadastro` para
+guardar postos e crachás). Sem `--confirmo` ele só conta. Não alcança o portal por construção.
+
 **← O PASSO 2 ESTÁ FEITO.** O passo 1 está feito na branch `matheus/mes-subir`:
 main trazida (184 commits, 2 conflitos), `prisma validate` limpo, **2.647 testes passando**,
 eslint 0 erros.

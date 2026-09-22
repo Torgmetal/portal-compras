@@ -408,3 +408,14 @@ novo, não conserto, e não entra sem o Matheus decidir.
 - **22/09 (manhã)** Regressão do modo demo: `pastaDeGravacao` normalizava o caminho fora do demo e
   derrubou TODA gravação no SharePoint em produção (lote de desenhos OP-94/118, romaneio, data book).
   Corrigido: fora do demo devolve o caminho intocado; teste novo cobre o caminho antigo.
+- **(22/09, manhã)** Última divergência tela × gravação fechada: a busca das irmãs preferia `opId`
+  e caía para `opNumero`; o agrupamento particionava por `opId`. Para a sessão de NESTING — que
+  nasce sem `opId`, porque `abrirNesting` só manda `opNumero` — a busca varria a obra pelo número e
+  juntava as manuais, mas o agrupamento separava justamente essas. Medido no exemplo do parecer:
+  manual encerrada (planejado 10, 2 boas) + nesting de 2 peças → tela dizia teto 2/saldo 2, gravação
+  dizia teto 10/saldo 8. **A identidade da obra virou UMA função (`daObra`)**, usada pela busca e
+  pelo agrupamento, com a precedência INVERTIDA: `opNumero` primeiro, porque é o campo que os dois
+  caminhos de abertura preenchem. Testes `mes-teto-nesting` (+3, agora 16). **2.860 passando.**
+  ⚠ O seletor de DEMO saiu da tela (decisão do Matheus); coluna, índices e filtros ficam.
+  ⚠ **Segue aberto e NÃO foi feito:** a mesma barra aberta em dois postos não é impedida — precisa
+  de reserva exclusiva por unidade+etapa+ambiente, que é desenho novo e aguarda o Matheus.

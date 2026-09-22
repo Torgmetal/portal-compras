@@ -37,22 +37,22 @@ export default async function EscolherRecurso({ searchParams }) {
         o <b>totem do seu setor</b> — o link de cada um está ao lado do nome, abaixo.
       </p>
 
-      {/* ⚠⚠ O MUNDO FICA À VISTA E TEM DE SER TROCADO DE PROPÓSITO. Sem este seletor não havia
-          caminho nenhum até os postos de DEMO — e, pior, os dois apareciam misturados na mesma
-          lista com rótulo idêntico. DEMO em âmbar porque é o que se lê antes de ler a palavra. */}
-      <div className="flex items-center gap-2 mb-6 text-sm">
-        <span className="text-torg-gray">Ambiente:</span>
-        <Link href="/mes-lab/totem?ambiente=PROD"
-          className={`px-3 py-1 rounded-lg border font-semibold ${ambiente === "PROD"
-            ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-200"}`}>
-          Produção
-        </Link>
-        <Link href="/mes-lab/totem?ambiente=DEMO"
-          className={`px-3 py-1 rounded-lg border font-semibold ${ambiente === "DEMO"
-            ? "bg-amber-500 text-white border-amber-500" : "bg-white text-torg-gray border-gray-200"}`}>
-          Simulação (DEMO)
-        </Link>
-      </div>
+      {/* ⚠⚠ O SELETOR DE AMBIENTE SAIU DA TELA (Matheus, 22/09/2026): *"não sei se compensa ter
+          DEMO e produção no MES, se ele já está fora de tudo eu posso ir testando em produção e
+          depois zerar tudo"*. Ele tem razão — o MES já está fora de tudo (schema próprio, cliente
+          próprio, ADMIN-only, fora do menu, sem UMA escrita em tabela do portal), então não há
+          dado real para o DEMO proteger enquanto a fábrica está no Syneco.
+
+          ⚠⚠ E O CUSTO FOI MEDIDO: das cinco falhas da 2ª rodada de revisão, DUAS eram do
+          `ambiente` — o isolamento que não chegava às telas e os planos de nesting disputando dez
+          posições na lista. Complexidade guardando casa vazia, e que erra enquanto guarda.
+
+          ⚠ A MAQUINARIA FICA: a coluna `ambiente`, os índices `@@unique([codigo, ambiente])` e
+          `@@unique([cracha, ambiente])` (provados no banco em 21/09) e os filtros das rotas. Tudo
+          inerte com um mundo só, e sem custo. O dia em que houver produção de verdade no MES e
+          alguém quiser um laboratório ao lado, é recolocar estes dois links — não reconstruir.
+
+          ⚠ Para recomeçar do zero enquanto isso: `node scripts/mes-zerar.mjs --confirmo`. */}
 
       {setores.map((setor) => (
         <section key={setor.id} className="mb-6">
