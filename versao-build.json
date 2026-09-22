@@ -1,7 +1,12 @@
 {
-  "build": 3399,
-  "gerado": "2026-09-22T21:07:40.244Z",
+  "build": 3400,
+  "gerado": "2026-09-22T21:12:12.423Z",
   "commits": [
+    {
+      "hash": "49e1adda25",
+      "data": "22/09/2026",
+      "titulo": "Registra a pendência aceita da fração composta no CMR"
+    },
     {
       "hash": "b80868fd4c",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "a1ab15393f",
       "data": "22/09/2026",
       "titulo": "US: a junta ensaiada com as listas da casa — GMAW/FCAW, chanfro X/V, Topo e Direto"
-    },
-    {
-      "hash": "bf32c164e0",
-      "data": "22/09/2026",
-      "titulo": "Facilita edição de peças e horários por demão nos relatórios"
     }
   ]
 }
