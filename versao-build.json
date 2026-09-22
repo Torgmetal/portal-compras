@@ -1,7 +1,12 @@
 {
-  "build": 3315,
-  "gerado": "2026-09-22T00:45:05.507Z",
+  "build": 3316,
+  "gerado": "2026-09-22T01:09:04.966Z",
   "commits": [
+    {
+      "hash": "ef0267fee5",
+      "data": "21/09/2026",
+      "titulo": "Cotação: o campo de quantidade para de mostrar o resíduo binário do banco"
+    },
     {
       "hash": "ed823f1d1d",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b191d482b8",
       "data": "19/09/2026",
       "titulo": "Simplifica lista de inspeções com filtros e ações compactas"
-    },
-    {
-      "hash": "b38de698ed",
-      "data": "18/09/2026",
-      "titulo": "Registra o fechamento dos três pendentes da revisão"
     }
   ]
 }

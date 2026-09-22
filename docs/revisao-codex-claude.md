@@ -299,3 +299,12 @@ temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu
   por teste de unidade; vale conferir em produção qual base a IA devolve de fato nestes PDFs.
 - **Pendência registrada:** GERDAU sem PDF real para medir a base, e a terceira coluna de
   porcentagem do `GERDAU_RE` continua descartada.
+- **(22h)** RNC: a exclusão deixa de ser cega. O `diff` do `EXCLUIR_RNC` era `{}` — foi o que fez a
+  recuperação da RNC-019 virar arqueologia (timestamp no `cuid`, fotos órfãs no blob; cliente, OP e
+  descrição não voltaram). Agora o registro INTEIRO e o plano 5W2H vão para o `diff`, na MESMA
+  transação da exclusão, e o `.catch(() => {})` da auditoria saiu: não conseguir preservar a cópia
+  impede apagar. `deleteMany` no plano (dentro de transação interativa, query que estoura aborta
+  tudo mesmo com `.catch`). 404 no id inexistente. Teste `rnc-excluir` (6). 2578 passando.
+  **Para revisar (database):** a transação envolve `auditLog.create` com um JSON do registro
+  inteiro — conferir se algum campo grande (fotos/anexos com muitos itens) merece corte.
+  **Pendente de decisão do Vitor/Matheus:** se RNC deveria ser CANCELÁVEL em vez de excluível.

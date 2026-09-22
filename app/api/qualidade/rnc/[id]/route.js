@@ -155,14 +155,51 @@ export async function PATCH(req, { params }) {
   return NextResponse.json({ success: true });
 }
 
+/**
+ * APAGAR UMA RNC — GUARDANDO O QUE FOI APAGADO.
+ *
+ * ⚠⚠ A EXCLUSÃO ERA CEGA, E ISSO CUSTOU UMA RNC INTEIRA (09/09/2026). A RNC-019/26 foi apagada por
+ * engano às 18:35 e o `diff` do AuditLog era `{}` — sobrou o número, o autor e a hora, e mais nada.
+ * Reconstruí-la em 21/09 foi arqueologia: decodificar o timestamp escondido no `cuid` do registro
+ * apagado para achar a data, e varrer o blob atrás das fotos órfãs. Cliente, OP e descrição não
+ * voltaram, porque não estavam em lugar nenhum.
+ *
+ * ⚠⚠ O REGISTRO É GRAVADO NA MESMA TRANSAÇÃO DA EXCLUSÃO, e o `.catch` que engolia a falha da
+ * auditoria SAIU. Em bookkeeping normal a regra é a oposta — log que falha não derruba o trabalho
+ * de verdade (ver `MesSyncLog`). Aqui o log É o trabalho: não conseguir preservar a cópia e apagar
+ * assim mesmo reproduz exatamente o incidente que este código existe para não repetir.
+ *
+ * ⚠ Isto NÃO transforma exclusão em cancelamento. Documento numerado da qualidade normalmente se
+ * cancela com motivo, mantendo o número — a decisão é do Vitor e do Matheus, e está pendente. Até
+ * lá, quem apagar por engano tem o conteúdo de volta em vez de uma investigação.
+ */
 export async function DELETE(_req, { params }) {
   let user;
   try { user = await requireRole(["ADMIN", "QUALIDADE"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
-  // Apaga também o plano de ação 5W2H vinculado (senão fica órfão na aba Plano de Ação).
-  const rnc = await prisma.naoConformidade.findUnique({ where: { id: params.id }, select: { planoAcaoId: true } });
-  await prisma.naoConformidade.delete({ where: { id: params.id } });
-  if (rnc?.planoAcaoId) await prisma.planoAcao.delete({ where: { id: rnc.planoAcaoId } }).catch(() => {});
-  await prisma.auditLog.create({ data: { userId: user.id, action: "EXCLUIR_RNC", entity: "NaoConformidade", entityId: params.id, diff: {} } }).catch(() => {});
+
+  // ⚠ O registro INTEIRO, não um `select` do que eu acho que importa: quem vai precisar disto está
+  // reconstruindo algo que já não existe, e o campo que faltar é o que ele vai procurar.
+  const rnc = await prisma.naoConformidade.findUnique({ where: { id: params.id } });
+  if (!rnc) return NextResponse.json({ error: "RNC não encontrada." }, { status: 404 });
+  // O plano de ação 5W2H vinculado é apagado junto (senão fica órfão na aba Plano de Ação) — então
+  // ele também tem de ser preservado junto.
+  const planoAcao = rnc.planoAcaoId
+    ? await prisma.planoAcao.findUnique({ where: { id: rnc.planoAcaoId } })
+    : null;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.auditLog.create({ data: {
+      userId: user.id, action: "EXCLUIR_RNC", entity: "NaoConformidade", entityId: params.id,
+      // ⚠ `numero` e `ano` soltos além do registro: é por eles que se procura "quem apagou a 019",
+      // e ninguém vasculha JSON aninhado atrás do número que já sabe.
+      diff: { numero: rnc.numero, ano: rnc.ano, registro: rnc, planoAcao },
+    } });
+    await tx.naoConformidade.delete({ where: { id: params.id } });
+    // ⚠ `deleteMany` e não `delete`: dentro de uma transação interativa, uma query que estoura
+    // aborta a transação inteira mesmo com `.catch()` em volta — e um plano já apagado por outra
+    // via levaria a RNC junto, sem razão.
+    if (rnc.planoAcaoId) await tx.planoAcao.deleteMany({ where: { id: rnc.planoAcaoId } });
+  });
   return NextResponse.json({ success: true });
 }
