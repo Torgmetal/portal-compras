@@ -1,7 +1,17 @@
 {
-  "build": 3363,
-  "gerado": "2026-09-22T11:10:05.924Z",
+  "build": 3365,
+  "gerado": "2026-09-22T11:12:43.922Z",
   "commits": [
+    {
+      "hash": "c5e2434d",
+      "data": "22/09/2026",
+      "titulo": "Organiza preenchimento do ultrassom no Campo"
+    },
+    {
+      "hash": "07cfd7ec",
+      "data": "22/09/2026",
+      "titulo": "Corrige: a trava do modo demo tirava a barra inicial e derrubou o SharePoint em produção"
+    },
     {
       "hash": "0c1e3bbd",
       "data": "22/09/2026",
@@ -141,16 +151,6 @@
       "hash": "b2e6cf92",
       "data": "21/09/2026",
       "titulo": "Pré-montagem: o relatório aceita vários projetos — o servidor barrava o segundo"
-    },
-    {
-      "hash": "c4b5c6a1",
-      "data": "21/09/2026",
-      "titulo": "Vincula o PDF do PIT ao Data Book"
-    },
-    {
-      "hash": "41a1dae6",
-      "data": "21/09/2026",
-      "titulo": "Corrige PIT do Data Book e limite de fotos"
     }
   ]
 }

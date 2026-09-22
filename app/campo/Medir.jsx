@@ -19,10 +19,8 @@ import { RESULTADO_LABEL } from "@/lib/revisao-inspecao";
 import { reduzImagem } from "@/lib/imagem-cliente";
 import { lerJson } from "@/lib/resposta-json";
 import { evidenciasDoTipo } from "@/lib/fotos-evidencia";
-import {
-  APARELHOS, CABECOTES, ANGULOS, ACOPLANTES, BLOCOS_PADRAO, FACES,
-  TIPOS_CARREGAMENTO, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL,
-} from "@/lib/us-campos";
+import FormularioUSCampo from "./FormularioUSCampo";
+import { ANGULOS, FACES, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL } from "@/lib/us-campos";
 
 /**
  * O INSPETOR DE CAMPO MEDINDO, NO CELULAR.
@@ -495,32 +493,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       <Equipamentos escolhidos={equipamentos} onMudar={setEquipamentos} tipo={rel.tipo} />
 
       {ehUS && (
-        <div className="mt-3 space-y-2.5">
-          <p className="text-[12px] font-semibold text-torg-gray">Aparelhagem e ensaio</p>
-          <p className="text-[11px] text-torg-gray -mt-1.5">
-            Uma vez por ensaio — é a mesma aparelhagem a manhã inteira.
-          </p>
-
-          {/* ⚠ OBRIGATÓRIO aqui, ao contrário do visual de solda: o item 18.1 do PI-QUA-003 exige o
-              tipo de estrutura no conteúdo mínimo do relatório, e o critério muda com ele (15.6
-              estática, 15.7 dinâmica). */}
-          <Sel rot="Tipo de estrutura (PI-QUA-003)" v={cond.carregamento} opcoes={TIPOS_CARREGAMENTO.map((t) => t.nome)}
-            onMudar={(v) => setCond((c) => ({ ...c, carregamento: v }))} destaque={!cond.carregamento} />
-
-          <Sel rot="Aparelho" v={cond.apModelo} opcoes={APARELHOS} onMudar={(v) => setCond((c) => ({ ...c, apModelo: v }))} />
-          <Txt rot="Nº de série do aparelho" v={cond.apSerie} onMudar={(v) => setCond((c) => ({ ...c, apSerie: v }))} />
-
-          <Sel rot="Cabeçote" v={cond.cbModelo}
-            opcoes={CABECOTES.map((c) => `${c.modelo}${c.angulo ? ` · ${c.angulo}°` : ""} · ${c.mhz} MHz`)}
-            onMudar={(v) => setCond((c) => ({ ...c, cbModelo: v }))} />
-          <Txt rot="Nº de série do cabeçote" v={cond.cbSerie} onMudar={(v) => setCond((c) => ({ ...c, cbSerie: v }))} />
-          <Txt rot="Ângulo real (graus)" v={cond.cbAngulo} tipo="number" onMudar={(v) => setCond((c) => ({ ...c, cbAngulo: v }))} />
-
-          <Sel rot="Acoplante" v={cond.acoplante} opcoes={ACOPLANTES} onMudar={(v) => setCond((c) => ({ ...c, acoplante: v }))} />
-          <Sel rot="Bloco padrão" v={cond.blocoPadrao} opcoes={BLOCOS_PADRAO} onMudar={(v) => setCond((c) => ({ ...c, blocoPadrao: v }))} />
-          <Txt rot="Ganho de varredura (dB)" v={cond.ganhoVarredura} tipo="number" onMudar={(v) => setCond((c) => ({ ...c, ganhoVarredura: v }))} />
-          <Txt rot="Local de ensaio" v={cond.local} onMudar={(v) => setCond((c) => ({ ...c, local: v }))} />
-        </div>
+        <FormularioUSCampo rel={rel} cond={cond} setCond={setCond} />
       )}
 
       {usaQuantidadeInspecao(rel.tipo) && pecasQuantidades.length > 0 && <QuantidadesPecas pecas={pecasQuantidades} onChange={setPecasQuantidades} disabled={salvando} />}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { camposCabecalhoUS } from "@/lib/us-relatorio";
+import { camposCabecalhoUS, progressoPreenchimentoUS } from "@/lib/us-relatorio";
 import { extractText } from "unpdf";
 import { gerarUSPDF } from "@/lib/relatorio-us-pdf";
 
@@ -74,5 +74,15 @@ describe("PDF de ultrassom", () => {
     for (const esperado of ["T113A1", "PI-QUA-003", "AWS D1.1", "MDF350B", "20x22", "2 MHz", "FD10012912", "2206365"]) {
       expect(text).toContain(esperado);
     }
+  });
+});
+
+describe("preenchimento móvel do ultrassom", () => {
+  it("mostra exatamente quais campos obrigatórios ainda faltam", () => {
+    expect(progressoPreenchimentoUS({
+      carregamento: "Estaticamente carregada", apModelo: "Mitech MDF350B", apSerie: "FD10012912",
+      cbModelo: "Mitech angular 20x22 · 70° · 2 MHz", cbSerie: "2206365",
+      cbAngulo: "70", acoplante: "Metilcelulose em água", blocoPadrao: "V2", local: "TORG METAL LTDA",
+    })).toEqual({ preenchidos: 9, total: 10, faltando: ["Ganho de varredura"] });
   });
 });
