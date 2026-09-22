@@ -229,7 +229,10 @@ export async function PATCH(req, { params }) {
     dados.resultados = { ...(rel.resultados || {}) };
     for (const k of ["iluminacao", "tecnica", "condicoes", "metalBase", "tipoEstrutura", "tipoPeca",
                      // ensaio por ultrassom (PI-QUA-003): aparelhagem e condição do ensaio
-                     "carregamento", "apModelo", "apSerie", "cbModelo", "cbSerie", "cbAngulo",
+                     // ⚠ `cbFabricante` FALTAVA e o fabricante escolhido era descartado na
+                     // gravação (achado do Codex, 22/09/2026) — o rótulo do cabeçote não carrega
+                     // mais a marca, então sem este campo o relatório perdia de quem é o aparelho.
+                     "carregamento", "apModelo", "apSerie", "cbModelo", "cbFabricante", "cbSerie", "cbAngulo",
                      "acoplante", "blocoPadrao", "ganhoVarredura", "local",
                      // pintura: medições desta inspeção e escolhas editáveis por OP.
                      // Alterar limpeza/abrasivo não modifica o PLP; somente a memória

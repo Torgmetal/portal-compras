@@ -564,3 +564,19 @@ novo, não conserto, e não entra sem o Matheus decidir.
   `campo-espessura-minima` (3) — todos vermelhos antes. **2.935 passando**, `npm run checar` limpo,
   `next build` ok. `app/campo/Pintura.jsx` voltou para baixo do teto de 350 linhas com a extração de
   `controles.jsx` e `PinturaAmbiente.jsx`.
+- **(22/09, 10h15) Fechado o achado ALTA do Codex sobre o cabeçote — era meu, de hoje de manhã.**
+  Mitech e Doppler têm "angular 20x22" nos mesmos três ângulos; tirado o nome da marca do rótulo
+  (pedido do Vitor), as duas telas descobriam o fabricante com `find` pelo TEXTO da opção — que acha
+  Mitech primeiro. Escolher o Doppler gravava **Mitech** no relatório que vai ao cliente. Agora cada
+  opção tem identidade própria (`chaveCabecote` = `fabricante|rótulo`, em `lib/us-campos.js`) e a
+  marca sai da chave, não de uma busca. O que fica gravado não mudou: rótulo em `cbModelo`, marca em
+  `cbFabricante`. ⚠ E `cbFabricante` **não estava na lista fechada** do `PATCH /api/campo/...`: no
+  celular, a marca escolhida era descartada na gravação. Entrou.
+  ⚠ Conferido na produção antes de mexer: existe **1** relatório de US (RUS-113-001), com o rótulo
+  antigo ("Mitech angular 20x22 · 70° · 2 MHz") e `cbFabricante` vazio — nenhum dado errado gravado.
+  A opção "(registrado antes)" mantém esse valor à vista nas duas telas.
+  Testes: `us-cabecote-fabricante` (4, novo) — o terceiro reproduz o defeito pela tela de verdade
+  (esperava Doppler, vinha Mitech). **2.948 passando**, `checar` limpo, build ok.
+  ⚠⚠ **O segundo achado do Codex continua aberto e é decisão do Vitor**: `revisao/route.js` passou
+  de ADMIN/QUALIDADE para `PERFIS_CAMPO`, então todo QUALIDADE_CAMPO pode reabrir qualquer relatório
+  já enviado para assinatura, de qualquer inspetor e qualquer OP.

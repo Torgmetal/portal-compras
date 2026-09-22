@@ -1,16 +1,24 @@
 "use client";
 import { CheckCircle2, AlertCircle } from "lucide-react";
-import { APARELHOS, ACOPLANTES, BLOCOS_PADRAO, TIPOS_CARREGAMENTO, cabecotesPorFabricante, PROCESSOS_SOLDA, CHANFROS } from "@/lib/us-campos";
+import { APARELHOS, ACOPLANTES, BLOCOS_PADRAO, TIPOS_CARREGAMENTO, cabecotesPorFabricante, chaveCabecote, cabecoteDaChave, PROCESSOS_SOLDA, CHANFROS } from "@/lib/us-campos";
+
+const gruposCabecote = cabecotesPorFabricante();
 import { camposCabecalhoUS, detalhesCabecoteUS, progressoPreenchimentoUS } from "@/lib/us-relatorio";
 
 const obrigatorio = <span className="text-red-600" aria-label="obrigatório"> *</span>;
 
-function Select({ rotulo, valor, opcoes = null, grupos = null, mudar }) {
+function Select({ rotulo, valor, opcoes = null, grupos = null, mudar, fora = null }) {
   return <label className="block"><span className="block text-[12px] font-semibold text-torg-dark mb-1">{rotulo}{obrigatorio}</span>
     <select value={valor || ""} onChange={e => mudar(e.target.value)} className={`w-full text-base border-2 rounded-xl px-3 py-3 outline-none ${valor ? "border-gray-200 focus:border-torg-blue" : "border-amber-300 bg-amber-50"}`}>
-      {/* ⚠ `grupos`: a MARCA é o título do grupo, não prefixo de cada opção (Vitor, 22/09/2026) */}
-      <option value="">Selecione…</option>{grupos
-        ? grupos.map(g => <optgroup key={g.fabricante} label={g.fabricante}>{g.itens.map(i => <option key={`${g.fabricante}-${i.rotulo}`} value={i.rotulo}>{i.rotulo}</option>)}</optgroup>)
+      {/* ⚠ `grupos`: a MARCA é o título do grupo, não prefixo de cada opção (Vitor, 22/09/2026) — e
+          o VALOR de cada opção leva a marca junto (`chaveCabecote`), senão Mitech e Doppler ficam
+          indistinguíveis e a gravação escolhe pelo primeiro que casar com o texto.
+          ⚠ `fora`: o que está gravado e não existe mais na lista continua à vista, senão o seletor
+          abre vazio e a primeira gravação apaga o cabeçote do relatório antigo. */}
+      <option value="">Selecione…</option>
+      {fora && <option value={valor}>{fora} (registrado antes)</option>}
+      {grupos
+        ? grupos.map(g => <optgroup key={g.fabricante} label={g.fabricante}>{g.itens.map(i => <option key={i.valor} value={i.valor}>{i.rotulo}</option>)}</optgroup>)
         : opcoes.map(o => <option key={o} value={o}>{o}</option>)}
     </select></label>;
 }
@@ -65,8 +73,10 @@ export default function FormularioUSCampo({ rel, cond, setCond }) {
     </Secao>
 
     <Secao numero="3" titulo="Cabeçote" ajuda="Escolha o conjunto completo; dimensão e frequência aparecem abaixo.">
-      <Select rotulo="Modelo, ângulo e frequência" valor={cond.cbModelo} grupos={cabecotesPorFabricante()}
-        mudar={(v) => setCond(c => ({ ...c, cbModelo: v, cbFabricante: cabecotesPorFabricante().find(g => g.itens.some(i => i.rotulo === v))?.fabricante || "" }))} />
+      <Select rotulo="Modelo, ângulo e frequência" grupos={gruposCabecote}
+        valor={chaveCabecote(cond.cbFabricante, cond.cbModelo)}
+        fora={cond.cbModelo && !gruposCabecote.some(g => g.itens.some(i => i.rotulo === cond.cbModelo)) ? cond.cbModelo : null}
+        mudar={(v) => { const { fabricante, rotulo } = cabecoteDaChave(v); setCond(c => ({ ...c, cbModelo: rotulo, cbFabricante: fabricante })); }} />
       {cond.cbModelo && <div className="grid grid-cols-3 gap-1.5 text-center">
         <div className="rounded-lg bg-gray-50 p-2"><p className="text-[9px] text-torg-gray">MODELO</p><p className="text-[11px] font-bold">{cabecote.modelo || "—"}</p></div>
         <div className="rounded-lg bg-gray-50 p-2"><p className="text-[9px] text-torg-gray">DIMENSÃO</p><p className="text-[11px] font-bold">{cabecote.dimensoes || "—"}</p></div>

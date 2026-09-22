@@ -1,7 +1,12 @@
 {
-  "build": 3378,
-  "gerado": "2026-09-22T13:09:45.925Z",
+  "build": 3379,
+  "gerado": "2026-09-22T13:17:13.906Z",
   "commits": [
+    {
+      "hash": "d60fb1a6",
+      "data": "22/09/2026",
+      "titulo": "Pintura: a foto ganha número e cada etapa, a sua condição ambiental"
+    },
     {
       "hash": "f471f43a",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "6d3ec758",
       "data": "21/09/2026",
       "titulo": "Excel: o painel só congela quando o cabeçalho está perto do topo"
-    },
-    {
-      "hash": "eb18132f",
-      "data": "21/09/2026",
-      "titulo": "Atualiza relatórios LP e EVS ao modelo revisado"
     }
   ]
 }

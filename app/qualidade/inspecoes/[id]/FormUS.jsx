@@ -5,6 +5,7 @@ import { Plus, Trash2, AlertTriangle } from "lucide-react";
 import {
   APARELHOS, ANGULOS, ACOPLANTES, BLOCOS_PADRAO, FACES, MATERIAL_PADRAO,
   TIPOS_CARREGAMENTO, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL, cabecotesPorFabricante,
+  chaveCabecote, cabecoteDaChave,
   ESPESSURAS_CHAPA, rotuloEspessura, valorEspessura, PROCESSOS_SOLDA, CHANFROS,
   JUNTA_PADRAO, TECNICA_PADRAO,
 } from "@/lib/us-campos";
@@ -35,11 +36,17 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
   const set = (i, campo, v) => setLinhas(linhas.map((l, k) => (k === i ? { ...l, [campo]: v } : l)));
 
   const grupos = cabecotesPorFabricante();
-  /** Escolher o cabeçote grava também a MARCA — o rótulo não a carrega mais. */
-  const escolherCabecote = (rotulo) => {
+  /**
+   * Escolher o cabeçote grava também a MARCA — o rótulo não a carrega mais.
+   *
+   * ⚠⚠ E A MARCA VEM DA CHAVE DA OPÇÃO, não de procurar pelo rótulo (achado do Codex, 22/09/2026):
+   * Mitech e Doppler têm "angular 20x22" nos mesmos três ângulos, e o `find` pelo texto achava
+   * Mitech primeiro — o Doppler escolhido virava Mitech no documento do cliente.
+   */
+  const escolherCabecote = (chave) => {
+    const { fabricante, rotulo } = cabecoteDaChave(chave);
     setResultado("cbModelo", rotulo);
-    const dono = grupos.find((g) => g.itens.some((i) => i.rotulo === rotulo));
-    setResultado("cbFabricante", dono?.fabricante || "");
+    setResultado("cbFabricante", fabricante);
   };
 
   // ⚠ O metal base nasce preenchido (Vitor, 22/09/2026: "deixe ela pré-setado em aço carbono") —
@@ -53,24 +60,27 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
   }, [travado]);
   const addLinha = () => setLinhas([...linhas, { marca: marcas[0] || "", indicacao: String(linhas.length + 1), laudo: "R" }]);
 
-  const Campo = useComponenteEstavel(({ rot, k, opcoes = null, rotulos = null, grupos = null, aoMudar = null, tipo = "text", destaque = false }) => {
+  const Campo = useComponenteEstavel(({ rot, k, opcoes = null, rotulos = null, grupos = null, aoMudar = null, chaveAtual = null, tipo = "text", destaque = false }) => {
     const valores = grupos ? grupos.flatMap((g) => g.itens.map((i) => i.rotulo)) : (opcoes || []);
+    // ⚠ com `grupos`, o valor do <select> é a CHAVE da opção (marca + rótulo) — o que fica gravado
+    // continua sendo o rótulo, em `res[k]`.
+    const atual = chaveAtual != null ? chaveAtual : (res[k] || "");
     return (
     <label className="block">
       <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
       {opcoes || grupos ? (
-        <select value={res[k] || ""} disabled={travado} onChange={(e) => (aoMudar ? aoMudar(e.target.value) : setResultado(k, e.target.value))}
+        <select value={atual} disabled={travado} onChange={(e) => (aoMudar ? aoMudar(e.target.value) : setResultado(k, e.target.value))}
           className={`w-full text-[12px] border rounded-lg px-2 py-1.5 disabled:bg-gray-50 ${
             destaque && !res[k] ? "border-amber-400 bg-amber-50" : "border-gray-200 focus:border-torg-blue"}`}>
           <option value="">—</option>
           {/* ⚠⚠ VALOR FORA DA LISTA CONTINUA À VISTA. Relatório antigo tem o cabeçote gravado com a
               marca ("Mitech angular 20x22 · 70° · 2 MHz"), que não existe mais entre as opções —
               sem esta linha o seletor abriria VAZIO e a primeira gravação apagaria o que estava lá. */}
-          {res[k] && !valores.includes(res[k]) && <option value={res[k]}>{res[k]} (registrado antes)</option>}
+          {res[k] && !valores.includes(res[k]) && <option value={atual}>{res[k]} (registrado antes)</option>}
           {grupos
             ? grupos.map((g) => (
               <optgroup key={g.fabricante} label={g.fabricante}>
-                {g.itens.map((i) => <option key={`${g.fabricante}-${i.rotulo}`} value={i.rotulo}>{i.rotulo}</option>)}
+                {g.itens.map((i) => <option key={i.valor} value={i.valor}>{i.rotulo}</option>)}
               </optgroup>
             ))
             : opcoes.map((o) => <option key={o} value={o}>{rotulos?.[o] || o}</option>)}
@@ -107,7 +117,7 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
           {/* ⚠ Vitor (22/09/2026): "tirar esse Mitech, pois já informamos a marca dele antes". A
               opção mostra só "angular 20x22 · 70 · 2 MHz"; a MARCA é o título do grupo e vai
               gravada em `cbFabricante` — Mitech e Doppler têm o mesmo 20x22 nos três ângulos. */}
-          <Campo rot="Cabeçote" k="cbModelo" grupos={grupos} aoMudar={escolherCabecote} />
+          <Campo rot="Cabeçote" k="cbModelo" grupos={grupos} aoMudar={escolherCabecote} chaveAtual={chaveCabecote(res.cbFabricante, res.cbModelo)} />
           <Campo rot="Nº de série do cabeçote" k="cbSerie" />
           <Campo rot="Ângulo real (graus)" k="cbAngulo" tipo="number" />
           <Campo rot="Ganho de varredura (dB)" k="ganhoVarredura" tipo="number" />
