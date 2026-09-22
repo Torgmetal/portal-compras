@@ -1,7 +1,12 @@
 {
-  "build": 3403,
-  "gerado": "2026-09-22T21:46:19.033Z",
+  "build": 3404,
+  "gerado": "2026-09-22T21:58:29.011Z",
   "commits": [
+    {
+      "hash": "1667600a3c",
+      "data": "22/09/2026",
+      "titulo": "Inteligência Fiscal: a aba, a sincronização oficial e a consulta de NCM/CFOP"
+    },
     {
       "hash": "7f61f48200",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ff0c28a8bd",
       "data": "22/09/2026",
       "titulo": "MES: a barra de nesting passa a ter dono, e a obra legada ganha o número de volta"
-    },
-    {
-      "hash": "39d068f6a0",
-      "data": "22/09/2026",
-      "titulo": "Relatório assinado passa a ser editável — sem revisão, com registro"
     }
   ]
 }

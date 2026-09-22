@@ -7,6 +7,7 @@ import { registrarExecucao } from "@/lib/cron-monitor";
 import { baixarTipi, baixarNcm } from "@/lib/fiscal/fonte-oficial";
 import { importarTipi, promover, guardarArtefato } from "@/lib/fiscal/importar-tipi";
 import { importarNcm, promoverNcm } from "@/lib/fiscal/importar-ncm";
+import { temCronSecret } from "@/lib/cron-auth";
 import { log } from "@/lib/log";
 
 // Verificação diária das fontes oficiais (TIPI + NCM).
@@ -24,6 +25,12 @@ import { log } from "@/lib/log";
 const registro = log("api/cron/fiscal-tipi");
 export const runtime = "nodejs";
 export const maxDuration = 180;
+// ⚠⚠ SEM ISTO O NEXT PRÉ-RENDERIZA O CRON E ELE NUNCA RODA EM PRODUÇÃO (achado no build,
+// 22/09/2026). O `GET()` não recebia `req` nem lia `headers`, então o Next o classificou como
+// ESTÁTICO (`○` na saída do build, contra `ƒ` de todos os outros crons): a rota foi EXECUTADA
+// durante o build e passaria a servir a resposta congelada dali — a Receita nunca mais seria
+// consultada. Pior: cada build gastaria um dos 3 acessos/hora que o Siscomex permite.
+export const dynamic = "force-dynamic";
 
 async function anotar(fonte, disparo, fn, disparadaPorId = null) {
   const sinc = await prisma.fiscalSincronizacao.create({ data: { fonte, disparo, status: "RODANDO", disparadaPorId } });
@@ -62,6 +69,10 @@ async function rodarTipi() {
 
 async function rodarNcm() {
   const b = await baixarNcm();
+  // ⚠⚠ O SISCOMEX PERMITE 3 ACESSOS POR HORA, e isso é documentado por eles (PUCX-ER1001). Bater
+  // no teto NÃO é defeito do portal nem da fonte: é limite conhecido, e a referência que já está
+  // ativa continua servindo. Dizer "FALHOU" aqui faria o monitor alertar por uma coisa normal.
+  if (b.limite) return { status: "SEM_MUDANCA", mensagem: b.erro };
   if (b.erro) return { status: "FALHOU", mensagem: b.erro };
   const r = await importarNcm({ baixado: b, guardarArtefato });
   if (r.semMudanca) return { status: "SEM_MUDANCA", sha256: b.sha256, versaoId: r.versao.id, mensagem: "Conteúdo idêntico ao já importado." };
@@ -70,7 +81,12 @@ async function rodarNcm() {
   return { status: "IMPORTADA", sha256: b.sha256, versaoId: r.versao.id, mensagem: p.erro ?? `${r.gravadas} códigos` };
 }
 
-export async function GET() {
+export async function GET(req) {
+  // ⚠⚠ O SEGREDO DO CRON — todos os outros crons do portal o exigem, e este tinha ficado ABERTO:
+  // qualquer um que soubesse a URL dispararia um download da Receita e uma promoção de versão.
+  if (!temCronSecret(req) && process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   // ⚠ Cold start do Neon: o PRIMEIRO query de um cron estoura antes de a compute acordar.
   await aquecerBanco(prismaDirect);
   // ⚠⚠ Trava contra execução simultânea: duas importações concorrentes chegariam na promoção com
