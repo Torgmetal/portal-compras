@@ -135,6 +135,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Consulta de estoque em barras](torg_consulta_estoque_barras.md) — resposta sempre em barras; cotação/pedido Omie com o líquido; falta atendimento parcial
 - [Faturamento direto](torg_faturamento_direto.md) — FD por item da OP; RMItem→OPItem nunca vinculado (usar lib/faturamento-direto.js, fallback por categoria)
 - [Status de compra (CMR)](torg_status_compra_cmr.md) — Preparação mostra material comprado/recebido; fonte é o CMR do Almoxarifado, não o Omie; sync diário
+- [CMR: a planilha manda; o R se confere nos dois lados](torg_recebimento_cmr.md) — R 261547 saiu com identidade de PORCA e certificado de CHAPA; planilha sobrescreve (célula vazia não apaga), R conferido antes de emitir, sem planilha não emite
 - [Recebimento pelo CMR](torg_recebimento_cmr.md) — item da RM baixa pelo CMR (FIFO, kg, ≥95%); Omie só no que não passa pelo CMR
 - [Rastreabilidade — o R por peça](torg_rastreio_corrida.md) — o R manda (puxa corrida/cert/NF); FIFO pela entrega mais antiga; só peça CORTADA ganha R; armadilha da chapa sem "ESPESSURA"
 - [Portal do cliente: naLPC/naLE + "aplicado em"](torg_portal_cliente_nalpc.md) — revisão da LPC gravava naLPC=false (OP-113 invisível ao cliente); certificado mostra o perfil do projeto; certificado sem PDF = pasta; LE só entra por Status da obra › Importar

@@ -1,7 +1,12 @@
 {
-  "build": 3385,
-  "gerado": "2026-09-22T14:43:05.649Z",
+  "build": 3386,
+  "gerado": "2026-09-22T16:39:24.584Z",
   "commits": [
+    {
+      "hash": "476994019c",
+      "data": "22/09/2026",
+      "titulo": "Compras: a conversão de unidade da cotação — a regra e as colunas (nada aplicado ainda)"
+    },
     {
       "hash": "f1533a4328",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "96fff418af",
       "data": "21/09/2026",
       "titulo": "MES: DEMO e PROD deixam de ser o mesmo mundo"
-    },
-    {
-      "hash": "2daa8d6e53",
-      "data": "21/09/2026",
-      "titulo": "Qualidade: apagar uma RNC passa a guardar o que foi apagado"
     }
   ]
 }

@@ -1,0 +1,68 @@
+import { describe, it, expect, vi } from "vitest";
+import { ehOutroMaterial } from "@/lib/cmr-reconciliar";
+import { proximoIndiceR } from "@/lib/cmr";
+import { prisma } from "@/lib/prisma";
+
+// ─── A PLANILHA MANDA, E O R PRECISA ESTAR LIVRE NOS DOIS LADOS ───────────────
+//
+// ⚠⚠ O CASO REAL (R 261547, 22/09/2026): o índice nasceu no portal como uma PORCA (série RC), a
+// planilha trouxe uma CHAPA com o MESMO número, e a regra de então — "preenche só o campo vazio,
+// o portal manda" — completou a PORCA com o CERTIFICADO e a CORRIDA da CHAPA. Identidade de um
+// material com a rastreabilidade de outro, no campo que o data book leva ao cliente.
+
+describe("ehOutroMaterial — trocar de dono é diferente de ganhar detalhe", () => {
+  it("PORCA virando CHAPA é troca de material", () => {
+    expect(ehOutroMaterial("PORCA A563 - 3/8\" - GF", "CHAPA ACO CARBONO LAMINADO A-36 9,50MM")).toBe(true);
+  });
+
+  // ⚠ Preencher a casca é o fluxo NORMAL — tratar como troca encheria o alerta de ruído, e alarme
+  // cheio de ruído ninguém lê.
+  it("casca sendo preenchida não é troca", () => {
+    expect(ehOutroMaterial("(sem descrição)", "CHAPA ACO CARBONO A-36 9,50MM")).toBe(false);
+    expect(ehOutroMaterial("", "CHAPA A-36")).toBe(false);
+  });
+
+  // ⚠ A comparação é pelo substantivo do material: bitola, acabamento e grafia mudam sem trocar
+  // de dono.
+  it.each([
+    ["CHAPA ACO CARBONO A-36 9,50MM", "CHAPA ACO CARBONO LAMINADO A-36 ESPESSURA 9,50MM"],
+    ["PORCA A563 3/8", "PORCA A563 - 3/8\" - GF"],
+    ["PERFIL W 200X26,6", "Perfil W 250x25,3"],
+  ])("%s → %s não é troca", (a, b) => expect(ehOutroMaterial(a, b)).toBe(false));
+});
+
+describe("proximoIndiceR — conta os dois lados", () => {
+  const comPortal = (ultimo) => {
+    vi.spyOn(prisma.documentoQualidade, "findFirst").mockResolvedValue(ultimo ? { importRef: ultimo } : null);
+  };
+
+  // ⚠⚠ ERA METADE DO DEFEITO: a planilha tem linhas que o portal NÃO importa (a "casca", o R
+  // reservado sem descrição), então o maior do portal fica atrás do maior da planilha — e o
+  // próximo número emitido já estava ocupado lá.
+  it("pula à frente do maior da PLANILHA, mesmo com o portal atrás", async () => {
+    comPortal("261400");
+    expect(await proximoIndiceR(2026, ["261547", "261548"])).toBe("261549");
+  });
+
+  it("sem planilha na conta, volta a enxergar meio mundo — e é por isso que ela é obrigatória", async () => {
+    comPortal("261400");
+    expect(await proximoIndiceR(2026)).toBe("261401");
+  });
+
+  // ⚠ Buraco na numeração da planilha NÃO é vaga: aquele R pode estar reservado como casca.
+  it("pula número ocupado mesmo abaixo do maior", async () => {
+    comPortal("261548");
+    expect(await proximoIndiceR(2026, ["261549", "261550"])).toBe("261551");
+  });
+
+  it("ano vazio nos dois lados começa em 0001", async () => {
+    comPortal(null);
+    expect(await proximoIndiceR(2026, [])).toBe("260001");
+  });
+
+  // ⚠ Índice de OUTRO ano na planilha não empurra a numeração deste.
+  it("índice de outro ano não conta", async () => {
+    comPortal("260010");
+    expect(await proximoIndiceR(2026, ["259999", "251000"])).toBe("260011");
+  });
+});

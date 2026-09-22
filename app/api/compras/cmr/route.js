@@ -8,6 +8,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { CMR_CAT, prefixoAno, proximoIndiceR, mapearLancamento, aprenderReferencias } from "@/lib/cmr";
+import { lerLinhasCmr } from "@/lib/cmr-sharepoint";
 import { appendLinhasCmr } from "@/lib/cmr-sharepoint";
 import { ehCascaVazia } from "@/lib/cmr-reconciliar";
 
@@ -110,14 +111,39 @@ export async function POST(req) {
 
   const ano = body.ano || new Date().getFullYear();
   const pre = prefixoAno(ano);
+
+  // ⚠⚠ O R É CONFERIDO NA PLANILHA ANTES DE SER EMITIDO (Matheus, 22/09/2026: "antes de mandar,
+  // verifica se o R está disponível na planilha"). Emitir olhando só o portal foi metade do defeito
+  // do R 261547: a planilha tem linhas que o portal não importa — a "casca", o R reservado sem
+  // descrição —, então o próximo número daqui já estava ocupado lá, e dois materiais diferentes
+  // passaram a dividir um índice.
+  //
+  // ⚠⚠ SEM CONSEGUIR LER A PLANILHA, NÃO SE EMITE R. É recusa deliberada: o lançamento fica para
+  // daqui a pouco, enquanto um número duplicado contamina o certificado que vai ao cliente e só
+  // aparece semanas depois. Quem lê a mensagem sabe o que houve e tenta de novo.
+  let ocupados;
+  try {
+    ocupados = (await lerLinhasCmr(ano)).map((l) => String(l.indiceR || "").trim()).filter(Boolean);
+  } catch (e) {
+    return NextResponse.json({
+      error: "Não consegui conferir a numeração na planilha do SharePoint, e sem isso o R pode sair "
+        + `repetido. Tente de novo em instantes. (${e.message})`,
+    }, { status: 503 });
+  }
+
   // Sequencial inicial do ano; incrementa em memória (evita corrida entre as linhas do lote).
-  const base = await proximoIndiceR(ano); // ex.: 261206
+  const base = await proximoIndiceR(ano, ocupados); // ex.: 261206
   let seq = Number(String(base).slice(2));
+  const usados = new Set(ocupados);
 
   const criados = [];
   const linhasSP = []; // p/ espelhar na planilha do SharePoint (mesma ordem/índice R)
   for (const l of body.lancamentos) {
+    // ⚠ Cada linha do lote confere de novo: o próximo número pode cair num buraco que a planilha
+    // já ocupa mais adiante.
+    while (usados.has(`${pre}${String(seq).padStart(4, "0")}`)) seq++;
     const indiceR = `${pre}${String(seq).padStart(4, "0")}`;
+    usados.add(indiceR);
     seq++;
     const data = mapearLancamento(l, indiceR, user.id);
     try {

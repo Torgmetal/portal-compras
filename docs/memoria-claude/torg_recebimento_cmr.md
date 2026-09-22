@@ -136,3 +136,45 @@ que não chegou trava a compra e para o corte.
 
 ⚠️ Item cujo material ainda **não chegou** simplesmente não é fechado por ninguém — nem CMR nem
 Omie. É o estado correto: 200 dos 555 em aberto estão nessa situação.
+
+## ⚠⚠ A PLANILHA MANDA, E O R PRECISA ESTAR LIVRE NOS DOIS LADOS (22/09/2026)
+
+Matheus, depois do R 261547 sair híbrido: *"o correto vai ser sempre o que foi lançado na
+planilha"* e *"se eu inserir algo pelo portal, o portal manda para a planilha — antes de mandar,
+verifica se o R está disponível na planilha"*.
+
+**O que aconteceu.** O índice 261547 nasceu no portal como uma **PORCA** (série **RC**, vinda do
+cron em 18/09). A planilha trouxe **261547 = CHAPA A-36 9,50MM** (série **R**). O reconciliador
+casa **só pelo número** — a série vive como texto na observação (`"Tipo: RC"`) — e a regra de então
+era *"preenche só o campo VAZIO; o portal manda"*. A PORCA estava sem certificado, então ela foi
+**completada com o certificado 79475 e a corrida 887182294 da CHAPA**.
+
+⚠⚠ **Identidade de um material com a rastreabilidade de outro** — e o índice R é a chave da ficha
+do data book (`lib/databook-ficha-r.js`), ou seja, ia para o documento do cliente.
+
+**As duas causas, que se somam:**
+1. `proximoIndiceR` olhava **só o portal**. A planilha tem linhas que o portal NÃO importa por
+   decisão — a *casca* (R reservado sem descrição) —, então o maior do portal fica atrás do maior
+   da planilha e o número emitido já estava ocupado lá.
+2. O reconciliador **completava** em vez de obedecer: campo vazio + mesmo número = preenche, sem
+   perguntar se ainda é o mesmo material.
+
+**O que passou a valer:**
+- **Planilha vence**: valor da planilha **sobrescreve** o do portal. ⚠ Célula **vazia não apaga** —
+  "o que foi lançado" fala do que ESTÁ lá, não do que falta.
+- **`ehOutroMaterial`**: se a descrição troca de substantivo (PORCA → CHAPA), é **troca de dono do
+  índice** — sai em `trocas` e vira `AuditLog` (`CMR_INDICE_TROCOU_DE_MATERIAL`). Casca sendo
+  preenchida **não** conta, senão o alerta vira ruído.
+- **O R é conferido na planilha ANTES de ser emitido** (`proximoIndiceR(ano, ocupados)`), pulando
+  inclusive buraco de numeração — buraco pode ser casca reservada, não vaga.
+- ⚠⚠ **Sem conseguir ler a planilha, o portal NÃO emite R** (503). Recusa deliberada: o lançamento
+  espera alguns minutos, enquanto um número duplicado contamina certificado e só aparece semanas
+  depois.
+
+⚠ **Ainda aberto:** a série (R/RC) continua fora da chave — mora na observação como texto. Se a
+planilha numerar R e RC em paralelo, dois materiais legítimos voltam a dividir um índice. A saída é
+a chave virar **(série, índice)**, com migração dos ~1.589 registros de 2026.
+
+⚠ **Dois índices duplicados no portal** (`261392` com três linhas, `261401` com duas), do import
+manual recriando o que já existia. O data book já desempata preferindo a linha da OP — a
+ambiguidade era conhecida e nunca foi fechada.
