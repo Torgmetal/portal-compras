@@ -37,14 +37,22 @@ describe("MODO_DEMO", () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("SharePoint: gravações vão para a pasta DEMO, nunca para a pasta real da obra", async () => {
+  it("SharePoint: gravações vão para /DEMO/…, com a barra inicial que o Graph exige", async () => {
     process.env.MODO_DEMO = "1";
     const { pastaDeGravacao } = await import("@/lib/modo-demo");
-    expect(pastaDeGravacao("SERVIDOR/Ordem de Servico/01. OP/OP-122/4. Expedição")).toBe("DEMO/SERVIDOR/Ordem de Servico/01. OP/OP-122/4. Expedição");
-    expect(pastaDeGravacao("/SERVIDOR/x")).toBe("DEMO/SERVIDOR/x");
+    expect(pastaDeGravacao("/Ordem de Servico/01. OP/OP-122/4. Expedição")).toBe("/DEMO/Ordem de Servico/01. OP/OP-122/4. Expedição");
+    expect(pastaDeGravacao("SERVIDOR/x")).toBe("/DEMO/SERVIDOR/x");
+    expect(pastaDeGravacao("/DEMO/SERVIDOR/x")).toBe("/DEMO/SERVIDOR/x");
+  });
+
+  // ⚠⚠ A REGRESSÃO DE 21/09/2026: fora do demo a função tirava a barra inicial, o Graph só aceita
+  // `root:/caminho`, e toda gravação no SharePoint da produção passou a falhar (lote de desenhos
+  // da OP-94/118, romaneio, data book). Fora do demo o caminho tem de voltar IDÊNTICO.
+  it("fora do demo o caminho volta intocado — barra inicial inclusive", async () => {
     delete process.env.MODO_DEMO;
-    vi.resetModules();
-    const { pastaDeGravacao: fora } = await import("@/lib/modo-demo");
-    expect(fora("SERVIDOR/x")).toBe("SERVIDOR/x");
+    const { pastaDeGravacao } = await import("@/lib/modo-demo");
+    for (const c of ["/Ordem de Servico/01. OP/OP-094/2. Engenharia/2.5 Projetos/2.5.2 Fabricação/A3", "/RH/Workspace", "SERVIDOR/x", "//dupla", ""]) {
+      expect(pastaDeGravacao(c)).toBe(c);
+    }
   });
 });

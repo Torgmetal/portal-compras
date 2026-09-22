@@ -405,3 +405,6 @@ novo, não conserto, e não entra sem o Matheus decidir.
   Novo: `scripts/mes-zerar.mjs` — apaga o MES inteiro (ou só o movimento, com `--manter-cadastro`),
   numa transação, só com `--confirmo`, e conferindo que sobrou zero. Não alcança o portal por
   construção: só nomeia tabelas do schema `mes`.
+- **22/09 (manhã)** Regressão do modo demo: `pastaDeGravacao` normalizava o caminho fora do demo e
+  derrubou TODA gravação no SharePoint em produção (lote de desenhos OP-94/118, romaneio, data book).
+  Corrigido: fora do demo devolve o caminho intocado; teste novo cobre o caminho antigo.

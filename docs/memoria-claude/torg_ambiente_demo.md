@@ -27,3 +27,17 @@ de branches dos previews; Postgres local resolveu em minutos e fica todo no Mac.
 ⚠ **Postgres local precisa estar de pé**: `brew services start postgresql@17`.
 
 Ver [[torg_tekla_tmsa_vale]] (o que a TMSA exige na OP-122) e [[torg_vercel_neon_deploy]].
+
+### ⚠⚠ A trava de demo quebrou a PRODUÇÃO por uma barra (21→22/09/2026)
+
+`pastaDeGravacao` tirava a barra inicial do caminho **em qualquer modo** — e o Graph só aceita
+`root:/caminho`. Resultado: da noite de 21/09 até a manhã de 22/09, **toda gravação no SharePoint
+da produção falhou** — Larissa não conseguiu imprimir o lote de desenhos da OP-94 e da OP-118
+(o PDF é montado e SUBIDO para a pasta da obra antes de voltar para a tela), e o mesmo valia para
+romaneio, data book e análise crítica.
+
+⚠ **Trava de ambiente não pode ter efeito colateral fora dele.** A função agora devolve o caminho
+**idêntico** quando `MODO_DEMO` não está ligado, e o teste cobre exatamente isso (`fora do demo o
+caminho volta intocado — barra inicial inclusive`). Regra geral: quando um recurso novo passa a
+atravessar um caminho antigo, o teste do caminho ANTIGO é o que importa.
+

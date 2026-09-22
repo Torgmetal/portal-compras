@@ -1,7 +1,12 @@
 {
-  "build": 3362,
-  "gerado": "2026-09-22T10:50:09.224Z",
+  "build": 3363,
+  "gerado": "2026-09-22T11:10:05.924Z",
   "commits": [
+    {
+      "hash": "0c1e3bbd",
+      "data": "22/09/2026",
+      "titulo": "Corrige relatório de ultrassom e mantém emitidos no Campo"
+    },
     {
       "hash": "f9f98b75",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "41a1dae6",
       "data": "21/09/2026",
       "titulo": "Corrige PIT do Data Book e limite de fotos"
-    },
-    {
-      "hash": "abe1be02",
-      "data": "21/09/2026",
-      "titulo": "Cotação: os e-mails saem em fila, com pausa — doze de uma vez estouravam o Resend"
     }
   ]
 }
