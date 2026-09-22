@@ -519,6 +519,10 @@ function ImportarModal({ opId, temLotes, onClose, onImportado }) {
   );
 }
 
+/** A mensagem de quem ficou selecionado sem quantidade — a mesma no aviso e no bloqueio. */
+const avisoSemQuantidade = (marcas) =>
+  `${marcas.length} marca(s) sem quantidade não entram no romaneio: ${marcas.slice(0, 6).join(", ")}${marcas.length > 6 ? "…" : ""}. Informe quantas peças de cada uma vão nesta carga, ou tire-as da lista.`;
+
 // ── wizard emitir romaneio (FORM 22) — 3 passos ───────────────────────────────
 function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
   const [passo, setPasso] = useState(1);
@@ -599,10 +603,16 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
     return (Number(m.pesoTotalKg) || 0) * (q / m.qtd);
   };
   const selecionadas = marcas ? marcas.filter((m) => sel.has(m.marca)) : [];
+  // ⚠⚠ MARCA SELECIONADA SEM QUANTIDADE NÃO ENTRA NO ROMANEIO — e era descartada em silêncio, no
+  // servidor, sumindo também do romaneio prévio (que é reescrito com o que foi emitido). Foi o que
+  // aconteceu na OP-067 (Vitor, 22/09/2026: "as peças não está puxando para o romaneio"): as marcas
+  // que o portal dava por expedidas entraram na carga com quantidade 0.
+  const semQuantidade = selecionadas.filter((m) => !(Number(qtds[m.marca]) > 0)).map((m) => m.marca);
   const pesoSel = selecionadas.reduce((s, m) => s + pesoAjustado(m), 0);
 
   async function emitir() {
     if (!selecionadas.length) { setErro("Selecione ao menos uma marca."); setPasso(1); return; }
+    if (semQuantidade.length) { setErro(avisoSemQuantidade(semQuantidade)); setPasso(1); return; }
     if (emitido && !f.mudanca.trim()) { setErro("Descreva o que mudou nesta revisão."); return; }
     setErro(""); setGerando(true);
     try {
@@ -629,6 +639,7 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
   // Prévia: gera o FORM 22 só pra conferir/imprimir — não salva no servidor, não emite.
   async function gerarPrevia() {
     if (!selecionadas.length) { setErro("Selecione ao menos uma marca."); setPasso(1); return; }
+    if (semQuantidade.length) { setErro(avisoSemQuantidade(semQuantidade)); setPasso(1); return; }
     setErro(""); setGerandoPrevia(true);
     try {
       const r = await fetch(`/api/comercial/op/${opId}/lotes-expedicao/${lote.id}/romaneio`, {
@@ -676,6 +687,13 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
               <CheckCircle2 size={32} className="mx-auto text-emerald-600 mb-2" />
               <p className="text-sm font-semibold text-torg-dark">Romaneio {ok.numero}{ok.revisao > 0 ? ` — revisão R${String(ok.revisao).padStart(2, "0")}` : ""} emitido</p>
               <p className="text-xs text-torg-gray mt-1">{ok.sharepoint?.ok ? "Salvo no servidor (4.2 Romaneios) e baixado." : ok.sharepoint ? `Baixado — mas não salvou no SharePoint: ${ok.sharepoint.erro}` : "Baixado."}</p>
+              {/* ⚠ o servidor também descarta marca sem quantidade — se chegou aqui, diz quais: o
+                  prévio é reescrito com o que foi emitido, e a peça sumiria sem ninguém saber. */}
+              {ok.ignoradas?.length > 0 && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2 inline-block">
+                  {ok.ignoradas.length} marca(s) ficaram de fora por estarem sem quantidade: {ok.ignoradas.slice(0, 6).join(", ")}{ok.ignoradas.length > 6 ? "…" : ""}
+                </p>
+              )}
             </div>
           ) : passo === 1 ? (
             <>
@@ -697,7 +715,8 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
                       <input type="checkbox" checked={sel.has(m.marca)} onChange={() => toggle(m.marca)} className="accent-torg-blue" />
                       <span className="font-mono text-torg-dark w-20 shrink-0 truncate">{m.marca}</span>
                       <span className="text-torg-gray truncate flex-1">{m.descricao || ""}</span>
-                      <CampoDecimal value={qtds[m.marca] ?? ""} onChange={(txt) => setQtds((q) => ({ ...q, [m.marca]: txt === "" ? "" : numeroBR(txt) }))} disabled={!sel.has(m.marca)} title="Quantidade" className="w-16 text-right text-[12px] border border-gray-300 rounded px-1.5 py-0.5 disabled:bg-gray-100 disabled:text-gray-400 outline-none focus:border-torg-blue" />
+                      <CampoDecimal value={qtds[m.marca] ?? ""} onChange={(txt) => setQtds((q) => ({ ...q, [m.marca]: txt === "" ? "" : numeroBR(txt) }))} disabled={!sel.has(m.marca)} title="Quantidade"
+                        className={`w-16 text-right text-[12px] border rounded px-1.5 py-0.5 disabled:bg-gray-100 disabled:text-gray-400 outline-none focus:border-torg-blue ${sel.has(m.marca) && !(Number(qtds[m.marca]) > 0) ? "border-red-400 bg-red-50 text-red-700" : "border-gray-300"}`} />
                       <span className="text-torg-gray tabular-nums whitespace-nowrap w-16 text-right">{m.pesoTotalKg != null ? fmtKg(pesoAjustado(m)) : ""}</span>
                       <button onClick={() => removerMarca(m.marca)} className="text-gray-300 hover:text-red-600 shrink-0 ml-0.5" title="Tirar esta peça do romaneio"><X size={13} /></button>
                     </div>
@@ -705,6 +724,9 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
                 </div>
               )}
               <p className="text-[11px] text-torg-gray">Ajuste a <strong>quantidade</strong>, ou clique no <strong>X</strong> pra tirar a peça do romaneio (volta pro pendente) — o peso acompanha.</p>
+              {semQuantidade.length > 0 && (
+                <p className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5">{avisoSemQuantidade(semQuantidade)}</p>
+              )}
 
               <div className="border-t border-gray-100 pt-2">
                 <span className="text-[11px] font-semibold text-torg-gray uppercase tracking-wide">Incluir peça</span>

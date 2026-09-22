@@ -68,31 +68,45 @@ export async function POST(req, { params }) {
 
   const numero = `R${previo.numero}`;
   const data = body.data ? new Date(body.data) : (previo.dataPrevista || new Date());
-  let itens;
+  let itens, ignoradas = [];
   if (body.itensSel?.length) {
     // Seleção com quantidade: o prévio traz o peso da qtd cheia; ao mudar a
     // quantidade, o peso vai proporcional (pesoUnit = pesoTotal / qte).
     // Universo = marcas do prévio + TODAS as da Lista de Expedição (permite INCLUIR
     // peça nova na revisão, não só as que já estavam no romaneio). pesoUnit = pesoTotal/qte.
-    const porMarca = new Map();
+    const daLista = new Map();
     const listasOP = await prisma.listaExpedicao.findMany({ where: { OR: [{ opId: op.id }, { opNumero: String(op.numero) }] }, select: { frente: true, marcasJson: true } });
     for (const l of listasOP) for (const mm of (Array.isArray(l.marcasJson) ? l.marcasJson : [])) {
       const kk = String(mm.marca || "").trim().toUpperCase();
-      if (kk && !porMarca.has(kk)) porMarca.set(kk, { marca: mm.marca, descricao: mm.descricao, frente: l.frente, qte: mm.qte, pesoTotal: mm.pesoTotal });
+      if (kk && !daLista.has(kk)) daLista.set(kk, { marca: mm.marca, descricao: mm.descricao, frente: l.frente, qte: mm.qte, pesoTotal: mm.pesoTotal });
     }
-    for (const m of marcasPrevio) if (m?.marca) porMarca.set(String(m.marca).trim().toUpperCase(), m);
+    const doPrevio = new Map();
+    for (const m of marcasPrevio) if (m?.marca) doPrevio.set(String(m.marca).trim().toUpperCase(), m);
     itens = body.itensSel
       .map((s) => {
-        const pm = porMarca.get(String(s.marca).trim().toUpperCase());
-        if (!pm) return null;
-        const qteOrig = Number(pm.qte) || 0;
-        const pesoOrig = Number(pm.pesoTotal) || 0;
+        const k = String(s.marca).trim().toUpperCase();
+        const pv = doPrevio.get(k), lst = daLista.get(k);
+        const base = pv || lst;
+        if (!base) return null;
+        // ⚠⚠ O PESO UNITÁRIO É DA MARCA, NÃO DA CARGA. Vitor (22/09/2026): "as peças da OP-67 não
+        // está puxando para o romaneio". As marcas que o portal dava por expedidas entraram no
+        // prévio com `qte: 0` e `pesoTotal: 0`; derivando o unitário desse item, a peça saía no
+        // FORM 22 pesando ZERO mesmo depois de alguém corrigir a quantidade na tela. Quando o item
+        // do prévio não tem de onde tirar o peso, quem responde é a Lista de Expedição.
+        const comPeso = Number(pv?.qte) > 0 && Number(pv?.pesoTotal) > 0 ? pv : (Number(lst?.qte) > 0 ? lst : base);
+        const qteOrig = Number(comPeso?.qte) || 0;
+        const pesoOrig = Number(comPeso?.pesoTotal) || 0;
         const pesoUnit = qteOrig > 0 ? pesoOrig / qteOrig : pesoOrig;
         const qtd = Number(s.qtd) || 0;
         // grava os dois nomes (qtd/pesoKg p/ o FORM 22; qte/pesoTotal/frente p/ o cruzamento de expedido)
-        return { marca: pm.marca, descricao: pm.descricao || null, frente: pm.frente || null, qtd, qte: qtd, pesoKg: pesoUnit * qtd, pesoTotal: pesoUnit * qtd };
+        return { marca: base.marca, descricao: base.descricao || lst?.descricao || null, frente: base.frente || lst?.frente || null, qtd, qte: qtd, pesoKg: pesoUnit * qtd, pesoTotal: pesoUnit * qtd };
       })
-      .filter((it) => it && it.qtd > 0);
+      .filter(Boolean);
+    // ⚠⚠ ITEM SEM QUANTIDADE NÃO SOME CALADO. Ele era descartado aqui mesmo — e o prévio é
+    // REESCRITO com o que foi emitido (mais abaixo), então a marca sumia do romaneio E da carga,
+    // sem nada na tela. Agora ela volta nomeada, para quem emitiu saber o que ficou de fora.
+    ignoradas = itens.filter((it) => !(it.qtd > 0)).map((it) => it.marca);
+    itens = itens.filter((it) => it.qtd > 0);
   } else {
     itens = marcasPrevio.filter((m) => m?.marca).map((m) => ({
       marca: m.marca, descricao: m.descricao || null, frente: m.frente || null,
@@ -105,7 +119,14 @@ export async function POST(req, { params }) {
       itens = itens.filter((it) => sel.has(String(it.marca).trim().toUpperCase()));
     }
   }
-  if (!itens.length) return NextResponse.json({ error: "Nenhuma marca/quantidade selecionada." }, { status: 400 });
+  if (!itens.length) {
+    return NextResponse.json({
+      error: ignoradas.length
+        ? `Sem quantidade para ${ignoradas.slice(0, 5).join(", ")}${ignoradas.length > 5 ? "…" : ""} — informe quantas peças de cada marca entram nesta carga.`
+        : "Nenhuma marca/quantidade selecionada.",
+      ignoradas,
+    }, { status: 400 });
+  }
 
   // Persiste o transportador no lote (vale pra prévia e final — conveniência).
   await prisma.loteExpedicao.update({ where: { id: lote.id }, data: { transportadora, motorista, placaVeiculo: placa, placaCarreta, contatoTransporte: contato } }).catch(() => {});
@@ -115,7 +136,7 @@ export async function POST(req, { params }) {
   // emitido, não vira revisão.
   if (body.previa) {
     const buf = await gerarRomaneioForm22({ op, romaneio: { numero, data, transportadora, motorista, placa, placaCarreta, contatoTransporte: contato }, itens });
-    return NextResponse.json({ ok: true, previa: true, numero, nome: `PREVIA Romaneio ${numero} - OP-${op.numero}${cli ? ` - ${cli}` : ""}.xlsx`, arquivo: buf.toString("base64") });
+    return NextResponse.json({ ok: true, previa: true, numero, ignoradas, nome: `PREVIA Romaneio ${numero} - OP-${op.numero}${cli ? ` - ${cli}` : ""}.xlsx`, arquivo: buf.toString("base64") });
   }
 
   // Emissão × revisão: 1ª vez emite R00; se já foi emitido, é revisão (exige motivo).
@@ -165,7 +186,7 @@ export async function POST(req, { params }) {
     },
   }).catch(() => {});
 
-  await prisma.auditLog.create({ data: { userId: user.id, action: novaRevisao === 0 ? "EMITIR_ROMANEIO" : "REVISAR_ROMANEIO", entity: "RomaneioPrevio", entityId: previo.id, diff: { numero, revisao: novaRevisao, itens: itens.length } } }).catch(() => {});
+  await prisma.auditLog.create({ data: { userId: user.id, action: novaRevisao === 0 ? "EMITIR_ROMANEIO" : "REVISAR_ROMANEIO", entity: "RomaneioPrevio", entityId: previo.id, diff: { numero, revisao: novaRevisao, itens: itens.length, ...(ignoradas.length ? { ignoradasSemQuantidade: ignoradas } : {}) } } }).catch(() => {});
 
-  return NextResponse.json({ ok: true, numero, revisao: novaRevisao, nome: fileNome, arquivo: buf.toString("base64"), sharepoint });
+  return NextResponse.json({ ok: true, numero, revisao: novaRevisao, ignoradas, nome: fileNome, arquivo: buf.toString("base64"), sharepoint });
 }

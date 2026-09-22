@@ -643,3 +643,18 @@ novo, não conserto, e não entra sem o Matheus decidir.
   ⚠ **Não confirmado com a Lais**: se o que falta for a lista de marcas nos tipos SEM quantidade
   (LP, US, EVS, pré-montagem), a tela mostra um textarea de marcas e não um seletor — aí é outra
   mudança, e depende de ela dizer em qual tela estava.
+- **(22/09, 16h15) A peça entrava na carga e não chegava no romaneio.** Vitor: *"as peças da OP-67
+  não está puxando para o romaneio"*. Duas coisas, ambas na emissão do FORM 22
+  (`lotes-expedicao/[loteId]/romaneio`), e as duas nascidas do item que entrou no prévio com
+  **quantidade 0** (as marcas que o portal dava por totalmente expedidas — ver a correção das 14h):
+  **(1) sumia em silêncio.** `filter(it => it.qtd > 0)` descartava o item, e logo abaixo o prévio é
+  **reescrito com o que foi emitido** — então a marca saía do romaneio E da carga, sem uma linha na
+  tela. Agora volta nomeada (`ignoradas`, na resposta e no AuditLog), a tela **bloqueia** antes de
+  emitir dizendo quais, e o campo de quantidade fica vermelho.
+  **(2) peso ZERO mesmo corrigindo a quantidade.** O unitário era derivado do item do prévio
+  (0 peças / 0 kg); o mapa da Lista de Expedição era sobrescrito por ele. Medido no teste: T67F62,
+  37,1 kg para 2 peças, saía com `pesoKg: 0`. Agora, quando o item do prévio não tem de onde tirar o
+  peso, quem responde é a Lista de Expedição — 18,55 kg por peça.
+  Testes: `romaneio-item-zero` (4), três vermelhos antes. **3.082 passando**, checar limpo, build ok.
+  ⚠ A reimportação da lista da OP-067 continua pendente (escrita no banco de produção, recusada pela
+  trava desta sessão): sem ela as 33 marcas parciais seguem invisíveis na seleção.

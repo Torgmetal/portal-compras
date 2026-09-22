@@ -1,7 +1,12 @@
 {
-  "build": 3394,
-  "gerado": "2026-09-22T19:03:50.741Z",
+  "build": 3395,
+  "gerado": "2026-09-22T19:18:57.445Z",
   "commits": [
+    {
+      "hash": "fd3bd59c",
+      "data": "22/09/2026",
+      "titulo": "Inspeção: a lista de peças da OP volta no relatório já enviado"
+    },
     {
       "hash": "8dd0cde0",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d0ae17d0",
       "data": "22/09/2026",
       "titulo": "MES: a obra passa a ter uma definição só, e o DEMO sai da tela"
-    },
-    {
-      "hash": "ac22f9f3",
-      "data": "22/09/2026",
-      "titulo": "Organiza preenchimento do ultrassom no Campo"
     }
   ]
 }
