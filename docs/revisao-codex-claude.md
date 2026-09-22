@@ -736,3 +736,23 @@ novo, não conserto, e não entra sem o Matheus decidir.
   conclui é a contabilidade.
   Testes: `fiscal-tipi-planilha` (43) e os 3 novos de fração em `cmr-planilha-manda` (31).
   **3.155 passando**, checar limpo, tela validada logada sem erro de console.
+- **(22/09, 20h55) Painel de Atualizações Tributárias — o MVP fiscal fecha.** Terceira aba, com as
+  duas referências ativas, o histórico de verificações e o botão "Verificar atualizações" (só ADMIN,
+  recusado no SERVIDOR e não só na tela).
+  ⚠⚠ **O TETO É DA FONTE, NÃO DO PORTAL**: o Siscomex permite **3 acessos por hora** (PUCX-ER1001).
+  Um botão sem trava, clicado três vezes, queima a cota e o cron da madrugada encontra a porta
+  fechada. Daí o intervalo de 15 min (`reservarVez`) somado à trava compartilhada com o cron
+  (`comTravaDeCron`, chave `fiscal-fontes`) — a mesma lição do botão de Prazos das RMs.
+  ⚠⚠ **DEFEITOS PEGOS PELO BUILD E PELOS TESTES, não por revisão**: (1) o cron estava sendo
+  PRÉ-RENDERIZADO (`○` contra `ƒ` de todos os outros) — rodava no build e serviria a resposta
+  congelada, ou seja, nunca rodaria de verdade; (2) o cron estava SEM `temCronSecret`; (3) `dataBr`
+  aceitava `32/13/2022` porque o JavaScript ROLA datas inválidas em vez de devolver `NaN` — virava
+  01/02/2023, uma data que ninguém escreveu, numa coluna de VIGÊNCIA.
+  ⚠ Matheus (22/09/2026): *"utilizamos o item ARMAÇÃO DE ESTRUTURA METÁLICA para todos os
+  faturamentos, só alteramos o NCM conforme o cliente solicita; o que é cada um vai na descrição do
+  item no Omie"*. Medido na NF 973: os 24 itens têm o MESMO `cProd` (ARM000010) e o mesmo `xProd`.
+  **`ListarNF` não devolve a subdescrição** — só quantidade e valor diferem. Consequência para a
+  auditoria: a varredura por Omie ACHA a divergência, mas identificar o que cada item é exige o XML
+  (`infAdProd`) ou o pedido. ⚠⚠ E fica a questão para a contabilidade: classificação fiscal segue a
+  natureza do produto, não o pedido do cliente.
+  Testes: `fiscal-ncm` (12), novo. **3.167 passando**, build local EXIT=0, tela validada logada.

@@ -9,7 +9,7 @@ export const metadata = {
 };
 
 export default async function InteligenciaFiscalPage() {
-  await requireAcesso({ modulos: ["FISCAL"] });
+  const user = await requireAcesso({ modulos: ["FISCAL"] });
   // ⚠ A referência vem do SERVIDOR já na primeira pintura: a tela nunca pode aparecer sem dizer de
   // quando é o dado que ela está servindo.
   const referencia = await referenciaAtiva();
@@ -20,6 +20,8 @@ export default async function InteligenciaFiscalPage() {
       operacoes={OPERACOES}
       cstIpi={CST_IPI}
       familias={Object.values(FAMILIA)}
+      // ⚠ O botão só aparece habilitado para ADMIN — e o SERVIDOR recusa de qualquer jeito.
+      ehAdmin={user.tipo === "ADMIN"}
     />
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, Info } from "lucide-react";
+import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 
 // ─── INTELIGÊNCIA FISCAL ─────────────────────────────────────────────────────
 //
@@ -338,9 +338,145 @@ function AbaCfop({ cfops, operacoes, cstIpi, familias }) {
   );
 }
 
-const ABAS = [{ id: "ncm", rotulo: "Consulta NCM" }, { id: "cfop", rotulo: "Consulta CFOP" }];
 
-export default function InteligenciaFiscalClient({ referencia, cfops, operacoes, cstIpi, familias }) {
+const fmtHora = (d) => (d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
+
+/** ⚠ Os três desfechos precisam ser distinguíveis: "sem mudança" é SUCESSO (e é o caminho normal),
+ *  não um meio-termo entre importar e falhar. */
+const DESFECHO = {
+  IMPORTADA:   { Icone: CheckCircle2, cor: "text-emerald-600", rotulo: "importada" },
+  SEM_MUDANCA: { Icone: MinusCircle,  cor: "text-torg-gray",   rotulo: "sem mudança" },
+  FALHOU:      { Icone: XCircle,      cor: "text-red-600",     rotulo: "falhou" },
+  RODANDO:     { Icone: Loader2,      cor: "text-torg-blue",   rotulo: "rodando" },
+};
+
+function AbaAdmin({ referencia: inicial, ehAdmin }) {
+  const [dados, setDados] = useState({ referencia: inicial, historico: [], ultimaVerificacaoOk: null });
+  const [sincronizando, setSincronizando] = useState(false);
+  const [aviso, setAviso] = useState(null);
+
+  const carregar = useCallback(async () => {
+    try {
+      const r = await fetch("/api/fiscal/inteligencia/status");
+      const d = await r.json();
+      if (d.success) setDados(d);
+    } catch { /* a tela já mostra o que tem */ }
+  }, []);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const verificar = async () => {
+    setSincronizando(true); setAviso(null);
+    try {
+      const r = await fetch("/api/fiscal/inteligencia/sincronizar", { method: "POST" });
+      const d = await r.json();
+      setAviso(d.success
+        ? { tipo: "ok", texto: `TIPI: ${d.tipi.mensagem} · NCM: ${d.ncm.mensagem}` }
+        : { tipo: "erro", texto: d.error || "Não foi possível verificar." });
+      await carregar();
+    } catch {
+      setAviso({ tipo: "erro", texto: "Falha de rede ao chamar a verificação." });
+    } finally { setSincronizando(false); }
+  };
+
+  const t = dados.referencia?.tipi;
+  const n = dados.referencia?.ncm;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">TIPI — alíquotas de IPI</p>
+          {t ? (
+            <>
+              <p className="mt-1 text-2xl font-bold text-torg-dark">{t.totalNcm.toLocaleString("pt-BR")}<span className="ml-1 text-sm font-normal text-torg-gray">NCMs</span></p>
+              <dl className="mt-2 space-y-0.5 text-xs text-torg-gray">
+                <div>Importada em <strong className="text-torg-dark">{fmtHora(t.observadoEm)}</strong></div>
+                <div>Aprovada em <strong className="text-torg-dark">{fmtHora(t.aprovadoEm)}</strong></div>
+                {/* ⚠⚠ As três datas ficam SEPARADAS de propósito — ver o contrato 1. */}
+                <div>Vigência normativa: <strong className="text-amber-700">{t.vigenciaDeclarada ? fmtHora(t.vigenciaInicio) : "não declarada pela fonte"}</strong></div>
+                <div className="pt-1 font-mono text-[10px] text-gray-400">sha {t.fonte.sha256.slice(0, 24)}</div>
+              </dl>
+            </>
+          ) : <p className="mt-2 text-sm text-amber-700">Nenhuma versão importada.</p>}
+        </div>
+
+        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">NCM — nomenclatura</p>
+          {n ? (
+            <>
+              <p className="mt-1 text-2xl font-bold text-torg-dark">{n.totalCodigos.toLocaleString("pt-BR")}<span className="ml-1 text-sm font-normal text-torg-gray">códigos</span></p>
+              <dl className="mt-2 space-y-0.5 text-xs text-torg-gray">
+                <div>Importada em <strong className="text-torg-dark">{fmtHora(n.observadoEm)}</strong></div>
+                {/* ⚠ Esta fonte DECLARA o ato — ao contrário da TIPI. */}
+                <div>Ato: <strong className="text-torg-dark">{n.atoDeclarado || "—"}</strong></div>
+                <div className="pt-1 font-mono text-[10px] text-gray-400">sha {n.fonte.sha256.slice(0, 24)}</div>
+              </dl>
+            </>
+          ) : <p className="mt-2 text-sm text-amber-700">Nenhuma versão importada.</p>}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
+        <button
+          onClick={verificar}
+          disabled={!ehAdmin || sincronizando}
+          className="inline-flex items-center gap-2 rounded-lg bg-torg-blue px-4 py-2 text-sm font-medium text-white transition hover:bg-torg-blue/90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {sincronizando ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+          Verificar atualizações
+        </button>
+        <span className="text-xs text-torg-gray">
+          Última verificação bem-sucedida: <strong className="text-torg-dark">{fmtHora(dados.ultimaVerificacaoOk)}</strong> · automática todo dia às 4h30
+        </span>
+        {!ehAdmin && <span className="text-xs text-amber-700">Só o administrador pode disparar a verificação.</span>}
+      </div>
+
+      {/* ⚠ O teto é da FONTE, não do portal — e dizer isso evita que o clique bloqueado pareça bug. */}
+      <p className="text-xs text-torg-gray">
+        ⚠ O Siscomex limita a <strong>3 consultas por hora</strong>. O botão espera 15 minutos entre disparos para não queimar a cota do cron.
+      </p>
+
+      {aviso && (
+        <div className={`rounded-xl border px-4 py-3 text-sm ${aviso.tipo === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}`}>
+          {aviso.texto}
+        </div>
+      )}
+
+      <div>
+        <h3 className="text-sm font-semibold text-torg-dark">Histórico de verificações</h3>
+        <div className="mt-2 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50/60 text-left text-xs uppercase text-torg-gray">
+              <tr><th className="px-4 py-2">Quando</th><th className="px-4 py-2">Fonte</th><th className="px-4 py-2">Origem</th><th className="px-4 py-2">Desfecho</th><th className="px-4 py-2">Detalhe</th></tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {dados.historico.map((h) => {
+                const d = DESFECHO[h.status] ?? DESFECHO.RODANDO;
+                const Icone = d.Icone;
+                return (
+                  <tr key={h.id}>
+                    <td className="whitespace-nowrap px-4 py-2 text-torg-dark">{fmtHora(h.iniciadaEm)}</td>
+                    <td className="px-4 py-2 font-medium text-torg-dark">{h.fonte}</td>
+                    <td className="px-4 py-2 text-xs text-torg-gray">{h.disparo === "CRON" ? "automática" : "manual"}</td>
+                    <td className={`whitespace-nowrap px-4 py-2 ${d.cor}`}><span className="inline-flex items-center gap-1.5"><Icone size={14} />{d.rotulo}</span></td>
+                    <td className="px-4 py-2 text-xs text-torg-gray">{h.mensagem || "—"}</td>
+                  </tr>
+                );
+              })}
+              {!dados.historico.length && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-torg-gray">Nenhuma verificação registrada ainda.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ABAS = [{ id: "ncm", rotulo: "Consulta NCM" }, { id: "cfop", rotulo: "Consulta CFOP" }, { id: "admin", rotulo: "Atualizações Tributárias" }];
+
+export default function InteligenciaFiscalClient({ referencia, cfops, operacoes, cstIpi, familias, ehAdmin }) {
   const [aba, setAba] = useState("ncm");
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -358,9 +494,9 @@ export default function InteligenciaFiscalClient({ referencia, cfops, operacoes,
         ))}
       </div>
 
-      {aba === "ncm"
-        ? <AbaNcm referencia={referencia} />
-        : <AbaCfop cfops={cfops} operacoes={operacoes} cstIpi={cstIpi} familias={familias} />}
+      {aba === "ncm" && <AbaNcm referencia={referencia} />}
+      {aba === "cfop" && <AbaCfop cfops={cfops} operacoes={operacoes} cstIpi={cstIpi} familias={familias} />}
+      {aba === "admin" && <AbaAdmin referencia={referencia} ehAdmin={ehAdmin} />}
 
       <p className="flex items-center gap-1.5 pt-2 text-xs text-torg-gray">
         <ExternalLink size={12} />

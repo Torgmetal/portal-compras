@@ -1,7 +1,12 @@
 {
-  "build": 3404,
-  "gerado": "2026-09-22T21:58:29.011Z",
+  "build": 3405,
+  "gerado": "2026-09-22T23:54:29.250Z",
   "commits": [
+    {
+      "hash": "bc9eddc2e7",
+      "data": "22/09/2026",
+      "titulo": "Fiscal: o cron era PRÉ-RENDERIZADO — nunca rodaria em produção"
+    },
     {
       "hash": "1667600a3c",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "15cc0b1f50",
       "data": "22/09/2026",
       "titulo": "MES: os três achados da revisão da reserva de barra"
-    },
-    {
-      "hash": "ff0c28a8bd",
-      "data": "22/09/2026",
-      "titulo": "MES: a barra de nesting passa a ter dono, e a obra legada ganha o número de volta"
     }
   ]
 }
