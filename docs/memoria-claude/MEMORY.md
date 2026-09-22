@@ -100,6 +100,9 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [FORM do SGQ vai no documento](torg_sgq_form_identificacao.md) — carimbo no rodapé/célula G7, NÃO no nome do arquivo (ISO §7.5.2); índice mestre manda, 11 FORMs inativos
 - [Pintura e tinta](torg_pintura_tinta.md) — mede em m² (não kg); PLP dá demãos/cor/SV; caderno de 3 folhas com fórmulas vivas; FEFO; por que "quanto falta" ainda não é afirmável
 - [Pintura tem DUAS telas](torg_pintura_duas_telas.md) — campo (Lais, só QUALIDADE_CAMPO) × computador; ajuste pedido por inspetor vai no de campo
+- [Pintura: condição ambiental por ETAPA](torg_pintura_condicoes_por_etapa.md) — jato/fundo/demais demãos; demão sem leitura herda a do jato (e diz); item 5.4 julga cada etapa
+- [Pintura: numeração das fotos](torg_pintura_fotos_numeracao.md) — "3 de 8" dentro do ENSAIO, em lib/fotos-evidencia.js; legenda não repete o nome do ensaio
+- [Pintura: micragem seca mínima](torg_pintura_micragem_minima.md) — é do RELATÓRIO (editável nas 2 telas); PLP dá o total da obra; fundo ainda é julgado contra o total
 - [Inspetor vê produto final por FASE](torg_inspetor_produto_final_fase.md) — /api/campo/pecas: sem croqui (só `croquis=1` no dimensional avulsas) nem acessório (AC c/ hífen, comprado); `fase`/`fases` da frente da LPC ou letra da marca; chips FiltroFase nas 2 telas
 - [Portal da Qualidade](torg_qualidade.md) — setor (PQ-00/NBR 16775) na main; F1 Controle de Documentos, F2 CMR+casamento PDFs, F3/F5 Data Book (pdf-lib); falta F4 foto PWA
 - [Cotas A/B/C no dimensional](torg_cotas_abc.md) — cota simples com letra+espec+tolerância; a cota desenhada APONTA onde medir, não mede (some o problema de escala)

@@ -536,3 +536,31 @@ novo, não conserto, e não entra sem o Matheus decidir.
   correção. **2.926 passando.**
   ⚠ **Não provado:** duas transações concorrentes de verdade no Postgres (o teste é fake) e o
   `ON CONFLICT` contra o banco real — o ciclo pedia para não fazer operação em produção.
+- **(22/09, 10h) Relatório de pintura: a numeração das fotos e a condição ambiental por etapa.**
+  Dois pedidos do Vitor, medidos no RIP-102-002 antes de mexer em código.
+  **(a) fotos.** *"as fotos estão ficando com marcação errada (…) ele marcar 1/8 2/8"*: a moldura da
+  folha 2 dizia "Medição de Espessura · 1 de 8" e as outras SETE saíam na folha de registro **sem
+  número**, com a legenda repetindo o ensaio ("Medição de Espessura · Medição de Espessura", 7×). O
+  índice era calculado só na moldura. Agora sai de `numerarPorEvidencia`/`legendaDaFoto`
+  (`lib/fotos-evidencia.js`), que as duas folhas chamam — índice **dentro do ensaio**, sem "1 de 1",
+  sem número em foto sem área, e a legenda do inspetor entra só quando diz algo além do rótulo.
+  Conferido no PDF real da produção: `1 de 2 / 2 de 2` e `1 de 8 … 8 de 8`.
+  **(b) ambiente.** *"precisas que tenha o campo para informarmos tanto no jato, quanto no fundo
+  quanto nas demais demãos"*: havia UM bloco (`prep*`), copiado para as três colunas — o RIP-102-002
+  declarava 41% / 24 °C / 23 °C no jato do dia 17 de manhã, no fundo do 17 à tarde e na 2ª demão do
+  dia 18. `ETAPAS_AMBIENTE` + `leiturasAmbientais` + `ambientePorEtapa` (`lib/pintura-campos.js`)
+  viram a regra única; o celular ganhou o bloco por demão (`app/campo/PinturaAmbiente.jsx`) e o
+  aviso de herança; o PDF passou a rotular "UMIDADE NO JATO" e a **nomear a etapa** fora do PO-05.
+  ⚠ A herança (demão sem leitura usa a do jato) foi **mantida** — é de 04/09 e evita coluna vazia —,
+  mas o campo da tela nunca mostra o valor herdado, senão salvar viraria medição inventada.
+  **(c) micragem seca mínima aberta** (pedido no meio do trabalho): `espessuraMinima` entrou na
+  lista fechada do `PATCH /api/campo/relatorios/[id]` e virou campo editável no portal de campo.
+  ⚠⚠ **PENDENTE, do Vitor:** cada demão é julgada contra o mínimo do SISTEMA. Medido: fundo 76–110
+  µm × mínimo 220 do PLP — o fundo acende vermelho sempre, e baixar o campo para 80 faria o PDF
+  declarar ao cliente um sistema de 80 µm. O certo é mínimo **por demão** (o PLP tem
+  `demaos[].espessuraMin`); não implementei porque depende de confirmar se aquele valor é por demão
+  ou acumulado.
+  Testes: `pintura-fotos-numeracao` (6), `pintura-ambiente-etapas` (6), `campo-pintura-ambiente` (3),
+  `campo-espessura-minima` (3) — todos vermelhos antes. **2.935 passando**, `npm run checar` limpo,
+  `next build` ok. `app/campo/Pintura.jsx` voltou para baixo do teto de 350 linhas com a extração de
+  `controles.jsx` e `PinturaAmbiente.jsx`.

@@ -293,6 +293,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           tempoPenetracao: r0.tempoPenetracao ?? "", tempoSecagem: r0.tempoSecagem ?? "",
           tempoRevelador: r0.tempoRevelador ?? "", temperatura: r0.temperatura ?? "", uv: r0.uv ?? "",
           espessuras: r0.espessuras || {}, demaos: r0.demaos || {},
+          // ⚠ a micragem seca mínima É DO RELATÓRIO e se ajusta aqui (Vitor, 22/09/2026) — o valor
+          // do PLP continua no `__espec` ao lado, como referência da obra.
+          espessuraMinima: r0.espessuraMinima ?? "",
           // ⚠ o ESPECIFICADO vai junto, mas fora do que se salva: a tela mostra para
           // conferência e o `__espec` é descartado no envio (ver salvar()).
           __espec: {

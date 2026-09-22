@@ -5,7 +5,7 @@ import { AlertTriangle, Check, ClipboardList } from "lucide-react";
 import { escopoDoTipo, amostragemDoTipo } from "@/lib/pit-escopo";
 import PlpPainel from "./PlpPainel";
 import { tipoDoProduto, camposDoRelatorioPintura } from "@/lib/plp";
-import { GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, TEMPO, CAMPOS_DEMAO, RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar } from "@/lib/pintura-campos";
+import { GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, TEMPO, CAMPOS_DEMAO, RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar, ambientePorEtapa } from "@/lib/pintura-campos";
 
 /**
  * O PREENCHIMENTO DA INSPEÇÃO DE PINTURA.
@@ -370,7 +370,9 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
           </tbody>
         </table>
         <div className="grid sm:grid-cols-2 gap-2.5 mt-3">
-          <Campo rot="Espessura mínima especificada (PLP)" k="espessuraMinima" />
+          {/* ⚠ "(PLP)" no rótulo fazia o campo parecer travado — ele é do RELATÓRIO, e o número do
+              plano da obra aparece como dica logo abaixo (Vitor, 22/09/2026). */}
+          <Campo rot="Micragem seca mínima (µm)" k="espessuraMinima" />
           <Campo rot="Laudo final" k="laudo" opcoes={["Aprovado", "Reprovado"]} />
         </div>
       </div>
@@ -407,9 +409,15 @@ function CondicoesAmbientais({ res, travado: _travado, setResultado: _setResulta
     tAmbiente: res.prepTAmb, tSuperficie: res.prepTSup,
     pontoOrvalho: res.prepOrvalho, umidade: res.prepUmidade, tempo: res.tempo,
   });
+  // ⚠⚠ E CADA DEMÃO TEM A SUA. Vitor (22/09/2026): "precisas que tenha o campo para informarmos
+  // tanto no jato, quanto no fundo quanto nas demais demãos". Os campos da demão sempre estiveram
+  // na tabela de aplicação, logo abaixo — o que faltava era dizer que ESTE bloco é o do jateamento
+  // e julgar cada etapa com a leitura dela. Sem isso, um fundo aplicado com 92% de umidade passava
+  // em branco enquanto a tela dizia "aplicação permitida" sobre a medição do jato.
+  const etapas = ambientePorEtapa(res).filter((e) => e.id !== "jato");
   return (
     <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
-      <p className="text-[12px] font-bold text-torg-dark mb-2">Condições ambientais · PO-05, item 5.4</p>
+      <p className="text-[12px] font-bold text-torg-dark mb-2">Condições ambientais do jateamento · PO-05, item 5.4</p>
       <div className="grid sm:grid-cols-5 gap-2.5">
         <Campo rot="Umidade relativa (%)" k="prepUmidade" tipo="number" />
         <Campo rot="Temp. ambiente (°C)" k="prepTAmb" tipo="number" />
@@ -432,6 +440,23 @@ function CondicoesAmbientais({ res, travado: _travado, setResultado: _setResulta
             <AlertTriangle size={13} /> Condições fora do PO-05 — não era permitido aplicar:
           </p>
           {r.impedimentos.map((m) => <p key={m} className="text-[11px] text-red-700 pl-5">· {m}</p>)}
+        </div>
+      )}
+
+      {/* ⚠ a leitura de cada demão se preenche na tabela de aplicação; aqui sai o VEREDITO dela,
+          junto do veredito do jato — é lado a lado que se vê que uma etapa destoou. */}
+      {etapas.length > 0 && (
+        <div className="mt-2.5 border-t border-gray-100 pt-2 space-y-1">
+          {etapas.map((e) => (
+            <p key={e.id} className={`text-[11px] inline-flex items-start gap-1.5 w-full ${
+              !e.avaliacao.avaliado ? "text-torg-gray" : e.avaliacao.permitido ? "text-emerald-700" : "text-red-700 font-medium"}`}>
+              {e.avaliacao.avaliado && (e.avaliacao.permitido ? <Check size={12} className="mt-0.5 shrink-0" /> : <AlertTriangle size={12} className="mt-0.5 shrink-0" />)}
+              <span>
+                <strong>{e.curto}</strong>{e.herdado ? " (sem leitura própria — usando a do jateamento)" : ""}:{" "}
+                {!e.avaliacao.avaliado ? "faltam leituras para conferir." : e.avaliacao.permitido ? "dentro do PO-05." : e.avaliacao.impedimentos.join(" ")}
+              </span>
+            </p>
+          ))}
         </div>
       )}
     </div>

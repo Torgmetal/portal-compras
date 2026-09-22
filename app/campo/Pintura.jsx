@@ -1,10 +1,13 @@
 "use client";
 import { useState } from "react";
 import { useComponenteEstavel } from "@/lib/react-estavel";
-import { AlertCircle, CheckCircle2, Paintbrush } from "lucide-react";
+import { Txt, TxtNA, Sel } from "./controles";
+import { CamposAmbiente, Veredito } from "./PinturaAmbiente";
+import { Paintbrush } from "lucide-react";
 import {
-  GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, TEMPO, METODOS_APLICACAO,
+  GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, TEMPO, METODOS_APLICACAO, ETAPAS_AMBIENTE, CAMPO_DO_JATO,
   RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar,
+  leiturasAmbientais,
 } from "@/lib/pintura-campos";
 
 // ─── PINTURA NO CELULAR ───────────────────────────────────────────────────────
@@ -135,7 +138,16 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
     pontoOrvalho: cond.prepOrvalho, umidade: cond.prepUmidade, tempo: cond.tempo,
   });
 
+  // a leitura desta demão (a dela, ou a herdada do jato) e o julgamento do item 5.4 sobre ELA
+  const ambDemao = leiturasAmbientais(cond, aba);
+  const ambientePermitido = condicoesPermitemPintar({
+    tAmbiente: ambDemao.tAmb, tSuperficie: ambDemao.tSup,
+    pontoOrvalho: ambDemao.orvalho, umidade: ambDemao.umidade, tempo: ambDemao.tempo,
+  });
+
   const espec = cond.__espec || {};
+  // ⚠ o mínimo que JULGA a leitura é o do relatório; o do PLP fica de referência ao lado do campo
+  const minEspessura = cond.espessuraMinima ?? espec.espessuraMinima ?? "";
 
   return (
     <div className="mt-3 space-y-4">
@@ -149,7 +161,7 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
             {espec.prepProcedimento && <p>Preparo: <strong>{espec.prepProcedimento}</strong></p>}
             {espec.abrasivo && <p>Abrasivo: <strong>{espec.abrasivo}</strong></p>}
             {espec.rugEspec && <p>Rugosidade: <strong>{espec.rugEspec}</strong></p>}
-            {espec.espessuraMinima && <p>Espessura mínima: <strong>{espec.espessuraMinima} µm</strong></p>}
+            {espec.espessuraMinima && <p>Espessura mínima da obra: <strong>{espec.espessuraMinima} µm</strong></p>}
           </div>
         </div>
       )}
@@ -195,33 +207,20 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
         </div>
       </div>
 
-      {/* ── CONDIÇÕES AMBIENTAIS ───────────────────────────────────────────── */}
-      <div>
-        <p className="text-[12px] font-semibold text-torg-gray mb-1.5">Condições ambientais</p>
-        <div className="grid grid-cols-2 gap-2">
-          <Txt rot="Temp. ambiente (°C)" tipo="number" v={cond.prepTAmb} onMudar={(v) => set("prepTAmb", v)} />
-          <Txt rot="Temp. superfície (°C)" tipo="number" v={cond.prepTSup} onMudar={(v) => set("prepTSup", v)} />
-          <Txt rot="Ponto de orvalho (°C)" tipo="number" v={cond.prepOrvalho} onMudar={(v) => set("prepOrvalho", v)} />
-          <Txt rot="Umidade relativa (%)" tipo="number" v={cond.prepUmidade} onMudar={(v) => set("prepUmidade", v)} />
-        </div>
+      {/* ── CONDIÇÕES AMBIENTAIS DO JATEAMENTO ─────────────────────────────────
+          ⚠⚠ ESTE BLOCO É DO JATO, e por anos foi o único. Vitor (22/09/2026): "precisas que tenha
+          o campo para informarmos tanto no jato, quanto no fundo quanto nas demais demãos". Sem o
+          rótulo, esta leitura era tratada como "a do relatório" e copiada para as três demãos —
+          três medições que ninguém fez. Cada demão agora tem o bloco dela, na aba dela. */}
+      <fieldset className="rounded-xl border-2 border-gray-100 p-3">
+        <legend className="px-1 text-[13px] font-semibold text-torg-dark">Condições ambientais · no jateamento</legend>
+        <CamposAmbiente valores={leiturasAmbientais(cond, "jato")} onMudar={(k, v) => set(CAMPO_DO_JATO[k], v)} />
         <div className="mt-2">
           <Sel rot="Tempo" v={cond.tempo} onMudar={(v) => set("tempo", v)} opcoes={TEMPO.map((t) => ({ v: t, t }))} />
         </div>
 
-        {amb.avaliado && (
-          <div className={`mt-2 rounded-xl px-3 py-2.5 ${amb.permitido ? "bg-emerald-50 border-2 border-emerald-300" : "bg-red-50 border-2 border-red-300"}`}>
-            <p className={`text-[13px] font-bold inline-flex items-center gap-1.5 ${amb.permitido ? "text-emerald-800" : "text-red-700"}`}>
-              {amb.permitido ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-              {amb.permitido ? "Condições permitem pintar" : "NÃO PODE PINTAR"}
-            </p>
-            {!amb.permitido && (
-              <ul className="text-[12px] text-red-700 mt-1 space-y-0.5">
-                {amb.impedimentos.map((im, i) => <li key={i}>· {im}</li>)}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
+        <Veredito amb={amb} />
+      </fieldset>
 
       {/* ── DEMÃOS ─────────────────────────────────────────────────────────── */}
       <div>
@@ -247,6 +246,26 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
               <Txt rot="Horário final" tipo="time" v={dem[aba]?.hFim} onMudar={(v) => setDem(aba, "hFim", v)} />
             </div>
           </fieldset>
+
+          {/* ── A CONDIÇÃO AMBIENTAL DESTA DEMÃO ──────────────────────────────────
+              ⚠⚠ ATÉ AQUI SÓ O JATO TINHA CAMPO, e o documento copiava a leitura dele nas três
+              colunas. Cada demão é outro dia — às vezes outro turno: o fundo do RIP-102-002 foi na
+              tarde do dia 17 e a 2ª demão na manhã do 18, e as três diziam 41% / 24 °C / 23 °C.
+              ⚠ O campo mostra o que ESTA demão tem, nunca o valor herdado: preenchido com a leitura
+              do jato, um toque em salvar transformaria a herança em medição. */}
+          <fieldset className="rounded-xl border-2 border-torg-blue/20 bg-torg-blue/5 p-3">
+            <legend className="px-1 text-[13px] font-semibold text-torg-dark">
+              Condições ambientais · {ETAPAS_AMBIENTE.find((e) => e.id === aba)?.curto || `${aba}ª demão`}
+            </legend>
+            <CamposAmbiente valores={dem[aba] || {}} onMudar={(k, v) => setDem(aba, k, v)} />
+            {ambDemao.herdado && (
+              <p className="text-[12px] text-amber-700 mt-2 leading-tight">
+                Sem leitura desta demão: o relatório vai sair com a do jateamento
+                ({[cond.prepUmidade && `${cond.prepUmidade}%`, cond.prepTAmb && `${cond.prepTAmb} °C`].filter(Boolean).join(" · ")}).
+              </p>
+            )}
+            <Veredito amb={ambientePermitido} />
+          </fieldset>
           <SelLote rot="Tinta (base) — lote" campo="loteA" campoVal="valA" comp="A" />
           <SelLote rot="Endurecedor — lote" campo="loteB" campoVal="valB" comp="B" />
           <SelLote rot="Diluente — lote" campo="loteD" campoVal="valD" comp="D" />
@@ -261,13 +280,30 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
             : <Txt rot="Cor aplicada" v={dem[aba]?.cor} onMudar={(v) => setDem(aba, "cor", v)} />}
 
 
+          {/* ── A MICRAGEM SECA MÍNIMA, ABERTA ──────────────────────────────────
+              ⚠⚠ ELA NASCE DO PLP E NÃO SERVE PARA TODA PEÇA. Vitor (22/09/2026): "deixe o campo de
+              micragem seca aberto para ajustar, pois temos espessuras diferentes para cada
+              relatórios às vezes e hoje um deles está dando como reprovado". O PLP traz UM número
+              por obra (a soma das demãos) e a tela acendia vermelho contra ele — a peça de outro
+              esquema media certo e parecia reprovada.
+              ⚠ Ajustar aqui muda ESTE relatório, nunca o PLP: o plano da obra é outro documento. */}
+          <label className="block">
+            <span className="block text-[12px] text-torg-gray mb-1">
+              Micragem seca mínima (µm){espec.espessuraMinima ? ` · PLP da obra: ${espec.espessuraMinima}` : ""}
+            </span>
+            <input type="number" inputMode="decimal" value={cond.espessuraMinima ?? ""}
+              placeholder={espec.espessuraMinima ? String(espec.espessuraMinima) : ""}
+              onChange={(e) => set("espessuraMinima", e.target.value)}
+              className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none" />
+          </label>
+
           <div>
             <p className="text-[12px] text-torg-gray mb-1">
-              Espessura seca — 5 leituras (µm){espec.espessuraMinima ? ` · mínimo ${espec.espessuraMinima}` : ""}
+              Espessura seca — 5 leituras (µm){minEspessura ? ` · mínimo ${minEspessura}` : ""}
             </p>
             <div className="grid grid-cols-5 gap-1.5">
               {(Array.isArray(esp[aba]) ? esp[aba] : ["", "", "", "", ""]).map((v, i) => {
-                const min = Number(espec.espessuraMinima);
+                const min = Number(minEspessura);
                 // ⚠ o PO-05 item 5.5.3.1 é literal: "nenhuma medição pode ser inferior à espessura
                 // mínima definida no PLP" — por isso a leitura acende sozinha, uma a uma.
                 const baixa = Number.isFinite(min) && min > 0 && v !== "" && v != null && Number(v) < min;
@@ -304,51 +340,5 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
         </div>
       </div>
     </div>
-  );
-}
-
-// ── controles no tamanho do dedo, iguais aos do resto do portal de campo ──
-function Txt({ rot, v, onMudar, tipo = "text" }) {
-  return (
-    <label className="block">
-      <span className="block text-[12px] text-torg-gray mb-1">{rot}</span>
-      <input type={tipo} inputMode={tipo === "number" ? "decimal" : undefined} value={v ?? ""}
-        onChange={(e) => onMudar(e.target.value)}
-        className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none" />
-    </label>
-  );
-}
-
-/** Campo que aceita número/texto OU N/A — com o botão do lado do rótulo, no tamanho do dedo. */
-function TxtNA({ rot, v, onMudar, tipo = "text" }) {
-  const na = v === "N/A";
-  return (
-    <label className="block">
-      <span className="flex items-center gap-2 text-[12px] text-torg-gray mb-1">
-        <span>{rot}</span>
-        <button type="button" onClick={() => onMudar(na ? "" : "N/A")}
-          className={`text-[11px] font-bold rounded-lg px-2 py-0.5 border ${
-            na ? "bg-torg-blue text-white border-torg-blue" : "bg-white text-torg-gray border-gray-300"}`}>
-          N/A
-        </button>
-      </span>
-      <input type={na ? "text" : tipo} inputMode={!na && tipo === "number" ? "decimal" : undefined}
-        value={v ?? ""} disabled={na} onChange={(e) => onMudar(e.target.value)}
-        className={`w-full text-base border-2 rounded-xl px-3 py-3 outline-none ${
-          na ? "border-gray-200 bg-gray-100 text-torg-gray" : "border-gray-200 focus:border-torg-blue"}`} />
-    </label>
-  );
-}
-
-function Sel({ rot, v, opcoes, onMudar }) {
-  return (
-    <label className="block">
-      <span className="block text-[12px] text-torg-gray mb-1">{rot}</span>
-      <select aria-label={rot} value={v ?? ""} onChange={(e) => onMudar(e.target.value)}
-        className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none">
-        <option value="">—</option>
-        {opcoes.map((o) => <option key={o.v} value={o.v}>{o.t}</option>)}
-      </select>
-    </label>
   );
 }

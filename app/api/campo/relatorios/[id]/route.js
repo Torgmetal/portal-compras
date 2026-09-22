@@ -234,6 +234,12 @@ export async function PATCH(req, { params }) {
                      // pintura: medições desta inspeção e escolhas editáveis por OP.
                      // Alterar limpeza/abrasivo não modifica o PLP; somente a memória
                      // de escolhas para os próximos relatórios.
+                     // ⚠⚠ A MICRAGEM SECA MÍNIMA É DESTE RELATÓRIO. Vitor (22/09/2026): "deixe o
+                     // campo de micragem seca aberto para ajustar, pois temos espessuras diferentes
+                     // para cada relatórios". Ela nasce do PLP — a SOMA das demãos, uma por obra — e
+                     // era só leitura aqui: a peça com outro esquema media certo e a tela acendia
+                     // vermelho contra um mínimo que não era dela. Ajustar aqui NÃO mexe no PLP.
+                     "espessuraMinima",
                      "limpeza", "abrasivo", "intemperismo", "prepData", "prepIni", "prepFim", "rugObtido",
                      "poeira", "salinidade", "tempo", "prepTAmb", "prepTSup", "prepOrvalho",
                      "prepUmidade", "laudo",
