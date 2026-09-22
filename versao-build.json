@@ -1,7 +1,12 @@
 {
-  "build": 3397,
-  "gerado": "2026-09-22T20:57:31.541Z",
+  "build": 3398,
+  "gerado": "2026-09-22T21:04:44.867Z",
   "commits": [
+    {
+      "hash": "27594f5d43",
+      "data": "22/09/2026",
+      "titulo": "CMR e conversão de unidade: os cinco achados P1 do Codex"
+    },
     {
       "hash": "498199259d",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "1c34c68d0d",
       "data": "22/09/2026",
       "titulo": "US: espessura de chapa em lista, aparelhagem da casa já preenchida"
-    },
-    {
-      "hash": "752e098706",
-      "data": "22/09/2026",
-      "titulo": "Relatório de US: cabeçote sem a marca, material padrão e os campos da junta soldada"
     }
   ]
 }

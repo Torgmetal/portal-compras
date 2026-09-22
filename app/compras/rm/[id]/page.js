@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/session";
 import { podeCancelarRM } from "@/lib/permissao-rm";
 import { ArrowLeft } from "lucide-react";
 import { calcularVerbaOP } from "@/lib/verba-op";
-import { paraODocumento } from "@/lib/unidades";
+import { paraODocumento, unidadeEfetivaDoItem } from "@/lib/unidades";
 import RMComprasClient from "./RMComprasClient";
 import ConsultaEstoqueSection from "@/components/compras/ConsultaEstoqueSection";
 
@@ -118,7 +118,7 @@ export default async function RMComprasDetail({ params }) {
         cotacaoItemId: it.id,
         rmItemId: it.rmItemId,
         descricao: it.rmItem.descricao,
-        unidade: (Number(it.rmItem.peso) || 0) > 0 ? "KG" : it.rmItem.unidade,
+        unidade: unidadeEfetivaDoItem(it.rmItem),
         qtdRm: (Number(it.rmItem.peso) || 0) > 0 ? Number(it.rmItem.peso) : it.rmItem.qtd,
         // ⚠⚠ O MODAL RECEBE OS NÚMEROS DO DOCUMENTO, NÃO OS CANÔNICOS (achado do Codex, 22/09/2026).
         // O banco guarda "2500 UN a R$ 0,4999"; o papel do fornecedor diz "25 CT a R$ 49,99". Sem

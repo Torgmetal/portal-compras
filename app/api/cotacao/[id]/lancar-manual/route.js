@@ -7,7 +7,7 @@
 //   - resolve fornecedor no Omie pelo CNPJ (igual ao submeter)
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { unidadeCanonica, conversaoDoItem, fatorFixo } from "@/lib/unidades";
+import { unidadeCanonica, conversaoDoItem, fatorFixo, unidadeEfetivaDoItem } from "@/lib/unidades";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
@@ -120,13 +120,19 @@ export function aplicarConversao(it, unidadeDaRMNoBanco = null) {
   };
 }
 
-/** A unidade de cada RMItem, lida do BANCO — a base contra a qual a conversão é conferida. */
+/**
+ * A unidade de cada RMItem, lida do BANCO — a base contra a qual a conversão é conferida.
+ *
+ * ⚠⚠ O `peso` ENTRA NA CONSULTA (achado do Codex, 22/09/2026). Item com peso é cotado em KG, e
+ * ler só a coluna `unidade` dava uma base diferente da que a tela mostrou ao fornecedor e da que o
+ * pedido do Omie usa — a conversão era descartada e os números por unidade viravam quilo depois.
+ */
 async function unidadesDosItens(itens) {
   const rows = await prisma.rMItem.findMany({
     where: { id: { in: itens.map((i) => i.rmItemId) } },
-    select: { id: true, unidade: true },
+    select: { id: true, unidade: true, peso: true },
   });
-  return new Map(rows.map((i) => [i.id, i.unidade]));
+  return new Map(rows.map((i) => [i.id, unidadeEfetivaDoItem(i)]));
 }
 
 export async function POST(req, { params }) {

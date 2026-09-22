@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 vi.mock("@/lib/session", () => ({ requireRole: vi.fn() }));
 import { aplicarConversao } from "@/app/api/cotacao/[id]/lancar-manual/route";
-import { paraODocumento } from "@/lib/unidades";
+import { paraODocumento, unidadeEfetivaDoItem } from "@/lib/unidades";
 
 // ─── A CONVERSÃO ACONTECE NO SERVIDOR ────────────────────────────────────────
 //
@@ -122,5 +122,36 @@ describe("o ciclo salvar → reabrir → salvar", () => {
     expect(volta).toEqual({ qtd: 130, preco: 10 });
     expect(regravado.qtdCotada).toBe(25);
     expect(Math.round(regravado.qtdCotada * regravado.precoUnit * 100) / 100).toBe(1300);
+  });
+});
+
+// ⚠⚠ ITEM COM PESO É COTADO EM KG (achado do Codex, 22/09/2026) ─────────────────────
+//
+// A coluna `unidade` do RMItem pode dizer "UN" enquanto a tela do fornecedor, o modal e o pedido
+// do Omie tratam o item em KG — quem decide é `peso > 0`. A consulta que alimenta a conversão lia
+// só a coluna crua: comparava "UN" com "UN", concluía que não havia o que converter, e gravava
+// quantidade e preço POR UNIDADE em algo que o resto do portal lê como QUILO.
+describe("a base da conversão é a unidade EFETIVA do item", () => {
+  it("peso positivo manda, mesmo com a coluna dizendo outra coisa", () => {
+    expect(unidadeEfetivaDoItem({ unidade: "UN", peso: 1250 })).toBe("KG");
+    expect(unidadeEfetivaDoItem({ unidade: "UN", peso: 0 })).toBe("UN");
+    expect(unidadeEfetivaDoItem({ unidade: "UN", peso: null })).toBe("UN");
+    expect(unidadeEfetivaDoItem({ unidade: null, peso: 0 })).toBe("KG");
+  });
+
+  // ⚠ O caso que passava calado: RM em "UN" COM peso, proposta cotada em UN. Lendo a coluna crua,
+  // as unidades pareciam iguais e a conversão era descartada — os números por peça viravam quilo.
+  it("RM com peso: cotar em UN contra base KG é conversão, não coincidência", () => {
+    const base = unidadeEfetivaDoItem({ unidade: "UN", peso: 1250 });
+    const r = aplicarConversao(item({ unidadeCotada: "UN", qtdCotada: 100, precoUnit: 12.5, fatorParaRM: 12.5 }), base);
+    expect(r.converteu).toBe(true);
+    expect(r.item.qtdCotada).toBe(1250);                     // 100 peças × 12,5 kg
+    expect(Math.round(r.item.qtdCotada * r.item.precoUnit * 100) / 100).toBe(1250);
+  });
+
+  // ⚠ Sem peso, nada muda — a coluna continua mandando.
+  it("sem peso, a coluna continua sendo a base", () => {
+    const r = aplicarConversao(item(), unidadeEfetivaDoItem({ unidade: "UN", peso: 0 }));
+    expect(r.item.qtdCotada).toBe(2500);
   });
 });

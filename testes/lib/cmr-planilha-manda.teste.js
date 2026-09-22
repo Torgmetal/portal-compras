@@ -63,6 +63,12 @@ describe("ehOutroMaterial — trocar de dono é diferente de ganhar detalhe", ()
     ["PERFIL W 200X26,6", "Perfil W 250x25,3"],
     ["CHAPA A-36 ESPESSURA 4,75MM", "CHAPA A-36 ESPESSURA 9,50MM"],
     ["CANTONEIRA 2 X 1/4", "CANTONEIRA 3 X 3/8"],
+    // ⚠⚠ O CONTRAEXEMPLO QUE DERRUBOU O `Set` (achado do Codex, 22/09/2026): as duas cantoneiras
+    // têm o MESMO conjunto de números, {2, 1, 4} — mudam a ORDEM e a REPETIÇÃO, que é justamente
+    // onde a bitola significa. Comparadas como conjunto, a segunda herdava certificado, corrida e
+    // NF da primeira.
+    ["CANTONEIRA 2 X 2 X 1/4", "CANTONEIRA 2 X 4 X 1/4"],
+    ["CHAPA 2000 X 6000", "CHAPA 6000 X 2000 X 2000"],
   ])("%s → %s é troca: as medidas conflitam", (a, b) => expect(ehOutroMaterial(a, b)).toBe(true));
 
   // ⚠⚠ MEDIDA A MAIS É COMPLETAR, NÃO TROCAR. Exigir conjuntos idênticos traria o defeito de volta

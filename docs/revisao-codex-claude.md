@@ -672,3 +672,32 @@ novo, não conserto, e não entra sem o Matheus decidir.
   serve para conferir carga.
   Testes: `romaneio-item-avulso` (5) e `itensDeObra` em `expedido-por-romaneio` (2), vermelhos antes.
   **3.089 passando**, checar limpo, build ok.
+- **(22/09, 18h) Os cinco achados P1 da conversão de unidade e do CMR, e mais dois da rodada
+  seguinte.** Commit `27594f5d43` fechou: (1) o `ReferenceError` que derrubava a sincronização
+  inteira do CMR quando UMA criação falhava (`falhasDeCriacao.push` na zona morta do `const`);
+  (2) bitola não contando como troca de material; (3) unidade escolhida sem fator gravando calado
+  (25 CT viravam 25 UN); (4) o arredondamento acontecendo DEPOIS da conferência do total; (5)
+  reabrir uma proposta convertida e salvar sem mexer em nada aumentando o preço.
+  ⚠⚠ A rodada seguinte derrubou a solução de (2): comparar as medidas como **conjunto** perde
+  ORDEM e REPETIÇÃO, e `CANTONEIRA 2 X 2 X 1/4` × `CANTONEIRA 2 X 4 X 1/4` dão o mesmo `{2,1,4}` —
+  duas cantoneiras diferentes declaradas idênticas, com a segunda herdando certificado, corrida e
+  NF da primeira. Virou **subsequência ordenada**: `[36]` cabe em ordem dentro de `[36; 4,75]`
+  (detalhou), `[2;2;1;4]` não cabe em `[2;4;1;4]` (trocou).
+  ⚠⚠ E a base da conversão ignorava o `peso`: item com peso é cotado em **KG**, não na unidade da
+  coluna. Lendo a coluna crua, "UN" × "UN" parecia coincidência, a conversão era descartada e os
+  números por peça viravam quilo no pedido do Omie. A regra `peso > 0 ? KG : unidade` estava escrita
+  à mão em `page.js` da RM, em `pedido-itens.js` e no formulário do fornecedor — passou a morar em
+  `unidadeEfetivaDoItem` (`lib/unidades.js`), com os três ligados nela.
+  ⚠ **Dívida anotada, fora desta tarefa:** outras ~5 rotas repetem a mesma conta só para RÓTULO
+  (`suprimentos`, `fornecedores/entrega`, `controle-financeiro`, `materiais`, `resumo-fd`). Não
+  decidem conversão, então não foram trocadas — mas são cópias da mesma regra.
+  ⚠⚠ **PENDÊNCIA DO VITOR — NÃO MEXIDA, por instrução do Matheus.** O Codex apontou P1 em
+  `app/comercial/[id]/AbaExpedicao.jsx:617` (commit `498199259d`, de Vitor, que entrou neste diff
+  pelo rebase): reabrir e revisar um romaneio perde a identificação dos avulsos, que voltam a
+  contar como peças da obra — o GET de `/lotes-expedicao/pecas` projeta os itens do prévio sem
+  `avulso` e sem `unidade`, e quando há `PecaLote` retorna antes e nem inclui os avulsos. É
+  exatamente o acoplamento de `itensDeObra` que a entrada anterior deste log já descrevia.
+  Fica registrado para ele, sem alteração nossa.
+  ⚠ A chave **(série, índice)** do CMR segue aberta — Matheus mandou pular por ora.
+  Testes: `cmr-reconciliar-falhas` (3) e `modal-lancar-manual-conversao` (2), novos e vermelhos
+  antes; `cmr-planilha-manda` 21 → 28; `cotacao-conversao-unidade` 8 → 15.
