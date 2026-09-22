@@ -236,6 +236,10 @@ export function ModalLancarManual({ cotacao, rm, onClose }) {
     // Itens: o cotacaoItem precisa ser identificado. Como o admin pode lancar pra
     // RMItens que talvez nao estejam na cotacao original, mapeamos pelo rmItemId
     // → busca/cria cotacaoItem correspondente no submit (API ja faz match).
+    // ⚠⚠ VAI O QUE ESTÁ NO DOCUMENTO DO FORNECEDOR, com a unidade e o fator ao lado — quem CONVERTE
+    // é o servidor. A tela mostra a conta para o comprador conferir contra o papel, mas fazer a
+    // conversão aqui deixaria o número gravado na mão do navegador: aba velha, arredondamento do
+    // JS e um campo mal preenchido viram preço errado no pedido, e ninguém revisa depois.
     const itens = linhas
       .map((l) => ({
         rmItemId: l.rmItemId,
@@ -243,6 +247,9 @@ export function ModalLancarManual({ cotacao, rm, onClose }) {
         qtdCotada: numeroBR(l.qtdCotada),
         icmsPct: numeroBR(l.icmsPct),
         ipiPct: numeroBR(l.ipiPct),
+        unidadeRM: l.unidade || null,
+        unidadeCotada: l.unidadeCotada || null,
+        fatorParaRM: numeroBR(l.fatorParaRM) || null,
       }))
       .filter((l) => l.precoUnit > 0);
     if (itens.length === 0) return setErro("Preencha ao menos um preço unitário.");

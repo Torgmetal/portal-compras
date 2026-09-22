@@ -3,6 +3,7 @@ import { FileText } from "lucide-react";
 import { numeroBR } from "@/lib/numero-br";
 import { fmtMoeda } from "../_lib/formatos";
 import CampoDecimal from "@/components/CampoDecimal";
+import ConversaoUnidade from "./ConversaoUnidade";
 
 // Grade de precos por item da RM dentro do lancamento manual de proposta.
 export function TabelaLinhasProposta({
@@ -25,6 +26,9 @@ export function TabelaLinhasProposta({
           <thead className="bg-gray-50">
             <tr>
               <th className="px-2 py-1.5 text-left font-medium text-gray-500 uppercase">Descrição</th>
+              {/* ⚠ A unidade do fornecedor vem ANTES da quantidade porque é ela que dá sentido ao
+                  número digitado: "25" só quer dizer alguma coisa depois de "CT". */}
+              <th className="px-2 py-1.5 text-left font-medium text-gray-500 uppercase">Un.</th>
               <th className="px-2 py-1.5 text-right font-medium text-gray-500 uppercase">Qtd</th>
               <th className="px-2 py-1.5 text-right font-medium text-gray-500 uppercase">Preço *</th>
               <th className="px-2 py-1.5 text-right font-medium text-gray-500 uppercase">ICMS%</th>
@@ -34,6 +38,9 @@ export function TabelaLinhasProposta({
           </thead>
           <tbody className="divide-y divide-gray-100">
             {linhas.map((l) => {
+              // ⚠⚠ O TOTAL DA LINHA NÃO MUDA COM A CONVERSÃO — é a invariante. Ele é calculado
+              // sobre o que está digitado (o documento do fornecedor), e continua igual depois de
+              // convertido: 25 × R$ 50,00 e 2500 × R$ 0,50 são o mesmo dinheiro.
               const t = (numeroBR(l.precoUnit)) * (numeroBR(l.qtdCotada));
               const isAuto = autoFilled.has(l.rmItemId);
               const isRevisado = revisado.has(l.rmItemId);
@@ -64,6 +71,9 @@ export function TabelaLinhasProposta({
                     {isRevisado && (
                       <span className="ml-2 text-[10px] text-torg-blue font-medium">✓</span>
                     )}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <ConversaoUnidade linha={l} setLinha={setLinha} />
                   </td>
                   <td className="px-2 py-1.5 text-right">
                     <CampoDecimal value={l.qtdCotada}
@@ -97,17 +107,17 @@ export function TabelaLinhasProposta({
           </tbody>
           <tfoot className="bg-gray-50">
             <tr>
-              <td colSpan={5} className="px-2 py-1 text-right text-torg-gray text-[11px]">Mercadoria (bruto):</td>
+              <td colSpan={6} className="px-2 py-1 text-right text-torg-gray text-[11px]">Mercadoria (bruto):</td>
               <td className="px-2 py-1 text-right text-torg-gray tabular-nums text-xs">{fmtMoeda(totalBrutoSemIPI)}</td>
             </tr>
             {totalIPI > 0 && (
               <tr>
-                <td colSpan={5} className="px-2 py-1 text-right text-torg-gray text-[11px]">+ IPI:</td>
+                <td colSpan={6} className="px-2 py-1 text-right text-torg-gray text-[11px]">+ IPI:</td>
                 <td className="px-2 py-1 text-right text-torg-gray tabular-nums text-xs">{fmtMoeda(totalIPI)}</td>
               </tr>
             )}
             <tr className="border-t border-gray-200">
-              <td colSpan={5} className="px-2 py-2 text-right text-torg-dark font-semibold">Total da nota (calculado):</td>
+              <td colSpan={6} className="px-2 py-2 text-right text-torg-dark font-semibold">Total da nota (calculado):</td>
               <td className="px-2 py-2 text-right font-bold text-torg-orange-700 tabular-nums">{fmtMoeda(total)}</td>
             </tr>
           </tfoot>

@@ -7,6 +7,7 @@
 //   - resolve fornecedor no Omie pelo CNPJ (igual ao submeter)
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { unidadeCanonica, conversaoDoItem } from "@/lib/unidades";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
@@ -34,6 +35,12 @@ const itemSchema = z.object({
   qtdCotada: z.number().min(0),
   icmsPct: z.number().min(0).optional().nullable(),
   ipiPct: z.number().min(0).optional().nullable(),
+  // ⚠⚠ A UNIDADE DO DOCUMENTO E O FATOR — quem converte é AQUI, não a tela. O comprador digita o
+  // que está no papel do fornecedor ("25 CT a R$ 50,00"); o servidor grava na unidade da RM
+  // ("2500 UN a R$ 0,50"), que é a base em que todo o resto do portal já lê.
+  unidadeRM: z.string().optional().nullable(),
+  unidadeCotada: z.string().optional().nullable(),
+  fatorParaRM: z.number().positive().optional().nullable(),
 });
 
 const anexoSchema = z.object({
@@ -56,6 +63,42 @@ const schema = z.object({
   // PDF/imagem da proposta uploaded — vincula como Anexo da Cotacao
   anexo: anexoSchema,
 });
+
+/**
+ * A CONVERSÃO DE UNIDADE, NO SERVIDOR.
+ *
+ * ⚠⚠ O PREÇO CONVERTIDO NÃO É ARREDONDADO A DUAS CASAS, e isso é deliberado. `round2` no unitário
+ * quebraria a invariante em fator que não divide redondo: R$ 49,99 o cento vira R$ 0,4999 por
+ * unidade, e arredondar para R$ 0,50 muda o total de R$ 1.249,75 para R$ 1.250,00. O que tem de
+ * fechar no centavo é o TOTAL — é ele que o fornecedor assinou.
+ *
+ * ⚠ Sem fator (ou fator 1), o caminho é exatamente o de antes: arredonda os dois e segue.
+ */
+export function aplicarConversao(it) {
+  const round2 = (n) => (n == null ? n : Math.round(Number(n) * 100) / 100);
+  const base = {
+    ...it,
+    icmsPct: it.icmsPct != null ? round2(it.icmsPct) : null,
+    ipiPct: it.ipiPct != null ? round2(it.ipiPct) : null,
+  };
+  const daRM = unidadeCanonica(it.unidadeRM);
+  const cotada = unidadeCanonica(it.unidadeCotada);
+  const fator = Number(it.fatorParaRM) || null;
+  if (!cotada || !daRM || cotada === daRM || !fator || fator === 1) {
+    return { converteu: false, item: { ...base, precoUnit: round2(it.precoUnit), qtdCotada: round2(it.qtdCotada), unidadeCotada: null, fatorParaRM: null } };
+  }
+
+  const r = conversaoDoItem({
+    qtdDoc: it.qtdCotada, precoDoc: it.precoUnit, fator, unidadeCotada: cotada, unidadeRM: daRM,
+  });
+  if (r.erro) return { erro: `${r.erro} (item ${it.rmItemId})` };
+
+  return {
+    converteu: true,
+    resumo: `${it.qtdCotada} ${cotada} → ${r.qtd} ${daRM}`,
+    item: { ...base, precoUnit: r.preco, qtdCotada: round2(r.qtd), unidadeCotada: cotada, fatorParaRM: fator },
+  };
+}
 
 export async function POST(req, { params }) {
   let user;
@@ -111,15 +154,14 @@ export async function POST(req, { params }) {
   const round2 = (n) => (n == null ? n : Math.round(Number(n) * 100) / 100);
 
   // Itens validos: precoUnit > 0
-  const itensValidos = body.itens
-    .filter((it) => it.precoUnit > 0)
-    .map((it) => ({
-      ...it,
-      precoUnit: round2(it.precoUnit),
-      qtdCotada: round2(it.qtdCotada),
-      icmsPct: it.icmsPct != null ? round2(it.icmsPct) : null,
-      ipiPct: it.ipiPct != null ? round2(it.ipiPct) : null,
-    }));
+  const comConversao = [];
+  const itensValidos = [];
+  for (const it of body.itens.filter((x) => x.precoUnit > 0)) {
+    const conv = aplicarConversao(it);
+    if (conv.erro) return NextResponse.json({ error: conv.erro }, { status: 400 });
+    if (conv.converteu) comConversao.push(conv.resumo);
+    itensValidos.push(conv.item);
+  }
   if (itensValidos.length === 0) {
     return NextResponse.json({ error: "Preencha ao menos um preço unitário." }, { status: 400 });
   }
@@ -162,6 +204,11 @@ export async function POST(req, { params }) {
             // clicável, pode vencer e virar pedido — com o "não tenho" do fornecedor ainda gravado
             // nele. Lançar um preço é afirmar que ele tem; a flag antiga é a resposta velha e sai.
             semEstoque: false,
+            // ⚠ A TRILHA DO DOCUMENTO: a unidade em que o fornecedor cotou e o fator usado. Os
+            // números gravados acima já estão na unidade da RM — estes dois são o que permite
+            // mostrar de volta "25 CT a R$ 50,00", que é o que está no papel dele.
+            unidadeCotada: it.unidadeCotada ?? null,
+            fatorParaRM: it.fatorParaRM ?? null,
             // A qtd digitada manualmente passa a mandar — limpa o snapshot do
             // abatimento de estoque para nao ficar contraditorio/orfao.
             qtdPecasCotada: null,
@@ -178,6 +225,8 @@ export async function POST(req, { params }) {
             qtdCotada: it.qtdCotada,
             icmsPct: it.icmsPct ?? null,
             ipiPct: it.ipiPct ?? null,
+            unidadeCotada: it.unidadeCotada ?? null,
+            fatorParaRM: it.fatorParaRM ?? null,
           },
         });
       }
@@ -250,10 +299,13 @@ export async function POST(req, { params }) {
           total, fornecedor: body.razaoSocial, cnpj: cnpjLimpo,
           itens: itensValidos.length,
           anexo: body.anexo?.nomeArquivo || null,
+          // ⚠ A conversão de unidade fica na trilha: "25 CT → 2500 UN". É a resposta para "por que
+          // a quantidade gravada é diferente da que está no PDF do fornecedor?".
+          ...(comConversao.length ? { conversoes: comConversao } : {}),
         },
       },
     });
   }, OPCOES_TX);
 
-  return NextResponse.json({ ok: true, total });
+  return NextResponse.json({ ok: true, total, ...(comConversao.length ? { conversoes: comConversao } : {}) });
 }

@@ -1,7 +1,12 @@
 {
-  "build": 3388,
-  "gerado": "2026-09-22T16:57:39.145Z",
+  "build": 3389,
+  "gerado": "2026-09-22T17:01:34.148Z",
   "commits": [
+    {
+      "hash": "631f70bd36",
+      "data": "22/09/2026",
+      "titulo": "CMR: a sincronização parou de morrer no meio do caminho"
+    },
     {
       "hash": "8bceb8ffec",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b72f5c5953",
       "data": "21/09/2026",
       "titulo": "MES: os cinco achados da revisão — saldo por etapa, teto do nesting, encerramento e ambiente nas telas"
-    },
-    {
-      "hash": "caa1021f45",
-      "data": "21/09/2026",
-      "titulo": "Merge branch 'matheus/mes-subir'"
     }
   ]
 }
