@@ -1,7 +1,12 @@
 {
-  "build": 3374,
-  "gerado": "2026-09-22T12:39:12.429Z",
+  "build": 3375,
+  "gerado": "2026-09-22T12:45:03.012Z",
   "commits": [
+    {
+      "hash": "ff0c28a8bd",
+      "data": "22/09/2026",
+      "titulo": "MES: a barra de nesting passa a ter dono, e a obra legada ganha o número de volta"
+    },
     {
       "hash": "39d068f6a0",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "1617eebdd2",
       "data": "21/09/2026",
       "titulo": "Cotação: o que o PDF leu e não casou deixa de ser jogado fora"
-    },
-    {
-      "hash": "a4012125d7",
-      "data": "21/09/2026",
-      "titulo": "Cliente: contatos editáveis na OP e obras liberadas por login"
     }
   ]
 }

@@ -24,21 +24,19 @@ function bancoFalso({ abertas = [], recursos = {} } = {}) {
     reservas.find((r) => r.unidadeId === unidadeId && r.ambiente === ambiente && !r.liberadaEm) || null;
 
   const tx = {
-    $executeRaw: vi.fn().mockResolvedValue(1),
+    // ⚠⚠ O FAKE IMITA `INSERT ... ON CONFLICT DO NOTHING`, que é como a reserva entra: linha nova
+    // quando a barra está livre, ZERO linhas quando já tem dona — e NUNCA uma exceção. Um fake que
+    // lançasse `P2002` esconderia justamente o defeito que o Codex pegou: no Postgres a exceção
+    // ABORTA a transação, e a consulta seguinte (a que descobre quem é a dona) morre junto.
+    $executeRaw: vi.fn(async (partes, ...vals) => {
+      if (!String(partes?.[0] || "").includes("MesUnidadeReserva")) return 1;
+      const [id, unidadeId, ambiente, recursoId, loteId, operadorId] = vals;
+      if (aberta(unidadeId, ambiente)) return 0;
+      reservas.push({ id, unidadeId, ambiente, recursoId, loteId, operadorId, liberadaEm: null });
+      return 1;
+    }),
     mesUnidadeReserva: {
       findFirst: vi.fn(async ({ where }) => aberta(where.unidadeId, where.ambiente)),
-      create: vi.fn(async ({ data }) => {
-        // ⚠ O índice, em JS: a segunda reserva aberta da mesma barra é recusada pelo BANCO.
-        if (aberta(data.unidadeId, data.ambiente)) {
-          const e = new Error("Unique constraint failed");
-          e.code = "P2002";
-          e.meta = { target: "MesUnidadeReserva_aberta_unica" };
-          throw e;
-        }
-        const r = { id: `res${reservas.length + 1}`, liberadaEm: null, ...data };
-        reservas.push(r);
-        return r;
-      }),
       update: vi.fn(async ({ where, data }) => {
         const r = reservas.find((x) => x.id === where.id);
         Object.assign(r, data);
@@ -113,25 +111,28 @@ describe("a barra tem um dono só", () => {
     expect(sessoes.length).toBe(antes);
   });
 
-  // ⚠⚠ QUEM GARANTE É O BANCO, NÃO A LEITURA. Duas aberturas concorrentes leem "livre" juntas —
-  // a trava do MES serializa por RECURSO, e aqui os recursos são dois. O `P2002` do índice
-  // parcial é o que sobra, e ele tem de virar recusa de negócio, não erro 500.
-  it("o conflito do índice parcial vira recusa, não exceção", async () => {
-    const { tx } = bancoFalso();
+  // ⚠⚠ A CORRIDA DE VERDADE: a leitura devolve "livre" para os dois, e a gravação do segundo é
+  // engolida pelo `ON CONFLICT`. Quem ficou com a barra é uma PERGUNTA ao banco depois do insert —
+  // e a resposta tem de ser recusa de negócio, nunca exceção.
+  //
+  // ⚠⚠ ERA UM `create` COM `catch` ATÉ O CODEX PEGAR (22/09/2026): no Postgres o erro ABORTA a
+  // transação, e a consulta que descobriria a dona morria junto, virando 500 na cara do operador.
+  it("dois postos lendo 'livre' ao mesmo tempo: um abre, o outro é recusado sem exceção", async () => {
+    const { tx, reservas } = bancoFalso();
     await reservarUnidade(tx, { unidadeId: "u1", ambiente: "PROD", recursoId: "r1", loteId: "l1" });
-    // simula a corrida: a leitura devolve "livre", a gravação bate no índice
-    tx.mesUnidadeReserva.findFirst.mockResolvedValueOnce(null);
+    tx.mesUnidadeReserva.findFirst.mockResolvedValueOnce(null); // o segundo também leu "livre"
     const posse = await reservarUnidade(tx, { unidadeId: "u1", ambiente: "PROD", recursoId: "r2", loteId: "l2" });
     expect(posse.ocupada).toMatchObject({ recursoId: "r1" });
+    expect(reservas).toHaveLength(1);
   });
 
-  // ⚠ Qualquer OUTRO P2002 é defeito e tem de subir — "barra ocupada" é o conflito DAQUELE índice.
-  it("P2002 de outro índice não vira 'barra ocupada'", async () => {
+  // ⚠ E nenhuma consulta é feita DEPOIS de um erro de gravação, porque não há erro de gravação:
+  // o insert que não entra devolve zero linhas.
+  it("a gravação que não entra não lança nada", async () => {
     const { tx } = bancoFalso();
-    tx.mesUnidadeReserva.create.mockRejectedValueOnce(
-      Object.assign(new Error("unique"), { code: "P2002", meta: { target: "MesSessao_chaveTrabalho" } }));
-    await expect(reservarUnidade(tx, { unidadeId: "u9", ambiente: "PROD", recursoId: "r1", loteId: "l1" }))
-      .rejects.toThrow(/unique/);
+    await reservarUnidade(tx, { unidadeId: "u1", ambiente: "PROD", recursoId: "r1", loteId: "l1" });
+    await expect(reservarUnidade(tx, { unidadeId: "u1", ambiente: "PROD", recursoId: "r2", loteId: "l2" }))
+      .resolves.toBeTruthy();
   });
 
   // ⚠ DEMO e PROD são dois mundos: um plano de teste não pode travar a barra de quem produz.
@@ -239,11 +240,38 @@ describe("a saída de emergência do ADMIN", () => {
     expect(auditoria[0]).toMatchObject({ action: "MES_LIBERAR_BARRA" });
   });
 
+  // ⚠⚠ A DONA É RELIDA DEPOIS DA TRAVA (achado do Codex, 22/09/2026). As chaves travadas saem da
+  // leitura feita ANTES: se a barra for transferida enquanto a liberação espera na fila, este
+  // código encerraria as sessões do NOVO posto sem nunca ter travado a máquina dele.
+  it("se a barra trocou de posto enquanto esperava, a liberação é recusada", async () => {
+    const { prisma, reservas, sessoes } = bancoFalso();
+    await abrir(prisma, "r1", "lote-1");
+    // a barra muda de mãos entre a leitura da origem e a trava
+    prisma.mesUnidadeReserva.findFirst.mockImplementationOnce(async () => reservas[0]);
+    prisma.mesUnidadeReserva.findFirst.mockImplementationOnce(async () => ({ ...reservas[0], id: "outra", recursoId: "r9" }));
+    const r = await liberarBarra(prisma, {
+      unidadeId: "u1", ambiente: "PROD", recursoId: "r2", motivo: "tablet morreu", usuario: {},
+    });
+    expect(r.erro).toMatch(/mudou de posto/i);
+    expect(sessoes.every((s) => s.status === "ABERTA")).toBe(true);
+  });
+
+  // ⚠⚠ MOTIVO EM BRANCO NÃO PASSA. A liberação ENCERRA trabalho aberto: sem justificativa, quem
+  // lesse a auditoria depois encontraria um texto genérico e `motivo: null`.
+  it.each(["", "   ", undefined])("motivo vazio (%p) é recusado ANTES de encerrar nada", async (motivo) => {
+    const { prisma, reservas, sessoes } = bancoFalso();
+    await abrir(prisma, "r1", "lote-1");
+    const r = await liberarBarra(prisma, { unidadeId: "u1", ambiente: "PROD", recursoId: "r2", motivo, usuario: {} });
+    expect(r.erro).toMatch(/por que/i);
+    expect(sessoes.every((s) => s.status === "ABERTA")).toBe(true);
+    expect(reservas[0].liberadaEm).toBeFalsy();
+  });
+
   // ⚠ Soltar a posse deixando as sessões abertas faria a barra ser cortada em dois lugares com a
   // bênção do sistema — o oposto do que a reserva existe para garantir.
   it("barra sem dono não é 'liberada' em silêncio", async () => {
     const { prisma } = bancoFalso();
-    const r = await liberarBarra(prisma, { unidadeId: "u1", ambiente: "PROD", recursoId: "r1", usuario: {} });
+    const r = await liberarBarra(prisma, { unidadeId: "u1", ambiente: "PROD", recursoId: "r1", motivo: "sumiu", usuario: {} });
     expect(r.erro).toMatch(/não está reservada/i);
   });
 });

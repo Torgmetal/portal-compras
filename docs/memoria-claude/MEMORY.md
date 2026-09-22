@@ -197,4 +197,3 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Ambiente de demonstração](torg_ambiente_demo.md) — Postgres local `torg_demo` (cópia via `scripts/demo-banco.sh`), `MODO_DEMO=1` corta e-mail/Omie e desvia SharePoint para `DEMO/`; worktree ~/dev/portal-compras-demo, porta 3002; ⚠ `npm run dev` grava na produção
 - [Total do PDF vem com IPI](torg_total_pdf_com_ipi.md) — a tela comparava contra `preço × qtd` e acendia vermelho em 7 de 7 linhas CERTAS; medido 17/17 a 0,000% em `qtd × preço × (1+IPI)`; quem conhece o layout declara a BASE, e o número exibido continua o impresso; guarda impede a rota da IA de reescrever o preço em +3,25%
 - [Editar relatório já assinado](torg_relatorio_editar_assinado.md) — decisão do Vitor: não exige revisão; auditoria marca `editadoAposAssinatura` e a tarja diz quem assinou; revisão fica para o que já saiu ao cliente
-
