@@ -628,3 +628,18 @@ novo, não conserto, e não entra sem o Matheus decidir.
   build ok.
   ⚠ Na produção o RPM-105-002 ainda espera o Davi: até ele assinar, o espaço do Renato continua
   vazio — que é exatamente o combinado.
+- **(22/09, 16h) A lista de peças voltou para o relatório já enviado para assinatura.** Vitor: *"ela
+  não consegue puxar as peças informadas"*. O GET de `/api/qualidade/inspecoes/[id]` buscava as
+  marcas da OP só `if (!rel.envioAssinaturaId)` — correto enquanto documento enviado era somente
+  leitura, e obsoleto desde a edição liberada hoje de manhã: o editor abria com a lista de marcas
+  VAZIA (datalist), sem de onde puxar a peça e sem preencher a quantidade. Os EVS/LP da OP-102, que
+  motivaram aquela liberação, são exatamente os que têm envio.
+  ⚠ Na mesma consulta entrou o filtro de **CROQUI** que o portal de campo já tinha: na OP-102 são
+  216 croquis para 58 conjuntos — croqui é componente, não peça de inspeção, e marca repetida somaria
+  quantidade errada. Medido: `tipoPeca` só assume null | CROQUI | CONJUNTO.
+  ⚠ O teste que afirmava o contrário ("não busca listas atuais para relatório enviado") foi reescrito
+  com o motivo — é o quinto teste desta semana que guardava a premissa "enviado = congelado".
+  **3.078 passando**, checar limpo, build ok.
+  ⚠ **Não confirmado com a Lais**: se o que falta for a lista de marcas nos tipos SEM quantidade
+  (LP, US, EVS, pré-montagem), a tela mostra um textarea de marcas e não um seletor — aí é outra
+  mudança, e depende de ela dizer em qual tela estava.

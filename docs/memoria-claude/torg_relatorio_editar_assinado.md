@@ -30,3 +30,13 @@ para um conteúdo que mudou — é assumido com registro, não com trava.
 **How to apply:** ao mexer em documento assinado, perguntar *já saiu da Torg?* Se saiu, revisão. Se
 não, edição registrada. Ver [[torg_databook_revisao]] (lá o data book emitido SÓ muda por revisão —
 regra diferente, porque ele é entregue) e [[torg_assinatura_doc]].
+
+⚠⚠ **DESTRAVAR A EDIÇÃO NÃO BASTA — o que a tela precisa para editar tem de vir junto.** 22/09/2026,
+Vitor: *"ela não consegue puxar as peças informadas"*. O GET de `/api/qualidade/inspecoes/[id]` só
+buscava a lista de marcas da OP `if (!rel.envioAssinaturaId)` — desligar as sugestões num documento
+fechado fazia sentido enquanto ele era somente leitura. Editável, o editor de peças abria com a
+**lista de marcas vazia**: quem ia acrescentar uma peça não tinha de onde puxá-la, e a quantidade não
+se preenchia sozinha. Justamente nos EVS/LP da OP-102, que são os que estão enviados para assinatura.
+
+⚠ Na mesma correção, a consulta passou a excluir **CROQUI** (`tipoPeca`), como o portal de campo já
+fazia: na OP-102 são 216 croquis para 58 conjuntos, e croqui é componente — não peça de inspeção.

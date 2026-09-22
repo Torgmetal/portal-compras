@@ -62,16 +62,27 @@ export async function GET(_req, { params }) {
 
   // Sugestões de leitura: só viram conteúdo do relatório quando o inspetor salva.
   // opNumero nas peças pode ser a frente da Engenharia; o vínculo correto é opId.
+  //
+  // ⚠⚠ A LISTA VEM TAMBÉM PARA RELATÓRIO JÁ ENVIADO PARA ASSINATURA. Ela era desligada nesse caso
+  // — fazia sentido enquanto o documento enviado era somente leitura. Desde 22/09/2026 ele é
+  // editável (Vitor: "não precisa gerar revisão, pode apenas alterar as informações"), e sem as
+  // sugestões o editor de peças abre com a lista de marcas VAZIA: quem vai acrescentar uma peça
+  // não tem de onde puxá-la, e a quantidade não se preenche sozinha. Ver
+  // testes/api/inspecao-editar-assinado.
+  //
+  // ⚠ Isto continua sendo SUGESTÃO: nada aqui é gravado no relatório sem o inspetor salvar.
   let quantidadesLista = {}, avisoQuantidades = null;
-  if (!rel.envioAssinaturaId) {
-    try {
-      const opId = rel.opId || (await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { id: true } }))?.id;
-      if (opId) quantidadesLista = quantidadesPorMarca(await prisma.pecaConjunto.findMany({
-        where: { opId }, select: { marca: true, qte: true },
-      }));
-    } catch {
-      avisoQuantidades = "Não foi possível consultar as quantidades da lista da OP. As quantidades já registradas foram mantidas.";
-    }
+  try {
+    const opId = rel.opId || (await prisma.oP.findFirst({ where: { numero: rel.opNumero }, select: { id: true } }))?.id;
+    // ⚠ CROQUI NÃO É PEÇA DE INSPEÇÃO — é componente do conjunto (ver lib/itens-expedicao.js e a
+    // mesma regra em /api/campo/relatorios/[id]). Na OP-102 são 216 croquis para 58 conjuntos:
+    // sem o filtro, a lista de marcas vira um monte de posição e uma marca repetida somaria a
+    // quantidade errada.
+    if (opId) quantidadesLista = quantidadesPorMarca(await prisma.pecaConjunto.findMany({
+      where: { opId, OR: [{ tipoPeca: "CONJUNTO" }, { tipoPeca: null }] }, select: { marca: true, qte: true },
+    }));
+  } catch {
+    avisoQuantidades = "Não foi possível consultar as quantidades da lista da OP. As quantidades já registradas foram mantidas.";
   }
   return NextResponse.json({ relatorio: rel, fotos, assinaturas, quantidadesLista, avisoQuantidades });
 }

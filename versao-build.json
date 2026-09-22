@@ -1,7 +1,12 @@
 {
-  "build": 3393,
-  "gerado": "2026-09-22T18:38:09.716Z",
+  "build": 3394,
+  "gerado": "2026-09-22T19:03:50.741Z",
   "commits": [
+    {
+      "hash": "8dd0cde0",
+      "data": "22/09/2026",
+      "titulo": "Cliente: o relatório fechado fica disponível para consulta"
+    },
     {
       "hash": "fa18ab5a",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ac22f9f3",
       "data": "22/09/2026",
       "titulo": "Organiza preenchimento do ultrassom no Campo"
-    },
-    {
-      "hash": "07cfd7ec",
-      "data": "22/09/2026",
-      "titulo": "Corrige: a trava do modo demo tirava a barra inicial e derrubou o SharePoint em produção"
     }
   ]
 }
