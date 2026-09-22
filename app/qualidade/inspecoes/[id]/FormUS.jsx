@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { useComponenteEstavel } from "@/lib/react-estavel";
 import { Plus, Trash2, AlertTriangle } from "lucide-react";
 import {
-  APARELHOS, CABECOTES, ANGULOS, ACOPLANTES, BLOCOS_PADRAO, FACES,
-  TIPOS_CARREGAMENTO, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL,
+  APARELHOS, ANGULOS, ACOPLANTES, BLOCOS_PADRAO, FACES, MATERIAL_PADRAO,
+  TIPOS_CARREGAMENTO, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL, cabecotesPorFabricante,
 } from "@/lib/us-campos";
 import { LAUDOS } from "@/lib/evs-campos";
 
@@ -31,17 +31,38 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
   }, []);
 
   const set = (i, campo, v) => setLinhas(linhas.map((l, k) => (k === i ? { ...l, [campo]: v } : l)));
+
+  const grupos = cabecotesPorFabricante();
+  /** Escolher o cabeçote grava também a MARCA — o rótulo não a carrega mais. */
+  const escolherCabecote = (rotulo) => {
+    setResultado("cbModelo", rotulo);
+    const dono = grupos.find((g) => g.itens.some((i) => i.rotulo === rotulo));
+    setResultado("cbFabricante", dono?.fabricante || "");
+  };
+
+  // ⚠ O metal base nasce preenchido (Vitor, 22/09/2026: "deixe ela pré-setado em aço carbono") —
+  // inclusive nos relatórios abertos antes desta versão, que vieram com o campo vazio.
+  useEffect(() => {
+    if (!travado && !String(res.material || "").trim()) setResultado("material", MATERIAL_PADRAO);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [travado]);
   const addLinha = () => setLinhas([...linhas, { marca: marcas[0] || "", indicacao: String(linhas.length + 1), laudo: "R" }]);
 
-  const Campo = useComponenteEstavel(({ rot, k, opcoes = null, tipo = "text", destaque = false }) => (
+  const Campo = useComponenteEstavel(({ rot, k, opcoes = null, grupos = null, aoMudar = null, tipo = "text", destaque = false }) => (
     <label className="block">
       <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
-      {opcoes ? (
-        <select value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
+      {opcoes || grupos ? (
+        <select value={res[k] || ""} disabled={travado} onChange={(e) => (aoMudar ? aoMudar(e.target.value) : setResultado(k, e.target.value))}
           className={`w-full text-[12px] border rounded-lg px-2 py-1.5 disabled:bg-gray-50 ${
             destaque && !res[k] ? "border-amber-400 bg-amber-50" : "border-gray-200 focus:border-torg-blue"}`}>
           <option value="">—</option>
-          {opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
+          {grupos
+            ? grupos.map((g) => (
+              <optgroup key={g.fabricante} label={g.fabricante}>
+                {g.itens.map((i) => <option key={`${g.fabricante}-${i.rotulo}`} value={i.rotulo}>{i.rotulo}</option>)}
+              </optgroup>
+            ))
+            : opcoes.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       ) : (
         <input type={tipo} value={res[k] ?? ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
@@ -71,12 +92,30 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
           <Campo rot="Bloco padrão" k="blocoPadrao" opcoes={BLOCOS_PADRAO} />
           <Campo rot="Aparelho" k="apModelo" opcoes={APARELHOS} />
           <Campo rot="Nº de série do aparelho" k="apSerie" />
-          <Campo rot="Cabeçote" k="cbModelo" opcoes={CABECOTES.map((c) => `${c.modelo}${c.angulo ? ` · ${c.angulo}°` : ""} · ${c.mhz} MHz`)} />
+          {/* ⚠ Vitor (22/09/2026): "tirar esse Mitech, pois já informamos a marca dele antes". A
+              opção mostra só "angular 20x22 · 70 · 2 MHz"; a MARCA é o título do grupo e vai
+              gravada em `cbFabricante` — Mitech e Doppler têm o mesmo 20x22 nos três ângulos. */}
+          <Campo rot="Cabeçote" k="cbModelo" grupos={grupos} aoMudar={escolherCabecote} />
           <Campo rot="Nº de série do cabeçote" k="cbSerie" />
           <Campo rot="Ângulo real (graus)" k="cbAngulo" tipo="number" />
           <Campo rot="Ganho de varredura (dB)" k="ganhoVarredura" tipo="number" />
           <Campo rot="Material" k="material" />
           <Campo rot="Espessura" k="espessura" />
+        </div>
+        {/* ⚠⚠ O PDF JÁ IMPRIMIA ESTES CAMPOS — e não havia onde preenchê-los. Vitor (22/09/2026):
+            "não tenho campo para informar o processo de soldagem". O cabeçalho do RUS tem
+            PROC. DE SOLDAGEM, METAL DE ADIÇÃO, TIPO DE JUNTA, TIPO DE CHANFRO e TÉCNICA DE ENSAIO;
+            sem entrada, o documento saía com as cinco caixas em branco na frente do cliente. */}
+        <p className="text-[11px] font-bold text-torg-dark mt-3 mb-1.5">A junta ensaiada</p>
+        <div className="grid sm:grid-cols-4 gap-2.5">
+          <Campo rot="Processo de soldagem" k="processoSolda" />
+          <Campo rot="Metal de adição" k="metalAdicao" />
+          {/* ⚠ `tipoJunta` é a chave que o EVS e o LP já usam — duas chaves para a mesma coisa
+              fariam o mesmo dado aparecer num relatório e sumir no outro. O PDF do US lê as duas. */}
+          <Campo rot="Tipo de junta" k="tipoJunta" />
+          <Campo rot="Tipo de chanfro" k="chanfro" />
+          <Campo rot="Técnica de ensaio" k="tecnica" />
+          <Campo rot="Desenho de referência" k="desenho" />
         </div>
         <p className="text-[10px] text-torg-gray mt-2">
           Procedimento: <strong className="text-torg-dark">{res.procedimento || "—"}</strong>

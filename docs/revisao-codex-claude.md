@@ -419,3 +419,22 @@ novo, não conserto, e não entra sem o Matheus decidir.
   ⚠ O seletor de DEMO saiu da tela (decisão do Matheus); coluna, índices e filtros ficam.
   ⚠ **Segue aberto e NÃO foi feito:** a mesma barra aberta em dois postos não é impedida — precisa
   de reserva exclusiva por unidade+etapa+ambiente, que é desenho novo e aguarda o Matheus.
+
+## 22/09/2026 — Relatório de US: cabeçote sem marca, material padrão, junta soldada (Claude)
+
+- **Pedidos do Vitor, na tela e no PDF do RUS:** "tirar esse Mitech, pois já informamos a marca dele
+  antes — deixar apenas angular 20x22 70 · 2"; "o ângulo não precisa [do símbolo de] grau"; "deixe
+  ela pré-setado em aço carbono" (Material); "pode tirar esse AWS a frente do procedimento"; "não
+  tenho campo para informar o processo de soldagem".
+- **Feito:** `CABECOTES` com `fabricante` separado + `rotuloCabecote`/`cabecotesPorFabricante`
+  (a marca virou título de `optgroup`, porque Mitech e Doppler têm o mesmo 20x22 nos três ângulos, e
+  o formulário grava `cbFabricante`); `MATERIAL_PADRAO` nos valores iniciais, no normalizador e no
+  formulário aberto; `PROCEDIMENTO_US` sem a norma, com normalização do nome antigo; campos da junta
+  ensaiada (processo de soldagem, metal de adição, tipo de junta, chanfro, técnica, desenho) no
+  computador e no celular — o PDF já os imprimia sem ter onde preencher. Testes: `us-relatorio` (+9).
+  2874 passando; build ok.
+- **Para revisar (testing):** a chave da junta passou a ser `tipoJunta` (a do EVS/LP); o PDF lê
+  `tipoJunta || junta` para não perder o que já estivesse gravado.
+- **De passagem:** `npm run checar` acusou `CheckCircle2` usado sem import em
+  `app/mes-lab/totem/[codigo]/Escolher.jsx` (commit 07dc4916) — corrigido em commit próprio.
+

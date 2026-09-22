@@ -241,7 +241,9 @@ export async function PATCH(req, { params }) {
                      "revelador", "reveladorLote", "tempoRevelador", "uv", "dataInspecao",
                      // modelos LP/EVS revisados em 21/09/2026
                      "desenhoCliente", "revisaoCliente", "revisaoDesenho", "metalAdicao",
-                     "processoSolda", "eps", "rqs", "tipoJunta"]) {
+                     "processoSolda", "eps", "rqs", "tipoJunta",
+                     // ultrassom: a junta ensaiada, que o PDF já imprimia sem ter onde preencher
+                     "chanfro", "desenho"]) {
       if (c[k] !== undefined) dados.resultados[k] = c[k] == null || c[k] === "" ? null : String(c[k]).slice(0, 120);
     }
 

@@ -1,7 +1,12 @@
 {
-  "build": 3366,
-  "gerado": "2026-09-22T11:41:55.477Z",
+  "build": 3367,
+  "gerado": "2026-09-22T11:42:18.933Z",
   "commits": [
+    {
+      "hash": "2db38b5c",
+      "data": "22/09/2026",
+      "titulo": "MES totem: importa o CheckCircle2 que a marca produzida usa"
+    },
     {
       "hash": "d0ae17d0",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "eef73065",
       "data": "21/09/2026",
       "titulo": "Traz a main para a branch do MES próprio"
-    },
-    {
-      "hash": "fdbe42ed",
-      "data": "21/09/2026",
-      "titulo": "Inspeção: o projeto anexado nunca chegava ao relatório — o webhook do blob tomava 401"
     }
   ]
 }
