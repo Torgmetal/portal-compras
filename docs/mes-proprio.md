@@ -1679,9 +1679,22 @@ decisão pertence.
 por nome — é o que permite conferir um sistema contra o outro enquanto os dois rodam. **Nenhum
 posto nasce dele.**
 
-⚠⚠ **A REMOÇÃO É CONDICIONADA: posto com sessão ou evento NÃO é apagado, é RELATADO.** `MesEvento` e
-`MesSessao` apontam para o recurso — apagar um posto que já registrou trabalho seria apagar
-produção. Na limpeza de 22/09 os 17 estavam zerados; da próxima vez pode não ser assim.
+⚠⚠ **SEMEAR E REMOVER SÃO OPERAÇÕES SEPARADAS — e o semeador NÃO apaga nada** (achado do Codex,
+22/09/2026). A primeira versão apagava "tudo o que está fora do Gantt e sem uso", e isso contradizia
+o que o próprio trabalho tinha escrito: *"quem quiser um posto a mais cadastra pela tela"*. Aquele
+filtro descreve tanto os 17 postos do Syneco quanto o posto que alguém cadastrar amanhã e ainda não
+tiver usado — a execução seguinte levaria o cadastro manual junto, sem avisar. Hoje o semeador
+RELATA o que está fora da lista; quem apaga é `--remover=CODIGO,CODIGO`, com os códigos nomeados por
+quem decidiu.
+
+⚠⚠ **"NUNCA USADO" É TODA RELAÇÃO, NÃO SÓ APONTAMENTO — e a TELA tinha o mesmo buraco.** Além de
+sessão e evento, `MesRecurso` é apontado por **presença, dispositivo e reserva de barra**, e nenhuma
+dessas FKs tem cascade. Um posto onde alguém só bipou o crachá passava por "nunca usado": o `delete`
+estourava violação de chave estrangeira, e quem estava na tela via erro de banco no lugar da frase
+que explica o que fazer. A conta virou `usosDoCadastro` (`lib/mes/cadastro.js`), **uma só**, usada
+pela tela de exclusão, pela trava de troca de código e pelo script. ⚠ A elegibilidade é reconferida
+no próprio `delete` (`sessoes: { none: {} }` e as outras): entre contar e apagar, alguém pode ter
+bipado o crachá ali.
 
 ⚠ **O que a granularidade menor custa, medido:** com UM posto de Acabamento não se sabe QUAL das dez
 bancadas produziu — o monitor e o OEE veem um recurso só. O que **não** custa é travar operador: a

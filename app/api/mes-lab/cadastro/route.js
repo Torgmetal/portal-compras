@@ -17,7 +17,7 @@ import { mesPrisma as prisma } from "@/lib/mes/prisma";
 import { requireRole } from "@/lib/session";
 import {
   ehEntidade, normalizarCodigo, recusaDoCadastro, recusaDaExclusao, recusaDaTrocaDeCodigo,
-  setoresSemPosto,
+  setoresSemPosto, usosDoCadastro,
 } from "@/lib/mes/cadastro";
 
 export const runtime = "nodejs";
@@ -29,30 +29,13 @@ const erroDeAcesso = (e) =>
   NextResponse.json({ success: false, error: e.message },
     { status: e.message === "Unauthorized" ? 401 : 403 });
 
-/** Quantas linhas de histórico dependem de cada registro — é o que decide excluir vs desativar. */
-const USO = {
-  // Setor não tem histórico próprio; quem o segura são os postos dentro dele.
-  setores: (id) => prisma.mesRecurso.count({ where: { setorId: id } }),
-  recursos: async (id) => {
-    const [eventos, sessoes] = await Promise.all([
-      prisma.mesEvento.count({ where: { recursoId: id } }),
-      prisma.mesSessao.count({ where: { recursoId: id } }),
-    ]);
-    return eventos + sessoes;
-  },
-  motivos: (id) => prisma.mesEvento.count({ where: { motivoId: id } }),
-  operadores: async (id) => {
-    const [eventos, sessoes] = await Promise.all([
-      prisma.mesEvento.count({ where: { operadorId: id } }),
-      prisma.mesSessao.count({ where: { operadorId: id } }),
-    ]);
-    return eventos + sessoes;
-  },
-};
-
+// ⚠⚠ A CONTA DOS VÍNCULOS MORA EM `lib/mes/cadastro.js` (22/09/2026). Aqui ela olhava só evento e
+// sessão — e `MesRecurso` também é apontado por presença, dispositivo e reserva de barra, sem
+// cascade em nenhuma. Um posto onde alguém só bipou o crachá passava por "nunca usado" e o delete
+// estourava violação de chave estrangeira: erro de banco no lugar da frase que explica o que fazer.
 const NOME_DO_USO = {
-  setores: "posto(s) dentro dele", recursos: "apontamento(s)/sessão(ões)",
-  motivos: "parada(s) registrada(s)", operadores: "apontamento(s)/sessão(ões)",
+  setores: "posto(s) dentro dele", recursos: "registro(s) ligado(s) a ele",
+  motivos: "parada(s) registrada(s)", operadores: "registro(s) ligado(s) a ele",
 };
 
 /** Só os campos que cada cadastro aceita — nada do corpo entra por tabela adentro sem passar aqui. */
@@ -118,7 +101,7 @@ export async function GET(req) {
 
   // ⚠ O USO VIAJA JUNTO COM A LISTA. É ele que diz à tela se o botão é "excluir" ou só "desativar" —
   // e mostrar "excluir" num registro que o servidor vai recusar é prometer o que não se cumpre.
-  const usos = await Promise.all(lista.map((r) => USO[tipo](r.id)));
+  const usos = await Promise.all(lista.map((r) => usosDoCadastro(prisma, tipo, r.id)));
   const comUso = lista.map((r, i) => ({ ...r, usos: usos[i] }));
 
   const extra = tipo === "recursos"
@@ -173,7 +156,7 @@ export async function PATCH(req) {
   if (recusa) return erro(recusa);
 
   if (tipo === "recursos") {
-    const usos = await USO.recursos(id);
+    const usos = await usosDoCadastro(prisma, "recursos", id);
     const trava = recusaDaTrocaDeCodigo(atual.codigo, corpo.codigo, usos);
     if (trava) return erro(trava, 409);
   }
@@ -195,7 +178,7 @@ export async function DELETE(req) {
   if (!ehEntidade(tipo)) return erro(`Cadastro desconhecido: ${tipo}`);
   if (!id) return erro("Informe qual registro excluir.");
 
-  const usos = await USO[tipo](id);
+  const usos = await usosDoCadastro(prisma, tipo, id);
   const recusa = recusaDaExclusao(usos, NOME_DO_USO[tipo]);
   if (recusa) return erro(recusa, 409);
 

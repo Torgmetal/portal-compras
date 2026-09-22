@@ -3,6 +3,8 @@
 //   node --experimental-loader ./scripts/mes-lab/alias-loader.mjs \
 //        --env-file=.env.local scripts/mes-semear-producao.mjs --confirmo
 //
+//   ... --confirmo --remover=ACABAMENTO01,PINTURAAIRLESS    (tira postos NOMEADOS, se nunca usados)
+//
 // Matheus (22/09/2026): *"crie você mesmo o restante dos cadastros (…) preenche o restante conforme
 // já falamos: os setores, máquinas e funcionários da fábrica"*.
 //
@@ -31,6 +33,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaClient as MesClient } from "../node_modules/.prisma/mes-client/index.js";
 import { urlDoMes } from "@/lib/mes/prisma";
 import { AMBIENTE } from "@/lib/mes/ambiente";
+import { usosDoCadastro } from "@/lib/mes/cadastro";
 import { RECURSOS, SETORES, COR_SETOR } from "@/app/pcp/producao/_gantt/recursos";
 
 const AMB = AMBIENTE.PROD;
@@ -45,10 +48,6 @@ const mes = new MesClient({ datasources: { db: { url: urlDoMes() } } });
 
 /** ⚠ O Corte do Gantt é a PREPARAÇÃO do MES (Matheus, 10/09/2026) — ver §11.3 do doc. */
 const SETOR_DO_GANTT = { CORTE: "PREPARACAO" };
-const SETOR_DO_SYNECO = {
-  Corte: "PREPARACAO", "Preparação": "PREPARACAO", Montagem: "MONTAGEM", Solda: "SOLDA",
-  Acabamento: "ACABAMENTO", Jato: "JATO", Pintura: "PINTURA",
-};
 const NOME_DO_SETOR = {
   PREPARACAO: "Preparação", MONTAGEM: "Montagem", SOLDA: "Solda", ACABAMENTO: "Acabamento",
   JATO: "Jato", PINTURA: "Pintura", EXPEDICAO: "Expedição",
@@ -125,33 +124,66 @@ async function semearRecursos(setores) {
   }
 
   console.log(`Postos: ${(await mes.mesRecurso.count({ where: { ambiente: AMB } })) - antes} novo(s), ${feitos.length} conferido(s)`);
-  await tirarOsQueNaoSaoDoGantt(feitos.map((r) => r.codigo));
+  await relatarForaDoGantt(feitos.map((r) => r.codigo));
 }
 
 /**
- * O QUE NÃO É DO GANTT SAI — mas só se nunca tiver sido usado.
+ * O QUE NÃO É DO GANTT É RELATADO — E NUNCA APAGADO POR CONTA PRÓPRIA.
  *
- * ⚠⚠ APAGAR POSTO COM APONTAMENTO SERIA APAGAR PRODUÇÃO. O `MesEvento` e a `MesSessao` apontam
- * para o recurso; um posto que já registrou trabalho vira dado histórico, não linha de cadastro.
- * Por isso a exclusão é CONDICIONADA e o que sobra é RELATADO — desativar ou renomear à mão é
- * decisão de quem olha, não de um script.
+ * ⚠⚠ A VERSÃO ANTERIOR APAGAVA (achado do Codex, 22/09/2026), e isso contradizia o que o próprio
+ * trabalho tinha escrito: "quem quiser um posto a mais cadastra pela tela". O filtro era "fora da
+ * lista do Gantt e sem uso" — que descreve tanto os 17 postos que o Syneco trouxe quanto o posto
+ * que alguém cadastrar amanhã e ainda não tiver usado. A próxima execução do semeador levaria o
+ * cadastro manual junto, sem avisar.
+ *
+ * Semear e remover viraram operações SEPARADAS: esta só conta a história; quem apaga é
+ * `--remover=CODIGO,CODIGO`, com os códigos NOMEADOS por quem decidiu.
  */
-async function tirarOsQueNaoSaoDoGantt(doGantt) {
+async function relatarForaDoGantt(doGantt) {
   const forasteiros = await mes.mesRecurso.findMany({
     where: { ambiente: AMB, codigo: { notIn: doGantt } },
-    select: { id: true, codigo: true, nome: true, _count: { select: { sessoes: true, eventos: true } } },
+    select: { codigo: true, nome: true },
   });
   if (!forasteiros.length) return;
+  console.log(`  ⚠ ${forasteiros.length} posto(s) fora da lista do Gantt (mantidos):`);
+  for (const r of forasteiros) console.log(`      ${r.nome} (${r.codigo})`);
+  console.log(`    Para tirar algum: --remover=${forasteiros.map((r) => r.codigo).join(",")}`);
+}
 
-  const limpos = forasteiros.filter((r) => !r._count.sessoes && !r._count.eventos);
-  const usados = forasteiros.filter((r) => r._count.sessoes || r._count.eventos);
-  if (limpos.length) {
-    await mes.mesRecurso.deleteMany({ where: { id: { in: limpos.map((r) => r.id) } } });
-    console.log(`  ${limpos.length} posto(s) fora do Gantt removido(s): ${limpos.map((r) => r.nome).join(", ")}`);
-  }
-  if (usados.length) {
-    console.log(`  ⚠ ${usados.length} posto(s) fora do Gantt MANTIDO(S) — já têm trabalho registrado:`);
-    for (const r of usados) console.log(`      ${r.nome} (${r._count.sessoes} sessão/ões, ${r._count.eventos} evento(s))`);
+/**
+ * REMOVER POSTOS NOMEADOS — a operação explícita, separada do semeio.
+ *
+ * ⚠⚠ SÓ SAI O QUE NUNCA FOI USADO, e "usado" é TODA relação, não só apontamento (achado do Codex).
+ * `MesRecurso` é apontado por sessão, evento, presença, dispositivo e reserva de barra, e nenhuma
+ * dessas FKs tem cascade: um posto onde alguém só bipou o crachá passaria por "limpo" e o delete
+ * estouraria violação de chave estrangeira — derrubando o script antes dos crachás. A conta mora em
+ * `lib/mes/cadastro.js`, a MESMA que a tela de exclusão usa.
+ *
+ * ⚠ A elegibilidade é reconferida NO PRÓPRIO DELETE (`sessoes: { none: {} }` e as outras): entre
+ * contar e apagar, alguém pode ter bipado o crachá naquele posto.
+ */
+async function removerPostos(codigos) {
+  const alvos = await mes.mesRecurso.findMany({
+    where: { ambiente: AMB, codigo: { in: codigos } },
+    select: { id: true, codigo: true, nome: true },
+  });
+  const achados = new Set(alvos.map((r) => r.codigo));
+  for (const c of codigos.filter((c) => !achados.has(c))) console.log(`  ⚠ ${c}: não existe neste ambiente.`);
+
+  for (const r of alvos) {
+    const usos = await usosDoCadastro(mes, "recursos", r.id);
+    if (usos) {
+      console.log(`  ⚠ ${r.nome} (${r.codigo}) MANTIDO — ${usos} registro(s) ligado(s) a ele. Desative pela tela.`);
+      continue;
+    }
+    const { count } = await mes.mesRecurso.deleteMany({
+      where: {
+        id: r.id,
+        sessoes: { none: {} }, eventos: { none: {} }, presencas: { none: {} },
+        dispositivos: { none: {} }, reservas: { none: {} },
+      },
+    });
+    console.log(count ? `  ${r.nome} (${r.codigo}) removido.` : `  ⚠ ${r.nome}: passou a ser usado agora mesmo — mantido.`);
   }
 }
 
@@ -202,8 +234,20 @@ function porSetor(pessoas) {
   console.log(`  por setor: ${[...mapa].sort().map(([s, n]) => `${s} ${n}`).join(" · ")}`);
 }
 
+/** `--remover=A,B` → ["A","B"] */
+function pedidoDeRemocao() {
+  const arg = process.argv.find((a) => a.startsWith("--remover="));
+  return arg ? arg.slice("--remover=".length).split(",").map((c) => c.trim()).filter(Boolean) : [];
+}
+
 async function main() {
   console.log(`MES de PRODUÇÃO, ambiente ${AMB}\n`);
+  const remover = pedidoDeRemocao();
+  if (remover.length) {
+    console.log(`Removendo ${remover.length} posto(s) nomeado(s):`);
+    await removerPostos(remover);
+    console.log("");
+  }
   const setores = await semearSetores();
   await semearRecursos(setores);
   await semearOperadores();

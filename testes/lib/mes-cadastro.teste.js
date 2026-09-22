@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   normalizarCodigo, recusaDoCadastro, recusaDaExclusao, recusaDaTrocaDeCodigo, setoresSemPosto,
+  usosDoCadastro,
 } from "@/lib/mes/cadastro";
 
 // O CADASTRO DA FÁBRICA — as recusas que impedem cadastro sem sentido de nascer.
@@ -127,5 +128,48 @@ describe("setoresSemPosto — o trabalho que não apareceria em terminal nenhum"
 
   it("sem nada, não inventa aviso", () => {
     expect(setoresSemPosto()).toEqual([]);
+  });
+});
+
+describe("usosDoCadastro — o que segura um cadastro", () => {
+  // ⚠⚠ FALTAVAM TRÊS RELAÇÕES, E A CONTA ERRADA NÃO DAVA RECUSA: DAVA ERRO DE BANCO (achado do
+  // Codex sobre o semeador, 22/09/2026 — a TELA tinha o mesmo buraco). `MesRecurso` também é
+  // apontado por presença, dispositivo e reserva de barra, e nenhuma dessas FKs tem cascade.
+  const contador = (valores) => ({
+    mesRecurso: { count: vi.fn(async () => valores.recursos ?? 0) },
+    mesEvento: { count: vi.fn(async () => valores.eventos ?? 0) },
+    mesSessao: { count: vi.fn(async () => valores.sessoes ?? 0) },
+    mesPresenca: { count: vi.fn(async () => valores.presencas ?? 0) },
+    mesDispositivo: { count: vi.fn(async () => valores.dispositivos ?? 0) },
+    mesUnidadeReserva: { count: vi.fn(async () => valores.reservas ?? 0) },
+  });
+
+  it("posto sem nada é removível", async () => {
+    expect(await usosDoCadastro(contador({}), "recursos", "r1")).toBe(0);
+  });
+
+  // ⚠⚠ O CASO QUE ESTOURAVA: alguém só bipou o crachá no posto, sem nenhum apontamento. Ele passava
+  // por "nunca usado" e o `delete` batia na chave estrangeira — o operador via erro de banco no
+  // lugar da frase que explica o que fazer.
+  it.each(["presencas", "dispositivos", "reservas"])(
+    "posto com %s e nenhum apontamento NÃO é removível", async (relacao) => {
+      const usos = await usosDoCadastro(contador({ [relacao]: 1 }), "recursos", "r1");
+      expect(usos).toBe(1);
+      expect(recusaDaExclusao(usos, "registro(s) ligado(s) a ele")).toMatch(/Desative/);
+    });
+
+  it("soma todas as relações do posto", async () => {
+    const usos = await usosDoCadastro(
+      contador({ eventos: 2, sessoes: 3, presencas: 1, dispositivos: 1, reservas: 4 }), "recursos", "r1");
+    expect(usos).toBe(11);
+  });
+
+  // ⚠ O operador também tem presença, e ela também segura — mesmo motivo.
+  it("operador com presença e nenhum apontamento NÃO é removível", async () => {
+    expect(await usosDoCadastro(contador({ presencas: 1 }), "operadores", "o1")).toBe(1);
+  });
+
+  it("setor é segurado pelos postos dentro dele", async () => {
+    expect(await usosDoCadastro(contador({ recursos: 5 }), "setores", "s1")).toBe(5);
   });
 });
