@@ -1,7 +1,12 @@
 {
-  "build": 3367,
-  "gerado": "2026-09-22T11:42:18.933Z",
+  "build": 3368,
+  "gerado": "2026-09-22T11:47:10.117Z",
   "commits": [
+    {
+      "hash": "752e0987",
+      "data": "22/09/2026",
+      "titulo": "Relatório de US: cabeçote sem a marca, material padrão e os campos da junta soldada"
+    },
     {
       "hash": "2db38b5c",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7f65b9f4",
       "data": "21/09/2026",
       "titulo": "Realinha o número do build depois do merge"
-    },
-    {
-      "hash": "eef73065",
-      "data": "21/09/2026",
-      "titulo": "Traz a main para a branch do MES próprio"
     }
   ]
 }

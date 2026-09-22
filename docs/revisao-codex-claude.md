@@ -437,4 +437,10 @@ novo, não conserto, e não entra sem o Matheus decidir.
   `tipoJunta || junta` para não perder o que já estivesse gravado.
 - **De passagem:** `npm run checar` acusou `CheckCircle2` usado sem import em
   `app/mes-lab/totem/[codigo]/Escolher.jsx` (commit 07dc4916) — corrigido em commit próprio.
+- **(22/09, tarde)** Mais três no RUS: seletor de espessura de chapa (8 mm → 3", lista conferida no
+  banco; rótulo com a bitola comercial, valor gravado em mm), aparelhagem da casa pré-preenchida
+  (`APARELHAGEM_PADRAO_US` — Mitech MDF350B/FD10012912 e o cabeçote 20x22 2 MHz, ⚠ sem o ângulo
+  real, que é medido) e **guarda de valor fora da lista** nos seletores: relatório antigo tem o
+  cabeçote com a marca, que não existe mais entre as opções — sem isso o campo abriria vazio e a
+  gravação seguinte apagaria o registro.
 

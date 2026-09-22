@@ -158,3 +158,53 @@ describe("procedimento no cabeçalho", () => {
     expect(camposCabecalhoUS({ marcas: ["T1"], resultados: { procedimento: "PI-QUA-003 - R2" } }).procedimento).toBe("PI-QUA-003 - R2");
   });
 });
+
+// Vitor (22/09/2026), no campo Espessura do RUS: "preciso que você coloque o seletor de espessura
+// de chapas de 8 até 3 polegadas". A lista é a das chapas que a casa compra — conferida contra o
+// banco (RMItem e PecaConjunto): 8, 9,50, 12,50, 16, 19, 22,40, 25,40, 31,50, 38, 44,50 mm são as
+// que aparecem de verdade; 50,80, 63,50 e 76,20 completam até as 3".
+describe("espessuras de chapa", () => {
+  it("vai de 8,00 mm a 76,20 mm (3\"), em ordem e sem repetir", async () => {
+    const { ESPESSURAS_CHAPA, valorEspessura } = await import("@/lib/us-campos");
+    const mm = ESPESSURAS_CHAPA.map((e) => e.mm);
+    expect(mm[0]).toBe(8);
+    expect(mm.at(-1)).toBeCloseTo(76.2, 2);
+    expect([...mm].sort((a, b) => a - b)).toEqual(mm);
+    expect(new Set(mm).size).toBe(mm.length);
+    expect(valorEspessura(ESPESSURAS_CHAPA[0])).toBe("8,00 mm");
+  });
+
+  it("o rótulo traz a polegada comercial quando existe; o valor gravado é só o milímetro", async () => {
+    const { ESPESSURAS_CHAPA, rotuloEspessura, valorEspessura } = await import("@/lib/us-campos");
+    const meia = ESPESSURAS_CHAPA.find((e) => e.mm === 12.5);
+    expect(rotuloEspessura(meia)).toBe('12,50 mm (1/2")');
+    expect(valorEspessura(meia)).toBe("12,50 mm");
+    const tres = ESPESSURAS_CHAPA.at(-1);
+    expect(rotuloEspessura(tres)).toBe('76,20 mm (3")');
+  });
+});
+
+// "O modelo do aparelho e do cabeçote é sempre o mesmo, pode deixar fixo" (Vitor, 22/09/2026).
+describe("aparelhagem padrão do ultrassom", () => {
+  it("é a da casa, com os números de série do equipamento", async () => {
+    const { APARELHAGEM_PADRAO_US } = await import("@/lib/us-campos");
+    expect(APARELHAGEM_PADRAO_US).toMatchObject({
+      apModelo: "Mitech MDF350B", apSerie: "FD10012912",
+      cbFabricante: "Mitech", cbModelo: "angular 20x22 · 70 · 2 MHz", cbSerie: "2206365",
+    });
+  });
+
+  // ⚠ o ângulo real é MEDIDO no bloco padrão — preenchê-lo de antemão seria dar por medido o que
+  // ninguém mediu, o mesmo erro de já marcar a peça como conferida.
+  it("não traz o ângulo real medido", async () => {
+    const { APARELHAGEM_PADRAO_US } = await import("@/lib/us-campos");
+    expect(APARELHAGEM_PADRAO_US.cbAngulo).toBeUndefined();
+  });
+
+  it("o cabeçote padrão existe na lista do seletor", async () => {
+    const { APARELHAGEM_PADRAO_US, APARELHOS, cabecotesPorFabricante } = await import("@/lib/us-campos");
+    expect(APARELHOS).toContain(APARELHAGEM_PADRAO_US.apModelo);
+    const rotulos = cabecotesPorFabricante().flatMap((g) => g.itens.map((i) => i.rotulo));
+    expect(rotulos).toContain(APARELHAGEM_PADRAO_US.cbModelo);
+  });
+});
