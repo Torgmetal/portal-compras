@@ -8,7 +8,7 @@
 
 import { NextResponse } from "next/server";
 import { ambientePedido, divergenciaDeAmbiente } from "@/lib/mes/ambiente";
-import { prisma } from "@/lib/prisma";
+import { mesPrisma as prisma } from "@/lib/mes/prisma";
 import { requireRole } from "@/lib/session";
 import { programadoPara } from "@/lib/mes/programado";
 import { conferirComGantt } from "@/lib/mes/nesting/conferir-gantt";

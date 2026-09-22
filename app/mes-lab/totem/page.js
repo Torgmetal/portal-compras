@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { mesPrisma as prisma } from "@/lib/mes/prisma";
 import { Factory, ArrowRight, Monitor } from "lucide-react";
 
 // A ESCOLHA DO RECURSO — só existe no laboratório.

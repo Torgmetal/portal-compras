@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { mesPrisma as prisma } from "@/lib/mes/prisma";
 import NestingClient from "./NestingClient";
 
 // O NESTING DA PREPARAÇÃO — importar o plano do programador.

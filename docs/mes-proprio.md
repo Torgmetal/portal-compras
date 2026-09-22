@@ -137,7 +137,80 @@ laboratório, que é o passo 4.
 **Falta do passo 2:** cliente Prisma próprio, `MesAuditoria`, e o desempenho (matar o `4 + 2N` do
 GET do totem e criar índice em `*DiaProgramado`).
 
-**← RETOMA-SE NO PASSO 2.** O passo 1 está feito na branch `matheus/mes-subir`:
+### Passo 2 — COMPLETO, e o MES está em PRODUÇÃO (21/09/2026)
+
+Matheus autorizou: *"pode subir tudo em produção porque a fábrica vai continuar usando o Syneco por
+hora até eu validar o nosso MES interno (…) só quero ele em produção para ir testando com OPs sem
+interferir nos dados reais do portal"*.
+
+⚠⚠ **A PREMISSA FOI CONFERIDA, NÃO ACEITADA.** Varrido por `grep` em todo `lib/mes` e
+`app/api/mes-lab`: as únicas escritas são em tabelas `Mes*` e no `AuditLog`. **Nenhuma** em
+`PecaConjunto`, OP, RM ou qualquer tabela do portal — o MES só LÊ a programação.
+
+#### O cliente e o schema próprios
+
+| | |
+|---|---|
+| Schema Prisma | `prisma/mes/schema.prisma` (14 models) |
+| Cliente | `node_modules/.prisma/mes-client`, singleton em `lib/mes/prisma.js` |
+| Schema no Postgres | **`mes`**, no mesmo banco Neon |
+| DDL | `prisma/mes/schema.sql` + `scripts/ensure-mes-proprio-tables.mjs` |
+
+**Conferido em produção**: 14 tabelas no schema `mes`, **0** vazadas para `public`, as 220 do
+portal intactas, `PecaConjunto` com 23.016 linhas.
+
+⚠⚠ **O CLIENTE DO MES ATRAVESSA O POOLER DO NEON** — era o risco real: `schema=mes` vira
+`search_path`, e PgBouncer em modo transaction podia não repassar. Medido pelo host `-pooler`: lê e
+conta as três tabelas sem erro.
+
+⚠⚠ **TUDO NO SQL É QUALIFICADO COM `mes.`**, em vez de confiar no `search_path`. Uma URL sem
+`schema=mes` — um `.env` velho, uma máquina nova — criaria as 14 tabelas dentro do schema do
+portal, e a separação teria existido só no código.
+
+⚠ **`MES_DATABASE_URL` é derivada, não obrigatória**: a do portal com `schema=mes`. Exigi-la no
+Vercel criaria um jeito novo de o deploy quebrar e a chance de as duas URLs apontarem para bancos
+diferentes sem ninguém notar. Ela existe como ESCAPE, para o dia do gateway local.
+
+⚠ **`MesAuditoria` é a 14ª tabela.** Com dois clientes, `tx.auditLog.create` dentro da transação da
+passagem de posto seria escrita em OUTRA conexão: a transação voltaria atrás e o carimbo ficaria de
+pé, ou o contrário.
+
+⚠⚠ **UM `;` DENTRO DE COMENTÁRIO SQL QUEBROU O SCRIPT** na primeira execução (`42601 syntax error
+at or near "quem"`): o separador de comandos fazia `split(";")` sem saber o que é comentário.
+
+#### Desempenho — as duas condições do regime de 30 terminais
+
+⚠⚠ **NÃO HAVIA ÍNDICE NENHUM NAS COLUNAS `*DiaProgramado`.** A lista do posto fazia **seq scan** de
+23.016 linhas para devolver 90. Índice **parcial** (`WHERE ... IS NOT NULL`), medido no Acabamento,
+em produção:
+
+| | antes | depois |
+|---|---|---|
+| tempo | 8,549 ms | **0,221 ms** |
+| buffers | 1.511 | **60** |
+
+⚠ Parcial e não completo porque só 90 das 23.016 linhas têm a coluna preenchida — o índice completo
+pesaria em toda escrita de `PecaConjunto`, que é tabela de importação em massa.
+`scripts/ensure-indices-programacao.mjs`, seis índices, um por setor do Gantt.
+
+⚠⚠ **O GET DO TOTEM CUSTAVA `4 + 3N`** — um `aggregate` e as duas consultas de `saldoDaMarca` para
+CADA marca aberta, e desde o nesting o posto abre a barra inteira. `saldosDasMarcas`
+(`lib/mes/saldo.js`) resolve todas em **duas** consultas.
+
+⚠ **`saldoDaMarca` continua existindo, e é o que a TRAVA usa** — dentro da transação com o advisory
+lock. Lá a pergunta é "cabe este lançamento agora" e tem de ser feita sobre o estado travado, uma
+marca por vez. A versão em lote é para a LEITURA da tela.
+
+#### Validado
+
+As cinco telas (`/mes-lab`, `/monitor`, `/nesting`, `/totem`, `/cadastro`) e quatro do portal
+(`/qualidade/rnc`, `/expedicao/conferencia`, `/pcp/producao`, `/compras/rm`) — todas sem erro de
+console nem 4xx/5xx. 2.659 testes, eslint sem erro.
+
+**Próximo:** cadastrar setores, postos e crachás pela tela (`/mes-lab/cadastro`) e começar a testar
+com OPs reais. O apontamento de verdade segue no Syneco.
+
+**← O PASSO 2 ESTÁ FEITO.** O passo 1 está feito na branch `matheus/mes-subir`:
 main trazida (184 commits, 2 conflitos), `prisma validate` limpo, **2.647 testes passando**,
 eslint 0 erros.
 

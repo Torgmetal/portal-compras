@@ -1,4 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
+
+// ⚠⚠ DOIS CLIENTES DESDE 21/09/2026. `PecaConjunto` (a programação) mora no portal e é lida pelo
+// cliente do portal, importado dentro da lib; sessões e apontamentos vêm do cliente do MES, que
+// continua chegando por parâmetro. O mock tem de cobrir os dois lados, senão o teste prova só metade.
+const portalFalso = vi.hoisted(() => ({ pecaConjunto: { findMany: vi.fn() } }));
+vi.mock("@/lib/prisma", () => ({ prisma: portalFalso, prismaDirect: portalFalso }));
+
 import { programadoPara } from "@/lib/mes/programado";
 
 // A LISTA DO TOTEM — o que o PCP programou, e o que JÁ SAIU.
@@ -21,8 +28,12 @@ const peca = (id, marca, qte, extra = {}) => ({
  * `sessoes` é o que existe em MesSessao; `boasPorSessao` o total lançado em cada uma.
  */
 function prismaFalso({ pecas = [], sessoes = [], boasPorSessao = {} } = {}) {
+  // ⚠ A programação entra pelo cliente do PORTAL (mockado acima), não por este objeto.
+  // ⚠⚠ `mockClear` porque o mock do portal é de MÓDULO, compartilhado entre os testes: sem isso,
+  // `mock.calls[0]` é a chamada de um teste anterior, e a asserção mede o teste errado.
+  portalFalso.pecaConjunto.findMany.mockClear();
+  portalFalso.pecaConjunto.findMany.mockResolvedValue(pecas);
   return {
-    pecaConjunto: { findMany: vi.fn().mockResolvedValue(pecas) },
     mesSessao: { findMany: vi.fn().mockResolvedValue(sessoes) },
     mesApontamentoQtd: {
       groupBy: vi.fn().mockResolvedValue(
@@ -144,7 +155,7 @@ describe("programadoPara — posto físico dentro de um balde do Gantt", () => {
 
     expect(r.doSetor).toBe(true);
     // ⚠ O filtro NÃO pode citar o código do posto: é justamente ele que não existe no Gantt.
-    const onde = prisma.pecaConjunto.findMany.mock.calls[0][0].where;
+    const onde = portalFalso.pecaConjunto.findMany.mock.calls[0][0].where;
     expect(onde.acabamentoBancada).toBeUndefined();
     expect(onde.acabamentoDiaProgramado).toBeTruthy();
     expect(r.lotes[0].marcas).toHaveLength(1);
@@ -155,7 +166,7 @@ describe("programadoPara — posto físico dentro de um balde do Gantt", () => {
     const r = await programadoPara(prisma, RECURSO);
 
     expect(r.doSetor).toBe(false);
-    expect(prisma.pecaConjunto.findMany.mock.calls[0][0].where.maquina).toBe("LASER_CHAPA");
+    expect(portalFalso.pecaConjunto.findMany.mock.calls[0][0].where.maquina).toBe("LASER_CHAPA");
   });
 
   // ⚠ A bancada única do acabamento é um código do Gantt: quem cadastrar um posto com ESSE código
@@ -164,7 +175,7 @@ describe("programadoPara — posto físico dentro de um balde do Gantt", () => {
     const prisma = prismaFalso({ pecas: [] });
     const r = await programadoPara(prisma, { codigo: "ACABAMENTO", setor: { codigo: "ACABAMENTO" } });
     expect(r.doSetor).toBe(false);
-    expect(prisma.pecaConjunto.findMany.mock.calls[0][0].where.acabamentoBancada).toBe("ACABAMENTO");
+    expect(portalFalso.pecaConjunto.findMany.mock.calls[0][0].where.acabamentoBancada).toBe("ACABAMENTO");
   });
 
   // ⚠ Peça do setor ainda SEM posto atribuído (`recurso: null` no Gantt) é trabalho que alguém tem

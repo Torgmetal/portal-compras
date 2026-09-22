@@ -14,7 +14,12 @@
 
 import { NextResponse } from "next/server";
 import { ambientePedido } from "@/lib/mes/ambiente";
-import { prisma } from "@/lib/prisma";
+// ⚠⚠ DOIS CLIENTES, E A FRONTEIRA APARECE NO CÓDIGO (21/09/2026). O MES tem schema e cliente
+// próprios (`lib/mes/prisma.js`); o portal continua no dele. Quem lê a PROGRAMAÇÃO (`PecaConjunto`)
+// usa o cliente do portal, explicitamente — não dá mais para uma consulta encostar nos dois sem
+// que isso esteja escrito aqui.
+import { prisma as portal } from "@/lib/prisma";
+import { mesPrisma as prisma } from "@/lib/mes/prisma";
 import { requireRole } from "@/lib/session";
 import { lerPlano } from "@/lib/mes/nesting/ler-arquivos";
 import { casarComOPortal, linhasDoPlano, marcasDoPlano } from "@/lib/mes/nesting/importar";
@@ -85,7 +90,7 @@ export async function POST(req) {
  */
 async function casarNoBanco(marcas, opNumero) {
   if (!marcas.length) return { casamento: new Map(), pendentes: [] };
-  const pecas = await prisma.pecaConjunto.findMany({
+  const pecas = await portal.pecaConjunto.findMany({
     where: { marca: { in: marcas } },
     select: { id: true, marca: true, opNumero: true, opId: true },
   });

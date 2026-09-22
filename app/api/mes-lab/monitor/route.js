@@ -10,7 +10,9 @@
 // cobre PÁGINA, não API — por isso `requireRole` aqui também (§7.4, pedido do Codex).
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+// ⚠ `panoramaDaFabrica` recebe o cliente do MES; a programação que ela lê do portal ela
+// importa por dentro, explicitamente (ver `lib/mes/monitor.js`).
+import { mesPrisma as prisma } from "@/lib/mes/prisma";
 import { requireRole } from "@/lib/session";
 import { panoramaDaFabrica } from "@/lib/mes/monitor";
 

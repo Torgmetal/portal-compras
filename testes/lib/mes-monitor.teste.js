@@ -1,4 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
+
+// ⚠ Dois clientes desde 21/09/2026: `PecaConjunto` vem do portal, o resto do cliente do MES.
+const portalFalso = vi.hoisted(() => ({ pecaConjunto: { findMany: vi.fn() } }));
+vi.mock("@/lib/prisma", () => ({ prisma: portalFalso, prismaDirect: portalFalso }));
 import {
   estadoDoCartao, cartaoDoRecurso, panoramaDaFabrica, resumir, LIVRE, DESCONHECIDO, HORAS_SUSPEITAS,
 } from "@/lib/mes/monitor";
@@ -160,11 +164,15 @@ describe("resumir — parado, livre e sem registro são três coisas diferentes"
 });
 
 function prismaFalso({ recursos = [], sessoes = [], somas = [], pecas = [] } = {}) {
+  // ⚠ Mock de MÓDULO é compartilhado entre os testes — limpar antes, senão `mock.calls[0]` é a
+  // chamada de outro teste.
+  portalFalso.pecaConjunto.findMany.mockClear();
+  portalFalso.pecaConjunto.findMany.mockResolvedValue(pecas);
   return {
     mesRecurso: { findMany: vi.fn().mockResolvedValue(recursos) },
     mesSessao: { findMany: vi.fn().mockResolvedValue(sessoes) },
     mesApontamentoQtd: { groupBy: vi.fn().mockResolvedValue(somas) },
-    pecaConjunto: { findMany: vi.fn().mockResolvedValue(pecas) },
+    // (a programação sai do mock do portal, acima)
   };
 }
 

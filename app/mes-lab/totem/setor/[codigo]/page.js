@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { mesPrisma as prisma } from "@/lib/mes/prisma";
 import Bancada from "./Bancada";
 
 // ─── AS BANCADAS DE UM SETOR — a home do PC daquele setor ─────────────────────

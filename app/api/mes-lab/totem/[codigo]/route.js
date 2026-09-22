@@ -14,9 +14,10 @@
 
 import { NextResponse } from "next/server";
 import { ambientePedido, divergenciaDeAmbiente } from "@/lib/mes/ambiente";
-import { prisma } from "@/lib/prisma";
+import { mesPrisma as prisma } from "@/lib/mes/prisma";
 import { requireRole } from "@/lib/session";
-import { abrirSessao, apontarQuantidade, encerrarSessao, mudarEstado, estadoDoRecurso, saldoDaMarca, ESTADO } from "@/lib/mes/sessao";
+import { abrirSessao, apontarQuantidade, encerrarSessao, mudarEstado, estadoDoRecurso, ESTADO } from "@/lib/mes/sessao";
+import { saldosDasMarcas } from "@/lib/mes/saldo";
 import { abrirLote, encerrarLote } from "@/lib/mes/lote";
 import { programadoPara, acharMarca } from "@/lib/mes/programado";
 import { entrarNoPosto, sairDoPosto, liberarPresenca, passarPosto } from "@/lib/mes/cracha";
@@ -102,20 +103,29 @@ export async function GET(req, { params }) {
   // ⚠⚠ UMA CONTA POR MARCA ABERTA. Desde 13/09/2026 o posto pode ter várias (o nesting abre a barra
   // inteira), e cada uma tem o seu apontado e o seu saldo — mostrar só o da primeira faria o
   // operador lançar contra o número da marca errada.
-  const trabalhos = await Promise.all((estado.sessoes || []).map(async (sessao) => {
-    const [s, conta] = await Promise.all([
-      prisma.mesApontamentoQtd.aggregate({
-        where: { sessaoId: sessao.id },
-        _sum: { boas: true, rejeitadas: true, retrabalho: true },
-      }),
-      saldoDaMarca(prisma, sessao),
-    ]);
+  // ⚠⚠ ERA `4 + 3N` CONSULTAS (levantado em 20/09/2026): um `aggregate` e as duas de
+  // `saldoDaMarca` PARA CADA marca aberta — e desde o nesting o posto abre a barra inteira. Com
+  // ~30 terminais o dia todo, que é o regime que o Matheus pediu, isso deixa de ser custo de tela
+  // e vira carga de banco. Agora são DUAS consultas para todas as marcas, mais duas do saldo.
+  const abertas = estado.sessoes || [];
+  const [porSessao, saldos] = await Promise.all([
+    abertas.length
+      ? prisma.mesApontamentoQtd.groupBy({
+          by: ["sessaoId"], where: { sessaoId: { in: abertas.map((s) => s.id) } },
+          _sum: { boas: true, rejeitadas: true, retrabalho: true },
+        })
+      : [],
+    saldosDasMarcas(prisma, abertas),
+  ]);
+  const apontados = new Map(porSessao.map((x) => [x.sessaoId, x._sum]));
+  const trabalhos = abertas.map((sessao) => {
+    const a = apontados.get(sessao.id) || {};
     return {
       sessao,
-      apontado: { boas: s._sum.boas || 0, rejeitadas: s._sum.rejeitadas || 0, retrabalho: s._sum.retrabalho || 0 },
-      saldo: conta,
+      apontado: { boas: a.boas || 0, rejeitadas: a.rejeitadas || 0, retrabalho: a.retrabalho || 0 },
+      saldo: saldos.get(sessao.id),
     };
-  }));
+  });
   const primeiro = trabalhos[0] || null;
 
   return NextResponse.json({

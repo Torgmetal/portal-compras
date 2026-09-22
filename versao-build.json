@@ -1,7 +1,12 @@
 {
-  "build": 3325,
-  "gerado": "2026-09-22T01:26:47.459Z",
+  "build": 3326,
+  "gerado": "2026-09-22T01:48:35.145Z",
   "commits": [
+    {
+      "hash": "96fff418af",
+      "data": "21/09/2026",
+      "titulo": "MES: DEMO e PROD deixam de ser o mesmo mundo"
+    },
     {
       "hash": "7d6b0df1bb",
       "data": "21/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0ef927c75e",
       "data": "17/09/2026",
       "titulo": "Planilha do Syneco ganha a 2ª aba: apontamento na frente manda dar baixa nos setores atrás"
-    },
-    {
-      "hash": "7521e51164",
-      "data": "17/09/2026",
-      "titulo": "Conferência finalizada manda a planilha ao PCP, com peso e observações por marca"
     }
   ]
 }

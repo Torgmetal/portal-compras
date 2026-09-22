@@ -13,7 +13,7 @@
 
 import { NextResponse } from "next/server";
 import { ambientePedido } from "@/lib/mes/ambiente";
-import { prisma } from "@/lib/prisma";
+import { mesPrisma as prisma } from "@/lib/mes/prisma";
 import { requireRole } from "@/lib/session";
 import {
   ehEntidade, normalizarCodigo, recusaDoCadastro, recusaDaExclusao, recusaDaTrocaDeCodigo,
