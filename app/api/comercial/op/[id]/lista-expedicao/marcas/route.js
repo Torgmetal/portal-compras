@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { acumularRomaneio, totalExpedido, fundirExpedido } from "@/lib/expedido-por-romaneio";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -25,14 +26,15 @@ export async function GET(_req, { params }) {
     where: { OR: [{ opId: op.id }, { opNumero: String(op.numero) }], emitidoEm: { not: null } },
     select: { numero: true, emitidoEm: true, itens: true },
   });
-  const expMap = new Map(); // MARCA(upper) -> { qtd, romaneios:Set, data }
+  // ⚠ POR ROMANEIO, não um total solto: é assim que o embarque do portal se funde com o que os
+  // FORM 22 da pasta contam sem a mesma carga entrar duas vezes (lib/expedido-por-romaneio.js).
+  const expMap = new Map(); // MARCA(upper) -> { porRomaneio:{nº:qtd}, data }
   for (const r of previosEmitidos) {
     for (const it of (Array.isArray(r.itens) ? r.itens : [])) {
       const k = String(it.marca || "").trim().toUpperCase();
       if (!k) continue;
-      const cur = expMap.get(k) || { qtd: 0, romaneios: new Set(), data: null };
-      cur.qtd += Number(it.qte ?? it.qtd) || 0;
-      cur.romaneios.add(String(r.numero).padStart(2, "0"));
+      const cur = expMap.get(k) || { porRomaneio: {}, data: null };
+      acumularRomaneio(cur.porRomaneio, { numero: r.numero, qtd: Number(it.qte ?? it.qtd) || 0 });
       if (r.emitidoEm && (!cur.data || r.emitidoEm > cur.data)) cur.data = r.emitidoEm;
       expMap.set(k, cur);
     }
@@ -62,10 +64,18 @@ export async function GET(_req, { params }) {
       const ex = expMap.get(kU);
       const bx = baixaMap.get(kU);
       const baixaQtd = bx ? bx.qtd : 0;
-      // Expedido = romaneios emitidos + baixas manuais (limitado ao total da marca).
-      const totalExp = (ex ? ex.qtd : 0) + baixaQtd;
+      // ⚠⚠ O QUE SAIU VEM DAS DUAS FONTES, FUNDIDAS POR NÚMERO DE ROMANEIO: os FORM 22 da pasta
+      // (`m.expedidoPorRomaneio`, gravado na importação da lista) e os prévios emitidos aqui. O
+      // romaneio emitido pelo portal vira arquivo na pasta — somar as duas listas contaria a mesma
+      // carga duas vezes.
+      // ⚠ Lista importada ANTES de 22/09/2026 não tem o `expedidoPorRomaneio`: ela continua caindo
+      // no booleano de sempre, lá embaixo, até a próxima importação da lista.
+      const porRomaneio = fundirExpedido(m.expedidoPorRomaneio, ex?.porRomaneio);
+      const totalExp = totalExpedido(porRomaneio) + baixaQtd;
       const expedidoQtd = qte != null ? Math.min(totalExp, qte) : totalExp;
-      const romaneios = ex ? [...ex.romaneios].sort() : [];
+      const romaneios = Object.keys(porRomaneio)
+        .sort((a2, b2) => Number(a2) - Number(b2))
+        .map((n) => String(n).padStart(2, "0"));
       // Situação derivada da quantidade: expedida (tudo saiu) / parcial / pendente.
       const totalmenteExpedida = qte != null && qte > 0 && expedidoQtd >= qte;
       return {

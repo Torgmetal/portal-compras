@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
+import { acumularRomaneio, totalExpedido, fundirExpedido } from "@/lib/expedido-por-romaneio";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -29,12 +30,13 @@ export async function GET(_req, { params }) {
     where: { OR: [{ opId: op.id }, { opNumero: String(op.numero) }], emitidoEm: { not: null } },
     select: { numero: true, emitidoEm: true, itens: true },
   });
+  // ⚠ MESMA CONTA DA TELA DE EXPEDIÇÃO (lib/expedido-por-romaneio.js): por número de romaneio, para
+  // o FORM 22 da pasta e o prévio emitido aqui não contarem a mesma carga duas vezes.
   const expMap = new Map();
   for (const r of previosEmitidos) for (const it of (Array.isArray(r.itens) ? r.itens : [])) {
     const kk = normMarca(it.marca); if (!kk) continue;
-    const cur = expMap.get(kk) || { qtd: 0, romaneios: new Set(), data: null };
-    cur.qtd += Number(it.qte ?? it.qtd) || 0;
-    cur.romaneios.add(String(r.numero).padStart(2, "0"));
+    const cur = expMap.get(kk) || { porRomaneio: {}, data: null };
+    acumularRomaneio(cur.porRomaneio, { numero: r.numero, qtd: Number(it.qte ?? it.qtd) || 0 });
     if (r.emitidoEm && (!cur.data || r.emitidoEm > cur.data)) cur.data = r.emitidoEm;
     expMap.set(kk, cur);
   }
@@ -52,7 +54,8 @@ export async function GET(_req, { params }) {
       const ex = expMap.get(k);
       const bx = baixaMap.get(k);
       const qte = m.qte ?? null;
-      const totalExp = (ex ? ex.qtd : 0) + (bx ? bx.qtd : 0);
+      const porRomaneio = fundirExpedido(m.expedidoPorRomaneio, ex?.porRomaneio);
+      const totalExp = totalExpedido(porRomaneio) + (bx ? bx.qtd : 0);
       const expedidoQtd = qte != null ? Math.min(totalExp, qte) : totalExp;
       // 100% expedida (setor EXPEDIDO) por quantidade; senão cai no booleano legado.
       const full = expedidoQtd > 0 && qte != null && qte > 0 ? expedidoQtd >= qte : m.expedidoRomaneio === true;
@@ -61,7 +64,9 @@ export async function GET(_req, { params }) {
         expedidoQtd, expedido: full,
         temExpedicao: expedidoQtd > 0 || m.expedidoRomaneio === true, // saiu algo → mostra romaneio/data
         baixaMotivo: bx ? bx.motivo : null, // baixa manual (sem romaneio)
-        romaneio: ex ? [...ex.romaneios].sort().join(", ") : (bx ? "baixa manual" : (m.romaneio || null)),
+        romaneio: Object.keys(porRomaneio).length
+          ? Object.keys(porRomaneio).sort((a2, b2) => Number(a2) - Number(b2)).map((n) => String(n).padStart(2, "0")).join(", ")
+          : (bx ? "baixa manual" : (m.romaneio || null)),
         dataExpedicao: ex?.data ?? m.dataExpedicao ?? null,
       });
     }

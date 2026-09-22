@@ -580,3 +580,29 @@ novo, não conserto, e não entra sem o Matheus decidir.
   ⚠⚠ **O segundo achado do Codex continua aberto e é decisão do Vitor**: `revisao/route.js` passou
   de ADMIN/QUALIDADE para `PERFIS_CAMPO`, então todo QUALIDADE_CAMPO pode reabrir qualquer relatório
   já enviado para assinatura, de qualquer inspetor e qualquer OP.
+- **(22/09, 14h) Marca pela metade sumia da próxima carga (OP-067).** Larissa (PCP): *"eram 2 peças
+  de cada marca, e uma peça de cada foi enviada no romaneio 24, o portal entende que as peças já
+  foram expedidas e não aparece para que eu possa selecionar, ou ele ignora quando subo a lista"*.
+  Medido antes de mexer: a leitura dos FORM 22 da pasta (`marcasExpedidasOP`) somava o peso, guardava
+  os números e **descartava o `qtd` de cada linha**, gravando na marca um booleano
+  (`expedidoRomaneio: true`) — e as três marcas da OP-067 estão assim, com `romaneio: "24"`. Nos 20
+  romaneios da obra **nenhuma linha está sem quantidade**: a 24 diz `qtd: 1` para as três.
+  A regra virou `lib/expedido-por-romaneio.js`, usada pela importação e pelas duas APIs que contavam
+  isso em paralelo (marcas da lista e produção da OP).
+  ⚠⚠ Dois riscos que o desenho precisou cobrir, os dois medidos na pasta da OP-067: **(a)** "08" e
+  "09 R1" são o MESMO romaneio com os mesmos 22 itens (idem 14/15 e 21/22) → **máximo por número**,
+  nunca soma entre arquivos; **(b)** o prévio 27 está emitido **e** existe "Romaneio R27" na pasta →
+  as duas fontes se fundem **por número**, senão a mesma carga conta duas vezes.
+  ⚠ Lista importada antes de hoje **não muda de comportamento**: sem `expedidoPorRomaneio` ela cai no
+  booleano de sempre. O número novo nasce na reimportação ("Atualizar da pasta do servidor"), por
+  obra. Simulado contra a produção na OP-067: 1.590 marcas confirmam inteiras, **33 viram parciais e
+  41 peças voltam a aparecer**; 45 marcas embarcam MAIS que a LE (reenvio/LE revisada) e seguem
+  limitadas ao total.
+  Também: o filtro "Só pendentes" virou "Com peça pendente" (parcial tem peça a embarcar — era outro
+  caminho para a marca sumir da tela), e a carga deixa de aceitar item com **0 peças**, que foi o que
+  sobrou no prévio 28 da OP-067.
+  ⚠ **Fora de escopo, declarado:** `pesoExpedido`/`pesoFaltante` da lista e `pesoFaltanteReal`
+  (avanço da Expedição no cronograma) continuam contando a marca inteira pelo booleano — mexe no
+  avanço de todas as obras e merece medição própria.
+  Testes: `expedido-por-romaneio` (8) e `lista-expedicao-marcas-parcial` (5), com os dois casos
+  vermelhos antes. **3.055 passando**, `checar` limpo, build ok.

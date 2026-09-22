@@ -112,7 +112,11 @@ export default function ConsultaExpedicao({ opId, readOnly = false, focoPendente
       if (frente && m.frente !== frente) return false;
       const sit = situacaoM(m);
       if (situacao === "expedidas" && sit !== "expedida") return false;
-      if (situacao === "pendentes" && sit !== "pendente") return false;
+      // ⚠⚠ PARCIAL TEM PEÇA PENDENTE. Larissa (22/09/2026) foi montar o romaneio da OP-067 e as
+      // marcas com 1 de 2 peças embarcadas não apareciam "para que eu possa selecionar" — o filtro
+      // exigia situação exatamente "pendente", e a marca que já saiu pela metade é justamente a
+      // que precisa entrar na próxima carga. "Só parciais" continua isolando essas.
+      if (situacao === "pendentes" && sit !== "pendente" && sit !== "parcial") return false;
       if (situacao === "parciais" && sit !== "parcial") return false;
       if (situacao === "baixas" && sit !== "baixa") return false;
       if (!b) return true;
@@ -295,11 +299,25 @@ export default function ConsultaExpedicao({ opId, readOnly = false, focoPendente
   }
   const aprovar = (p) => { if (confirm(`Aprovar a entrega do romaneio prévio ${String(p.numero).padStart(2, "0")}? Ele passa a valer para a Expedição.`)) patchPrevio(p, { aprovado: true }, "ok"); };
   const reabrir = (p) => patchPrevio(p, { aprovado: false }, "ok");
+  // ⚠⚠ ITEM COM 0 PEÇAS NÃO É ITEM. Foi o que a OP-067 ganhou (Larissa, 22/09/2026): as marcas que
+  // o portal achava totalmente expedidas entraram no prévio 28 com `qte: 0` — linha no romaneio que
+  // não embarca nada. Agora elas não entram, e a que já está lá com 0 pode ser REFEITA (a rota
+  // deduplica por marca ficando com a PRIMEIRA, então acrescentar por cima não adiantaria).
   const acrescentar = (p) => {
-    const novos = marcadas.filter((m) => !(p.itens || []).some((i) => String(i.marca).toUpperCase() === String(m.marca).toUpperCase()));
-    if (!novos.length) return setErro("As peças selecionadas já estão nesta carga.");
-    patchPrevio(p, { itens: [...(p.itens || []), ...novos.map((m) => ({ frente: m.frente, marca: m.marca, descricao: m.descricao, qte: qteUsar(m), pesoTotal: pesoUsar(m) }))] }, "itens");
+    const zeradas = marcadas.filter((m) => !(qteUsar(m) > 0)).map((m) => m.marca);
+    const comPeca = marcadas.filter((m) => qteUsar(m) > 0);
+    const naCarga = (m) => (p.itens || []).find((i) => String(i.marca).toUpperCase() === String(m.marca).toUpperCase());
+    const novos = comPeca.filter((m) => { const i = naCarga(m); return !i || !(Number(i.qte) > 0); });
+    if (!novos.length) {
+      return setErro(zeradas.length
+        ? `Sem peça pendente para ${zeradas.slice(0, 3).join(", ")}${zeradas.length > 3 ? "…" : ""} — nada a acrescentar.`
+        : "As peças selecionadas já estão nesta carga.");
+    }
+    const refeitas = new Set(novos.filter(naCarga).map((m) => String(m.marca).toUpperCase()));
+    const ficam = (p.itens || []).filter((i) => !refeitas.has(String(i.marca).toUpperCase()));
+    patchPrevio(p, { itens: [...ficam, ...novos.map((m) => ({ frente: m.frente, marca: m.marca, descricao: m.descricao, qte: qteUsar(m), pesoTotal: pesoUsar(m) }))] }, "itens");
     setSel({}); setQtdImport({});
+    if (zeradas.length) setMsg(`${zeradas.length} marca(s) sem peça pendente ficaram de fora.`);
   };
   const removerItem = (p, marca) => {
     const itens = (p.itens || []).filter((i) => String(i.marca).toUpperCase() !== String(marca).toUpperCase());
@@ -363,7 +381,7 @@ export default function ConsultaExpedicao({ opId, readOnly = false, focoPendente
               <option value="expedidas">Só expedidas</option>
               <option value="parciais">Só parciais</option>
               <option value="baixas">Só baixas (sem romaneio)</option>
-              <option value="pendentes">Só pendentes</option>
+              <option value="pendentes">Com peça pendente</option>
             </select>
             {/* importar relação de peças (ao lado do filtro, como pedido) */}
             {!readOnly && <>
@@ -614,7 +632,11 @@ export default function ConsultaExpedicao({ opId, readOnly = false, focoPendente
           </div>
         </div>
       )}
-      {modal && <NovoPrevioModal opId={opId} numero={proximo} itens={marcadas.map((m) => ({ ...m, qte: qteUsar(m), pesoTotal: pesoUsar(m) }))} peso={pesoSel} lotes={lotes} localObra={localEntrega} onClose={() => setModal(false)} onCriado={() => { setModal(false); setSel({}); setQtdImport({}); carregarPrevios(); setMsg("Romaneio prévio criado."); }} />}
+      {/* ⚠ só entra na carga a marca que TEM peça pendente — item de 0 peças é linha de romaneio
+          que não embarca nada (foi o que sobrou no prévio 28 da OP-067). */}
+      {modal && <NovoPrevioModal opId={opId} numero={proximo}
+        itens={marcadas.filter((m) => qteUsar(m) > 0).map((m) => ({ ...m, qte: qteUsar(m), pesoTotal: pesoUsar(m) }))}
+        foraPorZero={marcadas.filter((m) => !(qteUsar(m) > 0)).length} peso={pesoSel} lotes={lotes} localObra={localEntrega} onClose={() => setModal(false)} onCriado={() => { setModal(false); setSel({}); setQtdImport({}); carregarPrevios(); setMsg("Romaneio prévio criado."); }} />}
     </div>
   );
 }
@@ -739,14 +761,14 @@ function ImportarListaModal({ rows, nome, marcaNaCelula, onAplicar, onClose }) {
   );
 }
 
-function NovoPrevioModal({ opId, numero, itens, peso, lotes, localObra, onClose, onCriado }) {
+function NovoPrevioModal({ opId, numero, itens, peso, lotes, localObra, foraPorZero = 0, onClose, onCriado }) {
   // lote: "__novo__" = criar "Romaneio NN" (padrão), "" = sem lote, ou id existente.
   // Local já vem preenchido das informações da obra e pode ser alterado.
   const [f, setF] = useState({ dataPrevista: "", local: localObra || "", observacao: "", loteId: "__novo__" });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-torg-blue outline-none";
-  const jaExp = itens.filter((m) => m.expedido === true).length;
+
   const nn = numero ? String(numero).padStart(2, "0") : "NN";
 
   async function salvar() {
@@ -777,7 +799,7 @@ function NovoPrevioModal({ opId, numero, itens, peso, lotes, localObra, onClose,
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="px-5 py-4 space-y-3">
-          {jaExp > 0 && <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-center gap-1.5"><AlertCircle size={13} /> {jaExp} peça(s) selecionada(s) já constam como expedidas.</p>}
+          {foraPorZero > 0 && <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-flex items-center gap-1.5"><AlertCircle size={13} /> {foraPorZero} marca(s) selecionada(s) ficaram de fora: não há peça pendente nelas.</p>}
           <div>
             <label className="block text-xs font-medium text-torg-dark mb-1">Lote de entrega</label>
             <select value={f.loteId} onChange={(e) => setF((v) => ({ ...v, loteId: e.target.value }))} className={inp}>
@@ -806,7 +828,8 @@ function NovoPrevioModal({ opId, numero, itens, peso, lotes, localObra, onClose,
         </div>
         <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-xl">
           <button onClick={onClose} className="px-3 py-1.5 text-sm text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
-          <button onClick={salvar} disabled={salvando} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{salvando && <Loader2 size={14} className="animate-spin" />} Gerar</button>
+          {/* ⚠ carga sem peça não se cria: o servidor recusaria, e o erro chegaria depois do clique */}
+          <button onClick={salvar} disabled={salvando || !itens.length} className="px-4 py-1.5 bg-torg-blue text-white text-sm rounded-lg hover:bg-torg-dark font-medium inline-flex items-center gap-1.5 disabled:opacity-50">{salvando && <Loader2 size={14} className="animate-spin" />} Gerar</button>
         </div>
       </div>
     </div>
