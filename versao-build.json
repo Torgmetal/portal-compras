@@ -1,7 +1,22 @@
 {
-  "build": 3317,
-  "gerado": "2026-09-22T01:49:00.921Z",
+  "build": 3359,
+  "gerado": "2026-09-22T02:07:22.210Z",
   "commits": [
+    {
+      "hash": "caa1021f45",
+      "data": "21/09/2026",
+      "titulo": "Merge branch 'matheus/mes-subir'"
+    },
+    {
+      "hash": "31d93503c7",
+      "data": "21/09/2026",
+      "titulo": "MES: schema e cliente próprios, e o passo 2 fechado"
+    },
+    {
+      "hash": "96fff418af",
+      "data": "21/09/2026",
+      "titulo": "MES: DEMO e PROD deixam de ser o mesmo mundo"
+    },
     {
       "hash": "2daa8d6e53",
       "data": "21/09/2026",
@@ -83,6 +98,21 @@
       "titulo": "Conferência: a planilha do PCP separa o que é DESTA remessa"
     },
     {
+      "hash": "7d6b0df1bb",
+      "data": "21/09/2026",
+      "titulo": "Registra o plano de subida do MES e o que foi medido"
+    },
+    {
+      "hash": "7f65b9f4e4",
+      "data": "21/09/2026",
+      "titulo": "Realinha o número do build depois do merge"
+    },
+    {
+      "hash": "eef7306500",
+      "data": "21/09/2026",
+      "titulo": "Traz a main para a branch do MES próprio"
+    },
+    {
       "hash": "fdbe42ed1d",
       "data": "21/09/2026",
       "titulo": "Inspeção: o projeto anexado nunca chegava ao relatório — o webhook do blob tomava 401"
@@ -121,36 +151,6 @@
       "hash": "cc377795f0",
       "data": "21/09/2026",
       "titulo": "memória: a limpeza da LPC duplicada da 094 apagou a LE junto — conferir naLE antes de apagar"
-    },
-    {
-      "hash": "0446a634f2",
-      "data": "20/09/2026",
-      "titulo": "OP-105: a tarefa devolve as linhas de fabricação das fases ao avanço automático"
-    },
-    {
-      "hash": "5597653539",
-      "data": "20/09/2026",
-      "titulo": "Manutenção: OP-105 grava as listas em lote; a tela explica o corte por tempo"
-    },
-    {
-      "hash": "89f4ca6d77",
-      "data": "20/09/2026",
-      "titulo": "Cronograma: avanço de fabricação medido pela lista de peças da fase (OP-105 por TAG)"
-    },
-    {
-      "hash": "22e5ebf090",
-      "data": "20/09/2026",
-      "titulo": "memória: OP-122 — o contrato TMSA-1748-2 e o adiamento pedido pela Vale"
-    },
-    {
-      "hash": "a6dea05634",
-      "data": "19/09/2026",
-      "titulo": "feat: adotar template Torg para data books sem emissão anterior"
-    },
-    {
-      "hash": "f4c5df4f24",
-      "data": "19/09/2026",
-      "titulo": "Amplia campos de RNC e avisa sobre edições não salvas"
     }
   ]
 }

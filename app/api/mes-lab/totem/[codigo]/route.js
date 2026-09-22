@@ -131,6 +131,7 @@ export async function GET(req, { params }) {
   return NextResponse.json({
     success: true,
     recurso: { id: recurso.id, codigo: recurso.codigo, nome: recurso.nome, tipo: recurso.tipo,
+               ambiente: recurso.ambiente,
                setor: { codigo: recurso.setor.codigo, nome: recurso.setor.nome, cor: recurso.setor.cor } },
     ...estado, trabalhos, presencas: await presencasDoPosto(recurso.id),
     // ⚠ `apontado`/`saldo` no topo continuam sendo os do PRIMEIRO trabalho: a tela do totem antiga
@@ -162,6 +163,11 @@ const presencasDoPosto = (recursoId) =>
 async function planosDoPosto(recurso) {
   if (recurso.setor?.codigo !== "PREPARACAO") return [];
   const planos = await prisma.mesNesting.findMany({
+    // ⚠⚠ O FILTRO VEM ANTES DO `take` (achado do Codex, 22/09/2026). Sem ele, os planos dos dois
+    // mundos disputavam as mesmas dez posições: dez importações de teste empurravam para fora da
+    // lista TODOS os planos reais do posto de produção. E o operador ainda veria opções que
+    // `abrirNesting` recusa depois — a pior combinação, porque a lista promete o que não entrega.
+    where: { ambiente: recurso.ambiente },
     orderBy: { createdAt: "desc" },
     take: 10,
     include: {

@@ -308,3 +308,38 @@ temporário, `ENOENT`). Os pareceres são estáticos; quem rodou a suíte fui eu
   **Para revisar (database):** a transação envolve `auditLog.create` com um JSON do registro
   inteiro — conferir se algum campo grande (fotos/anexos com muitos itens) merece corte.
   **Pendente de decisão do Vitor/Matheus:** se RNC deveria ser CANCELÁVEL em vez de excluível.
+
+## 22/09/2026 — Os cinco achados do Codex no MES (Claude)
+
+Revisão automática do commit do MES em produção. **Os cinco conferidos no código antes de mexer**;
+todos procedem. Três são anteriores ao meu trabalho (o saldo, o teto do nesting, o encerramento);
+dois são buracos do que EU fiz (o isolamento parou nas APIs e não chegou às telas).
+
+1. **ALTA — uma etapa comia o saldo da seguinte.** `MesSessao.operacao` era gravada
+   (`recurso.setor.codigo`) e não participava de conta nenhuma: cortar as 10 peças de uma marca na
+   PREPARAÇÃO fazia MONTAGEM e SOLDA verem as mesmas 10 como produzidas e recusarem o PRIMEIRO
+   apontamento delas. `operacao` entrou em `saldoDaMarca`, `saldosDasMarcas` e `produzidoPorMarca`.
+   ⚠ Continua somando entre POSTOS da mesma etapa — é o que a peça física permite.
+2. **ALTA — a segunda barra do nesting nascia bloqueada.** `planejadoQtd` vem da unidade, o saldo
+   desconta todas as sessões da marca: duas barras de 2 peças ficavam com teto 2 em vez de 4. Agora
+   o reuso SOMA — e só quando a UNIDADE é nova, senão o reenvio com outro id de lote inflaria.
+3. **ALTA — concluir uma marca encerrava o POSTO.** A tela chama `encerrar` sozinha, e
+   `encerrarNaTransacao` gravava ENCERRAMENTO sem olhar as outras sessões (`encerrarLote` já tinha
+   a guarda; o caminho individual não). O monitor mostrava a máquina parada com duas marcas ainda
+   produzindo, e essa duração entrava no OEE. ⚠ A contagem ficou DENTRO do `!semEvento`: no lote
+   quem decide é `encerrarLote`, e contar por marca seria o N+1 que acabei de tirar do totem.
+4. **ALTA — o isolamento parava na API.** A página do totem ignorava `searchParams`, o cliente não
+   mandava `ambiente`, e ausência vale PROD: abrir o posto DEMO caía no PROD de mesmo código.
+   Agora o ambiente vem da URL, viaja em toda chamada e em todo link, a lista filtra, há seletor
+   Produção/Simulação e **tarja âmbar no totem de DEMO**.
+5. **MEDIA — `planosDoPosto` com `take: 10` sem filtro.** Dez importações de teste empurravam para
+   fora todos os planos reais do posto, e ainda ofereciam opções que `abrirNesting` recusa depois.
+
+**Testes:** `mes-etapas-saldo` (9, novo) + `totem-bancadas` (+1). **2.844 passando** (eram 2.834).
+Telas `/mes-lab/totem`, `?ambiente=DEMO` e `/mes-lab/monitor` sem erro de console nem 4xx/5xx.
+Índices conferidos no banco: `MesRecurso_codigo_ambiente_key` e `MesOperador_cracha_ambiente_key`
+existem como `btree (codigo, ambiente)` e `btree (cracha, ambiente)`.
+
+⚠ **NÃO empurrei nem escrevi em produção** — a rodada de correção proíbe. A prova de banco do
+achado 4 (dois recursos de mesmo código em DEMO e PROD coexistindo) exige INSERT e ficou de fora;
+o que dá para afirmar sem escrever é a definição dos índices, acima.

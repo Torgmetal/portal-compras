@@ -20,8 +20,10 @@ export default function Bancada({ recurso, cor, sessao, estado, operador }) {
   const { rotulo, fundo } = visualDo(estado);
   const emUso = Boolean(sessao);
 
+  // ⚠ O ambiente viaja no link: sem ele, a bancada de DEMO abriria o posto de PROD de mesmo
+  // código (achado do Codex, 22/09/2026).
   return (
-    <Link href={`/mes-lab/totem/${encodeURIComponent(recurso.codigo)}`}
+    <Link href={`/mes-lab/totem/${encodeURIComponent(recurso.codigo)}?ambiente=${recurso.ambiente || "PROD"}`}
           className={`group relative overflow-hidden rounded-3xl border transition active:scale-[0.99] flex flex-col justify-between min-h-[170px] p-7 ${
             emUso
               ? "bg-white/[0.07] border-white/20 hover:bg-white/[0.12]"

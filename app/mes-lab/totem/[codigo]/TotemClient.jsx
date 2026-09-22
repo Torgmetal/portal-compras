@@ -33,7 +33,7 @@ import EscolherMotivo from "./EscolherMotivo";
 // e apagá-la para tirar um campo da tela perderia dado que já existe. O totem passa a mandar zero.
 const vazio = { produzidas: "", retrabalho: "" };
 
-export default function TotemClient({ codigo }) {
+export default function TotemClient({ codigo, ambiente = "PROD" }) {
   const [dados, setDados] = useState(null);
   // ⚠⚠ `operador.presencaId` É O ID DO VÍNCULO DE CRACHÁ, e ele viaja em TODO comando. É o que
   // impede uma aba esquecida, aberta desde antes de uma liberação, de voltar a funcionar sozinha
@@ -52,18 +52,25 @@ export default function TotemClient({ codigo }) {
   // ⚠ UMA CHAVE POR TENTATIVA, trocada só depois do sucesso. É o padrão da Conferência de Peça
   // (`chave-operacao.js`): se a resposta se perder e o operador tocar de novo, chega a MESMA chave
   // e o servidor devolve o que já gravou em vez de gravar duas vezes.
+  // ⚠⚠ O AMBIENTE VIAJA EM TODA CHAMADA, E SEM ISSO O ISOLAMENTO PARAVA NA API (achado do Codex,
+  // 22/09/2026). As rotas já separavam DEMO de PROD, mas a tela nunca mandava o parâmetro — e
+  // `ambientePedido` trata ausência como PROD. Resultado: abrir o totem de um posto DEMO caía no
+  // posto PROD de mesmo código e apontava lá, que é exatamente o acidente que separar os dois
+  // mundos existia para impedir.
+  const url = `/api/mes-lab/totem/${encodeURIComponent(codigo)}?ambiente=${encodeURIComponent(ambiente)}`;
+
   const chave = useRef(`t-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   const novaChave = () => { chave.current = `t-${Date.now()}-${Math.random().toString(36).slice(2)}`; };
 
   const carregar = useCallback(async () => {
     try {
-      const r = await fetch(`/api/mes-lab/totem/${encodeURIComponent(codigo)}`, { cache: "no-store" });
+      const r = await fetch(url, { cache: "no-store" });
       const j = await r.json();
       if (!j.success) return setErro(j.error);
       setDados(j);
       setErro("");
     } catch { setErro("Não consegui falar com o servidor."); }
-  }, [codigo]);
+  }, [url]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -71,7 +78,7 @@ export default function TotemClient({ codigo }) {
     if (!operador) return setErro("Bipe o crachá primeiro.");
     setOcupado(true);
     try {
-      const r = await fetch(`/api/mes-lab/totem/${encodeURIComponent(codigo)}`, {
+      const r = await fetch(url, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ acao, cracha: operador.cracha, presencaId: operador.presencaId ?? null, chaveOperacao: chave.current, ...corpo }),
       });
@@ -109,7 +116,7 @@ export default function TotemClient({ codigo }) {
   async function entrar(cracha) {
     setOcupado(true);
     try {
-      const r = await fetch(`/api/mes-lab/totem/${encodeURIComponent(codigo)}`, {
+      const r = await fetch(url, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ acao: "entrar", cracha }),
       });
@@ -261,8 +268,10 @@ const daPassagem = ({ agir, sairDaTela, setFeito }) => ({
  */
 const listasDe = (dados) => ({
   presencas: dados.presencas || [], planos: dados.planos || [], motivos: dados.motivos || [],
+  // ⚠ O ambiente viaja na volta também: sem ele, sair do totem de DEMO cairia na lista de PROD.
   bancadas: dados.recurso?.setor?.codigo
-    ? `/mes-lab/totem/setor/${encodeURIComponent(dados.recurso.setor.codigo)}` : null,
+    ? `/mes-lab/totem/setor/${encodeURIComponent(dados.recurso.setor.codigo)}?ambiente=${dados.recurso.ambiente || "PROD"}`
+    : null,
 });
 
 function qualTela(dados, operador, selecionada) {
@@ -318,6 +327,14 @@ function Cabecalho({ recurso, operador, estado, aoSair }) {
         <p className="text-xs uppercase tracking-widest text-white/50">{recurso.setor.nome}</p>
         <h1 className="text-3xl md:text-4xl font-bold leading-tight">{recurso.nome}</h1>
         <p className="text-white/40 text-sm">{recurso.codigo}</p>
+        {/* ⚠⚠ QUEM ESTÁ NO LABORATÓRIO PRECISA VER QUE ESTÁ. O totem de DEMO é idêntico ao de
+            produção — mesma máquina, mesmo nome, mesmo código. Sem a tarja, o próprio Matheus
+            simulando o operador não teria como saber que aquele apontamento não vale. */}
+        {recurso.ambiente === "DEMO" && (
+          <p className="mt-2 inline-block bg-amber-500 text-amber-950 text-xs font-bold px-3 py-1 rounded-lg">
+            SIMULAÇÃO — este apontamento não vale para a produção
+          </p>
+        )}
       </div>
       <div className="flex items-center gap-4">
         <span className="flex items-center gap-2 text-sm font-semibold tracking-wide">

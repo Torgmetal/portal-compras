@@ -31,7 +31,14 @@ describe("Bancada — livre", () => {
   it("o card inteiro leva ao posto, com o código escapado na URL", () => {
     render(<Bancada recurso={RECURSO} cor="#006EAB" sessao={null} estado={null} />);
     // ⚠ O código tem ESPAÇO ("MONTAGEM 1"): sem escapar, o link quebra no navegador.
-    expect(screen.getByRole("link").getAttribute("href")).toBe("/mes-lab/totem/MONTAGEM%201");
+    expect(screen.getByRole("link").getAttribute("href")).toBe("/mes-lab/totem/MONTAGEM%201?ambiente=PROD");
+  });
+
+  // ⚠⚠ O AMBIENTE TEM DE VIAJAR NO LINK (achado do Codex, 22/09/2026). "MONTAGEM 1" existe em PROD
+  // e em DEMO; sem o parâmetro, a bancada do laboratório abria o posto de VERDADE — e apontava lá.
+  it("a bancada de DEMO leva ao totem de DEMO, não ao de produção", () => {
+    render(<Bancada recurso={{ ...RECURSO, ambiente: "DEMO" }} cor="#006EAB" sessao={null} estado={null} />);
+    expect(screen.getByRole("link").getAttribute("href")).toContain("ambiente=DEMO");
   });
 });
 

@@ -8,6 +8,11 @@ import TotemClient from "./TotemClient";
 
 export const metadata = { title: "Totem (laboratório)", robots: { index: false, follow: false } };
 
-export default function TotemPage({ params }) {
-  return <TotemClient codigo={decodeURIComponent(params.codigo)} />;
+// ⚠⚠ O AMBIENTE VEM DA URL E SEGUE PARA A TELA (achado do Codex, 22/09/2026). O código do posto
+// deixou de identificar sozinho — "SOLDA 5" existe em PROD e em DEMO. A página ignorava
+// `searchParams`, e como ausência vale PROD, o totem do laboratório abria o posto de VERDADE.
+export default function TotemPage({ params, searchParams }) {
+  const pedido = String(searchParams?.ambiente || "").trim().toUpperCase();
+  const ambiente = pedido === "DEMO" ? "DEMO" : "PROD";
+  return <TotemClient codigo={decodeURIComponent(params.codigo)} ambiente={ambiente} />;
 }

@@ -66,11 +66,16 @@ async function situacaoDasBancadas(recursos) {
   return { nomeDo, sessaoDo, estadoDo };
 }
 
-export default async function BancadasDoSetor({ params }) {
+export default async function BancadasDoSetor({ params, searchParams }) {
   const codigo = decodeURIComponent(params.codigo);
+  // ⚠⚠ O MUNDO VEM DA URL E FILTRA AS BANCADAS (achado do Codex, 22/09/2026). Sem isto, o totem do
+  // setor listava os postos dos DOIS ambientes com rótulo idêntico, e o link ia sempre para o de
+  // PROD — escolher a bancada de teste apontava na máquina de verdade.
+  const pedido = String(searchParams?.ambiente || "").trim().toUpperCase();
+  const ambiente = pedido === "DEMO" ? "DEMO" : "PROD";
   const setor = await prisma.mesSetor.findUnique({
     where: { codigo },
-    include: { recursos: { where: { ativo: true }, orderBy: { nome: "asc" } } },
+    include: { recursos: { where: { ativo: true, ambiente }, orderBy: { nome: "asc" } } },
   });
   if (!setor) notFound();
 
