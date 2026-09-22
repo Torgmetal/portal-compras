@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 vi.mock("@/lib/session", () => ({ requireRole: vi.fn() }));
 import { aplicarConversao } from "@/app/api/cotacao/[id]/lancar-manual/route";
+import { paraODocumento } from "@/lib/unidades";
 
 // ─── A CONVERSÃO ACONTECE NO SERVIDOR ────────────────────────────────────────
 //
@@ -30,17 +31,42 @@ describe("aplicarConversao", () => {
     expect(Math.round(r.item.qtdCotada * r.item.precoUnit * 100) / 100).toBe(1249.75);
   });
 
-  // ⚠ Sem fator (ou com fator 1) o caminho é exatamente o de antes — é o que mantém as cotações já
-  // recebidas funcionando sem tratamento nenhum.
+  // ⚠ Sem unidade cotada (ou com ela igual à da RM) o caminho é exatamente o de antes — é o que
+  // mantém as cotações já recebidas funcionando sem tratamento nenhum.
   it.each([
-    [{ fatorParaRM: null }],
     [{ fatorParaRM: 1, unidadeCotada: "UN" }],
     [{ unidadeCotada: null }],
-    [{ unidadeRM: "LATA 2,80L" }],
+    [{ unidadeRM: "LATA 2,80L", unidadeCotada: null }],
   ])("sem conversão, arredonda e segue (%o)", (extra) => {
     const r = aplicarConversao(item({ precoUnit: 12.345, qtdCotada: 7.891, ...extra }));
     expect(r.converteu).toBe(false);
     expect(r.item).toMatchObject({ precoUnit: 12.35, qtdCotada: 7.89, unidadeCotada: null, fatorParaRM: null });
+  });
+
+  // ⚠⚠ UNIDADE ESCOLHIDA SEM FATOR NÃO PODE PASSAR COMO "sem conversão" (achado do Codex,
+  // 22/09/2026). Era o furo mais caro: escolher CT e deixar o fator vazio gravava os 25 do papel
+  // como 25 UN — cem vezes menos material, calado.
+  describe("unidade escolhida sem fator", () => {
+    // ⚠ CT→UN tem fator FIXO (100): o servidor calcula, não recusa nem espera o navegador mandar.
+    it("par de fator fixo é convertido pelo servidor", () => {
+      const r = aplicarConversao(item({ fatorParaRM: null }));
+      expect(r.converteu).toBe(true);
+      expect(r.item).toMatchObject({ qtdCotada: 2500, precoUnit: 0.5, unidadeCotada: "CT", fatorParaRM: 100 });
+    });
+
+    // ⚠ M→UN depende do ITEM (quanto mede uma telha): sem fator não há o que calcular — é recusa.
+    it("par que depende do item é recusado", () => {
+      const r = aplicarConversao(item({ unidadeCotada: "M", fatorParaRM: null }));
+      expect(r.erro).toMatch(/Informe quantos UN cabem em 1 M/);
+      expect(r.item).toBeUndefined();
+    });
+  });
+
+  // ⚠⚠ A UNIDADE BASE VEM DO BANCO (achado do Codex): o corpo da requisição não decide a base.
+  it("a unidade da RM no banco vence a que veio no corpo", () => {
+    const r = aplicarConversao(item({ unidadeRM: "CT" }), "UN");
+    expect(r.converteu).toBe(true);
+    expect(r.item.qtdCotada).toBe(2500);
   });
 
   // ⚠ Telha: o fator é o comprimento, informado por quem tem o documento na mão.
@@ -52,5 +78,49 @@ describe("aplicarConversao", () => {
 
   it("o resumo diz a conversão, para a trilha", () => {
     expect(aplicarConversao(item()).resumo).toBe("25 CT → 2500 UN");
+  });
+});
+
+// ─── SALVAR, REABRIR E SALVAR DE NOVO NÃO PODE MUDAR VALOR ─────────────────────────
+//
+// ⚠⚠ O DEFEITO (achado do Codex, 22/09/2026): o modal reabria copiando os números CANÔNICOS do
+// banco e SEM os metadados da conversão. O reenvio caía no caminho "sem conversão", que arredonda —
+// R$ 0,4999 virava R$ 0,50 e os 2.500 parafusos subiam de R$ 1.249,75 para R$ 1.250,00. Ninguém
+// tinha tocado em nada.
+//
+// A volta é `paraODocumento` (o que `page.js` manda ao modal) e o reenvio é `aplicarConversao` de
+// novo. Este teste amarra o ciclo inteiro.
+describe("o ciclo salvar → reabrir → salvar", () => {
+  const cicloFecha = (papel) => {
+    const gravado = aplicarConversao(item(papel)).item;
+    // O que `page.js` devolve para o modal: os valores do documento + a trilha.
+    const volta = paraODocumento({ qtd: gravado.qtdCotada, preco: gravado.precoUnit, fator: gravado.fatorParaRM });
+    const limpo = (n) => Math.round(n * 1e6) / 1e6;
+    // O reenvio do modal, sem o comprador mexer em nada.
+    const regravado = aplicarConversao(item({
+      ...papel,
+      qtdCotada: limpo(volta.qtd), precoUnit: limpo(volta.preco),
+      unidadeCotada: gravado.unidadeCotada, fatorParaRM: gravado.fatorParaRM,
+    })).item;
+    return { gravado, volta: { qtd: limpo(volta.qtd), preco: limpo(volta.preco) }, regravado };
+  };
+
+  it("2500 parafusos a R$ 49,99 o cento continuam valendo R$ 1.249,75", () => {
+    const { gravado, volta, regravado } = cicloFecha({ precoUnit: 49.99, qtdCotada: 25 });
+    expect(volta).toEqual({ qtd: 25, preco: 49.99 });          // o papel do fornecedor, de volta
+    expect(regravado.qtdCotada).toBe(gravado.qtdCotada);
+    expect(regravado.precoUnit).toBeCloseTo(gravado.precoUnit, 10);
+    expect(Math.round(regravado.qtdCotada * regravado.precoUnit * 100) / 100).toBe(1249.75);
+  });
+
+  // ⚠ O caso duro: 25/130 é dízima, e é por isso que o fator GRAVADO é o efetivo e não o digitado.
+  it("130 M virando 25 UN sobrevive à ida e volta", () => {
+    const { gravado, volta, regravado } = cicloFecha({
+      precoUnit: 10, qtdCotada: 130, unidadeCotada: "M", fatorParaRM: 0.1923,
+    });
+    expect(gravado.qtdCotada).toBe(25);
+    expect(volta).toEqual({ qtd: 130, preco: 10 });
+    expect(regravado.qtdCotada).toBe(25);
+    expect(Math.round(regravado.qtdCotada * regravado.precoUnit * 100) / 100).toBe(1300);
   });
 });

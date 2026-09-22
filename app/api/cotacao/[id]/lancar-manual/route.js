@@ -7,7 +7,7 @@
 //   - resolve fornecedor no Omie pelo CNPJ (igual ao submeter)
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { unidadeCanonica, conversaoDoItem } from "@/lib/unidades";
+import { unidadeCanonica, conversaoDoItem, fatorFixo } from "@/lib/unidades";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { resolverFornecedorPorCnpj } from "@/lib/omie-pedido-compra";
@@ -74,18 +74,36 @@ const schema = z.object({
  *
  * ⚠ Sem fator (ou fator 1), o caminho é exatamente o de antes: arredonda os dois e segue.
  */
-export function aplicarConversao(it) {
+export function aplicarConversao(it, unidadeDaRMNoBanco = null) {
   const round2 = (n) => (n == null ? n : Math.round(Number(n) * 100) / 100);
   const base = {
     ...it,
     icmsPct: it.icmsPct != null ? round2(it.icmsPct) : null,
     ipiPct: it.ipiPct != null ? round2(it.ipiPct) : null,
   };
-  const daRM = unidadeCanonica(it.unidadeRM);
+  const semConverter = {
+    converteu: false,
+    item: { ...base, precoUnit: round2(it.precoUnit), qtdCotada: round2(it.qtdCotada), unidadeCotada: null, fatorParaRM: null },
+  };
+
+  // ⚠⚠ A UNIDADE BASE VEM DO BANCO, NÃO DO NAVEGADOR (achado do Codex, 22/09/2026). É ela que decide
+  // se houve conversão e por quanto — vinda do corpo da requisição, uma aba velha (ou um POST
+  // montado à mão) declarava a base que quisesse e a gravação saía na unidade errada, sem nada a
+  // acusar. O corpo só é consultado quando o item não está mais no banco.
+  const daRM = unidadeCanonica(unidadeDaRMNoBanco ?? it.unidadeRM);
   const cotada = unidadeCanonica(it.unidadeCotada);
-  const fator = Number(it.fatorParaRM) || null;
-  if (!cotada || !daRM || cotada === daRM || !fator || fator === 1) {
-    return { converteu: false, item: { ...base, precoUnit: round2(it.precoUnit), qtdCotada: round2(it.qtdCotada), unidadeCotada: null, fatorParaRM: null } };
+  if (!cotada || !daRM || cotada === daRM) return semConverter;
+
+  // ⚠⚠ UNIDADES DIFERENTES E SEM FATOR É RECUSA, NÃO "sem conversão" (achado do Codex, 22/09/2026).
+  // Este caminho caía no `semConverter` acima: escolher CT e deixar o fator vazio gravava os 25 do
+  // papel como se fossem 25 UN — cem vezes menos material, calado, e com os metadados apagados,
+  // então nem dava para reconstruir depois o que o fornecedor tinha cotado.
+  //
+  // ⚠ O fator FIXO é calculado aqui (CT=100, MI=1000, DZ=12): é exato e o servidor não tem por que
+  // esperar que o navegador mande. Só os pares que dependem do item (ML↔UN, KG↔UN) exigem digitação.
+  const fator = Number(it.fatorParaRM) > 0 ? Number(it.fatorParaRM) : fatorFixo(cotada, daRM);
+  if (!fator) {
+    return { erro: `Informe quantos ${daRM} cabem em 1 ${cotada} (item ${it.rmItemId}).` };
   }
 
   const r = conversaoDoItem({
@@ -93,11 +111,22 @@ export function aplicarConversao(it) {
   });
   if (r.erro) return { erro: `${r.erro} (item ${it.rmItemId})` };
 
+  // ⚠ `r.qtd` JÁ vem arredondado e `r.preco` foi derivado DELE — arredondar de novo aqui era
+  // exatamente o que movia o total (ver o comentário em `conversaoDoItem`).
   return {
     converteu: true,
     resumo: `${it.qtdCotada} ${cotada} → ${r.qtd} ${daRM}`,
-    item: { ...base, precoUnit: r.preco, qtdCotada: round2(r.qtd), unidadeCotada: cotada, fatorParaRM: fator },
+    item: { ...base, precoUnit: r.preco, qtdCotada: r.qtd, unidadeCotada: cotada, fatorParaRM: r.fator },
   };
+}
+
+/** A unidade de cada RMItem, lida do BANCO — a base contra a qual a conversão é conferida. */
+async function unidadesDosItens(itens) {
+  const rows = await prisma.rMItem.findMany({
+    where: { id: { in: itens.map((i) => i.rmItemId) } },
+    select: { id: true, unidade: true },
+  });
+  return new Map(rows.map((i) => [i.id, i.unidade]));
 }
 
 export async function POST(req, { params }) {
@@ -153,11 +182,13 @@ export async function POST(req, { params }) {
   // ou de inputs do form que possam ter casas extras.
   const round2 = (n) => (n == null ? n : Math.round(Number(n) * 100) / 100);
 
+  const unidadeNoBanco = await unidadesDosItens(body.itens);
+
   // Itens validos: precoUnit > 0
   const comConversao = [];
   const itensValidos = [];
   for (const it of body.itens.filter((x) => x.precoUnit > 0)) {
-    const conv = aplicarConversao(it);
+    const conv = aplicarConversao(it, unidadeNoBanco.get(it.rmItemId));
     if (conv.erro) return NextResponse.json({ error: conv.erro }, { status: 400 });
     if (conv.converteu) comConversao.push(conv.resumo);
     itensValidos.push(conv.item);

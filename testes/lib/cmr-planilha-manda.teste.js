@@ -50,13 +50,33 @@ describe("ehOutroMaterial — trocar de dono é diferente de ganhar detalhe", ()
     expect(ehOutroMaterial("", "CHAPA A-36")).toBe(false);
   });
 
-  // ⚠ A comparação é pelo substantivo do material: bitola, acabamento e grafia mudam sem trocar
-  // de dono.
+  // ⚠ Acabamento e grafia mudam sem trocar de dono — as MEDIDAS são as mesmas dos dois lados.
   it.each([
     ["CHAPA ACO CARBONO A-36 9,50MM", "CHAPA ACO CARBONO LAMINADO A-36 ESPESSURA 9,50MM"],
     ["PORCA A563 3/8", "PORCA A563 - 3/8\" - GF"],
-    ["PERFIL W 200X26,6", "Perfil W 250x25,3"],
   ])("%s → %s não é troca", (a, b) => expect(ehOutroMaterial(a, b)).toBe(false));
+
+  // ⚠⚠ EM AÇO A BITOLA É O MATERIAL (achado do Codex, 22/09/2026). Este caso passava como "não é
+  // troca" porque a primeira palavra coincidia — e, sem troca, célula vazia NÃO apaga: o perfil novo
+  // herdava certificado, corrida e NF do anterior. É o híbrido do R 261547 pela porta estreita.
+  it.each([
+    ["PERFIL W 200X26,6", "Perfil W 250x25,3"],
+    ["CHAPA A-36 ESPESSURA 4,75MM", "CHAPA A-36 ESPESSURA 9,50MM"],
+    ["CANTONEIRA 2 X 1/4", "CANTONEIRA 3 X 3/8"],
+  ])("%s → %s é troca: as medidas conflitam", (a, b) => expect(ehOutroMaterial(a, b)).toBe(true));
+
+  // ⚠⚠ MEDIDA A MAIS É COMPLETAR, NÃO TROCAR. Exigir conjuntos idênticos traria o defeito de volta
+  // com o sinal invertido: apagaria a rastreabilidade CERTA de quem só detalhou a descrição.
+  it.each([
+    ["CHAPA A-36", "CHAPA A-36 ESPESSURA 4,75MM"],
+    ["PERFIL W 200X26,6", "PERFIL W 200X26,6 - 6 MTS - ASTM A572"],
+  ])("%s → %s não é troca: a medida só foi detalhada", (a, b) => expect(ehOutroMaterial(a, b)).toBe(false));
+
+  // ⚠ A rastreabilidade continua mandando MAIS que o texto — inclusive sobre as medidas.
+  it("bitola diferente com o MESMO certificado ainda não é troca", () => {
+    expect(ehOutroMaterial("PERFIL W 200X26,6", "PERFIL W 250x25,3",
+      { certificadoAntes: "8195", certificadoDepois: "8195" })).toBe(false);
+  });
 });
 
 describe("proximoIndiceR — conta os dois lados", () => {

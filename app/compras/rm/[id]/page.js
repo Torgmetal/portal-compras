@@ -5,11 +5,20 @@ import { requireRole } from "@/lib/session";
 import { podeCancelarRM } from "@/lib/permissao-rm";
 import { ArrowLeft } from "lucide-react";
 import { calcularVerbaOP } from "@/lib/verba-op";
+import { paraODocumento } from "@/lib/unidades";
 import RMComprasClient from "./RMComprasClient";
 import ConsultaEstoqueSection from "@/components/compras/ConsultaEstoqueSection";
 
 // Sempre busca dados frescos do banco
 
+
+// ⚠ O caminho de volta para o que o fornecedor escreveu: o banco guarda na unidade da RM, o modal
+// mostra na unidade do documento. Sem fator gravado, devolve os próprios valores.
+const doDocumento = (it) => paraODocumento({ qtd: it.qtdCotada, preco: it.precoUnit, fator: it.fatorParaRM });
+
+// ⚠ Desconverter reintroduz ruído de ponto flutuante (49,99 vira 49,98999999999999). Seis casas
+// limpam isso sem perder preço de verdade — nenhum fornecedor cota na sétima.
+const semRuido = (n) => Math.round((Number(n) || 0) * 1e6) / 1e6;
 
 export default async function RMComprasDetail({ params }) {
   const user = await requireRole(["ADMIN", "COMPRAS"]);
@@ -75,6 +84,9 @@ export default async function RMComprasDetail({ params }) {
           id: true, rmItemId: true, precoUnit: true, qtdCotada: true,
           icmsPct: true, ipiPct: true, observacao: true, vencedor: true,
           semEstoque: true, prazoEntrega: true,
+          // ⚠ A trilha do documento do fornecedor — sem ela o modal reabre sem saber que houve
+          // conversão e regrava os números canônicos como se fossem os do papel.
+          unidadeCotada: true, fatorParaRM: true,
           rmItem: {
             select: {
               id: true, descricao: true, unidade: true, qtd: true,
@@ -108,8 +120,15 @@ export default async function RMComprasDetail({ params }) {
         descricao: it.rmItem.descricao,
         unidade: (Number(it.rmItem.peso) || 0) > 0 ? "KG" : it.rmItem.unidade,
         qtdRm: (Number(it.rmItem.peso) || 0) > 0 ? Number(it.rmItem.peso) : it.rmItem.qtd,
-        qtdCotada: it.qtdCotada || ((Number(it.rmItem.peso) || 0) > 0 ? Number(it.rmItem.peso) : it.rmItem.qtd),
-        precoUnit: it.precoUnit > 0 ? String(it.precoUnit) : "",
+        // ⚠⚠ O MODAL RECEBE OS NÚMEROS DO DOCUMENTO, NÃO OS CANÔNICOS (achado do Codex, 22/09/2026).
+        // O banco guarda "2500 UN a R$ 0,4999"; o papel do fornecedor diz "25 CT a R$ 49,99". Sem
+        // desconverter aqui, reabrir a proposta e salvar sem mexer em nada regravava 2500 CT — ou,
+        // sem o fator junto, arredondava R$ 0,4999 para R$ 0,50 e subia o total de R$ 1.249,75 para
+        // R$ 1.250,00. Salvar sem alterar nada não pode mudar valor.
+        qtdCotada: it.qtdCotada ? semRuido(doDocumento(it).qtd) : ((Number(it.rmItem.peso) || 0) > 0 ? Number(it.rmItem.peso) : it.rmItem.qtd),
+        precoUnit: it.precoUnit > 0 ? String(semRuido(doDocumento(it).preco)) : "",
+        unidadeCotada: it.unidadeCotada || "",
+        fatorParaRM: it.fatorParaRM != null ? String(it.fatorParaRM) : "",
         icmsPct: it.icmsPct != null ? String(it.icmsPct) : "",
         ipiPct: it.ipiPct != null ? String(it.ipiPct) : "",
         observacao: it.observacao || "",

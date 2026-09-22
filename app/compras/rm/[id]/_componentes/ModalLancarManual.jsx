@@ -51,6 +51,14 @@ export function ModalLancarManual({ cotacao, rm, onClose }) {
         qtdCotada: it.qtdCotada,
         icmsPct: it.icmsPct || "",
         ipiPct: it.ipiPct || "",
+        // ⚠⚠ A CONVERSÃO TEM DE VOLTAR JUNTO (achado do Codex, 22/09/2026). Sem estas duas linhas,
+        // reabrir uma proposta convertida e salvar sem mexer em nada mandava os metadados nulos: o
+        // servidor caía no caminho "sem conversão" e arredondava R$ 0,4999 para R$ 0,50 — os 2.500
+        // parafusos subiam de R$ 1.249,75 para R$ 1.250,00 sem ninguém tocar em nada. O servidor
+        // manda os valores JÁ na unidade do documento (ver `page.js`), então o que a tela mostra é o
+        // papel do fornecedor e o reenvio reconverte a partir dele.
+        unidadeCotada: it.unidadeCotada || "",
+        fatorParaRM: it.fatorParaRM || "",
         _rmNumero: it._rmNumero,
         _ehDestaRM: it._ehDestaRM,
       }));
