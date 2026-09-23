@@ -6852,8 +6852,12 @@ model FiscalDispositivo {
 /// apagaria a decisão que já orientou emissão — e é justamente o histórico que dá valor ao registro.
 model FiscalClassificacaoProduto {
   id                String    @id @default(cuid())
-  /// Código do produto no Omie (ARM000010…). NULL = vale para qualquer código.
+  /// Código do produto no Omie (ARM000010…), como foi digitado. NULL = vale para qualquer código.
   codigoProduto     String?
+  /// ⚠⚠ A FORMA CANÔNICA do código (`canonico()` do motor) — é ELA que o índice único e a
+  /// comparação de escopo usam. Gravar o literal deixava `ARM000010` e `arm000010` passarem pelo
+  /// índice como escopos diferentes e depois casarem juntos, virando AMBIGUA para sempre.
+  codigoNormalizado String?
   /// O texto que identifica a NATUREZA da peça ("FLANGE", "TORRE DE TRANSMISSÃO").
   padraoDescricao   String
   /// ⚠ `normalizar()` do motor. É a chave dos índices únicos PARCIAIS, que moram em

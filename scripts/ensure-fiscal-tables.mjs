@@ -216,12 +216,23 @@ const sql = [
   // ⚠ Eles garantem que não há DUPLICATA de escopo. Não garantem — e não têm como garantir — que
   // dois padrões diferentes não se sobreponham ("FLANGE" e "FLANGE MAIOR"); essa sobreposição é
   // detectada na leitura e sai como AMBIGUA.
-  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalClassificacaoProduto_aprovada_codigo"
-     ON "FiscalClassificacaoProduto"("codigoProduto","padraoNormalizado")
-     WHERE "status" = 'APROVADA' AND "codigoProduto" IS NOT NULL`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalClassificacaoProduto_aprovada_global"
+  `ALTER TABLE "FiscalClassificacaoProduto" ADD COLUMN IF NOT EXISTS "codigoNormalizado" TEXT`,
+  // ⚠⚠ O ÍNDICE VAI NA COLUNA CANÔNICA, NÃO NO LITERAL (achado do Codex, 23/09/2026). Indexando
+  // `codigoProduto` cru, `ARM000010` e `arm000010` são escopos DIFERENTES para o índice e o MESMO
+  // escopo para a leitura: as duas linhas eram aprovadas e depois casavam juntas, devolvendo
+  // AMBIGUA para sempre, sem ninguém entender por quê.
+  //
+  // ⚠⚠ E OS ÍNDICES ANTIGOS PRECISAM CAIR PELO NOME. `CREATE INDEX IF NOT EXISTS` casa pelo NOME,
+  // nunca pela definição — deixar os dois de pé manteria a unicidade errada viva em silêncio, que
+  // é exatamente o defeito do `FiscalTipiLinha_busca`. Só cai o que tem o nome antigo.
+  `DROP INDEX IF EXISTS "FiscalClassificacaoProduto_aprovada_codigo"`,
+  `DROP INDEX IF EXISTS "FiscalClassificacaoProduto_aprovada_global"`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalClassificacaoProduto_aprovada_escopo"
+     ON "FiscalClassificacaoProduto"("codigoNormalizado","padraoNormalizado")
+     WHERE "status" = 'APROVADA' AND "codigoNormalizado" IS NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalClassificacaoProduto_aprovada_geral"
      ON "FiscalClassificacaoProduto"("padraoNormalizado")
-     WHERE "status" = 'APROVADA' AND "codigoProduto" IS NULL`,
+     WHERE "status" = 'APROVADA' AND "codigoNormalizado" IS NULL`,
 
   // ⚠ As FKs vão DEPOIS das tabelas, e cada uma num bloco próprio: `ADD CONSTRAINT` não tem
   // `IF NOT EXISTS` no Postgres, então a repetição é tratada como sucesso (42710 = já existe).

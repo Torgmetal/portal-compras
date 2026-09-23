@@ -804,7 +804,7 @@ function CartaoClassificacao({ c }) {
 
 function AbaSimulador() {
   const [opcoes, setOpcoes] = useState({ ops: [], cfops: [], pares: [], familias: [], cstIpi: [] });
-  const [f, setF] = useState({ ncm: "", cfop: "", opId: "", ufDestino: "", valor: "", cstPretendido: "", descricaoProduto: "" });
+  const [f, setF] = useState({ ncm: "", cfop: "", opId: "", ufDestino: "", valor: "", cstPretendido: "", descricaoProduto: "", codigoProduto: "" });
   const parEscolhido = opcoes.pares.find((c) => c.chave === f.cfop) ?? null;
   const [r, setR] = useState(null);
   const [erro, setErro] = useState(null);
@@ -826,6 +826,7 @@ function AbaSimulador() {
           ufDestino: f.ufDestino || null, valor: f.valor ? Number(String(f.valor).replace(",", ".")) : null,
           cstPretendido: f.cstPretendido || null,
           descricaoProduto: f.descricaoProduto || null,
+          codigoProduto: f.codigoProduto || null,
         }),
       });
       const d = await resp.json();
@@ -907,10 +908,20 @@ function AbaSimulador() {
               registrada pelo NCM que está sendo conferido seria confirmação circular: o registro
               devolveria exatamente o que a pessoa acabou de digitar. O que localiza a decisão é a
               natureza da peça — que na TORG mora na descrição do item, nunca no código do produto. */}
-          <div className="md:col-span-3">
+          <div className="md:col-span-2">
             <label className={rotulo}>Descrição da peça (opcional — procura a classificação já decidida)</label>
             <input className={campo} placeholder="FLANGE MAIOR CONEXAO SAIDA - DES 71264380" value={f.descricaoProduto}
               onChange={(e) => setF({ ...f, descricaoProduto: e.target.value })} />
+          </div>
+          {/* ⚠⚠ SEM ESTE CAMPO, VERBETE COM CÓDIGO NUNCA ERA ACHADO (achado do Codex, 23/09/2026).
+              A tela de cadastro deixa amarrar a classificação a um código do Omie, e a API filtra
+              por ele — mas o simulador não mandava nenhum, então todo verbete específico era
+              excluído e a resposta saía "sem classificação" com a classificação existindo. Vazio
+              continua significando "só os que valem para qualquer código". */}
+          <div>
+            <label className={rotulo}>Código do produto no Omie (opcional)</label>
+            <input className={campo} placeholder="ARM000010" value={f.codigoProduto}
+              onChange={(e) => setF({ ...f, codigoProduto: e.target.value })} />
           </div>
           <div className="md:col-span-2">
             <label className={rotulo}>CST de IPI que pretende usar (opcional — o portal confere)</label>

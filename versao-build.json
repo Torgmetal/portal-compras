@@ -1,7 +1,12 @@
 {
-  "build": 3427,
-  "gerado": "2026-09-23T14:11:29.328Z",
+  "build": 3428,
+  "gerado": "2026-09-23T14:17:28.620Z",
   "commits": [
+    {
+      "hash": "5969682a3f",
+      "data": "23/09/2026",
+      "titulo": "Fiscal: o registro de classificação de produto — §14, a raiz do problema"
+    },
     {
       "hash": "65baa3bfa8",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b80868fd4c",
       "data": "22/09/2026",
       "titulo": "Conversão e CMR: os dois achados da rodada seguinte do Codex"
-    },
-    {
-      "hash": "27594f5d43",
-      "data": "22/09/2026",
-      "titulo": "CMR e conversão de unidade: os cinco achados P1 do Codex"
     }
   ]
 }

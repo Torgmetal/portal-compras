@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { lerNfe } from "@/lib/fiscal/xml-nfe";
 import { auditar, indiceDaTipi, GRAVIDADE } from "@/lib/fiscal/auditoria";
+import { canonico } from "@/lib/fiscal/classificacao-produto";
 
 // ─── A AUDITORIA DA NF-e ─────────────────────────────────────────────────────
 //
@@ -261,11 +262,17 @@ describe("o NCM da descrição vale para o XML também", () => {
 // conferência NÃO faz: não roda quando não foi pedida, não confunde falha de leitura com ausência,
 // não escolhe entre verbetes sobrepostos e não some quando o NCM está fora da TIPI.
 
-const verbete = (over = {}) => ({
-  id: "v1", status: "APROVADA", codigoProduto: null, padraoDescricao: "FLANGE",
-  ncm: "73072900", fundamento: "RGI 1 — acessório de tubulação.",
-  aprovadoPor: "Matheus", aprovadoEm: "2026-09-23T12:00:00Z", ...over,
-});
+// ⚠⚠ A FIXTURE TEM A FORMA QUE O BANCO DEVOLVE — `aprovadoPorNome` e `codigoNormalizado`. Com os
+// nomes inventados, o achado saía com o aprovador `null` em produção e o teste não via nada.
+const verbete = (over = {}) => {
+  const codigoProduto = "codigoProduto" in over ? over.codigoProduto : null;
+  return {
+    id: "v1", status: "APROVADA", padraoDescricao: "FLANGE",
+    ncm: "73072900", fundamento: "RGI 1 — acessório de tubulação.",
+    aprovadoPorNome: "Matheus", aprovadoEm: "2026-09-23T12:00:00Z", ...over,
+    codigoProduto, codigoNormalizado: codigoProduto ? canonico(codigoProduto) : null,
+  };
+};
 
 const auditarCom = (itens, classificacoes, t = tipi(linha("84379000", 3.25))) =>
   auditar(lerNfe(nfe(itens)), t, { classificacoes });
@@ -342,6 +349,13 @@ describe("a conferência contra o registro de classificação", () => {
     const r = auditarCom(item(1, { cst: "50", pIPI: 3.25, desc: "FLANGE MAIOR" }),
       [verbete({ codigoProduto: "OUTRO999" })]);
     expect(tipos(r)).not.toContain("NCM_DIVERGE_DA_CLASSIFICACAO");
+  });
+
+  // ⚠ O item da 973 traz `cProd` ARM000010; o verbete gravado em minúscula é o MESMO escopo.
+  it("verbete do código alcança o item mesmo com a caixa diferente", () => {
+    const r = auditarCom(item(1, { cst: "50", pIPI: 3.25, desc: "FLANGE MAIOR" }),
+      [verbete({ codigoProduto: "arm000010" })]);
+    expect(tipos(r)).toContain("NCM_DIVERGE_DA_CLASSIFICACAO");
   });
 });
 

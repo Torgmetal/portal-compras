@@ -1388,3 +1388,33 @@ operação de receita) não há lista — candidato só aparece onde ele se abst
   a apontar divergência em auditoria real.
   ⚠ **AINDA ABERTO**: o registro guarda a decisão, mas **ninguém classificou nada ainda**. A tabela
   nasce vazia de propósito: quem escreve o primeiro verbete é a contabilidade, não eu.
+  ⚠⚠⚠ **(rodada 1/2) TRÊS P2, E O PRIMEIRO É O MEU PADRÃO DE SEMPRE — O TESTE DEFENDIA O DEFEITO.**
+  - ⚠⚠⚠ **`aprovadoPor` NÃO EXISTE; A COLUNA É `aprovadoPorNome`.** O motor lia um campo que a
+    persistência nunca devolve: em produção o aprovador saía `null` e a tela escrevia **"—"** —
+    justamente o campo que dá sentido ao registro inteiro. E **minhas fixtures usavam o nome
+    inventado**, então os 21 testes passavam defendendo o buraco. As fixtures agora têm a forma que
+    o banco devolve, e o `codigoNormalizado` delas sai de `canonico()`, como a gravação faz.
+  - ⚠⚠⚠ **A ESCRITA GRAVAVA O LITERAL E A LEITURA NORMALIZAVA.** `ARM000010` e `arm000010` passavam
+    pelo índice único como escopos **diferentes** e depois casavam **juntos** — os dois aprovados,
+    e a consulta devolvendo AMBIGUA para sempre, sem ninguém entender por quê. Pior: `"---"`
+    sobrevivia ao `trim`, era gravado como específico e sumia na leitura, passando a valer para
+    **qualquer** produto. Agora há coluna `codigoNormalizado`, é **ela** que o índice e a
+    comparação usam, e código que normaliza para vazio é **recusado** na gravação.
+    ⚠ Os índices antigos **caem pelo NOME** (`DROP INDEX IF EXISTS` antes dos novos): `CREATE INDEX
+    IF NOT EXISTS` casa pelo nome, nunca pela definição — deixá-los de pé manteria a unicidade
+    errada viva em silêncio, que é exatamente o defeito do `FiscalTipiLinha_busca`.
+    ⚠ **No CÓDIGO a pontuação some; na DESCRIÇÃO ela vira espaço.** São regras diferentes de
+    propósito, e por isso `canonico` não é `normalizar`: código é identificador (`arm-000010` é o
+    `ARM000010`); descrição tem fronteira de palavra, que é o que impede "METALICAS FLANGE" de
+    casar dois campos grudados.
+  - ⚠⚠ **VERBETE COM CÓDIGO NUNCA ERA ACHADO PELO SIMULADOR.** O cadastro deixa amarrar a
+    classificação a um código do Omie e a API filtra por ele — mas o formulário não mandava nenhum,
+    então **todo** verbete específico era excluído e a resposta saía "sem classificação" com a
+    classificação existindo. O campo entrou na tela.
+  **3.580 passando**, lint sem erro, `next build` EXIT=0.
+  ⚠⚠ **PENDENTE DE AUTORIZAÇÃO — a correção exige DDL em produção.** A coluna `codigoNormalizado` e
+  a troca dos dois índices parciais só entram com `node scripts/ensure-fiscal-tables.mjs` (ou o
+  `npm run build` completo). A revisão proibiu operação em produção nesta rodada, então **não
+  rodei**, e a revalidação logada depende disso. A tabela está **vazia** (0 linhas, conferido), e
+  as operações são aditivas: `ADD COLUMN IF NOT EXISTS` + `DROP INDEX`/`CREATE UNIQUE INDEX` sobre
+  índices criados hoje e ainda sem nenhuma linha sob eles.

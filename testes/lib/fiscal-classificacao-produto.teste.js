@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  CLASSIFICACAO, STATUS, normalizar, verbetesDoCodigo, procurarClassificacao, compararNcm,
+  CLASSIFICACAO, STATUS, normalizar, canonico, verbetesDoCodigo, procurarClassificacao, compararNcm,
 } from "@/lib/fiscal/classificacao-produto";
 
 // ─── O REGISTRO DE CLASSIFICAÇÃO ─────────────────────────────────────────────
@@ -10,17 +10,26 @@ import {
 // A tentação em todos esses pontos é dar uma resposta útil; dar resposta útil aqui é inventar
 // classificação fiscal, que é exatamente o que o briefing proíbe.
 
-const verbete = (over = {}) => ({
-  id: over.id ?? "v1",
-  status: STATUS.APROVADA,
-  codigoProduto: null,
-  padraoDescricao: "FLANGE",
-  ncm: "73072900",
-  fundamento: "RGI 1 — acessório de tubulação.",
-  aprovadoPor: "Matheus",
-  aprovadoEm: "2026-09-23",
-  ...over,
-});
+// ⚠⚠ A FIXTURE TEM A FORMA QUE O BANCO DEVOLVE, e isso não é detalhe (achado do Codex,
+// 23/09/2026). A versão anterior inventava `aprovadoPor` onde a coluna se chama `aprovadoPorNome`,
+// e omitia `codigoNormalizado`: o motor lia `null` em produção e a tela escrevia "—" no campo que
+// dá sentido ao registro inteiro. O teste passava — ele **defendia o defeito**. Daí o
+// `codigoNormalizado` sair de `canonico()`, como a gravação faz, e não de um literal escrito à mão.
+const verbete = (over = {}) => {
+  const codigoProduto = "codigoProduto" in over ? over.codigoProduto : null;
+  return {
+    id: over.id ?? "v1",
+    status: STATUS.APROVADA,
+    padraoDescricao: "FLANGE",
+    ncm: "73072900",
+    fundamento: "RGI 1 — acessório de tubulação.",
+    aprovadoPorNome: "Matheus",
+    aprovadoEm: "2026-09-23",
+    ...over,
+    codigoProduto,
+    codigoNormalizado: codigoProduto ? canonico(codigoProduto) : null,
+  };
+};
 
 const item = (over = {}) => ({
   codigo: "ARM000010",
@@ -55,6 +64,23 @@ describe("o escopo do verbete", () => {
     expect(verbetesDoCodigo([verbete({ codigoProduto: "ARM000010" })], "ARM000001")).toHaveLength(0);
   });
 
+  // ⚠⚠ O ESCOPO É CANÔNICO NOS DOIS LADOS (achado do Codex, 23/09/2026).
+  it("o código casa independente de caixa e pontuação", () => {
+    expect(verbetesDoCodigo([verbete({ codigoProduto: "arm-000010" })], "ARM 000010")).toHaveLength(1);
+  });
+
+  it("um código que só tem pontuação normaliza para vazio — é por isso que a gravação o recusa", () => {
+    expect(canonico("---")).toBe("");
+  });
+
+  // ⚠⚠ NO CÓDIGO A PONTUAÇÃO SOME; na DESCRIÇÃO ela vira espaço. São regras diferentes de
+  // propósito: código é identificador, descrição tem fronteira de palavra.
+  it("no código, traço e ponto são ruído de digitação", () => {
+    expect(canonico("arm.000010")).toBe("ARM000010");
+    expect(canonico("ARM-000010")).toBe(canonico("ARM000010"));
+    expect(normalizar("ARM-000010")).toBe("ARM 000010");
+  });
+
   it("proposta e revogada nunca entram — só APROVADA orienta", () => {
     const vs = [verbete({ id: "p", status: STATUS.PROPOSTA }), verbete({ id: "r", status: STATUS.REVOGADA })];
     expect(verbetesDoCodigo(vs, "ARM000010")).toHaveLength(0);
@@ -66,6 +92,7 @@ describe("procurar a decisão humana", () => {
     const r = procurar(item(), [verbete()]);
     expect(r.status).toBe(CLASSIFICACAO.CORRESPONDENCIA_UNICA);
     expect(r.verbete.campo).toBe("descricaoItem");
+    // ⚠⚠ O NOME VEM DA COLUNA `aprovadoPorNome`. Era aqui que o defeito se escondia.
     expect(r.verbete.aprovadoPor).toBe("Matheus");
   });
 
