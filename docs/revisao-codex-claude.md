@@ -1016,3 +1016,77 @@ das rodadas acima fica como está — reescrever o passado apagaria a procedênc
 Matheus também firmou **"Codex: aceito sempre"** para pendência de terceiro e decisão humana.
 ⚠⚠ Isso NÃO vale para `resultado: "corrigir"` em código nosso — ver
 `docs/memoria-claude/torg_codex_aceito_sempre.md`.
+
+---
+
+## A BASE JURÍDICA (23/09/2026) — PARTES 10 a 13 do briefing de auditoria fiscal
+
+Matheus: *"pode seguir com todas"*. O requisito central era: *"a base de conhecimento fiscal da
+TORG deverá ser constituída por legislação e documentos oficiais armazenados em nosso banco
+interno; não queremos um conjunto de frases escritas por inteligência artificial sem sustentação
+jurídica"*.
+
+**10 normas coletadas, conferidas, hasheadas e guardadas** (`FiscalNorma` → `FiscalNormaVersao`
+→ `FiscalDispositivo`), em 11 s:
+
+| Peso | Documento | Dispositivos | Tamanho |
+|---|---|---|---|
+| VINCULANTE | RICMS/SP art. 52, 125, 402, 403, **404 a 408**, 409 | 138 · 131 · 6 · 3 · **18** · 2 | 58–2 KB |
+| INTERPRETATIVO | DN CAT 03/2016, RC 33732/2026, RC 33438/2026, RC 5788/2015 | — | 17–12 KB |
+
+⚠⚠ **`art405.aspx` a `art408.aspx` devolvem 404** — os quatro moram em `art404.aspx`, cujo título
+é "RICMS - Artigo 404 a 408". Sem esse mapa, o coletor concluiria que o **art. 406**, o artigo
+central da industrialização por conta de terceiros, simplesmente não existe.
+
+⚠⚠ **PESO JURÍDICO É ATRIBUTO DO DOCUMENTO.** `VINCULANTE` × `INTERPRETATIVO`: uma Resposta à
+Consulta é entendimento do fisco sobre os fatos DAQUELE consulente. A ressalva viaja com o
+documento e aparece na tela, não em rodapé — é o que impede uma RC de 2015 de virar regra
+universal de 2026.
+
+⚠⚠ **200 NÃO É SUCESSO.** O SharePoint da SEFAZ devolve a página de erro com HTTP 200. Todo
+documento declara marcadores (artigos esperados, frase-chave, corpo mínimo de 400 caracteres) e o
+que não passa **não vira ATIVO** — é gravado como SUPERADA, e a versão boa anterior continua
+valendo. Gravar uma página de erro como se fosse a lei seria pior que não coletar.
+
+⚠ **O corpo começa no primeiro artigo**, não no topo da página: das ~12.900 letras de
+`art404.aspx`, a maior parte é menu do SharePoint. Guardar o chrome faria o hash mudar a cada
+redesenho do portal da SEFAZ — falso "a lei mudou".
+
+**O fundamento virou citação verificável.** Cada nota da cadeia leva `cita: { norma, rotulo }`, e
+clicar no fundamento abre o **texto oficial guardado** com rótulo, peso, URL, `sha256` e data de
+coleta. Conferido logado na cadeia do art. 406:
+> **Artigo 406, II** · RICMS/SP — Artigos 404 a 408 · VINCULANTE
+> *"o estabelecimento autor da encomenda deverá, ressalvado o disposto no parágrafo único: a)
+> emitir Nota Fiscal relativa à remessa simbólica em nome do estabelecimento industrializador, sem
+> destaque do valor do imposto…"*
+> Coletado de legislacao.fazenda.sp.gov.br/Paginas/art404.aspx · sha256 `2be16dc63782` · 23/09/2026
+
+⚠⚠ **O TEXTO LEGAL CONFIRMOU E REFINOU o que eu tinha escrito de cabeça**: o parágrafo único do
+art. 406 **dispensa** a NF do fornecedor quando a remessa vai acompanhada da NF da alínea "a" do
+inciso II — exatamente a ressalva que eu havia colocado por precaução. E o art. 408 exige que
+encomendante e industrializador estejam **"localizados neste Estado"**, confirmando o corte de SP.
+
+**DOIS DEFEITOS MEUS, achados na própria validação:**
+- ⚠⚠ **`skipDuplicates` engolia dispositivo em silêncio**: 138 extraídos do art. 125 viravam **92
+  gravados**. A causa era o rótulo repetido ("Artigo 125, I" do caput e de um §). Agora o inciso é
+  qualificado pelo parágrafo em que está, o que ainda colidir ganha sufixo `(2)`, e o
+  `skipDuplicates` **saiu** — colisão tem de estourar, não sumir. 138 e 131 gravados.
+- ⚠⚠ **Entidade HTML é sensível a maiúscula**: casando por `toLowerCase()`, `&Ccedil;` virava "ç"
+  e **"INSCRIÇÃO" saía "INSCRIçãO"** — que é exatamente como cabeçalho de lei se escreve. E o mapa
+  não cobria `&ccedil;`/`&atilde;`: "operação" chegaria ao banco como `opera&ccedil;&atilde;o`,
+  quebrando a busca textual.
+
+⚠ **Coleta controlada**: sequencial, com pausa de 800 ms e user-agent identificado. São 9 páginas
+do mesmo servidor público — disparar tudo junto é o que faz um site oficial bloquear o IP da
+empresa. Cron semanal (`40 4 * * 1`), `ƒ` no build (não pré-renderizado), com `temCronSecret` e
+`aquecerBanco`.
+
+⚠ **POST é de ADMIN.** Quem lê o art. 406 usa o GET; trocar a base que fundamenta os apontamentos
+é outra coisa, e vai para o `AuditLog`.
+
+**3.403 passando.** Build limpo.
+
+**AINDA PENDENTE do briefing** (PARTES 13 a 15, 21, 24): o motor de regras como REGISTRO
+consultável (`FiscalRegra` com condições, status de validação e aprovador) — hoje as cadeias são
+dados estáticos em `cfop.js`, agora com fundamento verificável, mas ainda não são linhas de tabela
+que a contabilidade possa aprovar uma a uma. E a validação de referências entre NFs emitidas.

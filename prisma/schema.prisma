@@ -6776,3 +6776,69 @@ model FiscalSincronizacao {
 
   @@index([fonte, iniciadaEm])
 }
+
+/// ─── A BASE JURÍDICA: o texto oficial que sustenta cada recomendação ─────────
+///
+/// ⚠⚠ A REGRA NÃO PODE SER UM COMENTÁRIO MEU. Briefing de auditoria fiscal (22/09/2026): *"a base
+/// de conhecimento fiscal da TORG deverá ser constituída por legislação e documentos oficiais
+/// armazenados em nosso banco interno; não queremos um conjunto de frases escritas por
+/// inteligência artificial sem sustentação jurídica"*. O que o portal afirma aponta para um texto
+/// que ele baixou, conferiu, hasheou e guardou — com data de coleta e versão.
+model FiscalNorma {
+  id      String  @id @default(cuid())
+  chave   String  @unique /// RICMS-SP-art-404-405-406-407-408, RC-5788-2015…
+  tipo    String /// ARTIGO_RICMS | DECISAO_NORMATIVA | RESPOSTA_CONSULTA
+  /// ⚠⚠ O PESO É O QUE IMPEDE UMA RESPOSTA À CONSULTA DE VIRAR LEI: VINCULANTE | INTERPRETATIVO | REFERENCIA.
+  peso    String
+  orgao   String
+  titulo  String
+  norma   String
+  url     String
+  assunto String?
+
+  versoes FiscalNormaVersao[]
+
+  @@index([tipo])
+}
+
+/// ⚠⚠ VERSÃO, NÃO SOBRESCRITA. O briefing proíbe *"sobrescrever silenciosamente documentos já
+/// utilizados para fundamentar regras fiscais"*: o texto de ontem continua existindo, porque é ele
+/// que sustenta o apontamento que saiu ontem.
+model FiscalNormaVersao {
+  id         String      @id @default(cuid())
+  normaId    String
+  norma      FiscalNorma @relation(fields: [normaId], references: [id], onDelete: Cascade)
+  sha256     String
+  bytes      Int
+  coletadoEm DateTime    @default(now())
+  /// O corpo legal já recortado do chrome do site — ver `corpoLegal` em lib/fiscal/texto-legislacao.js.
+  corpo      String
+  /// ⚠ ATIVA | SUPERADA. O índice parcial "uma ativa por norma" mora em scripts/ensure-fiscal-tables.mjs.
+  status     String      @default("ATIVA")
+  /// ⚠⚠ A CONFERÊNCIA ESTRUTURAL FICA GRAVADA: uma página de erro do SharePoint devolve 200 com
+  /// HTML, e sem isso ela entraria no banco como se fosse a lei.
+  conferido  Boolean     @default(false)
+  faltam     Json?
+
+  dispositivos FiscalDispositivo[]
+
+  @@unique([normaId, sha256])
+  @@index([normaId, coletadoEm])
+}
+
+/// ⚠⚠ É O INCISO QUE FUNDAMENTA, NÃO O ARTIGO INTEIRO. A remessa simbólica do cliente é o
+/// **art. 406, II**; citar "art. 406" obrigaria quem confere a ler o artigo todo para achar o
+/// pedaço que sustenta a afirmação — e é aí que a rastreabilidade se perde.
+model FiscalDispositivo {
+  id       String            @id @default(cuid())
+  versaoId String
+  versao   FiscalNormaVersao @relation(fields: [versaoId], references: [id], onDelete: Cascade)
+  rotulo   String /// "Artigo 406, II"
+  artigo   String?
+  tipo     String /// ARTIGO | PARAGRAFO | INCISO
+  texto    String
+  ordem    Int
+
+  @@unique([versaoId, rotulo])
+  @@index([rotulo])
+}

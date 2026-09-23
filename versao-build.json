@@ -1,7 +1,12 @@
 {
-  "build": 3418,
-  "gerado": "2026-09-23T02:53:10.212Z",
+  "build": 3419,
+  "gerado": "2026-09-23T03:08:30.062Z",
   "commits": [
+    {
+      "hash": "7c9724d1a8",
+      "data": "22/09/2026",
+      "titulo": "Revisão: o P1 dos avulsos sai da nossa lista, e \"Codex: aceito sempre\" fica registrado"
+    },
     {
       "hash": "bc78300da3",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e6e684f662",
       "data": "22/09/2026",
       "titulo": "Cotação: converter a unidade em que o fornecedor cotou"
-    },
-    {
-      "hash": "631f70bd36",
-      "data": "22/09/2026",
-      "titulo": "CMR: a sincronização parou de morrer no meio do caminho"
     }
   ]
 }

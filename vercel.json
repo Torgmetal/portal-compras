@@ -132,6 +132,10 @@
     {
       "path": "/api/cron/fiscal-tipi",
       "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/fiscal-legislacao",
+      "schedule": "40 4 * * 1"
     }
   ]
 }

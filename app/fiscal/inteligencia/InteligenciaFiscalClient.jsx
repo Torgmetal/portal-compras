@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle, Upload, ShieldAlert, HelpCircle, Calculator, Ban } from "lucide-react";
 import CampoNcm from "./CampoNcm";
+import CitacaoLegal from "./CitacaoLegal";
 
 // ─── INTELIGÊNCIA FISCAL ─────────────────────────────────────────────────────
 //
@@ -856,7 +857,10 @@ function AbaSimulador() {
                           <p className={`mt-0.5 text-xs ${n.quem === "TORG" ? "text-torg-blue" : "text-amber-700"}`}>
                             {n.quem === "TORG" ? "Emitida pela TORG" : `Emitida por: ${n.quem} — a TORG recebe`}
                           </p>
-                          {n.fundamento && <p className="mt-0.5 text-[11px] text-torg-blue">{n.fundamento}</p>}
+                          {/* ⚠⚠ O FUNDAMENTO É CLICÁVEL E ABRE O TEXTO OFICIAL GUARDADO — com
+                              rótulo, hash e data de coleta. É o que separa "fundamento" de "frase
+                              que eu escrevi". */}
+                          {n.fundamento && <CitacaoLegal fundamento={n.fundamento} cita={n.cita} citaTambem={n.citaTambem} />}
                           {n.obs && <p className="mt-0.5 text-xs text-torg-gray">{n.obs}</p>}
                         </div>
                       </li>

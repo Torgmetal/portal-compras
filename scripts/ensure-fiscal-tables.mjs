@@ -93,8 +93,18 @@ const sql = [
   // Trocar o nome é o que faz o `IF NOT EXISTS` voltar a significar o que ele parece significar.
   //
   // ⚠ O índice antigo, sobre `descricaoCompleta`, ficou órfão: nenhuma consulta o usa e ele só
-  // pesa nas importações. Não é derrubado aqui — DROP em produção é decisão do usuário, e está
-  // registrado em docs/revisao-codex-claude.md.
+  // pesava nas importações. Derrubado com autorização do Matheus (22/09/2026, "pode seguir com
+  // todas"). ⚠⚠ O DROP é CONDICIONADO à definição: se algum dia `FiscalTipiLinha_busca` voltar a
+  // existir sobre a coluna CERTA, este bloco não o remove — derrubar às cegas pelo nome seria o
+  // mesmo erro do `IF NOT EXISTS`, só que na direção oposta.
+  `DO $$
+   BEGIN
+     IF EXISTS (SELECT 1 FROM pg_indexes
+                 WHERE tablename = 'FiscalTipiLinha' AND indexname = 'FiscalTipiLinha_busca'
+                   AND indexdef LIKE '%descricaoCompleta%')
+     THEN EXECUTE 'DROP INDEX "FiscalTipiLinha_busca"';
+     END IF;
+   END $$;`,
   `CREATE INDEX IF NOT EXISTS "FiscalTipiLinha_busca_pt" ON "FiscalTipiLinha" USING GIN (to_tsvector('portuguese', "busca"))`,
   // ⚠⚠ O SEGUNDO ÍNDICE É `simple`, E ELE EXISTE POR CAUSA DO AUTOCOMPLETE. Medido em 22/09/2026:
   // `to_tsquery` NÃO aplica stemming ao termo marcado com `:*` — "metalicas" é indexado como o
@@ -149,6 +159,30 @@ const sql = [
    )`,
   `CREATE INDEX IF NOT EXISTS "FiscalSincronizacao_fonte_iniciadaEm_idx" ON "FiscalSincronizacao"("fonte","iniciadaEm")`,
 
+  // ─── A BASE JURÍDICA ───────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS "FiscalNorma" (
+     "id" TEXT PRIMARY KEY, "chave" TEXT NOT NULL UNIQUE, "tipo" TEXT NOT NULL, "peso" TEXT NOT NULL,
+     "orgao" TEXT NOT NULL, "titulo" TEXT NOT NULL, "norma" TEXT NOT NULL, "url" TEXT NOT NULL, "assunto" TEXT)`,
+  `CREATE INDEX IF NOT EXISTS "FiscalNorma_tipo_idx" ON "FiscalNorma"("tipo")`,
+
+  `CREATE TABLE IF NOT EXISTS "FiscalNormaVersao" (
+     "id" TEXT PRIMARY KEY, "normaId" TEXT NOT NULL, "sha256" TEXT NOT NULL, "bytes" INTEGER NOT NULL,
+     "coletadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "corpo" TEXT NOT NULL,
+     "status" TEXT NOT NULL DEFAULT 'ATIVA', "conferido" BOOLEAN NOT NULL DEFAULT false, "faltam" JSONB)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalNormaVersao_normaId_sha256_key" ON "FiscalNormaVersao"("normaId","sha256")`,
+  `CREATE INDEX IF NOT EXISTS "FiscalNormaVersao_normaId_coletadoEm_idx" ON "FiscalNormaVersao"("normaId","coletadoEm")`,
+  // ⚠⚠ UMA VERSÃO ATIVA POR NORMA, GARANTIDO NO BANCO. Índice PARCIAL — o Prisma não tem sintaxe
+  // para isso no schema, e sem ele duas coletas simultâneas deixariam duas ATIVAS da mesma norma,
+  // com a tela mostrando uma e o motor citando a outra.
+  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalNormaVersao_uma_ativa" ON "FiscalNormaVersao"("normaId") WHERE "status" = 'ATIVA'`,
+
+  `CREATE TABLE IF NOT EXISTS "FiscalDispositivo" (
+     "id" TEXT PRIMARY KEY, "versaoId" TEXT NOT NULL, "rotulo" TEXT NOT NULL, "artigo" TEXT,
+     "tipo" TEXT NOT NULL, "texto" TEXT NOT NULL, "ordem" INTEGER NOT NULL)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalDispositivo_versaoId_rotulo_key" ON "FiscalDispositivo"("versaoId","rotulo")`,
+  // ⚠ O índice por rótulo é o que faz "quem cita o art. 406, II?" ser uma consulta, não uma varredura.
+  `CREATE INDEX IF NOT EXISTS "FiscalDispositivo_rotulo_idx" ON "FiscalDispositivo"("rotulo")`,
+
   // ⚠ As FKs vão DEPOIS das tabelas, e cada uma num bloco próprio: `ADD CONSTRAINT` não tem
   // `IF NOT EXISTS` no Postgres, então a repetição é tratada como sucesso (42710 = já existe).
 ];
@@ -158,6 +192,10 @@ const fks = [
   [`FiscalTipiLinha`, `FiscalTipiLinha_versaoId_fkey`, `FOREIGN KEY ("versaoId") REFERENCES "FiscalTipiVersao"("id") ON DELETE CASCADE`],
   [`FiscalNcmVersao`, `FiscalNcmVersao_arquivoId_fkey`, `FOREIGN KEY ("arquivoId") REFERENCES "FiscalFonteArquivo"("id")`],
   [`FiscalNcmCodigo`, `FiscalNcmCodigo_versaoId_fkey`, `FOREIGN KEY ("versaoId") REFERENCES "FiscalNcmVersao"("id") ON DELETE CASCADE`],
+  [`FiscalNormaVersao`, `FiscalNormaVersao_normaId_fkey`, `FOREIGN KEY ("normaId") REFERENCES "FiscalNorma"("id") ON DELETE CASCADE`],
+  [`FiscalDispositivo`, `FiscalDispositivo_versaoId_fkey`, `FOREIGN KEY ("versaoId") REFERENCES "FiscalNormaVersao"("id") ON DELETE CASCADE`],
+
+
 ];
 
 try {
