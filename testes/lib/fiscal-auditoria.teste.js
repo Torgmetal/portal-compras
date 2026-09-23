@@ -193,3 +193,42 @@ describe("auditar — CST tributado sem alíquota não passa calado", () => {
     expect(r.resumo.diferencaEstimada).toBe(0);
   });
 });
+
+describe("auditar — o caso da NF-e 1000: CST 53 num NCM de alíquota ZERO", () => {
+  // ⚠⚠ NF-e 1000 (TORG → DANPOWER, 22/09/2026), 1 item, NCM 9406.90.20, R$ 480.442,46: a TIPI
+  // lista esse código com alíquota **0%**, e a nota saiu com **CST 53 — saída NÃO TRIBUTADA**.
+  // Em dinheiro não muda nada; na declaração muda tudo. E o motor não via: a verificação principal
+  // exige alíquota > 0, então todo NCM a 0% passava batido com qualquer CST.
+  const zero = tipi(linha("94069020", 0));
+
+  it("o CST 53 sobre alíquota zero vira apontamento", () => {
+    const r = auditar(lerNfe(nfe(item(1, { ncm: "94069020", vProd: 480442.46 }))), zero, {});
+    const a = r.achados.find((x) => x.tipo === "CST_INCOMPATIVEL_COM_A_TIPI");
+    expect(a.titulo).toMatch(/CST 53 .*num NCM que a TIPI tributa a 0%/);
+    expect(a.detalhe).toMatch(/o CST correspondente é o 51/i);
+  });
+
+  // ⚠⚠ ZERO REAIS DE DIFERENÇA — e é exatamente por isso que o achado precisa existir separado:
+  // ele não aparece em nenhuma conta, só na declaração que a fiscalização lê.
+  it("não inventa diferença em dinheiro", () => {
+    const r = auditar(lerNfe(nfe(item(1, { ncm: "94069020", vProd: 480442.46 }))), zero, {});
+    expect(r.resumo.diferencaEstimada).toBe(0);
+    expect(r.achados.find((x) => x.tipo === "CST_INCOMPATIVEL_COM_A_TIPI").estimativa).toBeUndefined();
+  });
+
+  it("o CST 51 sobre alíquota zero é o correto e não alarma", () => {
+    const r = auditar(lerNfe(nfe(item(1, { ncm: "94069020", cst: "51" }))), zero, {});
+    expect(r.achados.filter((x) => x.tipo === "CST_INCOMPATIVEL_COM_A_TIPI")).toEqual([]);
+  });
+
+  // ⚠ NT é outra coisa: o NCM NEM CONSTA como tributado, e aí o CST 53 é coerente.
+  it("NT na TIPI não cai nesta verificação", () => {
+    const r = auditar(lerNfe(nfe(item(1, { ncm: "94069020" }))), tipi(linha("94069020", null)), {});
+    expect(r.achados.filter((x) => x.tipo === "CST_INCOMPATIVEL_COM_A_TIPI")).toEqual([]);
+  });
+
+  it("o CST 50 com alíquota declarada zero também é apontado", () => {
+    const r = auditar(lerNfe(nfe(item(1, { ncm: "94069020", cst: "52" }))), zero, {});
+    expect(r.achados.some((x) => x.tipo === "CST_INCOMPATIVEL_COM_A_TIPI")).toBe(true);
+  });
+});

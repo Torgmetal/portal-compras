@@ -305,7 +305,7 @@ describe("as notas que a operação exige — a pergunta que vem antes do CST", 
   it("a nota que o cliente emite vem marcada como dele", () => {
     const r = simular({ ncm: "84379000", cfop: "5124", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
     const seq = r.cfop.sequencias.find((s) => s.operacaoId === "indust-insumo-direto");
-    expect(seq.notas[0]).toMatchObject({ quem: "Cliente", cfop: null });
+    expect(seq.notas[0]).toMatchObject({ quem: "Cliente", cfop: "5901/6901", natureza: "física" });
     expect(seq.notas.filter((n) => n.quem === "TORG").map((n) => n.cfop)).toEqual(["5902/6902", "5124/6124"]);
   });
 
@@ -538,5 +538,63 @@ describe("os pares que faltavam funcionam de ponta a ponta", () => {
   it("escolhendo o 5.125 para o RS, o equivalente sugerido é o 6.125", () => {
     const r = simular({ ncm: "84379000", cfop: "5125", ufOrigem: "SP", ufDestino: "RS" }, tipi(linha(3.25)));
     expect(r.alertas.find((a) => a.nivel === "alto").texto).toMatch(/O código equivalente é o 6\.125/);
+  });
+});
+
+// ─── A CADEIA DO ART. 406 (briefing de 22/09/2026, PARTE 3) ─────────────────
+
+describe("industrialização com matéria-prima do cliente — a cadeia do art. 406", () => {
+  const cadeia = () => simular({ ncm: "84379000", cfop: "5125", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)))
+    .cfop.sequencias.find((s) => s.operacaoId === "indust-mp-cliente").notas;
+
+  // ⚠⚠ O ERRO QUE O MATHEUS IDENTIFICOU: o portal mostrava fornecedor → TORG, depois 5.925 e
+  // 5.125, e PULAVA a remessa simbólica que o autor da encomenda emite. Sem ela a cadeia não
+  // fecha — é ela que documenta que o encomendante entregou à TORG insumos que são dele.
+  it("a remessa SIMBÓLICA do cliente existe, com o inciso", () => {
+    const simbolica = cadeia().find((n) => n.natureza === "simbólica");
+    expect(simbolica).toMatchObject({ quem: "Cliente", cfop: "5949/6949", de: "Cliente", para: "TORG" });
+    expect(simbolica.fundamento).toMatch(/art\. 406, II/);
+  });
+
+  it("a cadeia tem os seis documentos, na ordem, com três emitentes", () => {
+    expect(cadeia().map((n) => `${n.quem}:${n.cfop}`)).toEqual([
+      "Fornecedor:5122/5123", "Fornecedor:5924/6924", "Cliente:5949/6949", "TORG:5925/6925", "TORG:5125/6125",
+    ]);
+    expect(new Set(cadeia().map((n) => n.quem)).size).toBe(3);
+  });
+
+  // ⚠⚠ O PORTAL NÃO PODE AFIRMAR QUE A NF DO FORNECEDOR É OBRIGATÓRIA SEM EXCEÇÃO: o parágrafo
+  // único do art. 406 prevê hipótese de dispensa. Ordinário ≠ único caminho possível.
+  it("a remessa física do fornecedor diz que há hipótese de dispensa", () => {
+    const fisica = cadeia().find((n) => n.cfop === "5924/6924");
+    expect(fisica.fundamento).toMatch(/art\. 406, I — procedimento ordinário/);
+    expect(fisica.obs).toMatch(/DISPENSA/);
+  });
+
+  // ⚠ O CFOP do fornecedor depende da natureza da operação DELE — a TORG não escolhe por ele.
+  it("o CFOP do fornecedor não é escolhido pela TORG", () => {
+    const venda = cadeia()[0];
+    expect(venda.cfop).toBe("5122/5123");
+    expect(venda.obs).toMatch(/a TORG não tem como escolher por ele/i);
+  });
+
+  // ⚠⚠ E O 5.924 SAIU DO SELETOR DO SIMULADOR, porque quem o emite é o fornecedor: para a TORG
+  // ele é documento de ENTRADA. Listá-lo em "o que eu vou emitir" mandava o operador emitir a
+  // nota de outra empresa.
+  it("o 5.924 está marcado como do fornecedor e fora do seletor", () => {
+    expect(CFOPS.find((c) => c.codigo === "5924").emitente).toBe("Fornecedor");
+    expect(paresDeCfop().filter((p) => p.emitente === "TORG").some((p) => p.chave === "5924/6924")).toBe(false);
+  });
+
+  it("todo CFOP que a TORG emite continua no seletor", () => {
+    expect(paresDeCfop().filter((p) => p.emitente === "TORG")).toHaveLength(12);
+  });
+
+  // ⚠ 5.124 × 5.125 é o TRÂNSITO dos insumos, e as duas cadeias são distintas do começo ao fim.
+  it("a cadeia do art. 402 (material sai do cliente) é outra, e termina no 5.124", () => {
+    const outra = simular({ ncm: "84379000", cfop: "5124", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)))
+      .cfop.sequencias.find((s) => s.operacaoId === "indust-insumo-direto").notas;
+    expect(outra.map((n) => n.cfop)).toEqual(["5901/6901", "5902/6902", "5124/6124"]);
+    expect(outra[0].obs).toMatch(/SAI FISICAMENTE do estabelecimento dele/);
   });
 });

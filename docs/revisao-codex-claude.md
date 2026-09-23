@@ -920,3 +920,51 @@ novo, não conserto, e não entra sem o Matheus decidir.
   ⚠ **A função de pares continua tratando código sem irmão** — um código novo entra sozinho até
   alguém acrescentar o par, e aparecer sozinho é melhor do que sumir.
   **3.326 passando**, tela validada logada (5.125/6.125 → OP 122/MG resolve para 6.125).
+- **(22/09, 23h15) Autocomplete de NCM, a cadeia do art. 406 e DOIS defeitos de banco.** Matheus
+  pediu o autocomplete (*"conforme vou digitando o NCM vai mostrando os resultados próximos"*) e,
+  no briefing de auditoria fiscal, apontou o erro da cadeia (*"faltou a remessa simbólica que deve
+  ser emitida pelo autor da encomenda"*). Ele estava certo nos dois.
+
+  **A CADEIA DO ART. 406 ESTAVA INCOMPLETA** — o portal mostrava fornecedor → TORG, 5.925 e 5.125,
+  e pulava a **remessa simbólica do cliente (5.949, art. 406, II)**, que é o documento que prova
+  que o encomendante entregou à TORG insumos que são dele. Agora são 5 documentos e 3 emitentes,
+  cada linha com natureza (física / simbólica / faturamento) e o inciso.
+  ⚠⚠ **E O 5.924 NÃO É DA TORG.** Ele é emitido pelo **FORNECEDOR**, que despacha direto ao
+  industrializador; para a TORG é documento de ENTRADA. Estava no seletor de "o que eu vou emitir",
+  mandando o operador emitir a nota de outra empresa. Saiu do seletor, ficou na Consulta CFOP com a
+  marca `emitida por: Fornecedor`.
+  ⚠ O CFOP do fornecedor (5.122 × 5.123) depende da natureza da operação DELE — a tela diz isso em
+  vez de escolher. E o parágrafo único do art. 406 prevê **dispensa** da NF do fornecedor: o portal
+  não afirma obrigatoriedade sem exceção.
+
+  **NF-e 1000 (TORG → DANPOWER, R$ 480.442,46) revelou um buraco no motor.** NCM 9406.90.20, que a
+  TIPI lista a **0%**, saiu com **CST 53 — saída NÃO tributada**. Em dinheiro não muda nada; na
+  declaração muda tudo: "alíquota zero" é estar DENTRO do campo e pagar zero (CST 51); "não
+  tributada" é estar FORA, e exige fundamento. ⚠⚠ O motor não via: a verificação principal exige
+  `aliquotaValor > 0`, então **todo NCM a 0% passava batido com qualquer CST**. Novo achado
+  `CST_INCOMPATIVEL_COM_A_TIPI`, gravidade MEDIA, sem estimativa em dinheiro.
+
+  **DOIS DEFEITOS DE BANCO, os dois silenciosos:**
+  - ⚠⚠⚠ **`FiscalTipiLinha_busca` estava na COLUNA ERRADA** (`descricaoCompleta`, não `busca`).
+    `CREATE INDEX IF NOT EXISTS` casa pelo **NOME**, não pela definição: quando a linha do script
+    mudou de coluna, o Postgres viu o nome, disse "já existe" e manteve o índice velho. Resultado
+    medido: **toda busca textual de NCM varria as 11.103 linhas — 326 ms onde o índice entrega
+    0,7 ms**. Nada quebrou, nada avisou. Corrigido com um nome novo (`_busca_pt`).
+    ⚠ O índice antigo ficou **órfão** e só pesa nas importações — **DROP é decisão do usuário**,
+    não foi executado.
+  - ⚠⚠ **`to_tsquery` NÃO aplica stemming ao termo com `:*`.** "metalicas" é indexado como o
+    radical `metal`; `metalic:*` procura lexema começando em "metalic" e **nunca casa** — passar do
+    limite do radical, digitando, ZERAVA a lista. Daí o segundo índice, `simple` (sem radical), com
+    prefixo em todos os termos. Os dois convivem: `portuguese` resolve singular/plural de palavra
+    inteira, `simple` resolve a palavra pela metade.
+  - ⚠⚠ **`OR` entre os dois `@@` derrubava os dois GIN** (548 ms, varredura). Em **UNION** cada
+    ramo é indexável: **0,4 ms**. E a ordenação passou a ser por `ts_rank` — ordenada por posição na
+    TIPI, "constru" devolvia *mármores* antes de *construções*, porque o 25 vem antes do 94.
+
+  **3.364 passando**, tela validada logada: autocomplete por teclado (↓ Enter → 9406.20.00) e a
+  cadeia do art. 406 com os 5 documentos e 3 emitentes.
+
+  **PENDENTE do briefing de auditoria fiscal** (PARTES 10 a 15): base documental jurídica
+  (RICMS/SP, DN CAT 03/2016, RCs 33732/2026, 33438/2026, 5788/2015), motor de regras com condições
+  e fundamento por regra, e validação de referências entre NFs. É trabalho de outra ordem de
+  grandeza — não foi iniciado.

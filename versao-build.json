@@ -1,7 +1,12 @@
 {
-  "build": 3414,
-  "gerado": "2026-09-23T01:35:48.496Z",
+  "build": 3415,
+  "gerado": "2026-09-23T02:38:15.792Z",
   "commits": [
+    {
+      "hash": "025eaff02f",
+      "data": "22/09/2026",
+      "titulo": "Fiscal: oito CFOPs estavam sem o par de fora do estado"
+    },
     {
       "hash": "2593f1bb25",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "476994019c",
       "data": "22/09/2026",
       "titulo": "Compras: a conversão de unidade da cotação — a regra e as colunas (nada aplicado ainda)"
-    },
-    {
-      "hash": "f1533a4328",
-      "data": "22/09/2026",
-      "titulo": "MES: o cadastro passa a ser em maiúscula, como Matheus padronizou"
     }
   ]
 }

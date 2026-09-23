@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle, Upload, ShieldAlert, HelpCircle, Calculator, Ban } from "lucide-react";
+import CampoNcm from "./CampoNcm";
 
 // ─── INTELIGÊNCIA FISCAL ─────────────────────────────────────────────────────
 //
@@ -279,6 +280,11 @@ function AbaCfop({ cfops, operacoes, cstIpi, familias }) {
               <span className="font-mono text-lg font-bold text-torg-dark">{c.codigoFormatado}</span>
               <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase text-torg-gray">{c.familia}</span>
               <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase text-torg-gray">{c.ambito === "INTERNA" ? "SP" : "Fora de SP"}</span>
+              {/* ⚠⚠ NEM TODO CFOP DA CADEIA É DA TORG. O 5.924 é do FORNECEDOR, e para a TORG é
+                  documento de ENTRADA — por isso ele não aparece no seletor do simulador. */}
+              {c.emitente && c.emitente !== "TORG" && (
+                <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase text-amber-700">emitida por: {c.emitente}</span>
+              )}
             </div>
             <p className="mt-1.5 text-sm text-torg-dark">{c.resumo}</p>
             {/* ⚠ O exemplo vem DEPOIS da descrição e com outro peso: ele ajuda a reconhecer o caso,
@@ -644,9 +650,11 @@ function AbaSimulador() {
       <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <div className="grid gap-3 md:grid-cols-3">
           <div className="md:col-span-1">
-            <label className={rotulo}>NCM</label>
-            <input className={`${campo} font-mono`} placeholder="8437.90.00" value={f.ncm}
-              onChange={(e) => setF({ ...f, ncm: e.target.value })} />
+            <label className={rotulo} htmlFor="sim-ncm">NCM</label>
+            {/* ⚠⚠ O NCM É O QUE O OPERADOR MENOS SABE DE CABEÇA — e o módulo inteiro nasceu de uma
+                nota em que ele não sabia que o 8437.90.00 exigia destaque de IPI. Pedir o código de
+                memória mantinha de pé justamente a etapa que causou o erro. */}
+            <CampoNcm id="sim-ncm" classe={campo} valor={f.ncm} onChange={(v) => setF({ ...f, ncm: v })} />
           </div>
           {/* ⚠⚠ O SELETOR É DE CFOP, NÃO DE "NOME DE OPERAÇÃO". Matheus (22/09/2026): *"tire os nomes,
               deixe os CFOPs e a descrição do CFOP"*. Quem emite pensa no código que vai na nota — e
@@ -661,7 +669,10 @@ function AbaSimulador() {
               <option value="">— escolha —</option>
               {opcoes.familias.map((fam) => (
                 <optgroup key={fam} label={fam}>
-                  {opcoes.pares.filter((c) => c.familia === fam).map((c) => (
+                  {/* ⚠⚠ O SELETOR É "O QUE EU VOU EMITIR", e o 5.924 é do FORNECEDOR. Listá-lo
+                      aqui mandava o operador emitir a nota de outra empresa. Ele continua na aba
+                      Consulta CFOP, com a marca de quem emite. */}
+                  {opcoes.pares.filter((c) => c.familia === fam && c.emitente === "TORG").map((c) => (
                     <option key={c.chave} value={c.chave}>{c.rotulo} — {c.resumo}</option>
                   ))}
                 </optgroup>
@@ -832,13 +843,20 @@ function AbaSimulador() {
                             {n.cfop && <span className="mr-1.5 font-mono font-semibold">{n.cfop.split("/").map((c) => `${c[0]}.${c.slice(1)}`).join(" / ")}</span>}
                             {n.papel}
                           </p>
-                          <p className="text-xs text-torg-gray">{n.de} → {n.para}</p>
+                          <p className="text-xs text-torg-gray">
+                            {n.de} → {n.para}
+                            {/* ⚠⚠ FÍSICA × SIMBÓLICA É A DISTINÇÃO QUE FAZ A CADEIA FECHAR: a
+                                remessa simbólica do art. 406, II não move mercadoria nenhuma, e foi
+                                exatamente a etapa que faltava no portal. */}
+                            {n.natureza && <span className="ml-1.5 rounded bg-white px-1.5 py-0.5 text-[10px] font-medium uppercase text-torg-gray">{n.natureza}</span>}
+                          </p>
                           {/* ⚠⚠ NEM TODA NOTA DO FLUXO É DA TORG: a remessa de entrada da
                               industrialização é do cliente ou do fornecedor dele. Sem dizer isso, o
                               operador procura no Omie uma nota que não é dele para emitir. */}
                           <p className={`mt-0.5 text-xs ${n.quem === "TORG" ? "text-torg-blue" : "text-amber-700"}`}>
                             {n.quem === "TORG" ? "Emitida pela TORG" : `Emitida por: ${n.quem} — a TORG recebe`}
                           </p>
+                          {n.fundamento && <p className="mt-0.5 text-[11px] text-torg-blue">{n.fundamento}</p>}
                           {n.obs && <p className="mt-0.5 text-xs text-torg-gray">{n.obs}</p>}
                         </div>
                       </li>

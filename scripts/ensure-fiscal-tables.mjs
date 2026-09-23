@@ -82,7 +82,28 @@ const sql = [
   // ⚠⚠ O ÍNDICE VAI NA COLUNA SEM ACENTO. `to_tsvector` não remove acento: indexando o texto com
   // acento, "construcoes pre-fabricadas" devolvia ZERO, e `plainto_tsquery` junta os termos com E —
   // um acento faltando derruba a consulta inteira.
-  `CREATE INDEX IF NOT EXISTS "FiscalTipiLinha_busca" ON "FiscalTipiLinha" USING GIN (to_tsvector('portuguese', "busca"))`,
+  // ⚠⚠⚠ O NOME É `_busca_pt` E NÃO `_busca` POR CAUSA DE UM DEFEITO QUE CUSTOU 326 ms POR BUSCA.
+  // Medido em 22/09/2026 contra a produção: `FiscalTipiLinha_busca` existia — mas sobre
+  // `descricaoCompleta`, a definição ANTERIOR à criação da coluna `busca`. E `CREATE INDEX IF NOT
+  // EXISTS` casa pelo NOME, não pela definição: quando a linha aqui mudou de coluna, o Postgres
+  // viu o nome, disse "já existe" e MANTEVE o índice velho, em silêncio.
+  //
+  // ⚠⚠ RESULTADO: toda busca textual de NCM varria as 11.103 linhas calculando `to_tsvector` em
+  // cada uma — 326 ms onde o índice entrega 0,7 ms. Nada quebrou, nada avisou; só ficou lento.
+  // Trocar o nome é o que faz o `IF NOT EXISTS` voltar a significar o que ele parece significar.
+  //
+  // ⚠ O índice antigo, sobre `descricaoCompleta`, ficou órfão: nenhuma consulta o usa e ele só
+  // pesa nas importações. Não é derrubado aqui — DROP em produção é decisão do usuário, e está
+  // registrado em docs/revisao-codex-claude.md.
+  `CREATE INDEX IF NOT EXISTS "FiscalTipiLinha_busca_pt" ON "FiscalTipiLinha" USING GIN (to_tsvector('portuguese', "busca"))`,
+  // ⚠⚠ O SEGUNDO ÍNDICE É `simple`, E ELE EXISTE POR CAUSA DO AUTOCOMPLETE. Medido em 22/09/2026:
+  // `to_tsquery` NÃO aplica stemming ao termo marcado com `:*` — "metalicas" é indexado como o
+  // radical `metal`, então `metalic:*` procura lexema começando em "metalic" e NUNCA casa. Passar
+  // do limite do radical, digitando, ZERAVA a lista. Com `simple` não há radical: o prefixo casa
+  // letra a letra, que é o que um autocomplete precisa.
+  // ⚠ Os dois convivem de propósito: `portuguese` resolve singular/plural de palavra inteira
+  // ("construção" acha "construções"); `simple` resolve a palavra pela metade. A consulta usa OR.
+  `CREATE INDEX IF NOT EXISTS "FiscalTipiLinha_busca_simple" ON "FiscalTipiLinha" USING GIN (to_tsvector('simple', "busca"))`,
 
   `CREATE TABLE IF NOT EXISTS "FiscalNcmVersao" (
      "id" TEXT PRIMARY KEY,
