@@ -69,9 +69,7 @@ function Procedencia({ referencia }) {
           <Info size={13} className="mt-0.5 shrink-0" />
           <span>
             A tabela se identifica como <strong className="text-torg-dark">{t.atualizacao.norma}</strong>,
-            atualizada até o <strong className="text-torg-dark">{t.atualizacao.atualizadaAte}</strong>
-            {" "}({t.atualizacao.atos.length} atos). Declarado por {t.atualizacao.declaradoPor} em{" "}
-            {t.atualizacao.declaradoEm.split("-").reverse().join("/")}; conferido contra o {t.atualizacao.conferidoContra}
+            atualizada até o <strong className="text-torg-dark">{t.atualizacao.atualizadaAte}</strong> ({t.atualizacao.atos.length} atos).
             <span className="mt-0.5 block text-amber-700">⚠ {t.atualizacao.naoProva}</span>
           </span>
         </p>
@@ -521,13 +519,36 @@ function AbaAuditoria() {
   const [carregando, setCarregando] = useState(false);
   const [medicoes, setMedicoes] = useState([]);
   const [medicaoId, setMedicaoId] = useState("");
+  const [erroLista, setErroLista] = useState(null);
+  const [carregandoLista, setCarregandoLista] = useState(true);
+  const [tentativa, setTentativa] = useState(0);
+  // ⚠⚠ UMA VEZ SÓ PARA AS DUAS ENTRADAS (achado do Codex, 23/09/2026). O seletor ficava desativado
+  // durante a auditoria, mas o upload de XML NÃO — e as duas atualizavam `resultado` sem se
+  // conhecer: subir um XML no meio de uma medição lenta deixava a resposta ANTIGA sobrescrever a
+  // recente. É o mesmo defeito de resposta fora de ordem que já apareceu no autocomplete.
+  const vez = useRef(0);
 
+  // ⚠⚠ ERRO NÃO É "NÃO HÁ MEDIÇÃO" — outra repetição do que o Codex já apontou no autocomplete.
+  // Um 500 ou uma queda de rede deixavam o seletor só com "— escolha a medição —", indistinguível
+  // de uma base vazia, e sem nada para clicar.
   useEffect(() => {
-    fetch("/api/fiscal/inteligencia/medicoes")
-      .then((r) => r.json())
-      .then((d) => setMedicoes(d.medicoes ?? []))
-      .catch(() => setMedicoes([]));
-  }, []);
+    let vivo = true;
+    setCarregandoLista(true); setErroLista(null);
+    (async () => {
+      try {
+        const r = await fetch("/api/fiscal/inteligencia/medicoes");
+        const d = await r.json().catch(() => null);
+        if (!vivo) return;
+        if (!r.ok || !d?.success) { setErroLista(d?.error || `Falha ao carregar (HTTP ${r.status}).`); setMedicoes([]); }
+        else { setMedicoes(d.medicoes ?? []); setErroLista(null); }
+      } catch (e) {
+        if (vivo) { setErroLista(`Não foi possível carregar as medições: ${e.message}`); setMedicoes([]); }
+      } finally {
+        if (vivo) setCarregandoLista(false);
+      }
+    })();
+    return () => { vivo = false; };
+  }, [tentativa]);
 
   // ⚠⚠ VALIDAR ANTES DE EMITIR É O PONTO INTEIRO. A auditoria de XML acha o erro DEPOIS — a
   // NF-e 973 custou R$ 7.026,56 e só apareceu quando alguém foi procurar. A medição é o mesmo
@@ -536,31 +557,35 @@ function AbaAuditoria() {
     setMedicaoId(id);
     if (!id) return;
     setCarregando(true); setErro(null); setResultado(null); setArquivo(null);
+    const minha = ++vez.current;
     try {
       const r = await fetch("/api/fiscal/inteligencia/auditoria", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ medicaoId: id }),
       });
-      const d = await r.json();
-      if (!d.success) setErro(d.error || "Não foi possível auditar a medição.");
+      const d = await r.json().catch(() => null);
+      if (minha !== vez.current) return;
+      if (!r.ok || !d?.success) setErro(d?.error || `Não foi possível auditar a medição (HTTP ${r.status}).`);
       else setResultado(d);
     } catch {
-      setErro("Falha de rede ao auditar a medição.");
-    } finally { setCarregando(false); }
+      if (minha === vez.current) setErro("Falha de rede ao auditar a medição.");
+    } finally { if (minha === vez.current) setCarregando(false); }
   };
 
   const enviar = async (f) => {
     if (!f) return;
     setCarregando(true); setErro(null); setResultado(null); setArquivo(f.name); setMedicaoId("");
+    const minha = ++vez.current;
     try {
       const fd = new FormData(); fd.append("xml", f);
       const r = await fetch("/api/fiscal/inteligencia/auditoria", { method: "POST", body: fd });
-      const d = await r.json();
-      if (!d.success) setErro(d.error || "Não foi possível auditar o arquivo.");
+      const d = await r.json().catch(() => null);
+      if (minha !== vez.current) return;
+      if (!r.ok || !d?.success) setErro(d?.error || `Não foi possível auditar o arquivo (HTTP ${r.status}).`);
       else setResultado(d);
     } catch {
-      setErro("Falha de rede ao enviar o arquivo.");
-    } finally { setCarregando(false); }
+      if (minha === vez.current) setErro("Falha de rede ao enviar o arquivo.");
+    } finally { if (minha === vez.current) setCarregando(false); }
   };
 
   const naoFaturadas = medicoes.filter((m) => m.aindaNaoFaturada);
@@ -573,8 +598,8 @@ function AbaAuditoria() {
           EVITA o erro; no XML ele só documenta um que já saiu. */}
       <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">Validar uma medição do Omie — antes de emitir</p>
-        <select className={`${campo} mt-2`} value={medicaoId} onChange={(e) => auditarMedicao(e.target.value)} disabled={carregando}>
-          <option value="">— escolha a medição —</option>
+        <select className={`${campo} mt-2`} value={medicaoId} onChange={(e) => auditarMedicao(e.target.value)} disabled={carregando || carregandoLista || Boolean(erroLista)}>
+          <option value="">{carregandoLista ? "carregando as medições…" : erroLista ? "—" : medicoes.length ? "— escolha a medição —" : "nenhuma medição sincronizada do Omie"}</option>
           {/* ⚠ "Não faturado" vem primeiro e separado: é a janela em que o achado ainda muda o
               que vai ser emitido. As já faturadas continuam auditáveis — só muda o que dá para
               fazer com o resultado. */}
@@ -589,14 +614,23 @@ function AbaAuditoria() {
             </optgroup>
           )}
         </select>
-        <p className="mt-1.5 text-xs text-torg-gray">
-          O pedido de venda do Omie já traz <strong>CST</strong>, <strong>enquadramento</strong> e a <strong>descrição real do item</strong> —
-          os três campos que obrigam a auditoria a pedir o XML depois que a nota saiu.
-        </p>
+        {erroLista ? (
+          <p className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-700">
+            <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+            <span>
+              {erroLista}
+              <button type="button" onClick={() => setTentativa((n) => n + 1)} className="ml-1 font-medium text-torg-blue underline">Tentar de novo</button>
+            </span>
+          </p>
+        ) : (
+          <p className="mt-1.5 text-xs text-torg-gray">
+            O pedido do Omie já traz <strong>CST</strong>, <strong>enquadramento</strong> e a <strong>descrição real do item</strong>.
+          </p>
+        )}
       </div>
 
       <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white py-10 transition hover:border-torg-blue/40 hover:bg-gray-50/60">
-        <input type="file" accept=".xml,text/xml,application/xml" className="hidden"
+        <input type="file" accept=".xml,text/xml,application/xml" className="hidden" disabled={carregando}
           onChange={(e) => enviar(e.target.files?.[0])} />
         {carregando ? <Loader2 size={26} className="animate-spin text-torg-blue" /> : <Upload size={26} className="text-gray-300" />}
         <span className="mt-2 text-sm font-medium text-torg-dark">{carregando ? "Auditando…" : "Enviar o XML da NF-e"}</span>
@@ -712,6 +746,14 @@ function AbaAuditoria() {
 
 
 const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
+/** ⚠ O texto copiado é o mesmo da tela, na mesma ordem — inclusive os "a definir", que são o que
+ *  a pessoa precisa levar para a contabilidade. */
+function copiarFicha(ficha) {
+  const linhas = ficha.linhas.map((l) => `${l.campo}: ${l.valor ? `${l.valor}${l.descricao ? ` - ${l.descricao}` : ""}` : `a definir (${l.motivo})`}`);
+  if (ficha.informacoesAdicionais.length) linhas.push("", `Informações adicionais: ${ficha.informacoesAdicionais.join(" · ")}`);
+  navigator.clipboard?.writeText(linhas.join("\n")).catch(() => {});
+}
+
 const campo = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-torg-dark outline-none transition focus:border-torg-blue focus:ring-2 focus:ring-torg-blue/20";
 const rotulo = "text-xs font-medium text-torg-gray";
 
@@ -786,7 +828,6 @@ function AbaSimulador() {
             {parEscolhido?.quando && (
               <p className="mt-1.5 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-torg-gray">
                 <strong className="text-torg-dark">Quando usar:</strong> {parEscolhido.quando}
-                <span className="mt-1 block text-[11px] text-amber-700">⚠ Exemplo da operação da TORG — não substitui a descrição oficial do CONFAZ.</span>
               </p>
             )}
           </div>
@@ -918,7 +959,10 @@ function AbaSimulador() {
                   <span className="font-mono">{r.cfop.parPendente}</span> — informe a UF de destino para o portal saber qual dos dois vale.
                 </p>
               ) : <p className="mt-2 text-sm text-torg-gray">Escolha o CFOP da operação.</p>}
-              <p className="mt-2 border-t border-gray-100 pt-2 text-xs text-amber-700">⚠ {r.cfop.ressalva}</p>
+              {/* ⚠ Uma ressalva só, curta: a longa repetia em todo cartão e virava paisagem. */}
+              <p className="mt-2 border-t border-gray-100 pt-2 text-xs text-amber-700">
+                ⚠ Descrição é o resumo operacional da TORG, pendente de conferência contra o CONFAZ.
+              </p>
             </div>
           </div>
 
@@ -1004,6 +1048,97 @@ function AbaSimulador() {
             </div>
           )}
 
+          {/* ⚠⚠ A FICHA É O QUE O OPERADOR VAI DIGITAR NO OMIE, e por isso vem antes de tudo.
+              Matheus (23/09/2026) mandou o formato que a contabilidade usa; a simulação inteira
+              existe para preencher esses campos. */}
+          {r.ficha && (
+            <div className="rounded-xl border border-torg-blue/20 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">Ficha de emissão</p>
+                <button type="button" onClick={() => copiarFicha(r.ficha)}
+                  className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-torg-blue transition hover:bg-gray-50">
+                  Copiar
+                </button>
+              </div>
+              <dl className="mt-2 space-y-1">
+                {r.ficha.linhas.map((l) => (
+                  <div key={l.campo} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                    <dt className="w-28 shrink-0 text-torg-gray">{l.campo}:</dt>
+                    {l.valor ? (
+                      <dd className="text-torg-dark">
+                        <span className="font-mono font-semibold">{l.valor}</span>
+                        {l.descricao && <span className="text-torg-gray"> — {l.descricao}</span>}
+                      </dd>
+                    ) : (
+                      // ⚠⚠ CAMPO SEM FUNDAMENTO SAI VAZIO, COM O MOTIVO — nunca preenchido "por
+                      // padrão". Vazio manda perguntar; preenchido vai para a nota.
+                      <dd className="flex-1 text-xs text-amber-700">a definir — {l.motivo}</dd>
+                    )}
+                  </div>
+                ))}
+              </dl>
+              {r.ficha.informacoesAdicionais.length > 0 && (
+                <div className="mt-2 border-t border-gray-100 pt-2 text-sm">
+                  <span className="text-torg-gray">Informações adicionais: </span>
+                  <span className="text-torg-dark">{r.ficha.informacoesAdicionais.join(" · ")}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ⚠⚠ A PRÉVIA VEM DEPOIS DA FICHA. Matheus (23/09/2026): *"quando clicar em simular ele me dê
+              uma prévia dos valores de cada imposto"*. É o que se confere de relance antes de
+              emitir; o detalhe de cada um continua nos cartões abaixo. */}
+          {r.resumoTributos && (
+            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">Prévia dos impostos</p>
+                <p className="text-xs text-torg-gray">
+                  sobre {r.resumoTributos.base.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                </p>
+              </div>
+              <table className="mt-2 w-full text-sm">
+                <tbody className="divide-y divide-gray-50">
+                  {r.resumoTributos.linhas.map((l) => (
+                    <tr key={l.tributo}>
+                      <td className="py-1.5 pr-2 font-medium text-torg-dark">
+                        {l.tributo}
+                        {l.cst && <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-torg-gray">CST {l.cst}</span>}
+                      </td>
+                      <td className="py-1.5 pr-2 text-right font-mono text-xs text-torg-gray">
+                        {l.aliquota != null ? `${String(l.aliquota).replace(".", ",")}%` : ""}
+                      </td>
+                      <td className="w-1/2 py-1.5 text-right">
+                        {l.valor != null ? (
+                          <span className="font-mono font-semibold text-torg-dark">
+                            {l.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                          </span>
+                        ) : (
+                          // ⚠⚠ LINHA SEM NÚMERO FICA NA TABELA, COM O MOTIVO CURTO: sumir com ela
+                          // faria o total parecer o imposto inteiro da operação.
+                          <span className="text-xs text-amber-700">{l.motivo}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-gray-200">
+                    <td className="pt-2 font-semibold text-torg-dark">Total estimado</td>
+                    <td />
+                    <td className="pt-2 text-right font-mono text-lg font-bold text-torg-dark">
+                      {r.resumoTributos.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+              <p className="mt-2 border-t border-gray-100 pt-2 text-xs text-amber-700">
+                ⚠ Estimativa sobre o valor digitado, não apuração.
+                {r.resumoTributos.semNumero > 0 && ` ${r.resumoTributos.semNumero} tributo(s) sem número — o total não é o imposto da operação.`}
+              </p>
+            </div>
+          )}
+
           {/* ⚠⚠ PIS/COFINS SAI COM NÚMERO PORQUE O REGIME FOI DECLARADO, e a tela mostra POR QUEM e
               CONFERIDO CONTRA O QUÊ. Sem a procedência, o número seria indistinguível do chute que
               o escopo do módulo proíbe — e é justamente a procedência que diz quando questionar. */}
@@ -1034,9 +1169,11 @@ function AbaSimulador() {
                   </div>
                 ))}
               </div>
+              {/* ⚠ A PROCEDÊNCIA FICA, O NOME SAI. Matheus (23/09/2026): *"sem as anotações falando
+                  do meu nome"*. Quem declarou continua registrado em lib/fiscal/regime.js e nos
+                  commits — a tela precisa do REGIME e da conferência, não da autoria. */}
               <p className="mt-2 text-xs text-torg-gray">
-                Regime <strong className="text-torg-dark">{r.regime.nome}</strong> (CRT {r.regime.crt}), declarado por {r.regime.declaradoPor} em {r.regime.declaradoEm.split("-").reverse().join("/")} e
-                conferido contra as NF-e {r.regime.conferidoEm.join(", ")} emitidas pelo Omie. {r.pisCofins.baseNota}
+                Regime <strong className="text-torg-dark">{r.regime.nome}</strong> (CRT {r.regime.crt}), conferido contra as NF-e {r.regime.conferidoEm.join(", ")}.
               </p>
               {/* ⚠⚠ UM NÚMERO SEM AS EXCEÇÕES VIRA CARIMBO. Dizer o que o portal NÃO detecta é o
                   que mantém o número utilizável por quem sabe reconhecer o próprio caso. */}
@@ -1081,9 +1218,8 @@ function AbaSimulador() {
                 </ul>
               </div>
               <p className="mt-2 border-t border-gray-100 pt-2 text-xs text-torg-gray">
-                Origem da mercadoria: <strong className="text-torg-dark">{r.icms.origem.codigo} — {r.icms.origem.rotulo}</strong>,
-                declarada por {r.icms.origem.declaradoPor} em {r.icms.origem.declaradoEm.split("-").reverse().join("/")}. {r.icms.origem.base}
-                <span className="mt-0.5 block text-amber-700">⚠⚠ {r.icms.origem.ressalva}</span>
+                Origem da mercadoria: <strong className="text-torg-dark">{r.icms.origem.codigo} — {r.icms.origem.rotulo}</strong>.
+                <span className="mt-0.5 block text-amber-700">⚠ {r.icms.origem.ressalva}</span>
               </p>
             </div>
           )}

@@ -598,3 +598,126 @@ describe("industrialização com matéria-prima do cliente — a cadeia do art. 
     expect(outra[0].obs).toMatch(/SAI FISICAMENTE do estabelecimento dele/);
   });
 });
+
+describe("a prévia dos impostos — uma linha por tributo", () => {
+  // ⚠⚠ O PEDIDO. Matheus (23/09/2026): *"quando clicar em simular ele me dê uma prévia dos valores
+  // de cada imposto, se tiver naquele caso"*. É o resumo que se confere de relance antes de emitir.
+  const venda = (extra = {}) => simular(
+    { ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", valor: 100000, ...extra },
+    tipi(linha(3.25)));
+
+  it("traz IPI, ICMS, PIS, COFINS e IBS/CBS, nessa ordem", () => {
+    expect(venda().resumoTributos.linhas.map((l) => l.tributo))
+      .toEqual(["IPI", "ICMS", "PIS", "COFINS", "IBS/CBS"]);
+  });
+
+  it("calcula cada um sobre o valor digitado", () => {
+    const r = venda().resumoTributos;
+    expect(r.linhas.find((l) => l.tributo === "IPI")).toMatchObject({ aliquota: 3.25, valor: 3250, cst: "50" });
+    expect(r.linhas.find((l) => l.tributo === "ICMS")).toMatchObject({ aliquota: 12, valor: 12000 });
+    expect(r.linhas.find((l) => l.tributo === "PIS")).toMatchObject({ aliquota: 1.65, valor: 1650 });
+    expect(r.linhas.find((l) => l.tributo === "COFINS")).toMatchObject({ aliquota: 7.6, valor: 7600 });
+  });
+
+  it("o total soma só o que tem número", () => {
+    expect(venda().resumoTributos.total).toBe(3250 + 12000 + 1650 + 7600);
+  });
+
+  // ⚠⚠ O QUE NÃO TEM NÚMERO FICA NA TABELA, COM O MOTIVO. Sumir com a linha faria o total parecer
+  // o imposto inteiro da operação.
+  it("o IBS/CBS aparece sem valor, com o motivo, e é contado", () => {
+    const r = venda().resumoTributos;
+    const ibs = r.linhas.find((l) => l.tributo === "IBS/CBS");
+    expect(ibs.valor).toBeNull();
+    expect(ibs.motivo).toMatch(/transição/i);
+    expect(r.semNumero).toBe(1);
+  });
+
+  // ⚠ Remessa não é receita e não recebe alíquota de referência de ICMS: três linhas sem número,
+  // e o resumo diz que são três.
+  it("na remessa, PIS, COFINS e ICMS saem sem número — e o resumo conta", () => {
+    const r = simular({ ncm: "84379000", cfop: "6901", ufOrigem: "SP", ufDestino: "RS", valor: 100000 }, tipi(linha(3.25))).resumoTributos;
+    expect(r.semNumero).toBe(4);
+    expect(r.linhas.find((l) => l.tributo === "ICMS").motivo).toMatch(/remessa/i);
+    expect(r.linhas.find((l) => l.tributo === "PIS").motivo).toMatch(/receita/i);
+  });
+
+  // ⚠ Com Ex TIPI o IPI não tem número, e o motivo diz por quê — não é "sem dado".
+  it("com Ex TIPI, o IPI fica sem valor e explica", () => {
+    const r = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", valor: 100000 }, tipi(linha(3.25), [linha(0)])).resumoTributos;
+    const ipi = r.linhas.find((l) => l.tributo === "IPI");
+    expect(ipi.valor).toBeNull();
+    expect(ipi.cst).toBeNull();
+    expect(ipi.motivo).toMatch(/Ex TIPI/);
+  });
+
+  it("sem valor digitado, nada tem número e o total é zero", () => {
+    const r = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS" }, tipi(linha(3.25))).resumoTributos;
+    expect(r.total).toBe(0);
+    expect(r.semNumero).toBe(5);
+    expect(r.linhas.every((l) => l.motivo)).toBe(true);
+  });
+});
+
+describe("a ficha de emissão — o que vai ser digitado no Omie", () => {
+  // ⚠⚠ O FORMATO VEIO DA CONTABILIDADE. Matheus (23/09/2026) mandou o exemplo: "CFOP: … / CST
+  // ICMS: … / CST IPI: … / CST PIS: … / CST COFINS: … / CBenef: … / Informações adicionais: …".
+  const ficha = (extra = {}) => simular(
+    { ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", valor: 100000, ...extra },
+    tipi(linha(3.25))).ficha;
+
+  it("traz os seis campos, na ordem do exemplo", () => {
+    expect(ficha().linhas.map((l) => l.campo))
+      .toEqual(["CFOP", "CST ICMS", "CST IPI", "CST PIS", "CST COFINS", "CBenef"]);
+  });
+
+  it("preenche o que tem fundamento: CFOP, CST de IPI e de PIS/COFINS", () => {
+    const l = Object.fromEntries(ficha().linhas.map((x) => [x.campo, x]));
+    expect(l.CFOP).toMatchObject({ valor: "6.101" });
+    expect(l["CST IPI"]).toMatchObject({ valor: "50", descricao: "Saída tributada" });
+    expect(l["CST PIS"]).toMatchObject({ valor: "01" });
+    expect(l["CST COFINS"]).toMatchObject({ valor: "01" });
+  });
+
+  // ⚠⚠ O EXEMPLO TRAZIA `CST ICMS: 41` E `CBenef: SP099999` — de uma operação NÃO TRIBUTADA
+  // específica. Repetir isso como sugestão seria o portal escolhendo tratamento de ICMS e
+  // inventando código de benefício, que é o que ele não tem base para fazer.
+  it.each(["CST ICMS", "CBenef"])("%s sai VAZIO, com o motivo", (campo) => {
+    const l = ficha().linhas.find((x) => x.campo === campo);
+    expect(l.valor).toBeNull();
+    expect(l.motivo).toBeTruthy();
+  });
+
+  it("o CST de ICMS mostra a alíquota de referência e diz que o CST é outra coisa", () => {
+    const l = ficha().linhas.find((x) => x.campo === "CST ICMS");
+    expect(l.motivo).toMatch(/alíquota de referência é 12%/);
+    expect(l.motivo).toMatch(/CST depende do tratamento/);
+  });
+
+  // ⚠ Com Ex TIPI o CST de IPI não é sugerido — a mesma abstenção do resto do módulo.
+  it("com Ex TIPI, o CST de IPI fica a definir", () => {
+    const l = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25), [linha(0)]))
+      .ficha.linhas.find((x) => x.campo === "CST IPI");
+    expect(l.valor).toBeNull();
+    expect(l.motivo).toMatch(/Ex TIPI/);
+  });
+
+  // ⚠ Remessa não é receita: PIS e COFINS ficam a definir em vez de sair com a alíquota básica.
+  it("na remessa, os CST de PIS e COFINS ficam a definir", () => {
+    const f = simular({ ncm: "84379000", cfop: "6901", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25))).ficha;
+    for (const c of ["CST PIS", "CST COFINS"]) {
+      expect(f.linhas.find((x) => x.campo === c).valor).toBeNull();
+    }
+  });
+
+  // ⚠ As informações adicionais saem do fundamento da cadeia quando ele existe — é o texto que a
+  // nota precisa carregar para o tratamento se sustentar.
+  it("a industrialização do art. 406 traz o fundamento nas informações adicionais", () => {
+    const f = simular({ ncm: "84379000", cfop: "5125", ufOrigem: "SP", ufDestino: "SP", valor: 1000 }, tipi(linha(3.25))).ficha;
+    expect(f.informacoesAdicionais.join(" ")).toMatch(/art\. 406/);
+  });
+
+  it("a venda comum não inventa informação adicional", () => {
+    expect(ficha().informacoesAdicionais).toEqual([]);
+  });
+});

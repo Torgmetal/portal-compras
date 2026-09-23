@@ -1214,3 +1214,35 @@ valor que o cliente pagaria sem que a tabela sustente.
 imposto sobre imposto e acusar divergência onde não há.
 
 **3.451 passando**, build limpo, validado logado (55 medições no seletor; o 327 audita na tela).
+
+- **(23/09, 11h30) Quatro achados do Codex na medição — e dois são repetição de lição minha.**
+  - ⚠⚠ **`Number(null)`, `Number("")` e `Number(" ")` devolvem ZERO**, e eu deixava esse zero passar
+    como valor declarado. Com CST 50 e `aliq_ipi` ausente, o item virava "0% declarado" em vez de
+    NAO_AVALIAVEL — e contra uma TIPI que também diz 0% a comparação passava **em silêncio**, que é
+    a conformidade por falta de dado que a regra 2 do motor existe para proibir.
+  - ⚠⚠ **A regra do NCM da descrição só valia no pedido.** Eu pus a extração em `lerPedidoOmie` e
+    não em `lerNfe`: o mesmo conflito **desaparecia** ao auditar o XML da nota já emitida. A regra
+    vale para o DOCUMENTO, não para a porta por onde ele entrou.
+  - ⚠ **Falha ao carregar as medições deixava o seletor vazio**, indistinguível de base vazia —
+    ⚠⚠ **o mesmo defeito que o Codex já tinha me apontado no autocomplete**. Agora tem carregando,
+    vazio, erro e "Tentar de novo", separados.
+  - ⚠ **Upload de XML durante uma medição lenta deixava a resposta ANTIGA sobrescrever a recente** —
+    ⚠⚠ **também repetição**: é a mesma resposta-fora-de-ordem do autocomplete. Uma `vez` só para as
+    duas entradas, e o upload trava durante a auditoria.
+
+- **(23/09, 11h45) Simulador: a ficha de emissão e a prévia dos impostos.** Matheus mandou o
+  formato que a contabilidade usa (*"CFOP: … / CST ICMS: … / CST IPI: … / CBenef: … / Informações
+  adicionais: …"*) e pediu *"prévia dos valores de cada imposto"*, *"menos texto"* e *"sem as
+  anotações falando do meu nome"*.
+  ⚠⚠ **CAMPO SEM FUNDAMENTO SAI VAZIO, COM O MOTIVO.** O exemplo trazia `CST ICMS: 41` e
+  `CBenef: SP099999` — de uma operação não tributada específica. Repetir isso como sugestão seria o
+  portal escolhendo tratamento de ICMS e inventando código de benefício, que é o que ele não tem
+  base para fazer. O que tem fundamento ele preenche: CFOP, CST de IPI (da TIPI) e CST de
+  PIS/COFINS (do regime declarado, quando a operação é receita).
+  ⚠ A prévia lista **uma linha por tributo com o valor**, e mantém na tabela as que não têm número,
+  com o motivo — sumir com a linha faria o total parecer o imposto inteiro da operação. O rodapé
+  diz quantas ficaram sem número.
+  ⚠ **A procedência fica, o nome sai**: quem declarou o regime e a origem continua em
+  `lib/fiscal/regime.js`, `lib/fiscal/icms.js` e nos commits; a tela mostra o regime e a
+  conferência, não a autoria.
+  **3.478 passando.** Validado logado. ⚠ **Sem push** enquanto a rodada estiver aberta.

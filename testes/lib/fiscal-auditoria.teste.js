@@ -232,3 +232,25 @@ describe("auditar — o caso da NF-e 1000: CST 53 num NCM de alíquota ZERO", ()
     expect(r.achados.some((x) => x.tipo === "CST_INCOMPATIVEL_COM_A_TIPI")).toBe(true);
   });
 });
+
+describe("o NCM da descrição vale para o XML também", () => {
+  // ⚠⚠ EU TINHA POSTO A EXTRAÇÃO SÓ NO PEDIDO DO OMIE (achado do Codex, 23/09/2026): o mesmo
+  // conflito — campo fiscal dizendo um NCM e a descrição dizendo outro — DESAPARECIA ao auditar o
+  // XML da nota já emitida. A regra vale para o documento, não para a porta por onde ele entrou.
+  it("acusa a divergência numa NF-e emitida", () => {
+    const xml = nfe(item(1, { ncm: "94069020", desc: "LONGARINA DES 70408127 - [NCM: 84313900]" }));
+    const t = tipi(linha("94069020", 0), linha("84313900", 0));
+    const a = auditar(lerNfe(xml), t, {}).achados.find((x) => x.tipo === "NCM_DIVERGE_DA_DESCRICAO");
+    expect(a.titulo).toMatch(/campo fiscal diz NCM 94069020, a descrição do item diz 84313900/);
+  });
+
+  it("o XML lê o NCM da descrição junto com a descrição", () => {
+    const d = lerNfe(nfe(item(1, { desc: "PEÇA - [NCM: 84313900]" })));
+    expect(d.itens[0].ncmDaDescricao).toBe("84313900");
+  });
+
+  it("descrição sem NCM não vira divergência", () => {
+    const d = lerNfe(nfe(item(1, { desc: "FLANGE MAIOR CONEXAO SAIDA - DES 71264380" })));
+    expect(d.itens[0].ncmDaDescricao).toBeNull();
+  });
+});

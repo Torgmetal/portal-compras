@@ -147,3 +147,46 @@ describe("auditar o pedido 327 — o caso real, antes de emitir", () => {
     expect(auditar(ok, tipi, {}).achados.filter((x) => x.tipo === "NCM_DIVERGE_DA_DESCRICAO")).toEqual([]);
   });
 });
+
+// ─── OS ACHADOS DO CODEX (23/09/2026) ───────────────────────────────────────
+
+describe("ausente não é zero", () => {
+  // ⚠⚠ `Number(null)`, `Number("")` e `Number(" ")` devolvem **0**, e eu deixava esse zero passar
+  // como valor DECLARADO. Com CST 50 e `aliq_ipi` ausente, o item virava "0% declarado" em vez de
+  // NAO_AVALIAVEL — e contra uma TIPI que também diz 0% a comparação passava em silêncio, que é a
+  // conformidade por falta de dado que a regra 2 do motor existe para proibir.
+  const semAliquota = (v) => {
+    const it = item(1, { cst: "50", valor: 1000 });
+    it.imposto.ipi.aliq_ipi = v;
+    return lerPedidoOmie(pedido([it]), { op });
+  };
+
+  it.each([null, undefined, "", "  "])("aliq_ipi %s vira null, não 0", (v) => {
+    expect(semAliquota(v).itens[0].ipi.aliquota).toBeNull();
+  });
+
+  // ⚠⚠ E O MOTOR VOLTA A SE ABSTER — contra TIPI zero, que é onde o silêncio passava.
+  it.each([
+    ["TIPI a 0%", 0],
+    ["TIPI a 3,25%", 3.25],
+  ])("CST 50 sem alíquota vira NAO_AVALIAVEL (%s)", (_, aliq) => {
+    const t = indiceDaTipi([{ codigo: "94069020", ex: "", aliquotaTipo: "PERCENTUAL", aliquotaValor: aliq }]);
+    const r = auditar(semAliquota(null), t, {});
+    const a = r.achados.find((x) => x.tipo === "NAO_AVALIAVEL");
+    expect(a.faltam).toContain("IPI/pIPI");
+    expect(r.resumo.naoAvaliaveis).toBe(1);
+  });
+
+  it("alíquota 0 DECLARADA continua sendo zero, não ausência", () => {
+    expect(semAliquota(0).itens[0].ipi.aliquota).toBe(0);
+  });
+
+  // ⚠ `valor_mercadoria` nulo precisa cair para `valor_total` — com o `num` antigo o nulo virava 0
+  // e o fallback nunca acontecia.
+  it("valor_mercadoria ausente cai para valor_total", () => {
+    const it = item(1, { valor: 500 });
+    it.produto.valor_mercadoria = null;
+    it.produto.valor_total = 500;
+    expect(lerPedidoOmie(pedido([it]), { op }).itens[0].valor).toBe(500);
+  });
+});

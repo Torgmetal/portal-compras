@@ -1,7 +1,12 @@
 {
-  "build": 3422,
-  "gerado": "2026-09-23T13:05:44.332Z",
+  "build": 3423,
+  "gerado": "2026-09-23T13:16:26.248Z",
   "commits": [
+    {
+      "hash": "43b1b3b083",
+      "data": "23/09/2026",
+      "titulo": "Auditoria: validar a medição do Omie ANTES de emitir — e o primeiro uso já achou um caso"
+    },
     {
       "hash": "333701e992",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "8dd0cde00f",
       "data": "22/09/2026",
       "titulo": "Cliente: o relatório fechado fica disponível para consulta"
-    },
-    {
-      "hash": "fa18ab5a32",
-      "data": "22/09/2026",
-      "titulo": "CMR: o certificado desempata a \"troca de material\", e os duplicados saem"
     }
   ]
 }
