@@ -12,6 +12,10 @@ export default function ProtecaoEdicao({ conteudo, versaoSalva, salvar, salvando
   const [salvoEm, setSalvoEm] = useState(null);
   const versao = useRef(versaoSalva);
   const liberar = useRef(false);
+  // ⚠ o `salvar` MAIS RECENTE: o ouvinte de clique é registrado quando a tela fica alterada e não é
+  // refeito a cada tecla — chamando o `salvar` daquele momento, gravaria o formulário de três teclas atrás.
+  const salvarAtual = useRef(salvar);
+  salvarAtual.current = salvar;
   useEffect(() => {
     if (versao.current !== versaoSalva) {
       versao.current = versaoSalva;
@@ -26,6 +30,21 @@ export default function ProtecaoEdicao({ conteudo, versaoSalva, salvar, salvando
     const clicar = e => {
       if (liberar.current || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
       const a = e.target.closest?.("a[href]");
+      // ⚠⚠ O PDF ABRE EM OUTRA ABA E MOSTRA O QUE ESTÁ GRAVADO. Vitor (23/09/2026): "as informações
+      // adicionadas não estão indo para o pdf" — preenchia a junta soldada, clicava em "Abrir PDF" e o
+      // documento vinha sem ela, porque nada tinha sido salvo. Link marcado com `data-salvar-antes`
+      // grava primeiro. A aba abre JÁ, dentro do clique: aberta depois do `await`, o navegador a
+      // trataria como pop-up e bloquearia. Se a gravação falha, ela fecha — o PDF velho não aparece
+      // fingindo ser o novo.
+      if (a && a.target === "_blank" && a.hasAttribute("data-salvar-antes")) {
+        e.preventDefault(); e.stopPropagation();
+        const aba = window.open("", "_blank");
+        Promise.resolve(salvarAtual.current()).then((ok) => {
+          if (ok !== true) { aba?.close(); return; }
+          if (aba) { aba.opener = null; aba.location.href = a.href; } else window.open(a.href, "_blank", "noopener");
+        });
+        return;
+      }
       if (!a || a.download || (a.target && a.target !== "_self")) return;
       const url = new URL(a.href, location.href);
       if (!/^https?:$/.test(url.protocol) || (url.pathname === location.pathname && url.search === location.search && url.origin === location.origin)) return;

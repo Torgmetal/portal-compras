@@ -1736,3 +1736,18 @@ modelo de ponta a ponta, e isso só dá para fazer em produção ou com a chave 
   ⚠ **Para revisar:** (a) a ficha é transcrição de PDF digitalizado — conferir contra as EPS; (b) com
   002 e 005 ambas FCAW, `epsDoProcesso` segue devolvendo a primeira (002) para a EPS permitida da junta;
   (c) NÃO preenchi os relatórios da OP-102 — quem escolhe a EPS é a inspeção.
+
+- **(23/09, 20h40) "As informações adicionadas não estão indo para o PDF" — não tinham sido gravadas.**
+  Medido no banco: nenhum relatório (de nenhuma OP) gravado depois das 19h12, nenhum padrão novo; o
+  gerador do PDF lê do banco na hora e estava certo. A armadilha era de tela: "Abrir PDF" (computador)
+  e "Ver prévia" (celular) abrem o documento GRAVADO, e a `ProtecaoEdicao` ignorava link de nova aba.
+  **Correção:** link com `data-salvar-antes` grava o pendente antes de abrir (aba aberta no clique;
+  falhou, fecha; `salvar` lido por ref — o ouvinte nasce na 1ª tecla e gravaria o formulário velho,
+  pego por teste); no celular, `verPrevia` grava sem sair, abre a prévia e RECARREGA do servidor (junta
+  nova ganha o índice do banco — sem isso a gravação seguinte a duplicaria). Sem alteração, os dois
+  abrem direto, sem gravar. Testes: protecao-edicao-pdf (4), qualidade-abrir-pdf-salva (1, a tela do
+  computador inteira, vermelho sem o atributo), campo-previa-salva (2). **3.787 passando**, checar
+  limpo, build ok.
+  ⚠ Pedido anterior da mesma conversa, NÃO executado: trocar o soldador da junta T102B62 (EVS-102-001)
+  para o Eberton — a gravação direta no banco foi bloqueada pela proteção do Claude Code; ficou para a
+  tela (um clique: escolher o soldador preenche sinete e EPS).

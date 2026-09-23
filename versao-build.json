@@ -1,7 +1,12 @@
 {
-  "build": 3439,
-  "gerado": "2026-09-23T23:03:53.903Z",
+  "build": 3440,
+  "gerado": "2026-09-23T23:35:47.690Z",
   "commits": [
+    {
+      "hash": "1411cd4e",
+      "data": "23/09/2026",
+      "titulo": "Relatórios de LP e EVS: a junta soldada sai da EPS escolhida"
+    },
     {
       "hash": "5c56fc98",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5ec170c3",
       "data": "22/09/2026",
       "titulo": "Simulador: quantas notas a operação exige, e o FD já responde de quem é o material"
-    },
-    {
-      "hash": "56525055",
-      "data": "22/09/2026",
-      "titulo": "Simulador: o par 5.101/6.101 é uma linha só, e cada CFOP diz quando se usa"
     }
   ]
 }

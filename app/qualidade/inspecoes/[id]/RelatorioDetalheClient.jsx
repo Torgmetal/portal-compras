@@ -214,7 +214,9 @@ export default function RelatorioDetalheClient({ id }) {
               {salvando ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Salvar
             </button>
           )}
-          <a href={`/api/qualidade/inspecoes/${id}/pdf`} target="_blank" rel="noopener noreferrer"
+          {/* ⚠ `data-salvar-antes`: com alteração pendente, a ProtecaoEdicao grava antes de abrir — o PDF
+              mostra o que está GRAVADO, e abria sem o que acabara de ser preenchido (Vitor, 23/09/2026) */}
+          <a href={`/api/qualidade/inspecoes/${id}/pdf`} target="_blank" rel="noopener noreferrer" data-salvar-antes
             className="text-[12px] text-torg-blue border border-torg-blue-200 hover:bg-torg-blue-50 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1.5 font-medium">
             <ExternalLink size={13} /> Abrir PDF
           </a>

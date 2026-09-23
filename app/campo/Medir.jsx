@@ -262,6 +262,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   // deixava escrever. Vale para as fotos tiradas em seguida e sai embaixo da foto no PDF.
   const [legendaFoto, setLegendaFoto] = useState("");
   const fileRef = useRef(null);
+  // ⚠ recarregar o relatório depois de gravar sem sair da tela (a prévia) — ver verPrevia()
+  const [recarga, setRecarga] = useState(0);
+  const [versaoCarga, setVersaoCarga] = useState(0);
 
   useEffect(() => {
     fetch(`/api/campo/relatorios/${id}`)
@@ -282,9 +285,21 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         // marca do cabeçote eram gravados e voltavam em branco (23/09/2026). Mora em
         // lib/campo-condicoes.js, com teste que varre as telas do campo.
         setCond(condicoesDoRelatorio(j.relatorio.resultados));
+        setVersaoCarga((v) => v + 1);
       })
       .catch((e) => setErro(e.message));
-  }, [id]);
+  }, [id, recarga]);
+
+  // ⚠⚠ O QUE A TELA TEM QUE AINDA NÃO FOI GRAVADO. Vitor (23/09/2026): "as informações adicionadas não
+  // estão indo para o pdf" — a prévia mostra o que está GRAVADO, e abria sem o que acabara de ser
+  // preenchido. É por esta comparação que a prévia sabe que precisa gravar antes.
+  const estado = JSON.stringify({ cond, linhas, removidas, equipamentos, observacoes, resultado, pecasQuantidades });
+  const [base, setBase] = useState(null);
+  const versaoVista = useRef(0);
+  useEffect(() => {
+    if (versaoVista.current !== versaoCarga) { versaoVista.current = versaoCarga; setBase(estado); }
+  }, [versaoCarga, estado]);
+  const alterado = base != null && base !== estado;
 
   useEffect(() => {
     // as fotos que já estão amarradas a este relatório
@@ -406,11 +421,12 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
     } catch (e) { alert(e.message); } finally { setSalvando(false); }
   }
 
-  async function salvar() {
+  /** Grava o que está na tela, sem sair dela. Devolve se deu certo — o erro já foi mostrado. */
+  async function gravar() {
     let pecasInformadas;
     if(usaQuantidadeInspecao(rel.tipo)){
       const v=pecasInformadasSchema.safeParse(pecasQuantidades.map(p=>({...p,quantidade:Number(p.quantidade)})));
-      if(!v.success){showToast(v.error.issues[0].message,"error");return;}
+      if(!v.success){showToast(v.error.issues[0].message,"error");return false;}
       pecasInformadas=v.data;
     }
     setSalvando(true);
@@ -448,9 +464,30 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
-      alert("Medidas gravadas.");
-      onVoltar();
-    } catch (e) { alert(e.message); } finally { setSalvando(false); }
+      return true;
+    } catch (e) { alert(e.message); return false; } finally { setSalvando(false); }
+  }
+
+  async function salvar() {
+    if (!(await gravar())) return;
+    alert("Medidas gravadas.");
+    onVoltar();
+  }
+
+  /**
+   * A prévia é o PDF GRAVADO — com alteração na tela, grava antes de abrir, e fica na tela.
+   *
+   * ⚠ A aba abre JÁ, dentro do toque: aberta depois do `await`, o navegador a trataria como pop-up.
+   * ⚠ Depois de gravar, a tela RECARREGA do servidor: as juntas acrescentadas ganham o índice do banco
+   * e a lixeira zera — gravar de novo com o estado velho acrescentaria as mesmas juntas outra vez.
+   */
+  async function verPrevia() {
+    const url = `/api/qualidade/inspecoes/${id}/pdf`;
+    if (!alterado) { window.open(url, "_blank", "noopener"); return; }
+    const aba = window.open("", "_blank");
+    if (!(await gravar())) { aba?.close(); return; }
+    if (aba) { aba.opener = null; aba.location.href = url; } else window.open(url, "_blank", "noopener");
+    setRecarga((n) => n + 1);
   }
 
   // ⚠ mede a mesma coisa que o servidor: tem medida preenchida e nenhum instrumento escolhido.
@@ -874,14 +911,15 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
 
       {/* ⚠ VER ANTES DE ENTREGAR. Vitor (04/09/2026): "na tela da Lais ela não consegue visualizar
           o relatório antes, como uma prévia". Quem mede preenchia às cegas e só via o documento
-          depois, com a Qualidade — erro de digitação voltava dias depois. Abre em outra aba: o PDF
-          é do estado GRAVADO, então o aviso diz para gravar primeiro. */}
-      <a href={`/api/qualidade/inspecoes/${id}/pdf`} target="_blank" rel="noreferrer"
-        className="mt-2.5 w-full bg-white border-2 border-torg-blue text-torg-blue active:bg-torg-blue/5 rounded-2xl py-4 text-[15px] font-semibold inline-flex items-center justify-center gap-2">
-        <FileText size={19} /> Ver prévia do relatório
-      </a>
+          depois, com a Qualidade — erro de digitação voltava dias depois. Abre em outra aba o PDF
+          GRAVADO; com alteração na tela, grava antes (Vitor, 23/09/2026: "as informações adicionadas
+          não estão indo para o pdf" — o aviso de "grave antes" não bastou). */}
+      <button type="button" onClick={verPrevia} disabled={salvando}
+        className="mt-2.5 w-full bg-white border-2 border-torg-blue text-torg-blue active:bg-torg-blue/5 rounded-2xl py-4 text-[15px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60">
+        <FileText size={19} /> {alterado ? "Gravar e ver a prévia" : "Ver prévia do relatório"}
+      </button>
       <p className="mt-1.5 text-center text-[12px] text-torg-gray">
-        A prévia mostra o que já foi gravado — grave as medidas antes de conferir.
+        {alterado ? "O que você alterou é gravado antes de abrir a prévia." : "A prévia mostra o relatório como está gravado."}
       </p>
     </Tela>
   );
