@@ -1311,3 +1311,18 @@ operação de receita) não há lista — candidato só aparece onde ele se abst
     na mensagem da família só cabe a razão comum às duas.
   **3.538 passando.** Validado logado lado a lado: 5.923 sem destaque e com o porquê da venda à
   ordem; 5.901 com o CST 50 e o art. 402. ⚠ **Sem push** enquanto a rodada estiver aberta.
+  ⚠⚠⚠ **(rodada 2/2) E EU TINHA CONSERTADO O CAMINHO QUE NÃO RODA.** O ajuste do 5.116/6.116
+  vivia só em `cenarios.js` — que a ficha consulta **apenas quando `estimarPisCofins` se abstém**.
+  Com valor digitado, o cálculo seguia devolvendo **CST 01 e os R$ 1.650 / R$ 7.600**, e a ressalva
+  sumia inteira. **É a mesma metade errada do Ex TIPI: arrumei o texto e deixei o número.**
+  ⚠ A indeterminação foi para o CÁLCULO (`RECEITA_JA_PODE_TER_SIDO_RECONHECIDA` em `regime.js`), e
+  daí ela chega sozinha à ficha, ao resumo e ao cartão — um lugar, três telas.
+  ⚠⚠ **A família diz que há receita; ela não diz que a receita é DESTA nota.** O 5.116 é a saída
+  física do que já foi faturado no 5.922: aplicar a alíquota básica aqui corre o risco de contar
+  duas vezes.
+  ⚠ **O ICMS do 5.116 continua determinado** — a saída física É o fato gerador do ICMS. Abster-se
+  dos dois seria trocar um exagero por outro.
+  ⚠ E o teste novo passa por `simular` **com valor positivo**, que é o que faltava: o anterior
+  chamava `cenarioDoCfop` isolado e não via a integração.
+  **3.545 passando.** Validado logado: 6.116 com R$ 100.000 sai sem CST e sem valor de PIS/COFINS,
+  com os candidatos; 6.101 segue com CST 01 e R$ 1.650 / R$ 7.600.

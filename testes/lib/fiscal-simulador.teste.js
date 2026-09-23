@@ -797,3 +797,57 @@ describe("a base de CST — candidatos por cenário, com o que cada um exige", (
     expect(l.candidatos.find((c) => c.cst === "90").nota).toMatch(/último recurso/i);
   });
 });
+
+describe("5.116/6.116 com VALOR — a indeterminação chega ao cálculo, não só ao texto", () => {
+  // ⚠⚠ EU TINHA "CONSERTADO" ISSO SÓ NO CENÁRIO — o caminho que só aparece quando NÃO há valor
+  // digitado (achado do Codex, 23/09/2026). Com valor positivo, `estimarPisCofins` seguia
+  // devolvendo CST 01 e a ficha escondia a ressalva inteira. É a mesma metade errada do Ex TIPI:
+  // arrumei o texto e deixei o número.
+  const r = (cfop) => simular({ ncm: "84379000", cfop, ufOrigem: "SP", ufDestino: "RS", valor: 100000 }, tipi(linha(3.25)));
+
+  it.each(["5116", "6116"])("o %s não recebe CST 01 nem valor de PIS/COFINS", (cfop) => {
+    const s = r(cfop);
+    expect(s.pisCofins.indisponivel).toBe(true);
+    expect(s.pisCofins.linhas).toBeUndefined();
+    for (const t of ["PIS", "COFINS"]) {
+      const l = s.resumoTributos.linhas.find((x) => x.tributo === t);
+      expect(l.valor).toBeNull();
+      expect(l.motivo).toMatch(/contar duas vezes/i);
+    }
+  });
+
+  it("a ficha mostra os candidatos e a orientação, não o CST 01", () => {
+    const l = r("5116").ficha.linhas.find((x) => x.campo === "CST PIS");
+    expect(l.valor).toBeNull();
+    expect(l.candidatos.length).toBeGreaterThan(0);
+    expect(l.porque).toMatch(/contar duas vezes/i);
+  });
+
+  // ⚠ E o portal NÃO escolhe outro CST no lugar: ele se abstém e diz por quê.
+  it("nenhum candidato de PIS/COFINS é eleito para o 5.116", () => {
+    expect(r("5116").ficha.linhas.find((x) => x.campo === "CST PIS").candidatos.filter((c) => c.provavel)).toEqual([]);
+  });
+
+  // ⚠⚠ O ICMS CONTINUA DETERMINADO: a saída física É o fato gerador do ICMS. Abster-se dos dois
+  // seria trocar um exagero por outro.
+  it("o ICMS do 5.116 segue com alíquota e valor", () => {
+    const s = r("5116");
+    expect(s.icms).toMatchObject({ estado: "REFERENCIA", aliquota: 12, valor: 12000 });
+    expect(s.resumoTributos.linhas.find((x) => x.tributo === "ICMS").valor).toBe(12000);
+  });
+
+  it("a venda comum não é afetada — 5.101 e 6.101 seguem com CST 01 e valor", () => {
+    for (const cfop of ["5101", "6101"]) {
+      const s = r(cfop);
+      expect(s.pisCofins.linhas.map((x) => x.cst)).toEqual(["01", "01"]);
+      expect(s.resumoTributos.linhas.find((x) => x.tributo === "PIS").valor).toBe(1650);
+      expect(s.ficha.linhas.find((x) => x.campo === "CST PIS").valor).toBe("01");
+    }
+  });
+
+  it("o total do resumo não conta PIS nem COFINS no 5.116", () => {
+    const s = r("5116");
+    expect(s.resumoTributos.total).toBe(3250 + 12000);
+    expect(s.resumoTributos.semNumero).toBe(3);
+  });
+});
