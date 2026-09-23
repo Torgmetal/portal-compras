@@ -40,3 +40,8 @@ se preenchia sozinha. Justamente nos EVS/LP da OP-102, que são os que estão en
 
 ⚠ Na mesma correção, a consulta passou a excluir **CROQUI** (`tipoPeca`), como o portal de campo já
 fazia: na OP-102 são 216 croquis para 58 conjuntos, e croqui é componente — não peça de inspeção.
+
+⚠ **O celular ficou na regra velha até 23/09/2026.** A rota de gravação aceitava, mas a LISTA do campo
+mandava o toque para o PDF (`somenteLeitura`), e quem inspecionou não tinha como completar os EVS/LP da
+OP-102. Agora abre para editar enquanto o envio está EM_ANDAMENTO; CONCLUÍDO segue só consulta no
+celular (revisão, no computador). Ver [[torg_campo_ida_e_volta]].

@@ -6,8 +6,15 @@
 //
 // Não estava mesmo: o portal de campo só fazia captura de foto. Este é o caminho que faltava.
 //
-// Relatório emitido continua aparecendo em modo de consulta. Quem o criou no Campo precisa poder
-// reencontrar o próprio trabalho; a edição segue bloqueada e o toque abre o PDF assinado/emitido.
+// Relatório emitido continua aparecendo. Quem o criou no Campo precisa poder reencontrar o próprio
+// trabalho.
+//
+// ⚠⚠ ENVIADO PARA ASSINATURA ABRE PARA EDITAR, enquanto a assinatura está em andamento (23/09/2026).
+// Desde 22/09 o relatório enviado continua editável, com registro — Vitor: "não precisa gerar
+// revisão, pode apenas alterar as informações" — e a rota de gravação já aceitava. Só esta lista
+// ficou na regra velha e mandava o toque para o PDF: quem inspecionou não tinha como completar os
+// EVS/LP da OP-102, que foram para assinatura com campos em branco. ⚠ CONCLUÍDO (todos assinaram)
+// continua só consulta aqui: mexer depois disso é caso de revisão, que se abre no computador.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -34,6 +41,13 @@ export async function GET(req) {
     orderBy: { createdAt: "desc" },
     take: 60,
   });
+  const envios = rs.some((r) => r.envioAssinaturaId)
+    ? await prisma.envioAssinatura.findMany({
+        where: { id: { in: rs.map((r) => r.envioAssinaturaId).filter(Boolean) } },
+        select: { id: true, status: true },
+      })
+    : [];
+  const concluido = new Set(envios.filter((e) => e.status === "CONCLUIDO").map((e) => e.id));
 
   const relatorios = rs.map((r) => {
     const linhas = Array.isArray(r.linhas) ? r.linhas : [];
@@ -49,7 +63,8 @@ export async function GET(req) {
       rotuloRevisao: `R${String(r.revisao ?? 0).padStart(2, "0")}`,
       resultadoInspecao: r.resultadoInspecao || null,
       status: r.status,
-      somenteLeitura: !!r.envioAssinaturaId,
+      assinado: !!r.envioAssinaturaId,
+      somenteLeitura: !!r.envioAssinaturaId && concluido.has(r.envioAssinaturaId),
     };
   });
 

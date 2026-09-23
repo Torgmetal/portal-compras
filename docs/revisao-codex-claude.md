@@ -1480,3 +1480,32 @@ operação de receita) não há lista — candidato só aparece onde ele se abst
   (3), assinatura-anexo-desenho (1), databook-vinculo-arquivo (3), inspecao-quantidade-canonica (3)
   — todos vermelhos antes. **3.616 passando**, checar limpo, build ok. Não validado no navegador
   logado (o dev local escreve na produção); validado regenerando os PDFs reais em leitura.
+
+- **(23/09, 16h) Portal de campo: o que a Lais digitava e "sumia" — quatro defeitos, OP-102 medida.**
+  Vitor: *"a questão que a Lais comentou de estar sumindo algumas informações que ela colocou"* e *"a
+  OP-102 precisa verificar pois ela mencionou que as informações não estavam ficando"*.
+  **OP-102 no banco (leitura):** pintura RIP-102-001/002 íntegra (demãos, lotes, datas/horas, rugosidade,
+  espessuras, fotos — banco e PDF batem; a 3ª demão foi limpa por ela). Nenhuma gravação desfez outra: a
+  auditoria `ALTERAR_PADRAO_INSPECAO` prova a ordem das 5 gravações de 22/09. A memória de padrões só age
+  na CRIAÇÃO (`valoresIniciaisInspecao`), não reescreve relatório existente.
+  **Os quatro defeitos (todos do caminho do celular):**
+  (1) LP: nº da indicação, local, tamanho e tipo — a tela pedia e a rota DESCARTAVA (nunca gravou);
+  (2) US: processo de soldagem, metal de adição, tipo de junta, chanfro e a marca do cabeçote gravavam mas
+  VOLTAVAM EM BRANCO ao reabrir — a lista de carga do `Medir.jsx` não acompanhou; o seletor do cabeçote
+  abria em "Selecione…" (a `chaveCabecote` precisa da marca — regressão do meu conserto de 22/09 10h15);
+  (3) a lixeira da junta desalinhava: índice recontado na tela × mescla por posição na rota = dados da 2ª
+  por cima da 1ª, a apagada não saía e a última duplicava; junta nova com índice pulado virava `null`;
+  (4) enviado para assinatura abria só o PDF no celular, embora a gravação aceitasse desde 22/09.
+  **Correção:** `lib/campo-condicoes.js` (carga única, teste que varre as telas e cobra cada `cond.X`),
+  `lib/campo-linhas.js` (mescla extraída da rota: LP com os tetos do computador, `removidas` pelo índice
+  do banco conferidas pela MARCA, nova junta no fim sem buraco, dimensional não apaga), lista do campo
+  com `assinado` + `somenteLeitura` só para envio CONCLUIDO, aviso "já enviado… fica registrado" na tela,
+  e a frase "Quem monta faz isso no computador" restrita às cotas (aparecia no EVS e na pintura — o
+  EVS-102-001 foi salvo com 0 juntas; as 4 que tem vieram do script de modelo do Codex em 21/09, com laudo
+  "A" copiado do resultado geral e soldador/EPS vazios).
+  Testes: `campo-reabrir-relatorio` (6, tela real com fetch simulado), `campo-linhas` (9, rota),
+  `campo-condicoes` (5, guarda das telas), visibilidade reescrita (3 — afirmava "emitido = consulta",
+  regra de antes de 22/09). Todos vermelhos antes. **3.638 passando**, checar limpo, build ok.
+  ⚠ **Para revisar:** (a) a remoção por índice confere só a MARCA — duas linhas com a mesma marca na
+  mesma posição trocada passariam; (b) CONCLUÍDO só-PDF é regra de TELA, a rota continua aceitando
+  (decisão do Vitor de 22/09); (c) não validado logado no navegador (o dev local grava na produção).

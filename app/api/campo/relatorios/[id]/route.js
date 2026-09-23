@@ -13,6 +13,7 @@ import { requireRole } from "@/lib/session";
 import { PERFIS_CAMPO, TIPO_LABEL } from "@/lib/qualidade-campo";
 import { RESULTADOS, proximaRevisao, rotuloRevisao } from "@/lib/revisao-inspecao";
 import { numeroBR } from "@/lib/numero-br";
+import { linhasDoCampo } from "@/lib/campo-linhas";
 
 export const runtime = "nodejs";
 
@@ -120,51 +121,9 @@ export async function PATCH(req, { params }) {
   const originais = Array.isArray(rel.linhas) ? rel.linhas : [];
   const medidas = Array.isArray(body.medidas) ? body.medidas : [];
 
-  // ⚠ MESCLA POR ÍNDICE, não substitui a lista. Se o celular mandasse as linhas inteiras, uma versão
-  // antiga aberta no bolso apagaria a cota que a Qualidade acabou de acrescentar no computador.
-  const linhas = [...originais].map((l, i) => {
-    const m = medidas.find((x) => x.i === i);
-    if (!m) return l;
-    const novo = { ...l };
-    if (m.encontradoMm !== undefined) novo.encontradoMm = num(m.encontradoMm);
-    if (m.laudo !== undefined) novo.laudo = m.laudo ? String(m.laudo).slice(0, 10) : null;
-    if (m.descontinuidade !== undefined) novo.descontinuidade = m.descontinuidade ? String(m.descontinuidade).slice(0, 40) : null;
-    if (m.obs !== undefined) novo.obs = m.obs ? String(m.obs).slice(0, 160) : null;
-    // ⚠ campos da JUNTA: no visual de solda quem descobre a junta é quem está na frente dela, então
-    // o campo escreve peça, EPS e soldador. No dimensional isso não vem — as cotas são definidas no
-    // desenho, antes, e o celular só responde a medida.
-    // ⚠ campos da INDICAÇÃO de ultrassom entram junto — o `c` e o `d` também, calculados na tela e
-    // gravados: quem lê o relatório meses depois precisa do número que foi usado, não de refazer a
-    // conta com uma fórmula que pode ter mudado de revisão.
-    for (const k of ["marca", "descricao", "eps", "soldador", "sinete",
-                     "indicacao", "angulo", "face", "comprimento", "percurso",
-                     "db_indicacao", "db_referencia", "db_atenuacao", "db_classe",
-                     "reprovado", "profundidade", "dist_x", "dist_y", "nivel"]) {
-      if (m[k] !== undefined) novo[k] = m[k] ? String(m[k]).slice(0, 60) : null;
-    }
-    if (m.qtd !== undefined) novo.qtd = num(m.qtd);
-    return novo;
-  });
-
-  // ⚠ juntas ACRESCENTADAS no celular vêm com índice além da lista original
-  for (const m of medidas) {
-    if (m.i < originais.length) continue;
-    linhas[m.i] = {
-      marca: m.marca ? String(m.marca).slice(0, 60) : null,
-      qtd: num(m.qtd), descricao: m.descricao ? String(m.descricao).slice(0, 120) : null,
-      eps: m.eps ? String(m.eps).slice(0, 60) : null,
-      soldador: m.soldador ? String(m.soldador).slice(0, 60) : null,
-      sinete: m.sinete ? String(m.sinete).slice(0, 20) : null,
-      ...Object.fromEntries(["indicacao", "angulo", "face", "comprimento", "percurso",
-        "db_indicacao", "db_referencia", "db_atenuacao", "db_classe",
-        "reprovado", "profundidade", "dist_x", "dist_y", "nivel"]
-        .map((k) => [k, m[k] ? String(m[k]).slice(0, 40) : null])),
-      descontinuidade: m.descontinuidade ? String(m.descontinuidade).slice(0, 40) : null,
-      laudo: m.laudo ? String(m.laudo).slice(0, 10) : null,
-      obs: m.obs ? String(m.obs).slice(0, 160) : null,
-    };
-  }
-
+  // ⚠ MESCLA POR ÍNDICE, não substitui a lista — e a lixeira vem à parte, conferida pela marca. Toda
+  // a regra (e o porquê de cada detalhe) mora em lib/campo-linhas.js.
+  const { linhas, removidas } = linhasDoCampo({ tipo: rel.tipo, originais, medidas, removidas: body.removidas });
   const dados = { linhas };
   if (Array.isArray(body.equipamentos)) {
     dados.equipamentos = body.equipamentos.slice(0, 20).map((e) => ({
@@ -343,7 +302,8 @@ export async function PATCH(req, { params }) {
   await prisma.auditLog.create({
     data: {
       userId: user.id, action: "MEDIR_RELATORIO_CAMPO", entity: "RelatorioInspecao", entityId: id,
-      diff: { codigo: rel.codigo, ...(assinaturasVigentes.length ? { editadoAposAssinatura: true, assinaturasVigentes } : {}), medidas: medidas.length, equipamentos: dados.equipamentos?.length ?? null, ...(body.pecasInformadas ? {antes:{marcas:rel.marcas,pecasInformadas:rel.resultados?.pecasInformadas ?? null},depois:{marcas:dados.marcas,pecasInformadas:dados.resultados.pecasInformadas}} : {}) },
+      diff: { codigo: rel.codigo, ...(assinaturasVigentes.length ? { editadoAposAssinatura: true, assinaturasVigentes } : {}), medidas: medidas.length,
+        ...(removidas.length ? { removidas } : {}), equipamentos: dados.equipamentos?.length ?? null, ...(body.pecasInformadas ? {antes:{marcas:rel.marcas,pecasInformadas:rel.resultados?.pecasInformadas ?? null},depois:{marcas:dados.marcas,pecasInformadas:dados.resultados.pecasInformadas}} : {}) },
     },
   }).catch(() => {});
 

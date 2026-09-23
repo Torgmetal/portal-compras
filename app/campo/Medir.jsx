@@ -22,6 +22,7 @@ import { lerJson } from "@/lib/resposta-json";
 import { evidenciasDoTipo } from "@/lib/fotos-evidencia";
 import FormularioUSCampo from "./FormularioUSCampo";
 import { ANGULOS, FACES, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL } from "@/lib/us-campos";
+import { condicoesDoRelatorio } from "@/lib/campo-condicoes";
 
 /**
  * O INSPETOR DE CAMPO MEDINDO, NO CELULAR.
@@ -83,6 +84,7 @@ export default function Medir({ op, onSair, Tela, Equipamentos, relatorioInicial
                   <span className="font-mono font-bold text-torg-blue text-[15px]">{r.codigo}</span>
                   <span className="flex items-center gap-1.5 shrink-0">
                     {r.somenteLeitura && <span className="text-[11px] font-semibold text-torg-gray bg-gray-100 border border-gray-200 rounded-full px-2 py-0.5">ver PDF</span>}
+                    {r.assinado && !r.somenteLeitura && <span className="text-[11px] font-semibold text-torg-blue bg-torg-blue/10 border border-torg-blue/30 rounded-full px-2 py-0.5">em assinatura</span>}
                     {r.revisao > 0 && <span className="text-[11px] font-mono font-bold text-torg-gray">{r.rotuloRevisao}</span>}
                     {r.resultadoInspecao === "REPROVADO"
                       ? <span className="text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">reprovado</span>
@@ -227,6 +229,8 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   const [quantidadesLista, setQuantidadesLista] = useState({});
   const [erro, setErro] = useState("");
   const [linhas, setLinhas] = useState([]);
+  // ⚠ as juntas GRAVADAS que a lixeira tirou da tela, pelo índice de origem — ver salvar()
+  const [removidas, setRemovidas] = useState([]);
   const [equipamentos, setEquipamentos] = useState([]);
   // ⚠ AS CONDIÇÕES DO ENSAIO SÃO DO CAMPO. Vitor (21/08/2026): "você só trouxe a medida do
   // luxímetro e o restante precisa ser preenchido também". Está certo — técnica, condições
@@ -265,45 +269,17 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         setPecasQuantidades(pecasDoRelatorio(j.relatorio,j.quantidadesLista));
         setQuantidadesLista(j.quantidadesLista || {});
         setResultado(j.relatorio.resultadoInspecao || null);
-        setLinhas(Array.isArray(j.relatorio.linhas) ? j.relatorio.linhas : []);
+        // ⚠ cada linha leva o índice que tem NO BANCO (`__i`): é por ele que o servidor mescla, e a
+        // lixeira muda a posição na tela, não no banco. Ver salvar().
+        setLinhas((Array.isArray(j.relatorio.linhas) ? j.relatorio.linhas : []).map((l, i) => ({ ...l, __i: i })));
+        setRemovidas([]);
         setEquipamentos(Array.isArray(j.relatorio.equipamentos) ? j.relatorio.equipamentos : []);
         setObservacoes(j.relatorio.observacoes || "");
-        const r0 = j.relatorio.resultados || {};
-        setCond({
-          iluminacao: r0.iluminacao ?? "", tecnica: r0.tecnica || "", condicoes: r0.condicoes || "",
-          metalBase: r0.metalBase || "", tipoPeca: r0.tipoPeca || "",
-          carregamento: r0.carregamento || "", apModelo: r0.apModelo || "", apSerie: r0.apSerie || "",
-          cbModelo: r0.cbModelo || "", cbSerie: r0.cbSerie || "", cbAngulo: r0.cbAngulo || "",
-          acoplante: r0.acoplante || "", blocoPadrao: r0.blocoPadrao || "",
-          ganhoVarredura: r0.ganhoVarredura || "", local: r0.local || "",
-          // ── pintura: o que se MEDE ──
-          abrasivo: r0.abrasivo || "",
-          limpeza: r0.limpeza || "", intemperismo: r0.intemperismo || "",
-          prepData: r0.prepData || "", prepIni: r0.prepIni || "", prepFim: r0.prepFim || "",
-          prepTAmb: r0.prepTAmb ?? "", prepTSup: r0.prepTSup ?? "", prepOrvalho: r0.prepOrvalho ?? "",
-          prepUmidade: r0.prepUmidade ?? "", tempo: r0.tempo || "",
-          poeira: r0.poeira ?? "", salinidade: r0.salinidade ?? "",
-          pullOffEquip: r0.pullOffEquip ?? "", pullOffValor: r0.pullOffValor ?? "",
-          pullOffMin: r0.pullOffMin ?? "", pullOffRuptura: r0.pullOffRuptura ?? "",
-          rugLeituras: Array.isArray(r0.rugLeituras) ? r0.rugLeituras : ["", "", "", "", ""],
-          // ── líquido penetrante ──
-          tipoPenetrante: r0.tipoPenetrante || "", metodo: r0.metodo || "",
-          penetranteMarca: r0.penetranteMarca || "", penetranteLote: r0.penetranteLote || "",
-          removedor: r0.removedor || "", removedorLote: r0.removedorLote || "",
-          revelador: r0.revelador || "", reveladorLote: r0.reveladorLote || "",
-          tempoPenetracao: r0.tempoPenetracao ?? "", tempoSecagem: r0.tempoSecagem ?? "",
-          tempoRevelador: r0.tempoRevelador ?? "", temperatura: r0.temperatura ?? "", uv: r0.uv ?? "",
-          espessuras: r0.espessuras || {}, demaos: r0.demaos || {},
-          // ⚠ a micragem seca mínima É DO RELATÓRIO e se ajusta aqui (Vitor, 22/09/2026) — o valor
-          // do PLP continua no `__espec` ao lado, como referência da obra.
-          espessuraMinima: r0.espessuraMinima ?? "",
-          // ⚠ o ESPECIFICADO vai junto, mas fora do que se salva: a tela mostra para
-          // conferência e o `__espec` é descartado no envio (ver salvar()).
-          __espec: {
-            prepProcedimento: r0.prepProcedimento || null, abrasivo: r0.abrasivo || null,
-            rugEspec: r0.rugEspec || null, espessuraMinima: r0.espessuraMinima || null,
-          },
-        });
+        // ⚠⚠ O QUE SE CARREGA AQUI É O QUE A TELA MOSTRA AO REABRIR. A lista vivia escrita à mão
+        // neste ponto e não acompanhou o ultrassom — processo, metal de adição, junta, chanfro e a
+        // marca do cabeçote eram gravados e voltavam em branco (23/09/2026). Mora em
+        // lib/campo-condicoes.js, com teste que varre as telas do campo.
+        setCond(condicoesDoRelatorio(j.relatorio.resultados));
       })
       .catch((e) => setErro(e.message));
   }, [id]);
@@ -439,8 +415,14 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
     try {
       // ⚠ manda só o que o campo pode escrever, com o ÍNDICE da linha — o servidor mescla. Mandar a
       // lista inteira apagaria a cota que a Qualidade acrescentou enquanto o celular estava no bolso.
-      const medidas = linhas.map((l, i) => ({
-        i,
+      //
+      // ⚠⚠ O ÍNDICE É O DO BANCO (`__i`), NÃO O DA TELA (23/09/2026). Com o índice da tela, apagar a
+      // 1ª junta fazia a 2ª subir para a posição 0 — e o servidor escrevia os dados dela POR CIMA da
+      // 1ª, e a última ficava repetida. Junta nova entra depois das gravadas; as apagadas vão à parte,
+      // com a marca, para o servidor conferir antes de tirar.
+      let proxima = Array.isArray(rel.linhas) ? rel.linhas.length : 0;
+      const medidas = linhas.map((l) => ({
+        i: l.__i ?? proxima++,
         ...(ehDim
           ? { encontradoMm: l.encontradoMm }
           : ehUS
@@ -460,7 +442,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       }));
       const r = await fetch(`/api/campo/relatorios/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pecasInformadas, medidas, equipamentos, observacoes, assumirInspetor: !rel.inspetor, condicoes: ehDim ? undefined : (({ __espec, ...resto }) => resto)(cond), resultadoInspecao: resultado }),
+        body: JSON.stringify({ pecasInformadas, medidas, removidas, equipamentos, observacoes, assumirInspetor: !rel.inspetor, condicoes: ehDim ? undefined : (({ __espec, ...resto }) => resto)(cond), resultadoInspecao: resultado }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
@@ -492,6 +474,19 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
             className="mt-2 w-full bg-amber-600 text-white active:bg-amber-700 rounded-xl py-3 text-[15px] font-semibold disabled:opacity-60">
             Abrir reinspeção
           </button>
+        </div>
+      )}
+
+      {/* ⚠ JÁ ENVIADO PARA ASSINATURA E AINDA ASSIM EDITÁVEL — decisão do Vitor (22/09/2026): "não
+          precisa gerar revisão, pode apenas alterar as informações". O celular abria só o PDF, e quem
+          inspecionou não tinha como completar o próprio relatório. A gravação registra que veio depois
+          da assinatura (`editadoAposAssinatura`). */}
+      {rel.envioAssinaturaId && (
+        <div className="mb-3 rounded-xl border border-torg-blue/30 bg-torg-blue/5 px-3 py-2.5">
+          <p className="text-[13px] font-semibold text-torg-dark">Já enviado para assinatura</p>
+          <p className="text-[12px] text-torg-gray mt-0.5">
+            Você pode completar e corrigir. Cada alteração fica registrada no histórico, junto de quem já tinha assinado.
+          </p>
         </div>
       )}
 
@@ -598,7 +593,11 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-bold text-torg-dark text-[15px]">{l.marca}{l.descricao ? ` · ${l.descricao}` : ""}</span>
                 {!ehDim && (
-                  <button onClick={() => setLinhas((p) => p.filter((_, k) => k !== i))} className="text-torg-gray active:text-red-600 shrink-0">
+                  <button onClick={() => {
+                    // a junta GRAVADA precisa ser dita ao servidor; a acrescentada agora só sai da tela
+                    if (l.__i != null) setRemovidas((r) => [...r, { i: l.__i, marca: l.marca || null }]);
+                    setLinhas((p) => p.filter((_, k) => k !== i));
+                  }} className="text-torg-gray active:text-red-600 shrink-0">
                     <Trash2 size={15} />
                   </button>
                 )}
@@ -753,9 +752,15 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
 
       {lendoQR && <LeitorQR onLer={aoLerQR} onFechar={() => setLendoQR(false)} />}
 
-      {!medir.length && (
+      {/* ⚠ "Quem monta faz isso no computador" só vale para as COTAS. No visual de solda, no US e no LP
+          a junta nasce aqui (Ler QR / Digitar), e a frase antiga mandava o inspetor esperar por algo
+          que ninguém ia fazer: o EVS-102-001 foi para assinatura sem nenhuma junta (23/09/2026).
+          Pintura não tem junta — ali a frase só confundia. */}
+      {!medir.length && !ehPintura && (
         <p className="text-sm text-torg-gray">
-          Este relatório ainda não tem {ehDim ? "cotas marcadas" : "juntas lançadas"}. Quem monta faz isso no computador.
+          {ehDim
+            ? "Este relatório ainda não tem cotas marcadas. Quem monta faz isso no computador."
+            : "Nenhuma junta lançada ainda — acrescente pelo Ler QR ou Digitar, logo acima."}
         </p>
       )}
 
