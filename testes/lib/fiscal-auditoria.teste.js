@@ -1,0 +1,169 @@
+import { describe, it, expect } from "vitest";
+import { lerNfe } from "@/lib/fiscal/xml-nfe";
+import { auditar, indiceDaTipi, GRAVIDADE } from "@/lib/fiscal/auditoria";
+
+// ─── A AUDITORIA DA NF-e ─────────────────────────────────────────────────────
+//
+// ⚠⚠ O CASO REAL QUE ORIGINOU ISTO (NF-e 973, TORG → TMSA, 14/09/2026): 24 itens, todos NCM
+// 8437.90.00 e CFOP 6101 — 22 com CST 53 ("saída não tributada") e 2 com CST 50 a 3,25%. Matheus
+// (22/09/2026): *"o fiscal realmente esqueceu de declarar o IPI, porque o operador não sabia que o
+// NCM precisava destacar — por isso estamos criando essa tela, para ajudar ele"*.
+//
+// ⚠⚠ E O SISTEMA APONTA, NÃO CONDENA. Mesmo sabendo hoje que foi erro, o motor não pode DECLARAR
+// erro: ele diz o que a nota afirmou, o que a fonte diz, e por que discordam. Quem conclui é a
+// contabilidade — e nenhuma NF complementar sai daqui.
+
+const linha = (codigo, valor, ex = "") => ({
+  codigo, ex, aliquotaTipo: valor == null ? "NT" : "PERCENTUAL", aliquotaValor: valor,
+});
+const tipi = (...ls) => indiceDaTipi(ls);
+
+const nfe = (itens, { emit = "TORG METAL LTDA" } = {}) => `<?xml version="1.0"?>
+<nfeProc><NFe><infNFe Id="NFe35260953694442000141550010000009731484823558">
+  <ide><nNF>973</nNF><serie>1</serie><dhEmi>2026-09-14T10:00:00-03:00</dhEmi><natOp>VENDA</natOp></ide>
+  <emit><CNPJ>53694442000141</CNPJ><xNome>${emit}</xNome><UF>SP</UF></emit>
+  <dest><CNPJ>92782705000126</CNPJ><xNome>TMSA</xNome><UF>RS</UF></dest>
+  ${itens}
+  <total><ICMSTot><vProd>0</vProd><vIPI>0</vIPI><vNF>0</vNF></ICMSTot></total>
+</infNFe></NFe></nfeProc>`;
+
+const item = (n, { ncm = "84379000", vProd = 1000, cst = "53", pIPI = null, cEnq = "999", desc = "PEÇA" } = {}) => `
+  <det nItem="${n}">
+    <prod><cProd>ARM000010</cProd><xProd>ARMACAO DE ESTRUTURAS METALICAS</xProd>
+      <NCM>${ncm}</NCM><CFOP>6101</CFOP><uCom>KG</uCom><qCom>1</qCom>
+      <vUnCom>${vProd}</vUnCom><vProd>${vProd}</vProd></prod>
+    <imposto><IPI><cEnq>${cEnq}</cEnq>
+      ${pIPI == null
+        ? `<IPINT><CST>${cst}</CST></IPINT>`
+        : `<IPITrib><CST>${cst}</CST><vBC>${vProd}</vBC><pIPI>${pIPI}</pIPI><vIPI>${(vProd * pIPI / 100).toFixed(2)}</vIPI></IPITrib>`}
+    </IPI></imposto>
+    <infAdProd>${desc}</infAdProd>
+  </det>`;
+
+describe("lerNfe — o que o Omie não entrega", () => {
+  // ⚠⚠ É POR ISTO QUE A AUDITORIA PRECISA DO XML. O `ListarNF` do Omie não devolve CST, cEnq nem
+  // `infAdProd` — e os 24 itens da 973 têm o MESMO código e a MESMA descrição de produto. Sem a
+  // subdescrição, os itens são indistinguíveis entre si.
+  it("extrai CST, cEnq e a descrição real do item", () => {
+    const d = lerNfe(nfe(item(1, { desc: "FLANGE MAIOR CONEXAO SAIDA - DES 71264380" })));
+    expect(d.itens[0]).toMatchObject({
+      ncm: "84379000", cfop: "6101",
+      descricao: "ARMACAO DE ESTRUTURAS METALICAS",
+      descricaoItem: "FLANGE MAIOR CONEXAO SAIDA - DES 71264380",
+    });
+    expect(d.itens[0].ipi).toMatchObject({ grupo: "IPINT", cst: "53", cEnq: "999" });
+  });
+
+  it("lê o grupo tributado com alíquota e valor", () => {
+    const d = lerNfe(nfe(item(1, { cst: "50", pIPI: 3.25, vProd: 3284.08 })));
+    expect(d.itens[0].ipi).toMatchObject({ grupo: "IPITrib", cst: "50", aliquota: 3.25, valor: 106.73 });
+  });
+
+  it("a chave vem do atributo Id", () => {
+    expect(lerNfe(nfe(item(1))).chave).toBe("35260953694442000141550010000009731484823558");
+  });
+
+  it.each(["", "<xml>nada</xml>", "não é xml"])("entrada que não é NF-e é recusada", (x) => {
+    expect(lerNfe(x).erro).toBeTruthy();
+  });
+});
+
+describe("auditar — o caso da NF-e 973", () => {
+  const base = tipi(linha("84379000", 3.25));
+
+  // ⚠⚠ O ACHADO CENTRAL: não é "vIPI é zero", é que a nota AFIRMOU estar fora do campo de
+  // incidência (CST 53) sobre um NCM que a TIPI tributa. Comparar só o valor trataria 51, 52, 53 e
+  // 55 como a mesma coisa — e cada um exige uma prova diferente.
+  it("CST 53 num NCM tributado vira apontamento de alta gravidade", () => {
+    const r = auditar(lerNfe(nfe(item(1, { vProd: 2542 }))), base, { vigenciaDeclarada: false });
+    const a = r.achados.find((x) => x.tipo === "IPI_NAO_DESTACADO");
+    expect(a.gravidade).toBe(GRAVIDADE.ALTA);
+    expect(a.titulo).toMatch(/CST 53 .*3,25%/);
+    expect(a.estimativa).toEqual({ base: 2542, aliquota: 3.25, ipi: 82.62 });
+  });
+
+  // ⚠⚠ O ACHADO MAIS FORTE, porque não depende de interpretar a lei: o mesmo NCM, no mesmo
+  // documento, tratado de dois jeitos. Um dos dois está errado por construção.
+  it("o mesmo NCM com dois CSTs na mesma nota é contradição interna", () => {
+    const r = auditar(lerNfe(nfe(item(1) + item(2, { cst: "50", pIPI: 3.25 }))), base, {});
+    const c = r.achados.find((x) => x.tipo === "CONTRADICAO_INTERNA");
+    expect(c.gravidade).toBe(GRAVIDADE.ALTA);
+    expect(c.detalhe).toMatch(/CST 53 em 1 item\(ns\) e CST 50 em 1 item\(ns\)/);
+  });
+
+  it("nota coerente e tributada não gera apontamento", () => {
+    const r = auditar(lerNfe(nfe(item(1, { cst: "50", pIPI: 3.25 }))), base, {});
+    expect(r.achados).toEqual([]);
+    expect(r.resumo.diferencaEstimada).toBe(0);
+  });
+
+  // ⚠ A soma é de ESTIMATIVAS, item a item — que é como sairia numa complementar. Somar a base e
+  // aplicar a alíquota no fim daria outro centavo, e o centavo de menos é o que o fiscal confere.
+  it("a diferença estimada soma item a item", () => {
+    const r = auditar(lerNfe(nfe(item(1, { vProd: 2542 }) + item(2, { vProd: 4158.40 }))), base, {});
+    expect(r.resumo.diferencaEstimada).toBe(82.62 + 135.15);
+  });
+});
+
+describe("auditar — o que ele se RECUSA a concluir", () => {
+  // ⚠⚠ REGRA 2: campo ausente produz "não avaliável", NUNCA conformidade. Silêncio por falta de
+  // dado é indistinguível de silêncio por estar tudo certo — a pior ambiguidade numa auditoria.
+  it("item sem CST não é aprovado: é declarado não avaliável", () => {
+    const xml = nfe(`<det nItem="1"><prod><NCM>84379000</NCM><CFOP>6101</CFOP><vProd>100</vProd></prod><imposto/></det>`);
+    const r = auditar(lerNfe(xml), tipi(linha("84379000", 3.25)), {});
+    const a = r.achados[0];
+    expect(a.tipo).toBe("NAO_AVALIAVEL");
+    expect(a.faltam).toContain("IPI/CST");
+    expect(r.resumo.naoAvaliaveis).toBe(1);
+  });
+
+  // ⚠⚠ REGRA 3: Ex desconhecido não significa geral. Com exceções na tabela e sem saber em qual o
+  // produto se enquadra, o apontamento sai marcado como INCONCLUSIVO.
+  it("NCM com Ex TIPI deixa o apontamento inconclusivo", () => {
+    const comEx = tipi(linha("84379000", 3.25), linha("84379000", 0, "01"));
+    const r = auditar(lerNfe(nfe(item(1))), comEx, {});
+    const a = r.achados.find((x) => x.tipo === "IPI_NAO_DESTACADO");
+    expect(a.inconclusivo).toBe(true);
+    expect(a.detalhe).toMatch(/Ex TIPI/);
+  });
+
+  it("NCM fora da TIPI não é comparado — é apontado como classificação a rever", () => {
+    const r = auditar(lerNfe(nfe(item(1, { ncm: "99999999" }))), tipi(linha("84379000", 3.25)), {});
+    expect(r.achados[0].tipo).toBe("NCM_FORA_DA_TIPI");
+    expect(r.resumo.diferencaEstimada).toBe(0);
+  });
+
+  // ⚠⚠ O APONTAMENTO CARREGA A RESSALVA DA REFERÊNCIA. Sem vigência declarada, ele vale contra a
+  // tabela que o portal usa HOJE — não contra a comprovadamente vigente na data de emissão. Omitir
+  // isso faria um apontamento de nota antiga parecer mais sólido do que é.
+  it("sem vigência declarada, a ressalva vai junto do resultado", () => {
+    const r = auditar(lerNfe(nfe(item(1))), tipi(linha("84379000", 3.25)), { vigenciaDeclarada: false });
+    expect(r.referencia.ressalva).toMatch(/não tem vigência declarada/i);
+  });
+
+  it("com vigência declarada, não há ressalva", () => {
+    const r = auditar(lerNfe(nfe(item(1))), tipi(linha("84379000", 3.25)), { vigenciaDeclarada: true });
+    expect(r.referencia.ressalva).toBeNull();
+  });
+
+  // ⚠ "NT" na TIPI não é alíquota positiva: CST 53 sobre ele é coerente, não divergência.
+  it("NCM NT na TIPI com CST 53 não vira apontamento", () => {
+    const r = auditar(lerNfe(nfe(item(1))), tipi(linha("84379000", null)), {});
+    expect(r.achados.filter((a) => a.tipo === "IPI_NAO_DESTACADO")).toEqual([]);
+  });
+});
+
+describe("auditar — o enquadramento legal", () => {
+  // ⚠⚠ "999" NÃO É ENQUADRAMENTO — é a ausência dele com um código no lugar. O briefing é explícito:
+  // não atribuir cEnq 999 automaticamente, e não usar CST 55 sem identificar o fundamento.
+  it("CST que exige fundamento com cEnq 999 é apontado", () => {
+    const r = auditar(lerNfe(nfe(item(1, { cst: "55" }))), tipi(linha("84379000", null)), {});
+    const a = r.achados.find((x) => x.tipo === "ENQUADRAMENTO_GENERICO");
+    expect(a.titulo).toMatch(/CST 55 com enquadramento 999/);
+  });
+
+  it("alíquota declarada diferente da TIPI é apontada", () => {
+    const r = auditar(lerNfe(nfe(item(1, { cst: "50", pIPI: 5 }))), tipi(linha("84379000", 3.25)), {});
+    expect(r.achados.find((x) => x.tipo === "ALIQUOTA_DIVERGENTE").titulo).toMatch(/5% × TIPI 3,25%/);
+  });
+});

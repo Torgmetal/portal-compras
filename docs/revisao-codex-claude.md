@@ -756,3 +756,28 @@ novo, não conserto, e não entra sem o Matheus decidir.
   (`infAdProd`) ou o pedido. ⚠⚠ E fica a questão para a contabilidade: classificação fiscal segue a
   natureza do produto, não o pedido do cliente.
   Testes: `fiscal-ncm` (12), novo. **3.167 passando**, build local EXIT=0, tela validada logada.
+- **(22/09, 21h05) Auditoria de NF-e por XML — o caso da 973 fechado com evidência.** Matheus
+  (22/09/2026): *"o fiscal realmente esqueceu de declarar o IPI, mas esqueceu porque o operador não
+  sabia que o NCM precisava destacar — por isso estamos criando essa tela, para ajudar ele"*.
+  ⚠⚠ **O XML era indispensável, e agora sei exatamente por quê.** O `ListarNF` do Omie não devolve
+  `CST`, `cEnq` nem `infAdProd`. Extraído do XML real: os 22 itens sem IPI têm **CST 53** ("saída
+  NÃO TRIBUTADA") com `cEnq 999`, e os 2 restantes têm **CST 50** a 3,25%. E o `infAdProd` traz a
+  peça de verdade ("FLANGE MAIOR CONEXAO SAIDA - DES 71264380") — sem ele os 24 itens são
+  indistinguíveis, porque todos usam o mesmo `cProd` ARM000010.
+  ⚠⚠ **O achado central não é "vIPI é zero" — é a AFIRMAÇÃO.** CST 53 declara que o produto está
+  FORA do campo de incidência; 51 declara alíquota zero; 55 declara suspensão. Comparar só o valor
+  trataria os quatro como a mesma coisa, e cada um exige prova diferente. O motor compara a
+  DECLARAÇÃO com a TIPI.
+  ⚠⚠ **E o achado mais forte não depende de interpretar lei**: `CONTRADICAO_INTERNA` — o mesmo NCM,
+  no mesmo documento, com dois CSTs. Um dos dois está errado por construção.
+  ⚠ **O sistema aponta, não condena** (contrato do parecer): nenhum achado diz "está errado";
+  campo ausente vira `NAO_AVALIAVEL` explícito; NCM com Ex TIPI sai marcado `inconclusivo`; e a
+  ressalva "a TIPI não tem vigência declarada" viaja junto do resultado. "Diferença estimada",
+  nunca "imposto devido". Nada é gravado e nenhuma NF complementar é gerada.
+  ⚠ Medido na 973: 22 `IPI_NAO_DESTACADO` + 1 `CONTRADICAO_INTERNA`, **R$ 7.026,56** estimados
+  sobre R$ 216.201,42. (Um centavo acima da conta anterior porque agora cada item é arredondado
+  individualmente — que é como sairia numa complementar.)
+  ⚠ `@xmldom/xmldom` passou a ser dependência DIRETA: já estava na árvore via docxtemplater/mammoth,
+  e depender de transitiva é depender de algo que some quando o pai atualiza. DOM de verdade e não
+  regex: é documento com valor legal.
+  Testes: `fiscal-auditoria` (18), novo. **3.185 passando**, tela validada logada com o XML real.

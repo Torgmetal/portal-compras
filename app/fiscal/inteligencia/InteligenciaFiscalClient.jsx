@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
+import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle, Upload, ShieldAlert, HelpCircle } from "lucide-react";
 
 // ─── INTELIGÊNCIA FISCAL ─────────────────────────────────────────────────────
 //
@@ -474,7 +474,132 @@ function AbaAdmin({ referencia: inicial, ehAdmin }) {
   );
 }
 
-const ABAS = [{ id: "ncm", rotulo: "Consulta NCM" }, { id: "cfop", rotulo: "Consulta CFOP" }, { id: "admin", rotulo: "Atualizações Tributárias" }];
+
+const moeda = (v) => (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+/** ⚠ Gravidade vira cor — mas "não avaliável" NÃO é uma gravidade menor: é a ausência de veredito,
+ *  e precisa de forma própria para não ser lida como "conferido, está ok". */
+const CHIP = {
+  ALTA:  "border-red-200 bg-red-50 text-red-700",
+  MEDIA: "border-amber-200 bg-amber-50 text-amber-800",
+  INFO:  "border-gray-200 bg-gray-50 text-torg-gray",
+};
+
+function AbaAuditoria() {
+  const [arquivo, setArquivo] = useState(null);
+  const [resultado, setResultado] = useState(null);
+  const [erro, setErro] = useState(null);
+  const [carregando, setCarregando] = useState(false);
+
+  const enviar = async (f) => {
+    if (!f) return;
+    setCarregando(true); setErro(null); setResultado(null); setArquivo(f.name);
+    try {
+      const fd = new FormData(); fd.append("xml", f);
+      const r = await fetch("/api/fiscal/inteligencia/auditoria", { method: "POST", body: fd });
+      const d = await r.json();
+      if (!d.success) setErro(d.error || "Não foi possível auditar o arquivo.");
+      else setResultado(d);
+    } catch {
+      setErro("Falha de rede ao enviar o arquivo.");
+    } finally { setCarregando(false); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white py-10 transition hover:border-torg-blue/40 hover:bg-gray-50/60">
+        <input type="file" accept=".xml,text/xml,application/xml" className="hidden"
+          onChange={(e) => enviar(e.target.files?.[0])} />
+        {carregando ? <Loader2 size={26} className="animate-spin text-torg-blue" /> : <Upload size={26} className="text-gray-300" />}
+        <span className="mt-2 text-sm font-medium text-torg-dark">{carregando ? "Auditando…" : "Enviar o XML da NF-e"}</span>
+        <span className="mt-0.5 text-xs text-torg-gray">{arquivo && !carregando ? arquivo : "o arquivo é lido e descartado — nada é gravado"}</span>
+      </label>
+
+      {erro && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erro}</div>}
+
+      {resultado && (
+        <>
+          <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-torg-dark">NF-e {resultado.numero}</h2>
+                <p className="text-xs text-torg-gray">
+                  {resultado.emitente?.nome} → {resultado.destinatario} · {resultado.itens} itens · emitida em {fmtData(resultado.emitidaEm)}
+                </p>
+                <p className="mt-0.5 font-mono text-[10px] text-gray-400">{resultado.chave}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs uppercase tracking-wide text-torg-gray">Diferença estimada</p>
+                <p className={`text-2xl font-bold ${resultado.resumo.diferencaEstimada > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                  {moeda(resultado.resumo.diferencaEstimada)}
+                </p>
+                {/* ⚠⚠ "ESTIMADA", NUNCA "DEVIDA". É a soma das contas óbvias dos achados, para
+                    dimensionar o problema — não uma apuração, e não base de cálculo de nada. */}
+                <p className="text-[10px] text-torg-gray">sobre {moeda(resultado.resumo.baseDaEstimativa)} · estimativa, não apuração</p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-3 text-xs">
+              <span className={`rounded-lg border px-2.5 py-1 font-medium ${CHIP.ALTA}`}>{resultado.resumo.alta} de alta gravidade</span>
+              <span className={`rounded-lg border px-2.5 py-1 font-medium ${CHIP.MEDIA}`}>{resultado.resumo.media} média</span>
+              <span className={`rounded-lg border px-2.5 py-1 font-medium ${CHIP.INFO}`}>{resultado.resumo.naoAvaliaveis} não avaliável(is)</span>
+            </div>
+
+            {/* ⚠⚠ A RESSALVA DA REFERÊNCIA ANDA JUNTO DO APONTAMENTO. Sem ela, um achado sobre nota
+                antiga pareceria mais sólido do que é. */}
+            {resultado.referencia?.ressalva && (
+              <p className="mt-3 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <Info size={13} className="mt-0.5 shrink-0" />{resultado.referencia.ressalva}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {resultado.achados.map((a, i) => (
+              <div key={i} className={`rounded-xl border bg-white p-4 shadow-sm ${a.gravidade === "ALTA" ? "border-red-100" : "border-gray-100"}`}>
+                <div className="flex items-start gap-2.5">
+                  {a.tipo === "NAO_AVALIAVEL" ? <HelpCircle size={16} className="mt-0.5 shrink-0 text-torg-gray" />
+                    : <ShieldAlert size={16} className={`mt-0.5 shrink-0 ${a.gravidade === "ALTA" ? "text-red-600" : "text-amber-600"}`} />}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-semibold text-torg-dark">{a.titulo}</h3>
+                      {a.inconclusivo && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">inconclusivo</span>}
+                    </div>
+                    {(a.item || a.descricao) && (
+                      <p className="mt-0.5 text-xs text-torg-gray">
+                        {a.item ? `item ${a.item}` : `${a.itens?.length ?? 0} itens`}{a.descricao ? ` · ${a.descricao}` : ""}
+                      </p>
+                    )}
+                    <p className="mt-1.5 text-xs text-torg-gray">{a.detalhe}</p>
+                    {a.estimativa && (
+                      <p className="mt-1.5 text-xs text-torg-dark">
+                        {moeda(a.estimativa.base)} × {String(a.estimativa.aliquota).replace(".", ",")}% = <strong>{moeda(a.estimativa.ipi)}</strong>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {!resultado.achados.length && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-6 text-center text-sm text-emerald-800">
+                Nenhuma divergência encontrada entre o declarado e a TIPI de referência.
+              </div>
+            )}
+          </div>
+
+          {/* ⚠⚠ O LIMITE DITO EM VOZ ALTA. O sistema aponta; quem conclui é a contabilidade. */}
+          <p className="rounded-xl border border-gray-100 bg-white px-4 py-3 text-xs text-torg-gray">
+            ⚠ Estes são <strong>apontamentos para investigar</strong>, não uma apuração. O portal compara o que a nota declarou
+            com a tabela oficial — tratamentos específicos, Ex TIPI e a classificação real de cada peça são decisão da contabilidade.
+            Nenhuma nota complementar é gerada aqui.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+const ABAS = [{ id: "ncm", rotulo: "Consulta NCM" }, { id: "cfop", rotulo: "Consulta CFOP" }, { id: "auditoria", rotulo: "Auditoria de NF-e" }, { id: "admin", rotulo: "Atualizações Tributárias" }];
 
 export default function InteligenciaFiscalClient({ referencia, cfops, operacoes, cstIpi, familias, ehAdmin }) {
   const [aba, setAba] = useState("ncm");
@@ -496,6 +621,7 @@ export default function InteligenciaFiscalClient({ referencia, cfops, operacoes,
 
       {aba === "ncm" && <AbaNcm referencia={referencia} />}
       {aba === "cfop" && <AbaCfop cfops={cfops} operacoes={operacoes} cstIpi={cstIpi} familias={familias} />}
+      {aba === "auditoria" && <AbaAuditoria />}
       {aba === "admin" && <AbaAdmin referencia={referencia} ehAdmin={ehAdmin} />}
 
       <p className="flex items-center gap-1.5 pt-2 text-xs text-torg-gray">

@@ -1,7 +1,12 @@
 {
-  "build": 3405,
-  "gerado": "2026-09-22T23:54:29.250Z",
+  "build": 3406,
+  "gerado": "2026-09-23T00:06:31.951Z",
   "commits": [
+    {
+      "hash": "70904dccd8",
+      "data": "22/09/2026",
+      "titulo": "Fiscal: o painel de Atualizações Tributárias, com o teto da fonte respeitado"
+    },
     {
       "hash": "bc9eddc2e7",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "20cca28918",
       "data": "22/09/2026",
       "titulo": "MES: trazer a barra para um posto parado deixa de apagar a parada"
-    },
-    {
-      "hash": "15cc0b1f50",
-      "data": "22/09/2026",
-      "titulo": "MES: os três achados da revisão da reserva de barra"
     }
   ]
 }
