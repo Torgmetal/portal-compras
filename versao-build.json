@@ -1,7 +1,12 @@
 {
-  "build": 3437,
-  "gerado": "2026-09-23T20:47:36.731Z",
+  "build": 3438,
+  "gerado": "2026-09-23T21:07:52.979Z",
   "commits": [
+    {
+      "hash": "390aa8b918",
+      "data": "23/09/2026",
+      "titulo": "Assistente Fiscal: a IA orquestra, a ferramenta é que determina"
+    },
     {
       "hash": "a18409031f",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ec409d18ef",
       "data": "22/09/2026",
       "titulo": "Simulador: o seletor passa a ser de CFOP, e isso pega um erro novo"
-    },
-    {
-      "hash": "96cace4fb8",
-      "data": "22/09/2026",
-      "titulo": "Fiscal: o Simulador — o alerta que a NF-e 973 não teve"
     }
   ]
 }

@@ -278,6 +278,13 @@ export default async function RMComprasDetail({ params }) {
       // como saber se o material chegou no prazo estimado.
       prazoEntregaPrevisto: true,
       prazoOriginal: true,
+      // ⚠⚠ A PROPOSTA PENDENTE DO FORNECEDOR VEM JUNTO PORQUE REMARCAR POR DENTRO A MATA. A rota
+      // já faz isso (`LIMPAR_PROPOSTA`), mas sem estes campos a tela não teria como AVISAR — e
+      // descartar em silêncio a data que o fornecedor mandou é o tipo de coisa que só se descobre
+      // quando ele cobra uma resposta que ninguém viu.
+      prazoProposto: true,
+      prazoPropostoEm: true,
+      prazoPropostoId: true,
       prazoHistorico: {
         select: { id: true, prazoAnterior: true, prazoNovo: true, motivo: true, criadoEm: true, alteradoPor: { select: { name: true } } },
         orderBy: { criadoEm: "asc" },

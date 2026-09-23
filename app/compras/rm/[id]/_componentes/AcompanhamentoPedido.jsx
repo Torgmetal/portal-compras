@@ -12,7 +12,8 @@
 // tempo por pedido empurraria tudo isso para fora da vista numa RM com quatro pedidos. A régua
 // fechada mostra o que decide se vale abrir: a previsão e se chegou no prazo.
 import { useState } from "react";
-import { CalendarClock, History, Plus, X, Loader2, CheckCircle2, Truck, PackageCheck } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { CalendarClock, History, Plus, X, Loader2, CheckCircle2, Truck, PackageCheck, AlertTriangle } from "lucide-react";
 import { linhaDoTempo, ETAPAS, ETAPAS_VALIDAS } from "@/lib/acompanhamento-pedido";
 import CampoData from "@/components/CampoData";
 
@@ -47,23 +48,66 @@ function Resumo({ previsao, atrasoDias, quantos }) {
   );
 }
 
-function FormLancamento({ pedidoId, aoLancar }) {
+// ⚠⚠ A PREVISÃO NÃO É UMA ETAPA, E ENTRA NO MESMO SELETOR ASSIM MESMO. Matheus (23/09/2026):
+// *"preciso que tenha a opção quando alterar a data de selecionar DATA DE ENTREGA, não achamos
+// essa opção, só apareceu 3 opção"*. As três são ACONTECIMENTOS que o comprador registra; a
+// previsão é uma PROMESSA sobre o futuro, e ela só se mudava na tela Compras › Cronograma.
+//
+// ⚠ Juntar as duas coisas num seletor só é deliberado: de onde a pessoa olha, é tudo "lançar uma
+// data sobre este pedido" — e a linha do tempo JÁ mistura os dois de propósito (`tipo: "prazo"` ao
+// lado de `tipo: "etapa"`), justamente para se enxergar a promessa ao lado do que aconteceu. O que
+// não pode é o rótulo mentir sobre qual das duas é: por isso ela sai separada por um traço no
+// seletor e escrita como **previsão**, nunca como "entregue".
+const PREVISAO = "__PREVISAO__";
+
+function FormLancamento({ pedido, aoLancar }) {
+  const pedidoId = pedido.id;
+  const { data: sessao } = useSession();
+  // ⚠⚠ REMARCAR PRAZO É DE ADMIN E COMPRAS; LANÇAR ETAPA TAMBÉM É DO ALMOXARIFADO. A rota de prazo
+  // exige `["ADMIN","COMPRAS"]` e a de acompanhamento aceita `ALMOXARIFADO` — oferecer a opção a
+  // quem não pode faria o almoxarife escolher e tomar um 403 sem entender por quê.
+  // ⚠ Espelha `requireRole(["ADMIN","COMPRAS"])` de lib/session.js: ADMIN é TIPO e passa em tudo;
+  // o resto precisa do MÓDULO. Inventar a conta aqui faria a tela e o servidor discordarem.
+  const u = sessao?.user;
+  const podeRemarcar = u?.tipo === "ADMIN" || (u?.modulos ?? []).includes("COMPRAS");
+
   const [etapa, setEtapa] = useState(ETAPAS_VALIDAS[0]);
   const [data, setData] = useState(hoje());
   const [observacao, setObservacao] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
+  const ehPrevisao = etapa === PREVISAO;
+
+  /**
+   * ⚠⚠ TROCAR PARA "PREVISÃO" TROCA A DATA PADRÃO, e isso não é conveniência. Etapa é um fato do
+   * passado, então HOJE é o palpite certo; previsão é uma data futura, e deixar HOJE ali convida a
+   * gravar sem querer um prazo para hoje — que jogaria o pedido para "vence hoje" na tela de
+   * Prazos e dispararia cobrança em cima de um fornecedor que não combinou nada disso.
+   */
+  const trocarTipo = (novo) => {
+    setEtapa(novo);
+    if (novo === PREVISAO) setData(pedido.prazoEntregaPrevisto ? new Date(pedido.prazoEntregaPrevisto).toISOString().slice(0, 10) : "");
+    else if (ehPrevisao) setData(hoje());
+  };
 
   const enviar = async (e) => {
     e.preventDefault();
     setSalvando(true);
     setErro("");
     try {
-      const r = await fetch(`/api/pedido-omie/${pedidoId}/acompanhamento`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ etapa, data, observacao: observacao.trim() || null }),
-      });
+      const r = ehPrevisao
+        ? await fetch("/api/compras/entregas/prazo", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            // ⚠ A observação vira o MOTIVO da remarcação — é o campo que o histórico de prazos
+            // mostra, e é o que responde "por que a data mudou" seis semanas depois.
+            body: JSON.stringify({ pedidoId, novoPrazo: data, motivo: observacao.trim() || undefined }),
+          })
+        : await fetch(`/api/pedido-omie/${pedidoId}/acompanhamento`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ etapa, data, observacao: observacao.trim() || null }),
+          });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || "Não foi possível lançar.");
       setObservacao("");
@@ -78,8 +122,13 @@ function FormLancamento({ pedidoId, aoLancar }) {
   const campo = "px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-torg-blue";
   return (
     <form onSubmit={enviar} className="mt-2 flex items-end gap-2 flex-wrap">
-      <select value={etapa} onChange={(e) => setEtapa(e.target.value)} className={campo} disabled={salvando}>
+      <select value={etapa} onChange={(e) => trocarTipo(e.target.value)} className={campo} disabled={salvando}>
         {ETAPAS_VALIDAS.map((k) => <option key={k} value={k}>{ETAPAS[k].rotulo}</option>)}
+        {podeRemarcar && (
+          <optgroup label="Previsão">
+            <option value={PREVISAO}>Data de entrega (previsão)</option>
+          </optgroup>
+        )}
       </select>
       {/* ⚠ A data vem com HOJE preenchido, mas editável: o caso comum é lançar no dia, e o caso
           que importa medir é o de lançar depois — quem registra na segunda o que chegou na sexta
@@ -103,6 +152,19 @@ function FormLancamento({ pedidoId, aoLancar }) {
         className="px-2.5 py-1 text-xs rounded bg-torg-blue text-white font-medium inline-flex items-center gap-1 disabled:opacity-50">
         {salvando ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />} Lançar
       </button>
+      {/* ⚠⚠ O AVISO DA PROPOSTA PENDENTE. Remarcar por dentro DESCARTA a data que o fornecedor
+          mandou pelo link público — e quem está remarcando talvez nem saiba que ela existe. */}
+      {ehPrevisao && pedido.prazoPropostoId && (
+        <span className="w-full inline-flex items-start gap-1.5 text-xs text-amber-700">
+          <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+          O fornecedor propôs {fmt(pedido.prazoProposto)} e essa proposta ainda está em análise. Remarcar aqui descarta a proposta dele.
+        </span>
+      )}
+      {ehPrevisao && (
+        <span className="w-full text-xs text-torg-gray">
+          Isto muda a <b className="font-medium text-torg-dark">previsão</b> de entrega do pedido e entra no histórico de prazos — não registra que o material chegou.
+        </span>
+      )}
       {erro && <span className="text-xs text-red-600 w-full">{erro}</span>}
     </form>
   );
@@ -169,7 +231,7 @@ export function AcompanhamentoPedido({ pedido, aoMudar }) {
           </ul>
         )}
 
-        <FormLancamento pedidoId={pedido.id} aoLancar={aoMudar} />
+        <FormLancamento pedido={pedido} aoLancar={aoMudar} />
       </div>
     </details>
   );
