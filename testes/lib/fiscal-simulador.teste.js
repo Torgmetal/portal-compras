@@ -195,10 +195,25 @@ describe("paresDeCfop — dentro e fora do estado são a MESMA operação", () =
     expect(venda.resumo).toBe("Venda de produção do estabelecimento");
   });
 
-  // ⚠ Aparecer sozinho é INFORMAÇÃO: quem procurar um "6.125" precisa ver que ele não está na lista.
-  it("código sem irmão aparece sozinho, não inventa o par", () => {
-    expect(pares.find((p) => p.chave === "5125").codigos).toEqual(["5125"]);
-    expect(pares.some((p) => p.chave.includes("6125"))).toBe(false);
+  // ⚠⚠ OITO CÓDIGOS ESTAVAM SEM O PAR, E ERA FALHA DA LISTA, NÃO DA TABELA. Matheus (22/09/2026),
+  // olhando o seletor: *"alguns CFOP ficaram sem a opção fora do estado"*. A ausência do 6.125
+  // fazia parecer que uma industrialização para cliente de fora do estado não tinha código.
+  it("todo código tem o seu par dentro/fora do estado", () => {
+    expect(pares.filter((p) => p.codigos.length !== 2)).toEqual([]);
+    expect(pares).toHaveLength(13);
+    expect(CFOPS).toHaveLength(26);
+  });
+
+  it.each(["6116", "6124", "6125", "6902", "6903", "6922", "6924", "6925"])("o %s entrou na lista", (c) => {
+    expect(CFOPS.find((x) => x.codigo === c)).toBeTruthy();
+  });
+
+  // ⚠ O 6.xxx herda a família do irmão — senão ele cairia noutro grupo do seletor.
+  it("o par vive na mesma família", () => {
+    for (const par of pares) {
+      const fams = new Set(par.codigos.map((c) => CFOPS.find((x) => x.codigo === c).familia));
+      expect(fams.size, par.chave).toBe(1);
+    }
   });
 
   it("nenhum código se perde nem se repete no agrupamento", () => {
@@ -291,7 +306,7 @@ describe("as notas que a operação exige — a pergunta que vem antes do CST", 
     const r = simular({ ncm: "84379000", cfop: "5124", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
     const seq = r.cfop.sequencias.find((s) => s.operacaoId === "indust-insumo-direto");
     expect(seq.notas[0]).toMatchObject({ quem: "Cliente", cfop: null });
-    expect(seq.notas.filter((n) => n.quem === "TORG").map((n) => n.cfop)).toEqual(["5902", "5124"]);
+    expect(seq.notas.filter((n) => n.quem === "TORG").map((n) => n.cfop)).toEqual(["5902/6902", "5124/6124"]);
   });
 
   it("a venda normal é uma nota só", () => {
@@ -474,8 +489,8 @@ describe("a sequência de notas não pode perder documento entre cenários", () 
   it("o 5.902 aparece nos DOIS cenários, com emitentes diferentes", () => {
     const r = simular({ ncm: "84379000", cfop: "5902", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
     const por = Object.fromEntries(r.cfop.sequencias.map((s) => [s.operacaoId, s.notas]));
-    expect(por["indust-insumo-direto"].find((n) => n.cfop === "5902").quem).toBe("TORG");
-    expect(por["terceirizacao"].find((n) => n.cfop === "5902").quem).toBe("Terceiro");
+    expect(por["indust-insumo-direto"].find((n) => n.cfop === "5902/6902").quem).toBe("TORG");
+    expect(por["terceirizacao"].find((n) => n.cfop === "5902/6902").quem).toBe("Terceiro");
   });
 
   it("todo cenário volta com a sua sequência COMPLETA", () => {
@@ -498,5 +513,30 @@ describe("ICMS entra como referência, não como imposto", () => {
   it("o IBS/CBS continua sem número algum", () => {
     const r = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25)));
     expect(r.naoDeterminados.map((x) => x.tributo)).toContain("IBS/CBS");
+  });
+});
+
+describe("os pares que faltavam funcionam de ponta a ponta", () => {
+  // ⚠⚠ SEM O 6.125, UMA INDUSTRIALIZAÇÃO PARA CLIENTE DE FORA DO ESTADO NÃO TINHA CÓDIGO NO
+  // SELETOR — e o operador ou escolhia o 5.125 (interno, que a SEFAZ rejeita) ou caía no 5.949.
+  it("o par 5.125/6.125 resolve para o 6.125 num destino de fora", () => {
+    const r = simular({ ncm: "84379000", cfop: "5125/6125", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25)));
+    expect(r.cfop.escolhido.codigoFormatado).toBe("6.125");
+    expect(r.alertas.filter((a) => /operação INTERNA/.test(a.texto))).toEqual([]);
+  });
+
+  // ⚠ E os 6.xxx novos trazem as operações reais junto — senão o código entraria mudo, sem
+  // pergunta e sem sequência de notas.
+  it.each(["6124", "6125", "6902", "6922", "6116", "6924", "6925"])("o %s traz as operações reais", (c) => {
+    const r = simular({ ncm: "84379000", cfop: c, ufOrigem: "SP", ufDestino: "RS" }, tipi(linha(3.25)));
+    expect(r.cfop.operacoes.length, c).toBeGreaterThan(0);
+    expect(r.cfop.sequencias.length, c).toBeGreaterThan(0);
+  });
+
+  // ⚠⚠ O 5.125 escolhido para fora do estado continua acendendo o alerta, agora COM o equivalente
+  // — antes não havia 6.125 na lista e a sugestão saía vazia.
+  it("escolhendo o 5.125 para o RS, o equivalente sugerido é o 6.125", () => {
+    const r = simular({ ncm: "84379000", cfop: "5125", ufOrigem: "SP", ufDestino: "RS" }, tipi(linha(3.25)));
+    expect(r.alertas.find((a) => a.nivel === "alto").texto).toMatch(/O código equivalente é o 6\.125/);
   });
 });

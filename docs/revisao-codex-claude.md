@@ -907,3 +907,16 @@ novo, não conserto, e não entra sem o Matheus decidir.
     que uma nota conforme sai. Agora gera NAO_AVALIAVEL com `faltam: ["IPI/pIPI"]`, e o contador
     da tela enxerga.
   **3.308 passando**, tela validada logada (NCM com Ex e simulação sem CFOP).
+- **(22/09, 22h45) Oito CFOPs estavam sem o par interestadual.** Matheus, olhando o seletor:
+  *"alguns CFOP ficaram sem a opção fora do estado, verifique e insira também"*. Estava certo:
+  5.116, 5.124, 5.125, 5.902, 5.903, 5.922, 5.924 e 5.925 apareciam sozinhos.
+  ⚠⚠ **ERA FALHA DA MINHA LISTA, NÃO DA TABELA.** A simetria 5.xxx/6.xxx é sistemática no Convênio
+  S/Nº: 6.116, 6.124, 6.125, 6.902, 6.903, 6.922, 6.924 e 6.925 existem. A ausência deles fazia
+  parecer que uma **industrialização para cliente de fora do estado não tinha código** — e aí o
+  operador escolhia o 5.125 (interno, que a SEFAZ rejeita) ou caía no 5.949, que esconde a operação
+  de quem for auditar. 18 códigos → **26**, 13 pares completos.
+  ⚠ **As operações reais passaram a listar os dois âmbitos.** Sem isso o 6.125 entraria MUDO: sem
+  perguntas, sem alerta e sem sequência de notas, porque `operacoesDoCfop` casa por código exato.
+  ⚠ **A função de pares continua tratando código sem irmão** — um código novo entra sozinho até
+  alguém acrescentar o par, e aparecer sozinho é melhor do que sumir.
+  **3.326 passando**, tela validada logada (5.125/6.125 → OP 122/MG resolve para 6.125).

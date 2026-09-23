@@ -1,7 +1,12 @@
 {
-  "build": 3413,
-  "gerado": "2026-09-23T01:28:33.316Z",
+  "build": 3414,
+  "gerado": "2026-09-23T01:35:48.496Z",
   "commits": [
+    {
+      "hash": "2593f1bb25",
+      "data": "22/09/2026",
+      "titulo": "Fiscal: eu tinha consertado a metade errada do Ex TIPI — e mais duas lacunas"
+    },
     {
       "hash": "c4defd7952",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f1533a4328",
       "data": "22/09/2026",
       "titulo": "MES: o cadastro passa a ser em maiúscula, como Matheus padronizou"
-    },
-    {
-      "hash": "96abd20f2e",
-      "data": "22/09/2026",
-      "titulo": "MES: a corrida entre contar e apagar vira recusa, não exceção"
     }
   ]
 }
