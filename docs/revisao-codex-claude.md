@@ -1090,3 +1090,49 @@ empresa. Cron semanal (`40 4 * * 1`), `ƒ` no build (não pré-renderizado), com
 consultável (`FiscalRegra` com condições, status de validação e aprovador) — hoje as cadeias são
 dados estáticos em `cfop.js`, agora com fundamento verificável, mas ainda não são linhas de tabela
 que a contabilidade possa aprovar uma a uma. E a validação de referências entre NFs emitidas.
+
+- **(23/09, 09h30) Três achados do Codex na coleta de legislação — e um erro de processo meu.**
+  ⚠⚠ **EU REPORTEI "3.403 PASSANDO" SEM RERODAR.** Rodei a suíte, DEPOIS acrescentei o cron ao
+  `vercel.json`, e commitei. O `testes/cron-agenda.teste.js` — que existe justamente para casar a
+  agenda da Vercel com o cadastro do monitor — ficou vermelho e eu não vi. A ponte pegou.
+  - ⚠ **Cron não cadastrado no monitor e sem `registrarExecucao`**: ele poderia parar de atualizar
+    a legislação por semanas sem ninguém saber. Cadastrado com `maxHoras: 24*8` (é semanal; cobrar
+    em 30 h alertaria seis dias por semana), e o ponto é batido mesmo com falha — **lote incompleto
+    não passa por sucesso**.
+  - ⚠⚠ **`SEM_MUDANCA` ignorava o status da versão.** Duas consequências: (1) página **reprovada
+    que se repete** sumia das falhas — no primeiro dia entra como REPROVADA, no segundo o mesmo
+    hash vira "sem mudança" e é contado como sucesso, com o portal dizendo que está tudo em dia
+    sobre uma norma que nunca conseguiu ler; (2) **A → B → A deixava B ativo** — voltando a um
+    conteúdo válido que o banco já tem, o caminho de criação (que é quem promove) não roda, e o
+    portal seguiria citando o texto intermediário. Agora há `REPROVADA` e `REATIVADA`, e a
+    reativação é atômica (senão o índice `uma_ativa` recusa o meio do caminho).
+  - ⚠⚠ **10 fontes × 30 s de timeout numa rota de 60 s.** Dois downloads lentos estouravam o
+    orçamento e a Vercel matava a execução no meio do lote, devolvendo "5 importadas, 0 falhas" —
+    indistinguível de uma rodada completa. O timeout agora **encolhe para o tempo restante**
+    (mesma lição do `ateMs` do `omieCall` nos Prazos), e **fonte não consultada é dita por nome**
+    em `naoProcessadas`.
+  - ⚠ O Codex também notou que **não havia teste do importador**. São 9 agora, cobrindo os três
+    cenários — todos invisíveis numa rodada feliz.
+
+- **(23/09, 10h00) A TIPI que a contabilidade mandou: o que ela complementa NÃO são as alíquotas.**
+  Matheus mandou `tabela tipi.pdf` (462 páginas, 9 MB) perguntando se dava para *"complementar
+  nossa base de NCMs que tributam IPI"*.
+  ⚠⚠ **A BASE DE CÓDIGOS E ALÍQUOTAS NÃO PRECISAVA.** Ela já vem da planilha oficial da Receita
+  (`tipi.xlsx`, sha `d155f1baafb4…`), com **11.103 NCMs e 582 linhas de Ex**. Extraí o PDF e
+  comparei: das 9.344 linhas que consegui ler, **8.950 batem**. As 394 "divergências" são **erro do
+  meu extrator**, não da base — conferido no `1211.20.00`, em que o portal tem `NT` na geral e `0`
+  no `Ex 01`, e meu parser pegava a linha do Ex. ⚠ Num PDF de 462 páginas gerado pelo Word, com
+  linhas de Ex intercaladas, **eu não consigo extração confiável o bastante para auditar alíquota**
+  — e apresentar esses 394 como achados seria fabricar divergência.
+  ⚠⚠ **O QUE O PDF RESOLVE É A VIGÊNCIA, E ISSO VALE MUITO.** "ATIVA" nunca foi "vigente": a
+  planilha da Receita não declara, dentro dela, a norma que a aprovou — e por isso **toda auditoria
+  saía com ressalva**. A folha de rosto do PDF traz a cadeia inteira: **Decreto 11.158/2022**,
+  atualizado por **18 atos** até o **ADE RFB nº 1, de 30/01/2026** (retificado no DOU de 12/02/2026).
+  ⚠⚠ **E A DECLARAÇÃO ESTÁ AMARRADA AO sha256 DO ARTEFATO.** Publicada uma planilha nova, o hash
+  muda, a declaração deixa de valer sozinha e **a ressalva volta** — sem essa amarra, a vigência de
+  hoje se arrastaria para uma tabela que ninguém conferiu, que é a mentira que a ressalva existia
+  para evitar.
+  ⚠ A declaração diz por extenso **o que não prova**: saber até qual ato a tabela está atualizada
+  não estabelece qual redação vigorava quando uma nota de março de 2024 foi emitida.
+
+  **3.422 passando.** ⚠ **Sem push** enquanto a rodada de correção estiver aberta.

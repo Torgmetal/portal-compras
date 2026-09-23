@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { aquecerBanco } from "@/lib/db-retry";
 import { temCronSecret } from "@/lib/cron-auth";
+import { registrarExecucao } from "@/lib/cron-monitor";
 import { importarLegislacao } from "@/lib/fiscal/importar-legislacao";
 
 // ⚠⚠ `force-dynamic` OU O CRON É PRÉ-RENDERIZADO E NUNCA RODA. Um `GET()` sem `req` e sem
@@ -15,6 +16,22 @@ export async function GET(req) {
   if (!temCronSecret(req)) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   // ⚠ Cold start do Neon: o primeiro query estoura antes de a compute acordar.
   await aquecerBanco(prisma);
-  const r = await importarLegislacao();
+  const t0 = Date.now();
+  // ⚠⚠ O ORÇAMENTO DE TEMPO VIAJA JUNTO (achado do Codex, 23/09/2026). São 10 fontes e a rota tem
+  // 60 s: dois downloads esgotando o timeout de 30 s já estouravam o orçamento, e a Vercel matava
+  // a rota no meio do lote — deixando as últimas fontes sem coletar **em silêncio**.
+  const r = await importarLegislacao({ ateMs: t0 + 50_000 });
+
+  // ⚠⚠ O PONTO É BATIDO MESMO COM FALHA DE COLETA — senão o cron "congela" e o monitor alerta por
+  // não ter notícia dele, quando na verdade ele rodou e a SEFAZ é que não respondeu. O que NÃO
+  // pode é um lote incompleto passar por sucesso: fonte não processada conta como falha.
+  const incompleto = r.falhas.length > 0 || r.naoProcessadas.length > 0;
+  await registrarExecucao("fiscal-legislacao", {
+    ok: !incompleto,
+    duracaoMs: Date.now() - t0,
+    mensagem: `${r.importadas} importadas · ${r.semMudanca} sem mudança`
+      + (r.falhas.length ? ` · ${r.falhas.length} falhas` : "")
+      + (r.naoProcessadas.length ? ` · ${r.naoProcessadas.length} sem tempo` : ""),
+  }).catch(() => {});
   return NextResponse.json({ success: true, ...r });
 }

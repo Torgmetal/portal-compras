@@ -1,7 +1,12 @@
 {
-  "build": 3419,
-  "gerado": "2026-09-23T03:08:30.062Z",
+  "build": 3420,
+  "gerado": "2026-09-23T12:12:50.827Z",
   "commits": [
+    {
+      "hash": "a61f9e7b9c",
+      "data": "23/09/2026",
+      "titulo": "Fiscal: a base jurídica — 10 normas oficiais coletadas, hasheadas e citáveis"
+    },
     {
       "hash": "7c9724d1a8",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5cf0762129",
       "data": "22/09/2026",
       "titulo": "CMR: criar os R que faltam vem antes de remendar observação"
-    },
-    {
-      "hash": "e6e684f662",
-      "data": "22/09/2026",
-      "titulo": "Cotação: converter a unidade em que o fornecedor cotou"
     }
   ]
 }

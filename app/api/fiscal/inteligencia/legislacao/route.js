@@ -75,12 +75,13 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: e.issues?.[0]?.message ?? "Dados inválidos." }, { status: 400 });
   }
 
-  const r = await importarLegislacao({ chaves: body.chaves ?? null });
+  // ⚠ Mesmo orçamento do cron: a rota tem 60 s, e o lote precisa caber neles ou dizer o que ficou.
+  const r = await importarLegislacao({ chaves: body.chaves ?? null, ateMs: Date.now() + 50_000 });
   await prisma.auditLog.create({
     data: {
       action: "SINCRONIZAR_LEGISLACAO", entity: "FiscalNorma", entityId: "legislacao",
       userId: sessao?.user?.id ?? null,
-      metadata: { total: r.total, importadas: r.importadas, semMudanca: r.semMudanca, falhas: r.falhas.map((f) => f.chave) },
+      metadata: { total: r.total, processadas: r.processadas, importadas: r.importadas, reativadas: r.reativadas, semMudanca: r.semMudanca, falhas: r.falhas.map((f) => f.chave), naoProcessadas: r.naoProcessadas },
     },
   }).catch(() => {});
   return NextResponse.json({ success: true, ...r });
