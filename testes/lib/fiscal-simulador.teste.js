@@ -87,9 +87,9 @@ describe("simular — o que ele se RECUSA a calcular", () => {
   // estadual, de redução de base e de o destinatário ser contribuinte — não de um regime que
   // alguém possa declarar numa linha. O briefing proíbe *"aplicar automaticamente 12% de ICMS a
   // toda venda interestadual"*, e um número plausível ali é pior que um campo vazio.
-  it("ICMS e IBS/CBS saem como não determinados, COM motivo", () => {
+  it("o IBS/CBS sai como não determinado, COM motivo", () => {
     const r = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25)));
-    expect(r.naoDeterminados.map((x) => x.tributo)).toEqual(["ICMS", "IBS/CBS"]);
+    expect(r.naoDeterminados.map((x) => x.tributo)).toEqual(["IBS/CBS"]);
     for (const nd of r.naoDeterminados) expect(nd.motivo.length).toBeGreaterThan(40);
   });
 
@@ -175,7 +175,7 @@ describe("simular — as perguntas que faltam", () => {
 
 describe("NAO_DETERMINADOS — o motivo é parte do contrato", () => {
   it("cada tributo diz por que não foi determinado", () => {
-    expect(NAO_DETERMINADOS).toHaveLength(2);
+    expect(NAO_DETERMINADOS).toHaveLength(1);
     for (const x of NAO_DETERMINADOS) {
       expect(x.tributo).toBeTruthy();
       expect(x.motivo).toBeTruthy();
@@ -401,5 +401,102 @@ describe("PIS/COFINS — regime DECLARADO, não deduzido do histórico", () => {
   // ⚠ Sem valor não há estimativa — e nada de zero disfarçado de resultado.
   it("sem valor digitado, não há estimativa", () => {
     expect(simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS" }, tipi(linha(3.25))).pisCofins).toBeNull();
+  });
+});
+
+// ─── OS ACHADOS DO PARECER DE ARQUITETURA (Codex, 22/09/2026) ────────────────
+
+describe("PIS/COFINS incide sobre RECEITA — remessa não é receita", () => {
+  // ⚠⚠ O DEFEITO: bastava um valor positivo para sair 1,65% e 7,6%, inclusive numa remessa para
+  // industrialização e até sem CFOP. As ressalvas diziam o certo e o número dizia o contrário —
+  // e para um operador que não é contador, o número ganha.
+  it.each([["5901", "remessa"], ["5902", "retorno"], ["5922", "entrega futura"], ["5949", "outras saídas"]])(
+    "o CFOP %s (%s) não recebe a alíquota básica", (cfop) => {
+      const r = simular({ ncm: "84379000", cfop, ufOrigem: "SP", ufDestino: "SP", valor: 1000 }, tipi(linha(3.25)));
+      expect(r.pisCofins.indisponivel).toBe(true);
+      expect(r.pisCofins.linhas).toBeUndefined();
+      expect(r.pisCofins.motivo).toMatch(/receita/i);
+    });
+
+  it.each(["5101", "5124", "5125"])("venda e industrialização cobrada são receita (%s)", (cfop) => {
+    const r = simular({ ncm: "84379000", cfop, ufOrigem: "SP", ufDestino: "SP", valor: 1000 }, tipi(linha(3.25)));
+    expect(r.pisCofins.linhas.map((x) => x.aliquota)).toEqual([1.65, 7.6]);
+  });
+
+  it("sem CFOP escolhido, não há número", () => {
+    const r = simular({ ncm: "84379000", ufOrigem: "SP", ufDestino: "SP", valor: 1000 }, tipi(linha(3.25)));
+    expect(r.pisCofins.indisponivel).toBe(true);
+  });
+
+  // ⚠⚠ É O QUE A NOTA DECLARA, NÃO A BASE DE APURAÇÃO — a apuração é mensal, com exclusões (entre
+  // elas o ICMS destacado, desde o RE 574.706). Confundir as duas faria o número virar previsão de
+  // recolhimento, que ele não é.
+  it("a base diz que é o declarado na nota, não a apuração do mês", () => {
+    const r = simular({ ncm: "84379000", cfop: "5101", ufOrigem: "SP", ufDestino: "SP", valor: 1000 }, tipi(linha(3.25)));
+    expect(r.pisCofins.baseNota).toMatch(/não é a base de apuração/i);
+    expect(r.pisCofins.baseNota).toMatch(/ICMS destacado/i);
+  });
+});
+
+describe("Ex TIPI: o simulador para de sugerir CST, como a auditoria já fazia", () => {
+  // ⚠⚠ A INCOERÊNCIA QUE O MÓDULO PROMETIA NÃO TER. A auditoria marcava o cenário com Ex como
+  // INCONCLUSIVO; o simulador seguia entregando CST e estimativa pela alíquota geral. Compartilhar
+  // o `CST_IPI` não é compartilhar a DECISÃO.
+  it("com Ex, não há CST sugerido e o resultado é inconclusivo", () => {
+    const r = simular({ ncm: "84379000", cfop: "5101", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25), [linha(0)]));
+    expect(r.ipi.cstSugerido).toBeNull();
+    expect(r.ipi.inconclusivo).toBe(true);
+    expect(r.ipi.nota).toMatch(/só quem conhece o produto/i);
+  });
+
+  it("sem Ex, o CST continua sendo sugerido", () => {
+    const r = simular({ ncm: "84379000", cfop: "5101", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
+    expect(r.ipi.cstSugerido).toBe("50");
+    expect(r.ipi.inconclusivo).toBeUndefined();
+  });
+
+  // ⚠ O alerta do CST pretendido CONTINUA: é o achado da 973, e ele não depende do CST sugerido.
+  it("o alerta do CST 53 pretendido não se perde com o Ex", () => {
+    const r = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", cstPretendido: "53" }, tipi(linha(3.25), [linha(0)]));
+    expect(r.alertas.some((a) => a.nivel === "alto")).toBe(true);
+  });
+
+  it("NT com Ex também não sugere CST", () => {
+    const r = simular({ ncm: "84379000", cfop: "5101", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(null, "NT"), [linha(0)]));
+    expect(r.ipi.cstSugerido).toBeNull();
+  });
+});
+
+describe("a sequência de notas não pode perder documento entre cenários", () => {
+  // ⚠⚠ O DEFEITO ERA SILENCIOSO: a deduplicação global apagava o retorno 5.902 emitido pelo
+  // TERCEIRO na terceirização, porque a industrialização com insumo do cliente já tinha um 5.902
+  // emitido pela TORG — mesmo CFOP, mesmo papel, EMITENTE DIFERENTE.
+  it("o 5.902 aparece nos DOIS cenários, com emitentes diferentes", () => {
+    const r = simular({ ncm: "84379000", cfop: "5902", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
+    const por = Object.fromEntries(r.cfop.sequencias.map((s) => [s.operacaoId, s.notas]));
+    expect(por["indust-insumo-direto"].find((n) => n.cfop === "5902").quem).toBe("TORG");
+    expect(por["terceirizacao"].find((n) => n.cfop === "5902").quem).toBe("Terceiro");
+  });
+
+  it("todo cenário volta com a sua sequência COMPLETA", () => {
+    const r = simular({ ncm: "84379000", cfop: "5124", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
+    for (const seq of r.cfop.sequencias) {
+      const orig = OPERACOES.find((o) => o.id === seq.operacaoId);
+      expect(seq.notas, seq.operacaoId).toHaveLength(orig.notas.length);
+    }
+  });
+});
+
+describe("ICMS entra como referência, não como imposto", () => {
+  it("a venda interestadual traz a alíquota do art. 52 e as condições", () => {
+    const r = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25)));
+    expect(r.icms).toMatchObject({ estado: "REFERENCIA", aliquota: 12, valor: 120 });
+    expect(r.icms.condicoes.join(" ")).toMatch(/DIFAL/);
+  });
+
+  // ⚠ O ICMS saiu de `naoDeterminados` porque agora tem referência — mas o IBS/CBS fica.
+  it("o IBS/CBS continua sem número algum", () => {
+    const r = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25)));
+    expect(r.naoDeterminados.map((x) => x.tributo)).toContain("IBS/CBS");
   });
 });

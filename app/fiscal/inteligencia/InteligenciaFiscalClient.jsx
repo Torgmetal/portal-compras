@@ -757,6 +757,13 @@ function AbaSimulador() {
                   <p className="mt-2 border-t border-gray-100 pt-2 text-xs text-amber-700">⚠ {r.ipi.cEnqNota}</p>
                 </>
               ) : <p className="mt-2 text-sm text-amber-700">{r.ipi.motivo}</p>}
+              {/* ⚠⚠ COM Ex TIPI O CST NÃO É SUGERIDO — a auditoria já se abstinha aqui, e o
+                  simulador seguia entregando um CST fechado. Uma regra, dois momentos. */}
+              {r.ipi.inconclusivo && (
+                <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  ⚠⚠ Resultado inconclusivo: este NCM tem Ex TIPI, e o CST não é sugerido aqui.
+                </p>
+              )}
               {r.descricaoNcm && <p className="mt-2 text-xs text-torg-gray">{r.descricaoNcm}</p>}
             </div>
 
@@ -877,7 +884,17 @@ function AbaSimulador() {
           {/* ⚠⚠ PIS/COFINS SAI COM NÚMERO PORQUE O REGIME FOI DECLARADO, e a tela mostra POR QUEM e
               CONFERIDO CONTRA O QUÊ. Sem a procedência, o número seria indistinguível do chute que
               o escopo do módulo proíbe — e é justamente a procedência que diz quando questionar. */}
-          {r.pisCofins && (
+          {/* ⚠⚠ REMESSA NÃO É RECEITA, e PIS/COFINS incide sobre receita. Antes bastava um valor
+              positivo para o número sair em qualquer operação — e num operador não contador o
+              número ganha da ressalva. */}
+          {r.pisCofins?.indisponivel && (
+            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">PIS / COFINS</p>
+              <p className="mt-1.5 text-sm text-torg-gray">{r.pisCofins.motivo}</p>
+            </div>
+          )}
+
+          {r.pisCofins?.linhas && (
             <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">PIS / COFINS · estimativa</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -906,6 +923,45 @@ function AbaSimulador() {
                   {r.pisCofins.ressalvas.map((x) => <li key={x}>⚠ {x}</li>)}
                 </ul>
               </div>
+            </div>
+          )}
+
+          {/* ⚠⚠ ALÍQUOTA DE REFERÊNCIA, NUNCA IMPOSTO DETERMINADO. O briefing veda "aplicar
+              automaticamente 12% a toda venda interestadual" — e a vedação é justa, porque 12%
+              não vale para todo destino. As condições ficam do lado do número, não numa nota de
+              rodapé: DIFAL, redução de base, ST e FCP entram depois e não estão no portal. */}
+          {r.icms && (
+            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">ICMS · alíquota de referência</p>
+              {r.icms.estado === "REFERENCIA" ? (
+                <>
+                  <div className="mt-2 flex flex-wrap items-baseline gap-x-3">
+                    <span className="font-mono text-2xl font-bold text-torg-dark">{r.icms.aliquota}%</span>
+                    {r.icms.valor != null && (
+                      <span className="font-mono text-lg font-semibold text-torg-dark">
+                        {r.icms.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-torg-gray">{r.icms.fundamento}</p>
+                  {r.icms.baseNota && <p className="mt-0.5 text-xs text-torg-gray">{r.icms.baseNota}</p>}
+                </>
+              ) : (
+                <p className="mt-1.5 text-sm text-torg-gray">{r.icms.motivo}</p>
+              )}
+              <div className="mt-2.5 border-t border-gray-100 pt-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-torg-gray">
+                  A alíquota é um insumo do cálculo, não o cálculo — falta verificar
+                </p>
+                <ul className="mt-1 space-y-0.5 text-xs text-amber-700">
+                  {r.icms.condicoes.map((c) => <li key={c}>⚠ {c}</li>)}
+                </ul>
+              </div>
+              <p className="mt-2 border-t border-gray-100 pt-2 text-xs text-torg-gray">
+                Origem da mercadoria: <strong className="text-torg-dark">{r.icms.origem.codigo} — {r.icms.origem.rotulo}</strong>,
+                declarada por {r.icms.origem.declaradoPor} em {r.icms.origem.declaradoEm.split("-").reverse().join("/")}. {r.icms.origem.base}
+                <span className="mt-0.5 block text-amber-700">⚠⚠ {r.icms.origem.ressalva}</span>
+              </p>
             </div>
           )}
 

@@ -822,3 +822,67 @@ novo, não conserto, e não entra sem o Matheus decidir.
   ⚠ Lista agrupada por família (6 optgroups): são 18 códigos, e "5.101" ao lado de "6.101" num
   select liso faz escolher o errado por um dígito.
   **3.213 passando**, tela validada logada.
+- **(22/09, 22h10) Parecer de ARQUITETURA sobre a aba fiscal inteira** (consulta `architecture`,
+  pedida pelo Matheus: *"pode ir revisando toda essa parte, principalmente por ser fiscal (…)
+  analisem toda essa aba para ver se estamos no caminho correto para o Fiscal da TORG METAL
+  Lucro Real"*). Veredito: base certa para **assistir emissão e auditoria**, não para determinar
+  tributo — e a lacuna estrutural é que **as ressalvas não controlavam o resultado**. O código
+  reconhecia hipótese desconhecida e mesmo assim entregava CST, alíquota e valor; para um operador
+  que não é contador, o número prevalece sobre o aviso.
+
+  **CORRIGIDO nesta rodada** (todos ALTA, todos defeito real):
+  - ⚠⚠ **PIS/COFINS saía em REMESSA.** Bastava valor positivo para render 1,65%/7,6% — inclusive
+    em remessa, retorno e até sem CFOP escolhido. Agora incide só onde há receita (famílias Venda e
+    Industrialização), e o resto recebe o motivo em vez do número.
+  - ⚠⚠ **A base do PIS/COFINS se apresentava como base.** É o que a NOTA declara, item a item; a
+    apuração é mensal e tem exclusões próprias (entre elas o ICMS destacado, RE 574.706). O texto
+    agora diz isso.
+  - ⚠⚠ **Ex TIPI: a auditoria se abstinha e o simulador não.** Com Ex, `ipiDaTipi` entregava CST
+    fechado e estimativa pela alíquota geral. Compartilhar o `CST_IPI` não é compartilhar a DECISÃO
+    — era exatamente a incoerência que o módulo promete não ter. Agora `cstSugerido: null` e
+    `inconclusivo: true`, nos dois ramos (PERCENTUAL e NT).
+  - ⚠⚠ **A sequência de notas perdia documento entre cenários, em silêncio.** A deduplicação era
+    global por CFOP+papel: o retorno 5.902 emitido pela TORG apagava o 5.902 emitido pelo TERCEIRO
+    na terceirização. Mesmo código, mesmo papel, **emitente diferente**. Agora dedupe por cenário,
+    com o emitente na chave.
+  - ⚠⚠ **"999 não é enquadramento" era afirmação ERRADA minha.** Na tabela oficial da NF-e, 999 é
+    *"Tributação normal IPI; Outros"* — existe e é legítimo. E o significado real torna o achado
+    MAIS forte: 999 afirma tributação normal, então usá-lo ao lado de um CST que afirma isenção,
+    imunidade ou suspensão é o documento dizendo duas coisas incompatíveis sobre o mesmo item.
+  - ⚠ **CONTRADICAO_INTERNA com Ex TIPI vira "esclarecer", não "errado".** Dois CSTs no mesmo NCM
+    só é contradição fechada quando a tabela não oferece tratamento alternativo.
+
+  **ICMS entrou como REFERÊNCIA, não como imposto** (`lib/fiscal/icms.js`). O parecer confirma que
+  a tabela do art. 52 do RICMS/SP não fura a proibição do briefing desde que devolva *alíquota de
+  referência sob condições explícitas*. 12% para MG/PR/RJ/RS/SC; 7% para N/NE/CO **e ES**; a
+  **interna fica de fora** (18% com campo grande de redução e benefício). As condições (finalidade,
+  DIFAL — que existe também para contribuinte, LC 190/2022 —, redução de base, ST, FCP, FCI) saem
+  do lado do número, não em rodapé.
+  ⚠⚠ **Achado MEU na validação da tela, não do Codex**: a remessa 5.901 de R$ 222.769,58 saía com
+  "12% · R$ 26.732,35". Número plausível, grande e provavelmente errado — remessa para
+  industrialização em SP corre com suspensão (art. 402 do RICMS/SP). Remessa, retorno, entrega
+  futura e outras saídas passaram a não receber alíquota de referência. O portal **não afirma** que
+  há suspensão (ela tem condições e prazo): diz que não se aplica sem confirmar.
+  ⚠ **Origem 0-nacional é DECLARAÇÃO com escopo e data**, não verdade gravada no código. Matheus
+  (22/09): *"origem sempre é nacional, não compramos material de fora do Brasil"*. Mas comprar de
+  fornecedor nacional **não prova** ausência de conteúdo importado — origem é atributo do PRODUTO,
+  apurado por FCI, e >40% levaria a 4%. A tela mostra quem declarou e o que a declaração não prova.
+
+  **PENDENTE — não tocado nesta rodada** (registrado, não aprovado):
+  - ⚠ **`jaRespondida` casa por palavra-chave.** Uma propriedade respondida elimina QUALQUER
+    pergunta contendo "contribuinte", inclusive uma futura pergunta composta sobre finalidade. O
+    certo é ID + predicado explícito por pergunta, o que obriga a reescrever os `exige` de todos os
+    18 CFOPs. Risco latente hoje, não defeito observado.
+  - ⚠ **Cobertura da auditoria.** "Nenhum achado" ainda pode significar "não verifiquei", e o
+    resumo não separa estimativa inconclusiva de estimativa firme. Falta registrar cobertura POR
+    VERIFICAÇÃO.
+  - ⚠ **Contrato comum por tributo** (`estado` / `premissas` / `pendencias` / `regra` / `resultado`).
+    Hoje IPI, PIS/COFINS e ICMS devolvem formatos parecidos mas não iguais. É refatoração ampla e
+    vale mais depois de o ICMS assentar.
+  - ⚠ **Sintegra / consulta de CNPJ**: o parecer é de que vale como **enriquecimento cadastral
+    desacoplado**, nunca como dependência do simulador — e que consulta de CNPJ **não comprova
+    Lucro Real/Presumido** (só o Simples é público). Falha ou dado velho tem de produzir
+    "desconhecido", nunca `false`. A IE como INDÍCIO está correta e fica.
+  - ⚠⚠ **Produtos da TORG (§14)** e o **P1 do Vitor** em `AbaExpedicao.jsx` seguem abertos.
+
+  **3.297 passando**, tela validada logada (venda SP→MG e remessa 6.901).

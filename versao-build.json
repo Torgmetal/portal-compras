@@ -1,7 +1,12 @@
 {
-  "build": 3411,
-  "gerado": "2026-09-23T00:51:32.082Z",
+  "build": 3412,
+  "gerado": "2026-09-23T01:10:08.368Z",
   "commits": [
+    {
+      "hash": "04e3a36de7",
+      "data": "22/09/2026",
+      "titulo": "Simulador: PIS/COFINS sai com número, porque o regime foi DECLARADO"
+    },
     {
       "hash": "5ec170c37b",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c75aaffd9d",
       "data": "22/09/2026",
       "titulo": "MES: semear deixa de apagar, e \"nunca usado\" passa a contar todas as relações"
-    },
-    {
-      "hash": "81393b1df2",
-      "data": "22/09/2026",
-      "titulo": "MES: o cadastro passa a ser só o que está no Gantt"
     }
   ]
 }
