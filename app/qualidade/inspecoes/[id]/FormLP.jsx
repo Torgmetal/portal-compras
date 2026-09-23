@@ -1,5 +1,7 @@
 "use client";
+import { useEffect, useState } from "react";
 import { useComponenteEstavel } from "@/lib/react-estavel";
+import CamposJuntaSoldada from "./CamposJuntaSoldada";
 import { AlertTriangle, CheckCircle2, Plus, Trash2 } from "lucide-react";
 import {
   TIPOS_PENETRANTE, METODOS, MARCAS, REMOVEDORES, CONDICOES_SUPERFICIE, TIPOS_INDICACAO,
@@ -22,6 +24,11 @@ import { LAUDOS } from "@/lib/evs-campos";
  * aparece inteira, com o item citado.
  */
 export default function FormLP({ rel, linhas, res, travado, setLinhas, setResultado }) {
+  // as EPS da casa — a escolhida puxa processo, metal de adição e RQS (lib/eps-casa.js)
+  const [eps, setEps] = useState([]);
+  useEffect(() => {
+    fetch("/api/qualidade/soldagem").then((r) => r.json()).then((j) => setEps(j.eps || [])).catch(() => {});
+  }, []);
   const fluor = res.tipoPenetrante === "I";
   const check = conferirEnsaio({
     tipo: res.tipoPenetrante, lux: res.iluminacao, uv: res.uv, tempSuperficie: res.temperatura,
@@ -60,11 +67,7 @@ export default function FormLP({ rel, linhas, res, travado, setLinhas, setResult
           <Campo rot="Desenho do cliente" k="desenhoCliente" />
           <Campo rot="Revisão do cliente" k="revisaoCliente" />
           <Campo rot="Metal base / espessura" k="metalBase" />
-          <Campo rot="Metal de adição" k="metalAdicao" />
-          <Campo rot="Processo de soldagem" k="processoSolda" />
-          <Campo rot="EPS" k="eps" />
-          <Campo rot="RQS" k="rqs" />
-          <Campo rot="Tipo de junta" k="tipoJunta" />
+          <CamposJuntaSoldada res={res} travado={travado} setResultado={setResultado} eps={eps} />
           <Campo rot="Condições superficiais" k="condicoes" opcoes={CONDICOES_SUPERFICIE} />
         </div>
       </div>

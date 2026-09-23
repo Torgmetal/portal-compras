@@ -1,156 +1,156 @@
 {
-  "build": 3438,
-  "gerado": "2026-09-23T21:07:52.979Z",
+  "build": 3439,
+  "gerado": "2026-09-23T23:03:53.903Z",
   "commits": [
     {
-      "hash": "390aa8b918",
+      "hash": "5c56fc98",
+      "data": "23/09/2026",
+      "titulo": "Prazos: a data de entrega faltava no seletor, e ela não é uma etapa"
+    },
+    {
+      "hash": "390aa8b9",
       "data": "23/09/2026",
       "titulo": "Assistente Fiscal: a IA orquestra, a ferramenta é que determina"
     },
     {
-      "hash": "a18409031f",
+      "hash": "a1840903",
       "data": "23/09/2026",
       "titulo": "Fiscal: a validação das regras — e por que elas não viraram tabela"
     },
     {
-      "hash": "414826b9d3",
+      "hash": "414826b9",
       "data": "23/09/2026",
       "titulo": "Simulador: quatro campos decidem; o resto é conferência e foi para trás de um clique"
     },
     {
-      "hash": "d869b9726b",
+      "hash": "d869b972",
       "data": "23/09/2026",
       "titulo": "Portão por módulo: /fiscal nunca esteve na tabela, e por isso quebrava"
     },
     {
-      "hash": "99f932cc04",
+      "hash": "99f932cc",
       "data": "23/09/2026",
       "titulo": "Fiscal: a cadeia de documentos de uma obra — e ela nunca diz \"falta uma nota\""
     },
     {
-      "hash": "b166069fc8",
+      "hash": "b166069f",
       "data": "23/09/2026",
       "titulo": "Portal de campo: o que o inspetor digitava deixava de aparecer"
     },
     {
-      "hash": "bf88a11cc3",
+      "hash": "bf88a11c",
       "data": "23/09/2026",
       "titulo": "Relatórios de inspeção: assinatura sem duplicar, cor da tinta, desenho no anexo"
     },
     {
-      "hash": "1c2b990f4d",
+      "hash": "1c2b990f",
       "data": "23/09/2026",
       "titulo": "Desenho do dimensional: o carimbo do A2 deixa de cortar a coluna ao meio"
     },
     {
-      "hash": "e512935662",
+      "hash": "e5129356",
       "data": "23/09/2026",
       "titulo": "Classificação: DDL aplicado e as três correções provadas contra o banco"
     },
     {
-      "hash": "409de29159",
+      "hash": "409de291",
       "data": "23/09/2026",
       "titulo": "Classificação: o teste defendia o defeito — três achados do Codex"
     },
     {
-      "hash": "5969682a3f",
+      "hash": "5969682a",
       "data": "23/09/2026",
       "titulo": "Fiscal: o registro de classificação de produto — §14, a raiz do problema"
     },
     {
-      "hash": "65baa3bfa8",
+      "hash": "65baa3bf",
       "data": "23/09/2026",
       "titulo": "PIS/COFINS no 5.116: a indeterminação estava só no texto, não no cálculo"
     },
     {
-      "hash": "895bc9259a",
+      "hash": "895bc925",
       "data": "23/09/2026",
       "titulo": "Cenários: a família era grossa demais, e propagou fundamento de uma operação para outra"
     },
     {
-      "hash": "c6c6b02cd2",
+      "hash": "c6c6b02c",
       "data": "23/09/2026",
       "titulo": "Fiscal: a base de CST — ICMS, PIS/COFINS e origem, com os cenários principais"
     },
     {
-      "hash": "9b0432cbf3",
+      "hash": "9b0432cb",
       "data": "23/09/2026",
       "titulo": "Simulador: a ficha de emissão e a prévia dos impostos — e quatro achados do Codex"
     },
     {
-      "hash": "43b1b3b083",
+      "hash": "43b1b3b0",
       "data": "23/09/2026",
       "titulo": "Auditoria: validar a medição do Omie ANTES de emitir — e o primeiro uso já achou um caso"
     },
     {
-      "hash": "333701e992",
+      "hash": "333701e9",
       "data": "23/09/2026",
       "titulo": "Legislação: a declaração da TIPI estava apagando a ressalva — e mais dois"
     },
     {
-      "hash": "92a02cc702",
+      "hash": "92a02cc7",
       "data": "23/09/2026",
       "titulo": "Legislação: três achados do Codex, e a TIPI da contabilidade resolve a vigência"
     },
     {
-      "hash": "a61f9e7b9c",
+      "hash": "a61f9e7b",
       "data": "23/09/2026",
       "titulo": "Fiscal: a base jurídica — 10 normas oficiais coletadas, hasheadas e citáveis"
     },
     {
-      "hash": "7c9724d1a8",
+      "hash": "7c9724d1",
       "data": "22/09/2026",
       "titulo": "Revisão: o P1 dos avulsos sai da nossa lista, e \"Codex: aceito sempre\" fica registrado"
     },
     {
-      "hash": "bc78300da3",
+      "hash": "bc78300d",
       "data": "22/09/2026",
       "titulo": "Autocomplete: apagar depois de a lista abrir deixava \"Nenhum NCM\" no ar"
     },
     {
-      "hash": "233171b46f",
+      "hash": "233171b4",
       "data": "22/09/2026",
       "titulo": "Autocomplete de NCM: quatro achados do Codex, e o pior o teste não pegava"
     },
     {
-      "hash": "b0b320a522",
+      "hash": "b0b320a5",
       "data": "22/09/2026",
       "titulo": "Fiscal: autocomplete de NCM, a cadeia do art. 406 completa, e um índice na coluna errada"
     },
     {
-      "hash": "025eaff02f",
+      "hash": "025eaff0",
       "data": "22/09/2026",
       "titulo": "Fiscal: oito CFOPs estavam sem o par de fora do estado"
     },
     {
-      "hash": "2593f1bb25",
+      "hash": "2593f1bb",
       "data": "22/09/2026",
       "titulo": "Fiscal: eu tinha consertado a metade errada do Ex TIPI — e mais duas lacunas"
     },
     {
-      "hash": "c4defd7952",
+      "hash": "c4defd79",
       "data": "22/09/2026",
       "titulo": "Fiscal: o parecer de arquitetura achou 6 defeitos reais, e o ICMS entra como referência"
     },
     {
-      "hash": "04e3a36de7",
+      "hash": "04e3a36d",
       "data": "22/09/2026",
       "titulo": "Simulador: PIS/COFINS sai com número, porque o regime foi DECLARADO"
     },
     {
-      "hash": "5ec170c37b",
+      "hash": "5ec170c3",
       "data": "22/09/2026",
       "titulo": "Simulador: quantas notas a operação exige, e o FD já responde de quem é o material"
     },
     {
-      "hash": "56525055e8",
+      "hash": "56525055",
       "data": "22/09/2026",
       "titulo": "Simulador: o par 5.101/6.101 é uma linha só, e cada CFOP diz quando se usa"
-    },
-    {
-      "hash": "ec409d18ef",
-      "data": "22/09/2026",
-      "titulo": "Simulador: o seletor passa a ser de CFOP, e isso pega um erro novo"
     }
   ]
 }

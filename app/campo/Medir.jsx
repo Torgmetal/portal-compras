@@ -21,6 +21,8 @@ import { reduzImagem } from "@/lib/imagem-cliente";
 import { lerJson } from "@/lib/resposta-json";
 import { evidenciasDoTipo } from "@/lib/fotos-evidencia";
 import FormularioUSCampo from "./FormularioUSCampo";
+import JuntaSoldada from "./JuntaSoldada";
+import { rotuloEps } from "@/lib/eps-casa";
 import { ANGULOS, FACES, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL } from "@/lib/us-campos";
 import { condicoesDoRelatorio } from "@/lib/campo-condicoes";
 
@@ -501,6 +503,9 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       {ehPintura && <Pintura cond={cond} setCond={setCond} tintas={tintas} plp={plp} />}
 
       {ehLp && <ParametrosLP cond={cond} setCond={setCond} />}
+      {/* ⚠ a junta soldada (EPS, RQS, processo, metal de adição, tipo de junta) — só existia no
+          computador, e os EVS/LP da OP-102 foram para assinatura com os cinco em branco (23/09/2026) */}
+      {ehLp && <JuntaSoldada cond={cond} setCond={setCond} eps={listas.eps} />}
 
       {!ehDim && !ehUS && !ehPintura && !ehLp && (
         <div className="mt-3 space-y-2.5">
@@ -550,6 +555,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
             </select>
           </label>
 
+          <JuntaSoldada cond={cond} setCond={setCond} eps={listas.eps} />
         </div>
       )}
 
@@ -660,7 +666,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                           // junta soldada sob procedimento que ele não tem qualificação para usar.
                           const permitidas = listas.soldadores.find((y) => y.nome === l.soldador)?.epsPermitidas;
                           const lst = permitidas?.length ? listas.eps.filter((x) => permitidas.includes(x.codigo)) : listas.eps;
-                          return lst.map((x) => <option key={x.codigo} value={x.codigo}>{x.codigo}{x.processo ? ` · ${x.processo}` : ""}</option>);
+                          return lst.map((x) => <option key={x.codigo} value={x.codigo}>{rotuloEps(x)}{x.processo ? ` · ${x.processo}` : ""}</option>);
                         })()}
                       </select>
                     </label>

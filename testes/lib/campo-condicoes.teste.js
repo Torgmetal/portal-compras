@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { condicoesDoRelatorio, CAMPOS_CONDICAO_CAMPO } from "@/lib/campo-condicoes";
 import { CAMPO_DO_JATO } from "@/lib/pintura-campos";
@@ -8,8 +8,10 @@ import { CAMPO_DO_JATO } from "@/lib/pintura-campos";
 // ganhou processo de soldagem, metal de adição, junta, chanfro e a marca do cabeçote: gravava, mas
 // voltava em branco. Este teste varre as telas e cobra cada `cond.X` delas.
 
-const TELAS = ["Medir", "Pintura", "PinturaAmbiente", "Lp", "FormularioUSCampo"]
-  .map((n) => readFileSync(`app/campo/${n}.jsx`, "utf8"));
+// ⚠ TODAS as telas do campo, não uma lista: a tela nova (a junta soldada, 23/09) é justamente a que
+// uma lista fixa esqueceria.
+const TELAS = readdirSync("app/campo").filter((n) => n.endsWith(".jsx"))
+  .map((n) => readFileSync(`app/campo/${n}`, "utf8"));
 
 /** Todo campo de `cond` que alguma tela do campo lê ou escreve. */
 function camposUsadosPelasTelas() {

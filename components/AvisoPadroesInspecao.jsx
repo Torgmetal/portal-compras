@@ -2,8 +2,8 @@ import { grauNaNorma } from '@/lib/pintura-campos';
 
 const CAMPOS = {
   PINTURA: 'grau de limpeza, abrasivo e escolhas do esquema de pintura',
-  VISUAL_SOLDA: 'técnica e critério de inspeção',
-  LP: 'tipo de penetrante, método, fabricante, removedor, revelador e critério',
+  VISUAL_SOLDA: 'técnica, critério de inspeção e a junta soldada (EPS, RQS, processo, metal de adição e tipo de junta)',
+  LP: 'tipo de penetrante, método, fabricante, removedor, revelador, critério e a junta soldada (EPS, RQS, processo, metal de adição e tipo de junta)',
   ULTRASSOM: 'acoplante, bloco padrão, local e critérios',
 };
 export default function AvisoPadroesInspecao({ tipo, resultados = {} }) {

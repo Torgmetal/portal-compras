@@ -6,6 +6,8 @@ import { DESCONTINUIDADES, LAUDOS, laudoSugerido, LUX_MINIMO, TECNICAS, CONDICOE
 import { criteriosDoDefeito, ONDE_VALE } from "@/lib/aws-d11";
 import CampoDecimal from "@/components/CampoDecimal";
 import { numeroBR } from "@/lib/numero-br";
+import CamposJuntaSoldada from "./CamposJuntaSoldada";
+import { rotuloEps } from "@/lib/eps-casa";
 
 /**
  * O PREENCHIMENTO DO ENSAIO VISUAL DE SOLDA.
@@ -88,11 +90,7 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
           <Campo rot="Desenho do cliente" k="desenhoCliente" />
           <Campo rot="Revisão do desenho do cliente" k="revisaoCliente" />
           <Campo rot="Metal base" k="metalBase" opcoes={METAIS_BASE} />
-          <Campo rot="Metal de adição" k="metalAdicao" />
-          <Campo rot="Processo de soldagem" k="processoSolda" />
-          <Campo rot="EPS" k="eps" />
-          <Campo rot="RQS" k="rqs" />
-          <Campo rot="Tipo de junta" k="tipoJunta" />
+          <CamposJuntaSoldada res={res} travado={travado} setResultado={setResultado} eps={eps} />
           <label className="block">
             <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">
               Iluminação (lux) <span className="font-normal">· mínimo {LUX_MINIMO}</span>
@@ -179,7 +177,7 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
                       {(() => {
                         const permitidas = soldadores.find((y) => y.nome === l.soldador)?.epsPermitidas;
                         const lst = permitidas?.length ? eps.filter((x) => permitidas.includes(x.codigo)) : eps;
-                        return lst.map((x) => <option key={x.codigo} value={x.codigo}>{x.codigo}{x.processo ? ` · ${x.processo}` : ""}</option>);
+                        return lst.map((x) => <option key={x.codigo} value={x.codigo}>{rotuloEps(x)}{x.processo ? ` · ${x.processo}` : ""}</option>);
                       })()}
                     </select>
                   </label>

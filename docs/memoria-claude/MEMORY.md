@@ -101,6 +101,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Pintura e tinta](torg_pintura_tinta.md) — mede em m² (não kg); PLP dá demãos/cor/SV; caderno de 3 folhas com fórmulas vivas; FEFO; por que "quanto falta" ainda não é afirmável
 - [Pintura tem DUAS telas](torg_pintura_duas_telas.md) — campo (Alexandre Stival, stival2112@gmail.com — ex-"Lais" —, só QUALIDADE_CAMPO) × computador; ajuste pedido por inspetor vai no de campo
 - [Campo: ida e volta de cada campo](torg_campo_ida_e_volta.md) — celular grava por 3 listas fechadas (rota, `lib/campo-condicoes`, `lib/campo-linhas`); faltando uma, a informação "some" ao reabrir; lixeira pelo índice do banco; enviado em assinatura abre para completar
+- [Junta soldada e as EPS da casa](torg_junta_soldada_eps.md) — EPS 001–005/2025 (GMAW/FCAW/SMAW, ER70S-6/E71T-1C/E7018, RQPS de mesmo número); a EPS escolhida puxa processo, metal e RQS; mais de uma EPS por relatório; ficha em lib/eps-casa.js
 - [Quadros de assinatura: uma regra só](torg_relatorio_quadros_assinatura.md) — `quadrosDeAssinatura`: papel do convite pela posição, cada assinatura num quadro, inspetor = aprovador vira um quadro; o dimensional tinha cópia velha
 - [.env.local sem RESEND](torg_env_local_sem_resend.md) — script local não manda e-mail (chave vazia); reenvio de convite por script falhou calado em 21/09
 - [Pintura: condição ambiental por ETAPA](torg_pintura_condicoes_por_etapa.md) — jato/fundo/demais demãos; demão sem leitura herda a do jato (e diz); item 5.4 julga cada etapa

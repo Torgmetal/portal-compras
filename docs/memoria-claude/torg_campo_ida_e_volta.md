@@ -40,8 +40,8 @@ atualizou o modelo (laudo "A" copiado do resultado geral, soldador/EPS vazios).
 
 **OP-102, medido em 23/09:** pintura (RIP-102-001/002) íntegra — tudo o que ela digitou em 22/09 está
 no banco e no PDF (ela mesma limpou a 3ª demão, que o PLP numerava como 1 e 3). Nenhuma gravação
-desfez outra (a auditoria da memória de padrões prova a ordem). Os campos novos do modelo LP/EVS de
-21/09 (EPS, RQS, metal de adição, processo, tipo de junta, data) só existem no formulário do computador.
+desfez outra (a auditoria da memória de padrões prova a ordem). A junta soldada (EPS, RQS, metal de adição,
+processo, tipo de junta) passou a existir também no celular em 23/09 — ver [[torg_junta_soldada_eps]].
 
 **How to apply:** campo novo numa tela do campo → entra na rota E em `lib/campo-condicoes.js` (ou em
 `lib/campo-linhas.js`, se for da linha). Os dois testes acusam se faltar um lado.

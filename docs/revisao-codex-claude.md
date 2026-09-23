@@ -1717,3 +1717,22 @@ logada.
 aparece **desligado** aqui, com tarja. O caminho determinístico inteiro (ferramentas, recuperação,
 orçamento, persistência, conferência de prosa) está testado; o que falta provar é a resposta do
 modelo de ponta a ponta, e isso só dá para fazer em produção ou com a chave colada à mão.
+
+- **(23/09, 20h) A junta soldada dos relatórios de LP/EVS — e as EPS da casa como fonte.** Vitor:
+  *"nos relatórios da OP-102 está faltando preencher Metal de adição, Processo de soldagem, EPS, RQS e
+  tipo de junta"*. Os cinco só existiam como texto livre no computador; o celular não tinha.
+  **Fonte dos valores:** li as EPS na pasta do SGQ (digitalizadas; a "EPS Resumida" tem texto) —
+  EPS 001–005/2025, cada uma com RQPS de mesmo número; 01/03 GMAW ER70S-6, 02/05 FCAW E71T-1C, 04 SMAW
+  E7018; todas topo e ângulo. Transcritas em `lib/eps-casa.js` (`FICHAS_EPS`) e aplicadas em `listarEPS`
+  — o nome do arquivo não traz o processo de 03/04/05, e o soldador SMAW ficava sem EPS permitida.
+  **Tela:** bloco "Junta soldada" no celular (LP e EVS) e no computador (`CamposJuntaSoldada`): acrescentar
+  EPS (uma ou mais — o EVS-102-001 tem GMAW e SMAW) preenche RQS, processo e metal; tipo de junta em
+  lista (Topo / Ângulo / Topo e ângulo). Valor antigo fora da lista continua à vista. Os cinco entraram
+  na carga do celular (`lib/campo-condicoes.js`; o guarda agora varre TODAS as telas do campo) e na
+  memória de padrões por OP (LP e EVS). **PDF:** as linhas da junta usam `linhaInfoCresce` (duas EPS
+  saíam "EPS 001/2025, E…"), e a EPS da junta sai com o número do documento como o cabeçalho.
+  Testes: eps-casa (9), soldagem-eps (2), campo-junta-soldada (6), qualidade-junta-soldada (5),
+  pdf-junta-soldada (3), padroes-inspecao (+1). **3.780 passando**, checar limpo, build ok.
+  ⚠ **Para revisar:** (a) a ficha é transcrição de PDF digitalizado — conferir contra as EPS; (b) com
+  002 e 005 ambas FCAW, `epsDoProcesso` segue devolvendo a primeira (002) para a EPS permitida da junta;
+  (c) NÃO preenchi os relatórios da OP-102 — quem escolhe a EPS é a inspeção.
