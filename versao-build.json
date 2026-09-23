@@ -1,7 +1,12 @@
 {
-  "build": 3407,
-  "gerado": "2026-09-23T00:14:27.730Z",
+  "build": 3408,
+  "gerado": "2026-09-23T00:23:33.533Z",
   "commits": [
+    {
+      "hash": "96cace4fb8",
+      "data": "22/09/2026",
+      "titulo": "Fiscal: o Simulador — o alerta que a NF-e 973 não teve"
+    },
     {
       "hash": "2d8c507697",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d60fb1a607",
       "data": "22/09/2026",
       "titulo": "Pintura: a foto ganha número e cada etapa, a sua condição ambiental"
-    },
-    {
-      "hash": "f471f43ade",
-      "data": "22/09/2026",
-      "titulo": "Registra a decisão sobre as propostas em PDF da GERDAU"
     }
   ]
 }

@@ -805,3 +805,20 @@ novo, não conserto, e não entra sem o Matheus decidir.
   ⚠ **AINDA ABERTO**: "Produtos da TORG" (§14 do briefing) — classificar o `ARM000010` por peça
   real, com responsável e data. É a raiz do problema: enquanto um código serve para tudo, o NCM
   segue sendo escolhido caso a caso. E o P1 do Vitor em `AbaExpedicao.jsx` continua sem toque.
+- **(22/09, 21h25) O seletor do Simulador passa a ser de CFOP.** Matheus (22/09/2026): *"na
+  natureza de operação tire os nomes, deixe os CFOPs e a descrição do CFOP"*. Ele está certo sobre
+  o fluxo: quem emite pensa no código que vai na nota, e um rótulo como "Venda à ordem (ex.: TMSA)"
+  fazia a operação parecer DAQUELE cliente.
+  ⚠⚠ **E a troca HABILITOU uma verificação nova**: o CFOP contra as UFs. 5.xxx é interna e 6.xxx é
+  interestadual — o primeiro dígito não é decoração. Escolher 5.101 numa venda para o RS é erro que
+  a SEFAZ rejeita, e é exatamente o que o operador não sabe de cabeça. O alerta sai com o
+  equivalente sugerido (6.101).
+  ⚠ O par equivalente casa pelos TRÊS ÚLTIMOS DÍGITOS, não pela descrição — os textos diferem de
+  propósito ("Venda de produção" × "Venda INTERESTADUAL de produção"). E nem todo par existe
+  (5.902 e 5.124 não têm 6.xxx na lista da TORG), então a sugestão só entra quando há equivalente.
+  ⚠ As perguntas e alertas das operações reais não se perderam: voltam pelo caminho inverso, a
+  partir das operações em que o CFOP aparece. O exemplo continua sendo exemplo; só deixou de ser a
+  porta de entrada.
+  ⚠ Lista agrupada por família (6 optgroups): são 18 códigos, e "5.101" ao lado de "6.101" num
+  select liso faz escolher o errado por um dígito.
+  **3.213 passando**, tela validada logada.

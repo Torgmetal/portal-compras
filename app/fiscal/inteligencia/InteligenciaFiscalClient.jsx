@@ -605,8 +605,8 @@ const campo = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-
 const rotulo = "text-xs font-medium text-torg-gray";
 
 function AbaSimulador() {
-  const [opcoes, setOpcoes] = useState({ ops: [], operacoes: [], cstIpi: [] });
-  const [f, setF] = useState({ ncm: "", operacao: "", opId: "", ufDestino: "", valor: "", cstPretendido: "" });
+  const [opcoes, setOpcoes] = useState({ ops: [], cfops: [], familias: [], cstIpi: [] });
+  const [f, setF] = useState({ ncm: "", cfop: "", opId: "", ufDestino: "", valor: "", cstPretendido: "" });
   const [r, setR] = useState(null);
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(false);
@@ -623,7 +623,7 @@ function AbaSimulador() {
       const resp = await fetch("/api/fiscal/inteligencia/simular", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ncm: f.ncm, operacao: f.operacao || null, opId: f.opId || null,
+          ncm: f.ncm, cfop: f.cfop || null, opId: f.opId || null,
           ufDestino: f.ufDestino || null, valor: f.valor ? Number(String(f.valor).replace(",", ".")) : null,
           cstPretendido: f.cstPretendido || null,
         }),
@@ -644,11 +644,22 @@ function AbaSimulador() {
             <input className={`${campo} font-mono`} placeholder="8437.90.00" value={f.ncm}
               onChange={(e) => setF({ ...f, ncm: e.target.value })} />
           </div>
+          {/* ⚠⚠ O SELETOR É DE CFOP, NÃO DE "NOME DE OPERAÇÃO". Matheus (22/09/2026): *"tire os nomes,
+              deixe os CFOPs e a descrição do CFOP"*. Quem emite pensa no código que vai na nota — e
+              um rótulo como "Venda à ordem (ex.: TMSA)" fazia a operação parecer daquele cliente.
+              ⚠ Agrupado por família: são 18 códigos, e "5.101" ao lado de "6.101" num select liso
+              faz escolher o errado por um dígito. */}
           <div className="md:col-span-2">
-            <label className={rotulo}>Natureza da operação</label>
-            <select className={campo} value={f.operacao} onChange={(e) => setF({ ...f, operacao: e.target.value })}>
+            <label className={rotulo}>CFOP da operação</label>
+            <select className={campo} value={f.cfop} onChange={(e) => setF({ ...f, cfop: e.target.value })}>
               <option value="">— escolha —</option>
-              {opcoes.operacoes.map((o) => <option key={o.id} value={o.id}>{o.titulo}{o.cliente ? ` (ex.: ${o.cliente})` : ""}</option>)}
+              {opcoes.familias.map((fam) => (
+                <optgroup key={fam} label={fam}>
+                  {opcoes.cfops.filter((c) => c.familia === fam).map((c) => (
+                    <option key={c.codigo} value={c.codigo}>{c.codigoFormatado} — {c.resumo}</option>
+                  ))}
+                </optgroup>
+              ))}
             </select>
           </div>
 
@@ -736,19 +747,29 @@ function AbaSimulador() {
 
             <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">
-                CFOP sugerido {r.cfop.ambito ? `· operação ${r.cfop.ambito === "INTERNA" ? "interna" : "interestadual"}` : ""}
+                CFOP escolhido {r.cfop.ambito ? `· operação ${r.cfop.ambito === "INTERNA" ? "interna" : "interestadual"}` : ""}
               </p>
-              {r.cfop.candidatos.length ? (
-                <ul className="mt-2 space-y-1.5">
-                  {r.cfop.candidatos.map((c) => (
-                    <li key={c.codigo} className="text-sm">
-                      <span className="font-mono font-semibold text-torg-dark">{c.codigoFormatado}</span>
-                      <span className="text-torg-gray"> — {c.resumo}</span>
-                      {c.nota && <span className="block text-xs text-amber-700">{c.nota}</span>}
-                    </li>
-                  ))}
-                </ul>
-              ) : <p className="mt-2 text-sm text-torg-gray">Escolha a natureza da operação.</p>}
+              {r.cfop.escolhido ? (
+                <>
+                  <div className="mt-2">
+                    <span className="font-mono text-2xl font-bold text-torg-dark">{r.cfop.escolhido.codigoFormatado}</span>
+                    <span className="ml-2 rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase text-torg-gray">{r.cfop.escolhido.familia}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-torg-gray">{r.cfop.escolhido.resumo}</p>
+                  {r.cfop.escolhido.nota && <p className="mt-1 text-xs text-amber-700">{r.cfop.escolhido.nota}</p>}
+                  {/* ⚠ Os exemplos reais são CONTEXTO, não determinação — por isso vêm depois do código. */}
+                  {r.cfop.operacoes.length > 0 && (
+                    <div className="mt-2.5 border-t border-gray-100 pt-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-torg-gray">Aparece nestas operações da TORG</p>
+                      {r.cfop.operacoes.map((o) => (
+                        <p key={o.id} className="mt-0.5 text-xs text-torg-gray">
+                          {o.titulo}{o.cliente ? ` (ex.: ${o.cliente})` : ""} · {o.fluxo.join(" → ")}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : <p className="mt-2 text-sm text-torg-gray">Escolha o CFOP da operação.</p>}
               <p className="mt-2 border-t border-gray-100 pt-2 text-xs text-amber-700">⚠ {r.cfop.ressalva}</p>
             </div>
           </div>

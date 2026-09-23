@@ -46,7 +46,7 @@ describe("ipiDaTipi — o CST é consequência da tabela, não escolha", () => {
 
 describe("simular — o alerta que a NF-e 973 não teve", () => {
   const entrada973 = {
-    ncm: "84379000", operacao: "venda-normal", ufOrigem: "SP", ufDestino: "RS",
+    ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS",
     valor: 2542, cstPretendido: "53",
   };
 
@@ -87,13 +87,13 @@ describe("simular — o que ele se RECUSA a calcular", () => {
   // interestadual"* e *"não aplicar PIS 1,65% e COFINS 7,6% a todas as operações"*. Um número
   // plausível aqui é pior que um campo vazio: o vazio manda perguntar, o plausível vai para a nota.
   it("ICMS, PIS/COFINS e IBS/CBS saem como não determinados, COM motivo", () => {
-    const r = simular({ ncm: "84379000", operacao: "venda-normal", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25)));
+    const r = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25)));
     expect(r.naoDeterminados.map((x) => x.tributo)).toEqual(["ICMS", "PIS/COFINS", "IBS/CBS"]);
     for (const nd of r.naoDeterminados) expect(nd.motivo.length).toBeGreaterThan(40);
   });
 
   it("nenhum tributo além do IPI vem com número", () => {
-    const r = simular({ ncm: "84379000", operacao: "venda-normal", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25)));
+    const r = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25)));
     const texto = JSON.stringify(r.naoDeterminados);
     expect(texto).not.toMatch(/"valor"|"aliquota"/);
   });
@@ -101,13 +101,13 @@ describe("simular — o que ele se RECUSA a calcular", () => {
   // ⚠⚠ cEnq NÃO É SUGERIDO. O briefing proíbe atribuir 999 automaticamente, e sugerir um código
   // aqui seria o portal inventando fundamento legal.
   it("o enquadramento legal nunca é preenchido sozinho", () => {
-    const r = simular({ ncm: "84379000", operacao: "venda-normal", ufOrigem: "SP", ufDestino: "RS" }, tipi(linha(3.25)));
+    const r = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS" }, tipi(linha(3.25)));
     expect(r.ipi.cEnq).toBeNull();
     expect(r.ipi.cEnqNota).toMatch(/não é sugerido automaticamente/i);
   });
 
   it("NCM fora da TIPI não é simulado — manda rever a classificação", () => {
-    const r = simular({ ncm: "99999999", operacao: "venda-normal", ufOrigem: "SP", ufDestino: "RS" }, undefined);
+    const r = simular({ ncm: "99999999", cfop: "6101", ufOrigem: "SP", ufDestino: "RS" }, undefined);
     expect(r.ipi.determinado).toBe(false);
     expect(r.ipi.motivo).toMatch(/classificação precisa ser revista/i);
   });
@@ -117,30 +117,44 @@ describe("simular — as perguntas que faltam", () => {
   it("sem UF e sem operação, o simulador pergunta em vez de chutar", () => {
     const r = simular({ ncm: "84379000" }, tipi(linha(3.25)));
     expect(r.perguntas.some((p) => /UF de origem/.test(p))).toBe(true);
-    expect(r.perguntas.some((p) => /natureza da operação/.test(p))).toBe(true);
+    expect(r.perguntas.some((p) => /Escolha o CFOP/.test(p))).toBe(true);
   });
 
   // ⚠ Cada CFOP candidato traz o que ainda precisa ser respondido — é isso que impede o simulador
   // de virar um carimbo.
   it("a industrialização pergunta de quem são os insumos e por onde transitaram", () => {
-    const r = simular({ ncm: "84379000", operacao: "indust-insumo-direto", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
+    const r = simular({ ncm: "84379000", cfop: "5901", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
     expect(r.perguntas.some((p) => /insumos/i.test(p))).toBe(true);
     expect(r.alertas.some((a) => /TRÂNSITO dos insumos/i.test(a.texto))).toBe(true);
   });
 
-  it("a venda à ordem devolve os CFOPs de venda e de remessa", () => {
-    const r = simular({ ncm: "84379000", operacao: "venda-a-ordem", ufOrigem: "SP", ufDestino: "RS" }, tipi(linha(3.25)));
-    const cods = r.cfop.candidatos.map((c) => c.codigo);
-    expect(cods).toContain("6118");
-    expect(cods).toContain("6923");
+  it("o CFOP escolhido traz a descrição e os exemplos reais em que aparece", () => {
+    const r = simular({ ncm: "84379000", cfop: "6118", ufOrigem: "SP", ufDestino: "RS" }, tipi(linha(3.25)));
+    expect(r.cfop.escolhido).toMatchObject({ codigoFormatado: "6.118", ambito: "INTERESTADUAL" });
+    expect(r.cfop.operacoes.map((o) => o.id)).toContain("venda-a-ordem");
     expect(r.cfop.ressalva).toMatch(/pendente de conferência/i);
+  });
+
+  // ⚠⚠ A VERIFICAÇÃO QUE SÓ EXISTE PORQUE O USUÁRIO ESCOLHE O CÓDIGO. 5.xxx é interna e 6.xxx é
+  // interestadual — o primeiro dígito não é decoração. Escolher 5.101 numa venda para o RS é erro
+  // que a SEFAZ rejeita, e é o tipo de coisa que o operador não sabe de cabeça.
+  it("CFOP interno com destino fora do estado acende alerta ALTO", () => {
+    const r = simular({ ncm: "84379000", cfop: "5101", ufOrigem: "SP", ufDestino: "RS" }, tipi(linha(3.25)));
+    const a = r.alertas.find((x) => x.nivel === "alto");
+    expect(a.texto).toMatch(/5\.101 é de operação INTERNA/);
+    expect(a.texto).toMatch(/O código equivalente é o 6\.101/);
+  });
+
+  it("CFOP coerente com as UFs não alarma", () => {
+    const r = simular({ ncm: "84379000", cfop: "5101", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
+    expect(r.alertas.filter((x) => /operação INTERNA|INTERESTADUAL/.test(x.texto))).toEqual([]);
   });
 
   // ⚠⚠ LISTA QUE PERGUNTA O QUE JÁ FOI RESPONDIDO ENSINA A IGNORAR A LISTA, e aí a pergunta que
   // importa some junto. Os `exige` de cada CFOP são estáticos — pedem "UF de destino" mesmo com o
   // campo preenchido. Apareceu na primeira validação da tela.
   it("não repete a pergunta que a entrada já responde", () => {
-    const r = simular({ ncm: "84379000", operacao: "venda-normal", ufOrigem: "SP", ufDestino: "RS", destinatarioContribuinte: true }, tipi(linha(3.25)));
+    const r = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", destinatarioContribuinte: true }, tipi(linha(3.25)));
     expect(r.perguntas.some((p) => /UF de destino/i.test(p))).toBe(false);
     expect(r.perguntas.some((p) => /contribuinte/i.test(p))).toBe(false);
   });
@@ -148,12 +162,12 @@ describe("simular — as perguntas que faltam", () => {
   // ⚠ Conservador de propósito: sem a resposta, a pergunta FICA. Perguntar de novo é ruído;
   // deixar de perguntar é o defeito que o módulo existe para evitar.
   it("sem a resposta, a pergunta continua na lista", () => {
-    const r = simular({ ncm: "84379000", operacao: "venda-normal" }, tipi(linha(3.25)));
+    const r = simular({ ncm: "84379000", cfop: "6101" }, tipi(linha(3.25)));
     expect(r.perguntas.some((p) => /contribuinte/i.test(p))).toBe(true);
   });
 
   it("destinatário não contribuinte vira aviso sobre o ICMS", () => {
-    const r = simular({ ncm: "84379000", operacao: "venda-normal", ufOrigem: "SP", ufDestino: "RS", destinatarioContribuinte: false }, tipi(linha(3.25)));
+    const r = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", destinatarioContribuinte: false }, tipi(linha(3.25)));
     expect(r.alertas.some((a) => /não contribuinte/i.test(a.texto))).toBe(true);
   });
 });
