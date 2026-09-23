@@ -1,7 +1,12 @@
 {
-  "build": 3436,
-  "gerado": "2026-09-23T19:24:59.252Z",
+  "build": 3437,
+  "gerado": "2026-09-23T20:47:36.731Z",
   "commits": [
+    {
+      "hash": "a18409031f",
+      "data": "23/09/2026",
+      "titulo": "Fiscal: a validação das regras — e por que elas não viraram tabela"
+    },
     {
       "hash": "414826b9d3",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "96cace4fb8",
       "data": "22/09/2026",
       "titulo": "Fiscal: o Simulador — o alerta que a NF-e 973 não teve"
-    },
-    {
-      "hash": "2d8c507697",
-      "data": "22/09/2026",
-      "titulo": "Fiscal: auditoria de NF-e por XML, com a 973 como caso de teste"
     }
   ]
 }

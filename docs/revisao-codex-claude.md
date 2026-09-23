@@ -1661,3 +1661,59 @@ operação de receita) não há lista — candidato só aparece onde ele se abst
   Testes: `fiscal-regras-validacao` (19). **3.704 passando**, lint sem erro, build EXIT=0 (`ƒ`),
   validado logado: com tudo pendente a ficha SAI; contestando o 5.101 a ficha SOME, o motivo sobe
   como alerta alto e o IPI da TIPI continua. ⚠ A linha de teste foi removida da produção.
+
+## 23/09/2026 — Assistente Fiscal TORG (chat na Inteligência Fiscal)
+
+**Parecer prévio** (`consultar.py architecture`): *"Aprovar a direção, condicionada a corrigir A1,
+A4/A5 e A8 antes da implementação"*. As três foram corrigidas antes de eu escrever código:
+
+- **A1 — "o LLM só orquestra" não bastava.** *"Uma ferramenta pode retornar o fato correto e o
+  modelo aplicar esse fato à operação errada."* Virou três camadas: lista fechada de ferramentas,
+  **blocos fiscais renderizados pelo servidor** e `conferirProsa`, que acusa alíquota, artigo, CFOP
+  e NCM sem lastro nas evidências. Conferir que a citação EXISTE não prova que ela sustenta a frase.
+- **A4/A5 — hash identifica, não preserva.** `FiscalNormaVersao` tem exclusão em cascata e
+  `FiscalValidacaoRegra` guarda a decisão, não a regra. A evidência passou a guardar o **trecho**.
+  ⚠ E o índice GIN que eu tinha proposto **foi retirado**: era alterar tabela existente, o oposto do
+  que eu havia prometido. A recuperação virou leitura cacheada + ranking puro.
+- **A8 — corrida de orçamento.** Reserva atômica por `ON CONFLICT DO UPDATE … WHERE`, ANTES da
+  chamada. **Provado contra a produção: 12 simultâneas com teto de 4 → passaram 4.** Linha removida.
+
+Também acatados: `simular` entrou no MVP (sem ela o "calcula" do briefing não é atendido); os
+**cinco** estados da regra preservados (eu tinha esquecido ALTERADA e INDISPONIVEL); cobertura
+**parcial** em vez de recusa binária; ferramenta renomeada para `consultar_regra_e_situacao`
+(*"hoje não há regras validadas"*); streaming só de **progresso**, nunca de afirmação fiscal não
+conferida; execução com estado e reconciliação por **expiração**, não por `finally`.
+
+⚠⚠⚠ **O piso de relevância da busca legal é 4 e foi MEDIDO, não arbitrado.** Sem ele, "impressora em
+locação" devolvia o art. 408 (industrialização) e "receita de bolo" devolvia o art. 131 — porque no
+RICMS *receita* é faturamento. **Não há uma linha sobre locação nesta base**, e dispositivo errado é
+pior que nenhum: nenhum vira "não tenho fundamento aqui"; errado vira resposta com cara de
+fundamentada.
+
+⚠⚠ **Um defeito meu pego antes da tela, do meu padrão de sempre**: escrevi o bloco de classificação
+lendo `r.classificacao`/`r.evidencias`, e o motor devolve `status`/`candidatos` — a tela sairia com
+"undefined" no lugar do **aprovador**, que é o campo que dá sentido ao registro. Conferido contra o
+módulo antes de commitar, e o teste agora usa a forma real. ⚠ E `log()` expõe `erro`, não `error`:
+eu tinha chamado `registro.error` **dentro do catch**, que mascararia o erro original.
+
+⚠ **Defeito pego na validação de tela**: o Torguinho (`fixed bottom-4 right-4`) cobria o botão de
+enviar. Saiu de `/fiscal/inteligencia` — e o segundo motivo pesa mais que o primeiro: dois
+assistentes na mesma tela fazem perguntar de fiscal para o que não consulta a TIPI.
+
+**Fora do MVP, com contrato reservado:** upload de XML/PDF, PDF de auditoria, painel administrativo
+completo, memória corporativa. ⚠ O SDK 0.30.1 **não lê PDF nativamente** — subir versão é
+pré-requisito do §17.
+
+Arquivos: `lib/fiscal/assistente/{contrato,ranking,recuperacao,ferramentas,instrucao,provedor,
+orquestrador,orcamento,conversas}.js`, `app/api/fiscal/assistente/{mensagem,conversas}`,
+`components/fiscal/assistente/{AssistenteFiscal,Mensagem,BlocoFiscal,TextoFormatado}.jsx`,
+3 models + `ensure-fiscal-tables.mjs`, aba em `InteligenciaFiscalClient.jsx`.
+Testes: `fiscal-assistente-{contrato,ranking,laco}` + `api/fiscal-assistente-rota` (41 novos).
+**3.745 passando**, `npm run checar` limpo, build EXIT=0 com as 3 rotas como `ƒ`, tela validada
+logada.
+
+⚠⚠ **PENDENTE DE VALIDAÇÃO EM PRODUÇÃO: a chamada real ao modelo.** `vercel env pull` devolve
+`[SENSITIVE]` para variável *Secret*, então a chave não desce para o ambiente local — o assistente
+aparece **desligado** aqui, com tarja. O caminho determinístico inteiro (ferramentas, recuperação,
+orçamento, persistência, conferência de prosa) está testado; o que falta provar é a resposta do
+modelo de ponta a ponta, e isso só dá para fazer em produção ou com a chave colada à mão.

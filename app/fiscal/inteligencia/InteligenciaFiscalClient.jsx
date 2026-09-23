@@ -6,6 +6,7 @@ import CampoNcm from "./CampoNcm";
 import AbaClassificacoes from "./AbaClassificacoes";
 import AbaCadeia from "./AbaCadeia";
 import AbaRegras from "./AbaRegras";
+import AssistenteFiscal from "@/components/fiscal/assistente/AssistenteFiscal";
 import CitacaoLegal from "./CitacaoLegal";
 
 // ─── INTELIGÊNCIA FISCAL ─────────────────────────────────────────────────────
@@ -1370,10 +1371,15 @@ function AbaSimulador() {
   );
 }
 
-const ABAS = [{ id: "ncm", rotulo: "Consulta NCM" }, { id: "cfop", rotulo: "Consulta CFOP" }, { id: "simulador", rotulo: "Simulador" }, { id: "auditoria", rotulo: "Auditoria de NF-e" }, { id: "classificacoes", rotulo: "Classificação de produtos" }, { id: "cadeia", rotulo: "Cadeia de documentos" }, { id: "regras", rotulo: "Validação de regras" }, { id: "admin", rotulo: "Atualizações Tributárias" }];
+// ⚠⚠ O ASSISTENTE É A PRIMEIRA ABA, E NENHUMA DAS OITO SAIU. O briefing pede o chat como porta de
+// entrada — *"o colaborador não precisa descobrir sozinho qual tabela ou simulador utilizar"* — e é
+// explícito em manter as consultas tradicionais: quem já sabe qual tela quer não deve passar por
+// uma conversa para chegar nela.
+const ABAS = [{ id: "assistente", rotulo: "Assistente Fiscal" },
+  { id: "ncm", rotulo: "Consulta NCM" }, { id: "cfop", rotulo: "Consulta CFOP" }, { id: "simulador", rotulo: "Simulador" }, { id: "auditoria", rotulo: "Auditoria de NF-e" }, { id: "classificacoes", rotulo: "Classificação de produtos" }, { id: "cadeia", rotulo: "Cadeia de documentos" }, { id: "regras", rotulo: "Validação de regras" }, { id: "admin", rotulo: "Atualizações Tributárias" }];
 
 export default function InteligenciaFiscalClient({ referencia, cfops, operacoes, cstIpi, familias, ehAdmin }) {
-  const [aba, setAba] = useState("ncm");
+  const [aba, setAba] = useState("assistente");
   const { showToast } = useStore();
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -1391,6 +1397,7 @@ export default function InteligenciaFiscalClient({ referencia, cfops, operacoes,
         ))}
       </div>
 
+      {aba === "assistente" && <AssistenteFiscal showToast={showToast} />}
       {aba === "ncm" && <AbaNcm referencia={referencia} />}
       {aba === "cfop" && <AbaCfop cfops={cfops} operacoes={operacoes} cstIpi={cstIpi} familias={familias} />}
       {aba === "simulador" && <AbaSimulador />}

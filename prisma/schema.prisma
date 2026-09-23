@@ -6918,3 +6918,92 @@ model FiscalClassificacaoProduto {
   @@index([status])
   @@index([codigoProduto])
 }
+
+/// ─── O ASSISTENTE FISCAL: CONVERSA, EXECUÇÃO E CONSUMO ───────────────────────
+///
+/// ⚠⚠ RASTREABILIDADE É GUARDAR O TEXTO, NÃO O PONTEIRO (parecer do Codex, 23/09/2026):
+/// *"hash identifica; não preserva conteúdo"*. `FiscalNormaVersao` tem exclusão em cascata e
+/// `FiscalValidacaoRegra` guarda a DECISÃO humana, não a regra — então id e sha256 sozinhos não
+/// reconstroem o fundamento de uma resposta antiga. Por isso `evidencias` guarda o TRECHO
+/// apresentado, e não só a chave para ir buscá-lo.
+model FiscalConversa {
+  id        String   @id @default(cuid())
+  userId    String
+  /// ⚠ NOME junto do id, como no resto do módulo: a conversa precisa continuar legível depois que
+  /// a pessoa sai da empresa.
+  userNome  String
+  titulo    String
+  /// ATIVA | ARQUIVADA
+  status    String   @default("ATIVA")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mensagens FiscalMensagem[]
+
+  @@index([userId, updatedAt])
+}
+
+/// ⚠⚠ A MENSAGEM DO ASSISTENTE É UMA EXECUÇÃO COM ESTADO, não um texto que aparece pronto. A rota
+/// da Vercel pode morrer no meio do streaming (`maxDuration` limita a duração TOTAL, streaming
+/// incluso): sem estado, ficaria uma mensagem pela metade indistinguível de uma resposta curta.
+model FiscalMensagem {
+  id            String         @id @default(cuid())
+  conversaId    String
+  conversa      FiscalConversa @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+  seq           Int
+  /// USUARIO | ASSISTENTE
+  papel         String
+  /// ⚠⚠ CHAVE DE IDEMPOTÊNCIA POR TENTATIVA: reenvio do POST (rede caindo, usuário tocando duas
+  /// vezes) devolve a execução que já existe em vez de cobrar outra chamada à API. Mesma lição da
+  /// `chaveOperacao` da Conferência de Peça.
+  chave         String?
+  /// EM_ANDAMENTO | CONCLUIDA | INTERROMPIDA | FALHOU
+  estado        String         @default("CONCLUIDA")
+  conteudo      String         @default("")
+  /// ⚠⚠ OS BLOCOS FISCAIS RENDERIZADOS PELO SERVIDOR — CFOP, alíquota, citação. O modelo não
+  /// escreve esses valores; ele os comenta. É a fronteira de `lib/fiscal/assistente/contrato.js`.
+  blocos        Json?
+  /// O trecho legal efetivamente apresentado, retido — ver o aviso do topo.
+  evidencias    Json?
+  /// Entrada e saída de cada ferramenta executada, para o §22 do briefing.
+  ferramentas   Json?
+  /// As versões resolvidas UMA VEZ por execução (TIPI, normas, impressão das regras) — resolver a
+  /// cada ferramenta misturaria referências no meio de uma atualização.
+  referencias   Json?
+  /// ⚠ Citação sem lastro nas evidências, detectada por `conferirProsa`. Fica gravada: é a prova
+  /// de que o portal conferiu, e o que a tela mostra em tarja.
+  avisos        Json?
+  modelo        String?
+  tokensEntrada Int            @default(0)
+  tokensSaida   Int            @default(0)
+  /// ⚠ Em MICROS de real (10⁻⁶) e inteiro: centavo em float acumula erro ao somar milhares de linhas.
+  custoMicros   Int            @default(0)
+  erro          String?
+  iniciadoEm    DateTime       @default(now())
+  terminadoEm   DateTime?
+
+  @@unique([conversaId, seq])
+  @@unique([conversaId, chave])
+  @@index([conversaId, seq])
+  @@index([estado, iniciadoEm])
+}
+
+/// ⚠⚠ A RESERVA É ATÔMICA E VEM ANTES DA CHAMADA (parecer do Codex): conferir o saldo e incrementar
+/// depois deixa duas chamadas simultâneas passarem as duas. O `UPDATE ... WHERE gasto + reserva <=
+/// teto` faz o Postgres decidir, não a aplicação.
+/// ⚠ `dia` é texto "AAAA-MM-DD" em America/Sao_Paulo — o teto diário é do dia de quem trabalha,
+/// não do UTC.
+model FiscalUsoIa {
+  id            String   @id @default(cuid())
+  userId        String
+  dia           String
+  chamadas      Int      @default(0)
+  tokensEntrada Int      @default(0)
+  tokensSaida   Int      @default(0)
+  /// Reservado antes da chamada; conciliado com o consumo real depois.
+  custoMicros   Int      @default(0)
+  atualizadoEm  DateTime @updatedAt
+
+  @@unique([userId, dia])
+  @@index([dia])
+}

@@ -252,6 +252,59 @@ const sql = [
   `CREATE INDEX IF NOT EXISTS "FiscalValidacaoRegra_regraId_em_idx" ON "FiscalValidacaoRegra"("regraId","em")`,
   `CREATE INDEX IF NOT EXISTS "FiscalValidacaoRegra_estado_idx" ON "FiscalValidacaoRegra"("estado")`,
 
+  // ── O ASSISTENTE FISCAL ────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS "FiscalConversa" (
+     "id" TEXT PRIMARY KEY,
+     "userId" TEXT NOT NULL,
+     "userNome" TEXT NOT NULL,
+     "titulo" TEXT NOT NULL,
+     "status" TEXT NOT NULL DEFAULT 'ATIVA',
+     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+  `CREATE INDEX IF NOT EXISTS "FiscalConversa_userId_updatedAt_idx" ON "FiscalConversa"("userId","updatedAt")`,
+
+  `CREATE TABLE IF NOT EXISTS "FiscalMensagem" (
+     "id" TEXT PRIMARY KEY,
+     "conversaId" TEXT NOT NULL,
+     "seq" INTEGER NOT NULL,
+     "papel" TEXT NOT NULL,
+     "chave" TEXT,
+     "estado" TEXT NOT NULL DEFAULT 'CONCLUIDA',
+     "conteudo" TEXT NOT NULL DEFAULT '',
+     "blocos" JSONB,
+     "evidencias" JSONB,
+     "ferramentas" JSONB,
+     "referencias" JSONB,
+     "avisos" JSONB,
+     "modelo" TEXT,
+     "tokensEntrada" INTEGER NOT NULL DEFAULT 0,
+     "tokensSaida" INTEGER NOT NULL DEFAULT 0,
+     "custoMicros" INTEGER NOT NULL DEFAULT 0,
+     "erro" TEXT,
+     "iniciadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     "terminadoEm" TIMESTAMP(3))`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalMensagem_conversaId_seq_key" ON "FiscalMensagem"("conversaId","seq")`,
+  // ⚠⚠ A IDEMPOTÊNCIA DO REENVIO. Múltiplos NULL não colidem no Postgres, então mensagem do
+  // usuário (que não leva chave) não é afetada — a trava vale só para a execução do assistente.
+  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalMensagem_conversaId_chave_key" ON "FiscalMensagem"("conversaId","chave")`,
+  `CREATE INDEX IF NOT EXISTS "FiscalMensagem_conversaId_seq_idx" ON "FiscalMensagem"("conversaId","seq")`,
+  // ⚠ Por estado e início: é como a reconciliação acha execução abandonada (rota morta no meio).
+  `CREATE INDEX IF NOT EXISTS "FiscalMensagem_estado_iniciadoEm_idx" ON "FiscalMensagem"("estado","iniciadoEm")`,
+
+  `CREATE TABLE IF NOT EXISTS "FiscalUsoIa" (
+     "id" TEXT PRIMARY KEY,
+     "userId" TEXT NOT NULL,
+     "dia" TEXT NOT NULL,
+     "chamadas" INTEGER NOT NULL DEFAULT 0,
+     "tokensEntrada" INTEGER NOT NULL DEFAULT 0,
+     "tokensSaida" INTEGER NOT NULL DEFAULT 0,
+     "custoMicros" INTEGER NOT NULL DEFAULT 0,
+     "atualizadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+  // ⚠⚠ ESTE ÚNICO É O QUE FAZ A RESERVA ATÔMICA FUNCIONAR: o `INSERT ... ON CONFLICT DO UPDATE`
+  // do orçamento depende dele para serializar duas chamadas simultâneas do mesmo usuário.
+  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalUsoIa_userId_dia_key" ON "FiscalUsoIa"("userId","dia")`,
+  `CREATE INDEX IF NOT EXISTS "FiscalUsoIa_dia_idx" ON "FiscalUsoIa"("dia")`,
+
   // ⚠ As FKs vão DEPOIS das tabelas, e cada uma num bloco próprio: `ADD CONSTRAINT` não tem
   // `IF NOT EXISTS` no Postgres, então a repetição é tratada como sucesso (42710 = já existe).
 ];
@@ -263,6 +316,7 @@ const fks = [
   [`FiscalNcmCodigo`, `FiscalNcmCodigo_versaoId_fkey`, `FOREIGN KEY ("versaoId") REFERENCES "FiscalNcmVersao"("id") ON DELETE CASCADE`],
   [`FiscalNormaVersao`, `FiscalNormaVersao_normaId_fkey`, `FOREIGN KEY ("normaId") REFERENCES "FiscalNorma"("id") ON DELETE CASCADE`],
   [`FiscalDispositivo`, `FiscalDispositivo_versaoId_fkey`, `FOREIGN KEY ("versaoId") REFERENCES "FiscalNormaVersao"("id") ON DELETE CASCADE`],
+  [`FiscalMensagem`, `FiscalMensagem_conversaId_fkey`, `FOREIGN KEY ("conversaId") REFERENCES "FiscalConversa"("id") ON DELETE CASCADE`],
 
 
 ];

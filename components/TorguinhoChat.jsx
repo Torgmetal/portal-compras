@@ -186,6 +186,14 @@ export default function TorguinhoChat() {
   // ⚠ E o monitor da supervisão, que é uma TV ligada o dia inteiro: o balão cobre um card de posto
   // e ninguém vai clicar nele de lá — mas alguém vai deixar de ver a máquina que está atrás.
   if (pathname?.startsWith("/mes-lab/monitor")) return null;
+  // ⚠⚠ E A INTELIGÊNCIA FISCAL, por DOIS motivos, e o segundo é o que pesa. O primeiro é o de
+  // sempre: `fixed bottom-4 right-4` cai exatamente em cima do botão de enviar do chat fiscal —
+  // visto na validação da tela em 1440×900 (23/09/2026), não descoberto lendo o código.
+  // ⚠⚠ O segundo é que DOIS assistentes na mesma tela é um convite a perguntar de fiscal para o
+  // errado. O Torguinho é ajuda geral do portal e não consulta a TIPI nem a legislação; o
+  // Assistente Fiscal consulta e cita fonte. Quem digitar "qual o IPI do 8437.90.00" no balão
+  // recebe um palpite sem lastro — que é tudo o que este módulo existe para impedir.
+  if (pathname?.startsWith("/fiscal/inteligencia")) return null;
   if (status !== "authenticated" || !config || !config.ativo || !temAcesso) return null;
 
   user?.name?.split(" ")[0] || "colega";
