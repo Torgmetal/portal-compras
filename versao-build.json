@@ -1,7 +1,12 @@
 {
-  "build": 3412,
-  "gerado": "2026-09-23T01:10:08.368Z",
+  "build": 3413,
+  "gerado": "2026-09-23T01:28:33.316Z",
   "commits": [
+    {
+      "hash": "c4defd7952",
+      "data": "22/09/2026",
+      "titulo": "Fiscal: o parecer de arquitetura achou 6 defeitos reais, e o ICMS entra como referência"
+    },
     {
       "hash": "04e3a36de7",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "96abd20f2e",
       "data": "22/09/2026",
       "titulo": "MES: a corrida entre contar e apagar vira recusa, não exceção"
-    },
-    {
-      "hash": "c75aaffd9d",
-      "data": "22/09/2026",
-      "titulo": "MES: semear deixa de apagar, e \"nunca usado\" passa a contar todas as relações"
     }
   ]
 }

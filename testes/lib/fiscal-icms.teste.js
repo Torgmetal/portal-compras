@@ -7,15 +7,18 @@ import { icmsDeReferencia, estimarIcms, ESTADO, SETE_POR_CENTO, ORIGEM_DECLARADA
 // vedação é justa — 12% não vale para todo destino. O que sai daqui é a alíquota do art. 52 do
 // RICMS/SP com as condições à vista. Referência condicionada é o oposto de automatismo.
 
+// ⚠ A tabela só é consultável com a operação em mãos — ver o último describe.
+const VENDA = { familia: "Venda", codigoFormatado: "6.101" };
+
 describe("icmsDeReferencia — a tabela do art. 52 do RICMS/SP", () => {
   it.each([["RS", 12], ["MG", 12], ["RJ", 12], ["PR", 12], ["SC", 12]])("SP → %s é %i%%", (uf, a) => {
-    expect(icmsDeReferencia("SP", uf)).toMatchObject({ estado: ESTADO.REFERENCIA, aliquota: a });
+    expect(icmsDeReferencia("SP", uf, VENDA)).toMatchObject({ estado: ESTADO.REFERENCIA, aliquota: a });
   });
 
   // ⚠⚠ O ES É SUDESTE E MESMO ASSIM RECEBE 7%. É o erro clássico de quem decora a regra pela
   // região em vez de pela lista — e era exatamente o "12% para toda venda interestadual".
   it.each([["ES", 7], ["BA", 7], ["DF", 7], ["MT", 7], ["AM", 7]])("SP → %s é %i%%", (uf, a) => {
-    expect(icmsDeReferencia("SP", uf)).toMatchObject({ estado: ESTADO.REFERENCIA, aliquota: a });
+    expect(icmsDeReferencia("SP", uf, VENDA)).toMatchObject({ estado: ESTADO.REFERENCIA, aliquota: a });
   });
 
   it("as duas listas cobrem os 26 estados e o DF, sem sobreposição", () => {
@@ -27,22 +30,22 @@ describe("icmsDeReferencia — a tabela do art. 52 do RICMS/SP", () => {
   // ⚠⚠ A INTERNA FICA DE FORA DE PROPÓSITO: 18% com um campo enorme de reduções e benefícios por
   // mercadoria. Sem fonte estruturada, um número ali seria o chute que o módulo existe para evitar.
   it("dentro de SP não determina, e diz por quê", () => {
-    const r = icmsDeReferencia("SP", "SP");
+    const r = icmsDeReferencia("SP", "SP", VENDA);
     expect(r.estado).toBe(ESTADO.NAO_DETERMINADO);
     expect(r.motivo).toMatch(/reduções e benefícios/i);
   });
 
   // ⚠ A tabela é a das saídas de SP; supor que a de outro estado é igual seria inventar.
   it("saída de outro estado não usa esta tabela", () => {
-    expect(icmsDeReferencia("MG", "RS").motivo).toMatch(/legislação daquele estado/i);
+    expect(icmsDeReferencia("MG", "RS", VENDA).motivo).toMatch(/legislação daquele estado/i);
   });
 
   it.each([["SP", ""], ["", "RS"]])("sem as duas UFs, não determina", (a, b) => {
-    expect(icmsDeReferencia(a, b).estado).toBe(ESTADO.NAO_DETERMINADO);
+    expect(icmsDeReferencia(a, b, VENDA).estado).toBe(ESTADO.NAO_DETERMINADO);
   });
 
   it("UF de destino inexistente não vira 12% por descuido", () => {
-    expect(icmsDeReferencia("SP", "XX").estado).toBe(ESTADO.NAO_DETERMINADO);
+    expect(icmsDeReferencia("SP", "XX", VENDA).estado).toBe(ESTADO.NAO_DETERMINADO);
   });
 });
 
@@ -50,7 +53,7 @@ describe("as condições vêm SEMPRE, inclusive quando não determina", () => {
   // ⚠⚠ A ALÍQUOTA É UM INSUMO DO CÁLCULO, NÃO O CÁLCULO. DIFAL, redução de base, ST e FCP entram
   // depois, e nenhum deles está estruturado no portal.
   it.each([["SP", "RS"], ["SP", "SP"], ["MG", "RS"]])("%s → %s lista as condições", (a, b) => {
-    const r = icmsDeReferencia(a, b);
+    const r = icmsDeReferencia(a, b, VENDA);
     expect(r.condicoes.length).toBeGreaterThanOrEqual(5);
     expect(r.condicoes.join(" ")).toMatch(/DIFAL/);
   });
@@ -58,7 +61,7 @@ describe("as condições vêm SEMPRE, inclusive quando não determina", () => {
   // ⚠⚠ DIFAL NÃO É SÓ PARA NÃO CONTRIBUINTE (LC 190/2022) — reduzir isso a um booleano era a
   // simplificação que o parecer apontou.
   it("o DIFAL é descrito sem virar o booleano 'não contribuinte'", () => {
-    expect(icmsDeReferencia("SP", "RS").condicoes.join(" ")).toMatch(/tanto para contribuinte quanto para não contribuinte/i);
+    expect(icmsDeReferencia("SP", "RS", VENDA).condicoes.join(" ")).toMatch(/tanto para contribuinte quanto para não contribuinte/i);
   });
 });
 
@@ -74,22 +77,22 @@ describe("a origem é DECLARADA, com escopo e data", () => {
 
 describe("estimarIcms", () => {
   it("aplica a alíquota de referência sobre o valor digitado", () => {
-    expect(estimarIcms("SP", "RS", 222769.58)).toMatchObject({ aliquota: 12, valor: 26732.35 });
+    expect(estimarIcms("SP", "RS", 222769.58, VENDA)).toMatchObject({ aliquota: 12, valor: 26732.35 });
   });
 
   it("7% no destino de 7%", () => {
-    expect(estimarIcms("SP", "ES", 1000)).toMatchObject({ aliquota: 7, valor: 70 });
+    expect(estimarIcms("SP", "ES", 1000, VENDA)).toMatchObject({ aliquota: 7, valor: 70 });
   });
 
   // ⚠ Sem alíquota de referência não há estimativa — e nada de zero disfarçado de resultado.
   it("sem referência, devolve o não determinado e nenhum valor", () => {
-    const r = estimarIcms("SP", "SP", 1000);
+    const r = estimarIcms("SP", "SP", 1000, VENDA);
     expect(r.estado).toBe(ESTADO.NAO_DETERMINADO);
     expect(r.valor).toBeUndefined();
   });
 
   it("sem valor, fica só a alíquota de referência", () => {
-    expect(estimarIcms("SP", "RS", 0).valor).toBeUndefined();
+    expect(estimarIcms("SP", "RS", 0, VENDA).valor).toBeUndefined();
   });
 });
 
@@ -118,8 +121,15 @@ describe("remessa e retorno não recebem alíquota de referência", () => {
     expect(icmsDeReferencia("SP", "RS", cfop(f, "6.101")).aliquota).toBe(12);
   });
 
-  it("sem CFOP, a referência sai (a tela ainda vai pedir o código)", () => {
-    expect(icmsDeReferencia("SP", "RS").aliquota).toBe(12);
+  // ⚠⚠ ESTE TESTE AFIRMAVA O DEFEITO. Ele dizia que "sem CFOP a referência sai" — e sair era
+  // justamente o erro: sem o código não dá para saber se a operação é das excluídas, e SP → RS com
+  // R$ 1.000 rendia 12% e R$ 120. Teste que congela um comportamento errado é pior que teste
+  // ausente: ele defende o defeito na próxima refatoração.
+  it("sem CFOP não há referência — é a operação que diz se a alíquota se aplica", () => {
+    const r = icmsDeReferencia("SP", "RS");
+    expect(r.estado).toBe(ESTADO.NAO_DETERMINADO);
+    expect(r.aliquota).toBeUndefined();
+    expect(estimarIcms("SP", "RS", 1000).valor).toBeUndefined();
   });
 
   it("estimarIcms respeita o corte por família", () => {

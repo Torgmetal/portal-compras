@@ -886,3 +886,24 @@ novo, não conserto, e não entra sem o Matheus decidir.
   - ⚠⚠ **Produtos da TORG (§14)** e o **P1 do Vitor** em `AbaExpedicao.jsx` seguem abertos.
 
   **3.297 passando**, tela validada logada (venda SP→MG e remessa 6.901).
+- **(22/09, 22h30) Rodada 3 — três lacunas fiscais, todas minhas, todas corrigidas.** O Matheus
+  aceitou a pendência; corrigi mesmo assim, porque é acabamento do que eu tinha escrito 40 minutos
+  antes, não escopo novo. O P1 dos avulsos (`AbaExpedicao.jsx:617`, commit `498199259d` do Vitor)
+  segue **sem toque**, por instrução.
+  - ⚠⚠ **P1 — eu consertei a metade errada do Ex TIPI.** Tirei o `cstSugerido` e **esqueci o
+    dinheiro**: geral 3,25%, Ex 0% e R$ 1.000 continuavam rendendo "R$ 32,50" na tela, porque a
+    `estimativa` olhava só `determinado && tipo && valor`. O CST é o que a pessoa lê; o VALOR é o
+    que ela copia para a nota. Agora `!ipi.inconclusivo` entra na condição.
+    ✔ Conferido logado no NCM 2203.00.00 (1 Ex): sai `CST —` e nenhuma estimativa.
+  - ⚠⚠ **P2 — ICMS sem CFOP ainda dava 12% e R$ 120.** O bloqueio por família dependia de `cfop`
+    preenchido; sem código não dá para saber se a operação é das excluídas. O PIS/COFINS já se
+    abstinha na mesma condição — a incoerência era minha.
+    ⚠⚠ **E eu tinha escrito um TESTE afirmando o defeito** ("sem CFOP, a referência sai"). Teste que
+    congela comportamento errado é pior que teste ausente: ele defende o defeito na refatoração
+    seguinte. O teste foi invertido, com o motivo escrito nele.
+  - ⚠⚠ **P2 — CST 50 com `pIPI` ausente passava calado**, furando a regra 2 do próprio motor. Item
+    com CST tributado, NCM na TIPI e sem alíquota não entrava na comparação nem virava
+    NAO_AVALIAVEL: a nota saía com zero achados, diferença zero e zero não avaliáveis — do jeito
+    que uma nota conforme sai. Agora gera NAO_AVALIAVEL com `faltam: ["IPI/pIPI"]`, e o contador
+    da tela enxerga.
+  **3.308 passando**, tela validada logada (NCM com Ex e simulação sem CFOP).

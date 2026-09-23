@@ -167,3 +167,29 @@ describe("auditar — o enquadramento legal", () => {
     expect(r.achados.find((x) => x.tipo === "ALIQUOTA_DIVERGENTE").titulo).toMatch(/5% × TIPI 3,25%/);
   });
 });
+
+describe("auditar — CST tributado sem alíquota não passa calado", () => {
+  // ⚠⚠ FURAVA A REGRA 2 DO PRÓPRIO MOTOR (achado do Codex, 22/09/2026): um item com CST 50, NCM na
+  // TIPI e `pIPI` ausente não entrava na comparação E não virava NAO_AVALIAVEL. A nota saía com
+  // zero achados, diferença zero e zero não avaliáveis — indistinguível de uma nota conforme.
+  const semAliquota = nfe(`
+    <det nItem="1">
+      <prod><NCM>84379000</NCM><CFOP>6101</CFOP><vProd>1000</vProd></prod>
+      <imposto><IPI><cEnq>999</cEnq><IPITrib><CST>50</CST><vBC>1000</vBC></IPITrib></IPI></imposto>
+    </det>`);
+
+  it("vira NAO_AVALIAVEL, e o contador da tela enxerga", () => {
+    const r = auditar(lerNfe(semAliquota), tipi(linha("84379000", 3.25)), {});
+    const a = r.achados.find((x) => x.tipo === "NAO_AVALIAVEL");
+    expect(a.titulo).toMatch(/CST 50 .*sem alíquota declarada/);
+    expect(a.faltam).toContain("IPI/pIPI");
+    expect(r.resumo.naoAvaliaveis).toBe(1);
+  });
+
+  // ⚠ E não inventa divergência: sem o número não há o que comparar.
+  it("não gera ALIQUOTA_DIVERGENTE a partir do nada", () => {
+    const r = auditar(lerNfe(semAliquota), tipi(linha("84379000", 3.25)), {});
+    expect(r.achados.filter((x) => x.tipo === "ALIQUOTA_DIVERGENTE")).toEqual([]);
+    expect(r.resumo.diferencaEstimada).toBe(0);
+  });
+});
