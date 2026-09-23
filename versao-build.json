@@ -1,7 +1,12 @@
 {
-  "build": 3430,
-  "gerado": "2026-09-23T18:00:28.970Z",
+  "build": 3431,
+  "gerado": "2026-09-23T18:00:53.382Z",
   "commits": [
+    {
+      "hash": "1c2b990f",
+      "data": "23/09/2026",
+      "titulo": "Desenho do dimensional: o carimbo do A2 deixa de cortar a coluna ao meio"
+    },
     {
       "hash": "e5129356",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "a9983490",
       "data": "22/09/2026",
       "titulo": "Fiscal: o modelo de dados, com \"ativa\" separado de \"vigente\""
-    },
-    {
-      "hash": "7cdb37c5",
-      "data": "22/09/2026",
-      "titulo": "Fiscal: a leitura da TIPI oficial, medida contra o arquivo da Receita"
     }
   ]
 }

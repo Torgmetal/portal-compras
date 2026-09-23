@@ -45,7 +45,7 @@ export async function GET(_req, { params }) {
   let quantidadesLista = {};
   if (usaQuantidadeInspecao(rel.tipo)) {
     const opId=rel.opId || (await prisma.oP.findFirst({where:{numero:rel.opNumero},select:{id:true}}))?.id;
-    if(opId) quantidadesLista=quantidadesPorMarca(await prisma.pecaConjunto.findMany({where:{opId,OR:[{tipoPeca:"CONJUNTO"},{tipoPeca:null}]},select:{marca:true,qte:true}}));
+    if(opId) quantidadesLista=quantidadesPorMarca(await prisma.pecaConjunto.findMany({where:{opId,OR:[{tipoPeca:"CONJUNTO"},{tipoPeca:null}]},select:{marca:true,qte:true,fonte:true,naLE:true,tipoPeca:true,pesoTotalKg:true}}));
   }
   return NextResponse.json({
     quantidadesLista,

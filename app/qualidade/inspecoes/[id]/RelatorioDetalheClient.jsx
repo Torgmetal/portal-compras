@@ -7,10 +7,11 @@ import { useStore } from "@/lib/store";
 import { pecasDoRelatorio, pecasInformadasSchema, usaQuantidadeInspecao } from "@/lib/inspecao-pecas";
 import PecasInformadasEditor from "./PecasInformadasEditor";
 import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, Lock, FolderOpen, Crop, RotateCcw } from "lucide-react";
-import { TIPO_LABEL, pendenciasParaAssinatura } from "@/lib/qualidade-campo";
+import { TIPO_LABEL, pendenciasParaAssinatura, faltamAssinar, rotuloAssinante, tarjaDoEnvio } from "@/lib/qualidade-campo";
 import CampoTolerancia from "./CampoTolerancia";
 import {foraDaTolerancia} from "@/lib/tolerancia-inspecao";
 import MarcadorCotas from "./MarcadorCotas";
+import { desenhoDaLinha, trocarCotasDoDesenho } from "@/lib/cota-marcacao";
 import RecorteDesenho from "./RecorteDesenho";
 import FormEVS from "./FormEVS";
 import FormUS from "./FormUS";
@@ -80,6 +81,13 @@ export default function RelatorioDetalheClient({ id }) {
   const res = rel.resultados || {};
   const desenhos = Array.isArray(rel.desenhos) ? rel.desenhos : [];
   const marcaAtual = marcaVista || desenhos[0]?.marca || "";
+  // ⚠⚠ SÓ AS COTAS DO DESENHO EM VISTA. Vitor (23/09/2026), no RID-084-002 da OP-84: "parece que os
+  // desenhos estão ficando zuado". A marcação recebia TODAS as cotas do relatório e as desenhava
+  // sobre qualquer desenho escolhido no seletor — no relatório de avulsas, com um desenho por marca,
+  // as cotas do chumbador T84A1 apareciam por cima das colunas — e a cota nova nascia sem dizer de
+  // qual desenho era, de modo que o PDF a punha noutra folha. A regra de quem é a cota mora em
+  // lib/cota-marcacao (`desenhoDaLinha`), a mesma que o PDF usa.
+  const cotasDaVista = cotas.filter((l) => desenhoDaLinha(l, desenhos) === (marcaAtual || null));
   // ⚠⚠ ENVIADO PARA ASSINATURA NÃO TRAVA MAIS A EDIÇÃO. Vitor (22/09/2026), sobre os EVS e LP da
   // OP-102 assinados com o ensaio em branco: "não precisa gerar revisão, pode apenas alterar as
   // informações". O que fica: a tarja dizendo quem assinou, o aviso de que a alteração é
@@ -87,6 +95,8 @@ export default function RelatorioDetalheClient({ id }) {
   // para o documento que já saiu para o cliente.
   const assinado = !!rel.envioAssinaturaId;
   const assinaram = (dados.assinaturas || []).filter((a) => a.assinadoEm).map((a) => a.nome || a.email);
+  // ⚠ quem FALTA, com o e-mail do convite — "assinado por Fulano" sozinho parece documento assinado
+  const faltamNoEnvio = assinado ? faltamAssinar(dados.assinaturas) : [];
   const travado = false;
 
   const setLinha = (i, campo, v) => {
@@ -180,11 +190,12 @@ export default function RelatorioDetalheClient({ id }) {
                   quem precisa completar o relatório não descobria nem por que está travado nem
                   que o caminho é o botão ao lado. */}
               <span className="text-[11px] px-2 py-1 rounded-lg bg-gray-100 text-torg-gray inline-flex items-center gap-1.5"
-                title={assinaram.length ? `Já assinaram: ${assinaram.join(", ")}` : "Enviado para assinatura; ninguém assinou ainda"}>
+                title={[
+                  assinaram.length ? `Já assinaram: ${assinaram.join(", ")}` : "Enviado para assinatura; ninguém assinou ainda",
+                  faltamNoEnvio.length ? `Falta: ${faltamNoEnvio.map(rotuloAssinante).join(", ")}` : "",
+                ].filter(Boolean).join("\n")}>
                 <Lock size={12} />
-                {assinaram.length
-                  ? `assinado por ${assinaram.join(", ")} · R${String(rel.revisao ?? 0).padStart(2, "0")} — alterações ficam registradas`
-                  : `enviado para assinatura · R${String(rel.revisao ?? 0).padStart(2, "0")} — alterações ficam registradas`}
+                {tarjaDoEnvio(dados.assinaturas, rel.revisao)}
               </span>
               <button onClick={salvar} disabled={salvando}
                 className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-50">
@@ -290,11 +301,15 @@ export default function RelatorioDetalheClient({ id }) {
             relatorioId={id}
             marca={marcaAtual}
             comprimentoMm={res.comprPeca?.[String(marcaAtual).toUpperCase()] ?? null}
-            cotas={cotas}
+            cotas={cotasDaVista}
             onChange={(novas) => setDados((d) => ({
               ...d,
-              // as automáticas ficam no fim, preservadas; as cotas assumem a frente
-              relatorio: { ...d.relatorio, linhas: [...novas, ...(d.relatorio.linhas || []).filter((l) => !l.letra)] },
+              // troca só as cotas DESTE desenho, com a marca dele carimbada; as dos outros desenhos e
+              // as linhas automáticas ficam preservadas
+              relatorio: {
+                ...d.relatorio,
+                linhas: trocarCotasDoDesenho(d.relatorio.linhas, novas, marcaAtual, desenhos),
+              },
             }))}
             ocultos={res.ocultosDesenho || []}
             onOcultos={(o) => setResultado("ocultosDesenho", o)}
@@ -479,6 +494,8 @@ export default function RelatorioDetalheClient({ id }) {
                 <p key={a.email} className="text-[11px] text-torg-gray inline-flex items-center gap-1 mr-3">
                   {a.assinadoEm ? <Check size={11} className="text-emerald-600" /> : null}
                   {a.nome}{a.setor ? ` · ${a.setor}` : ""}
+                  {/* ⚠ pendente mostra o e-mail do convite: é ele que diz se o link foi para a caixa certa */}
+                  {!a.assinadoEm && <span className="text-amber-700">· pendente{a.email ? ` (${a.email})` : ""}</span>}
                 </p>
               ))}
             </div>

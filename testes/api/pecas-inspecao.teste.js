@@ -31,7 +31,7 @@ it('consulta a lista pelo vínculo da OP sem gravar sugestões no relatório',as
  const r=await GET(null,{params:{id:'r'}});const j=await r.json();
  expect(j.quantidadesLista).toEqual({P1:10});
  // ⚠ croqui fora: é componente do conjunto, não peça de inspeção (mesma regra do portal de campo)
- expect(mockPrisma.pecaConjunto.findMany).toHaveBeenCalledWith({where:{opId:'obra-106',OR:[{tipoPeca:'CONJUNTO'},{tipoPeca:null}]},select:{marca:true,qte:true}});
+ expect(mockPrisma.pecaConjunto.findMany).toHaveBeenCalledWith({where:{opId:'obra-106',OR:[{tipoPeca:'CONJUNTO'},{tipoPeca:null}]},select:{marca:true,qte:true,fonte:true,naLE:true,tipoPeca:true,pesoTotalKg:true}});
  expect(mockPrisma.relatorioInspecao.update).not.toHaveBeenCalled();
 });
 // ⚠⚠ ERA O CONTRÁRIO ATÉ 22/09/2026: relatório enviado para assinatura não buscava a lista, porque

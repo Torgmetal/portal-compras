@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Loader2, FileText, Check, Send, AlertCircle, ChevronRight, ExternalLink, Plus, X, ShieldCheck, Trash2, Link2, Search, MoreHorizontal } from "lucide-react";
-import { TIPO_LABEL, TIPOS_RELATORIO, usaCotas, pendenciasParaAssinatura } from "@/lib/qualidade-campo";
+import { TIPO_LABEL, TIPOS_RELATORIO, usaCotas, pendenciasParaAssinatura, faltamAssinar, rotuloAssinante } from "@/lib/qualidade-campo";
 import { rotuloFase } from "@/lib/fase-peca";
 import FiltroFase from "@/components/qualidade/FiltroFase";
 
@@ -223,6 +223,11 @@ function Relatorio({ r, onMudou, podeFechar = true }) {
   const assinadas = r.assinaturas.filter((a) => a.assinadoEm).length;
   const resultado = { APROVADO: "Inspeção aprovada", REPROVADO: "Reprovado · revisar", REC: "Exame complementar" }[r.resultadoInspecao];
   const situacao = r.envioAssinaturaId ? (r.assinaturas.length > 0 && assinadas === r.assinaturas.length ? "Assinaturas concluídas" : "Aguardando assinaturas") : r.emitidoEm ? "Emitido · não enviado" : "Rascunho";
+  // ⚠⚠ QUEM FALTA APARECE NA LINHA, com o e-mail do convite. Aprovado cai na aba "Aprovados" com
+  // ou sem assinatura, e o nome de quem falta só se via abrindo "Gerenciar assinaturas" — em
+  // 23/09/2026 eram 12 relatórios esperando, 4 deles com o convite num e-mail que não é o login
+  // do inspetor, e nada na tela deixava perceber.
+  const faltam = r.envioAssinaturaId ? faltamAssinar(r.assinaturas) : [];
 
   async function excluir() {
     // ⚠ o aviso diz o que ACONTECE, não só "tem certeza?": o relatório sai do data book e as fotos
@@ -249,10 +254,11 @@ function Relatorio({ r, onMudou, podeFechar = true }) {
           <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
             <span className="text-xs font-bold text-torg-gray">OP-{r.opNumero}</span>
             <Link href={`/qualidade/inspecoes/${r.id}`} className="font-semibold font-mono text-sm text-torg-blue hover:underline">{r.codigo}</Link>
-            <span className="text-[11px] rounded px-2 py-0.5 bg-slate-100 text-torg-gray">{situacao}</span>
+            <span className={`text-[11px] rounded px-2 py-0.5 ${faltam.length ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-torg-gray"}`}>{situacao}</span>
             {resultado&&<span className={`text-[11px] ${r.resultadoInspecao==="APROVADO"?"text-emerald-700":"text-orange-700"}`}>{resultado}</span>}
           </div>
           <p className="text-xs text-torg-gray mt-1.5">{r.inspetor || r.criadoPorNome || "Inspetor não informado"}{r.fotos>0?` · ${r.fotos} fotos`:""}{r.emitidoEm?` · ${fmtDT(r.emitidoEm)}`:""}{r.envioAssinaturaId?` · ${assinadas}/${r.assinaturas.length} assinaturas`:""}</p>
+          {faltam.length > 0 && <p className="text-xs text-amber-800 mt-1 break-words">Falta assinar: {faltam.map(rotuloAssinante).join(" · ")}</p>}
           {!!r.marcas?.length&&<details className="mt-1 text-xs text-torg-gray"><summary className="cursor-pointer py-1 w-fit">{r.marcas.length} marca{r.marcas.length>1?"s":""} · ver peças</summary><p className="mt-1 break-words text-torg-dark leading-relaxed">{r.marcas.join(", ")}</p></details>}
         </div>
         <div className="flex shrink-0 items-center gap-1">

@@ -1431,3 +1431,52 @@ operação de receita) não há lista — candidato só aparece onde ele se abst
   rodei**, e a revalidação logada depende disso. A tabela está **vazia** (0 linhas, conferido), e
   as operações são aditivas: `ADD COLUMN IF NOT EXISTS` + `DROP INDEX`/`CREATE UNIQUE INDEX` sobre
   índices criados hoje e ainda sem nenhuma linha sob eles.
+- **(23/09, 15h) Relatórios de inspeção: quatro agentes, uma integração.** Vitor: *"notei que alguns
+  estão com o Geraldo duplicando a assinatura, e outros estamos como emitido e faltando assinar (…)
+  verifique os relatórios da OP-84 de dimensional, pois parece que os desenhos estão ficando zuado,
+  precisa ajustar e ver o que mais tem errado — se for necessário coloque mais agentes"*. Quatro
+  agentes em paralelo (assinatura, pendências, OP-84, varredura dos 23 relatórios), cada um numa
+  worktree de origin/main e com o banco em SOMENTE LEITURA; eu integrei, revisei e testei junto.
+  **(1) Geraldo duplicado.** Não era registro (nenhum envio tem assinante repetido): o gerador do
+  dimensional/pré-montagem tinha CÓPIA VELHA da regra de quadros — cada coluna procurava de novo na
+  lista, e "Torg Metal" está dentro de "Inspetor Torg Metal" E de "Fiscalização Torg Metal". Os 5 RPM.
+  Regra única em `lib/assinatura-quadros.js`: papel do convite pela POSIÇÃO, cada assinatura num
+  quadro, inspetor = aprovador vira UM quadro. De quebra: o RIP-089-002/003 punha o Geraldo como
+  "Inspetor de Qualidade" (ordem alfabética) — composição que o Davi já recusou duas vezes —, e a
+  cópia velha podia SUMIR com a assinatura do cliente no dimensional. Descartei a regra paralela do
+  agente de pendências (`assinatura-colunas.js`): resolvia o RIP-089 mas não o dimensional.
+  **(2) Emitidos faltando assinar.** Dos 12, só o RPM-105-002 espera de verdade. Os outros 11 são
+  OPERAÇÃO, não código: convite para `alexandre_stival@yahoo.com.br` (não é login de ninguém), convite
+  "reenviado" por script local em 21/09 que falhou calado (`.env.local` sem RESEND — ver
+  [[torg_env_local_sem_resend]]), RIP-071/085 reenviados sem corrigir o que o inspetor recusou, e o
+  RIP-089 esperando o PDF certo. Código: a lista e o detalhe passam a dizer "Falta assinar: nome
+  (e-mail)" (`faltamAssinar`, `tarjaDoEnvio`). A conta stival2112@gmail.com é do ALEXANDRE desde 04/09.
+  **(3) OP-84.** Recorte automático: a divisória do carimbo era "a vertical mais longa entre 15% e
+  70% da altura" — no A2 o carimbo do Tekla tem 20% e uma cota da coluna (26%) ganhava; agora ela
+  nasce na moldura de baixo, na metade direita (`bordaDoCarimbo`). O corte por "CORTE" só vale se
+  menos de 2 traços do desenho atravessarem o limite. Medido contra 19 desenhos reais: os certos
+  saem idênticos pixel a pixel; mudam só os quebrados (T84A2–A5 e o T102A1). E a cota agora sabe de
+  qual desenho é (`lib/cota-marcacao.js`): as A/B do chumbador T84A1 saíam na folha do T84A5.
+  **(4) Da varredura (24 tipos de defeito), corrigi os que saem errados para o cliente:** a COR da
+  tinta que nunca saía no PDF (a TMSA devolveu o RIP-103-002 R00 por isso); a folha 1 da pintura
+  estourando a margem (datas das assinaturas em y = −2,2 no RIP-106-002 — a linha das tabelas cede,
+  entre 9,5 e 12,4 pt); o anexo do e-mail da pré-montagem SEM o desenho; hora da assinatura do
+  dimensional em UTC; RESULTADO vazio em relatório aprovado (só o resultado — dimensional/
+  alinhamento/acabamento não se inferem); e um risco MEU: desde a edição liberada em 22/09, editar o
+  título de um emitido apagava o link do PDF no data book (`vincularNoDataBook(rel, null)`).
+  **(5) Quantidade dobrada:** LE + LPC somadas nos RID-084 (8/2/2/4/2 para 4/1/1/2/1) — agora
+  `quantidadesPorMarca` usa `pecasReais`, e a criação do dimensional também.
+  ⚠⚠ **FICOU PARA DECISÃO/DEPOIS (lista da varredura):** D1 revisão antiga impressa com as
+  assinaturas/peças da atual (`aplicarRevisao`); D2 link de envio devolvido mostra o documento atual;
+  D10 "FOLHA x DE y" em EVS/LP/US/dimensional; D11 Nº desenho "REFERENCIA"; D14 envelope sempre R00;
+  D15 backup do SharePoint gerado na aprovação (antes de assinar); D17 rascunho sem tarja fora do
+  dimensional; D18 rascunho aparecendo como ANEXADO no data book; D19 campos cortados com "...";
+  `pendenciasParaAssinatura` não confere pintura/EVS/LP/US; o DELETE não encerra o envio (órfão
+  RPM-067-001); `lib/portal-obra-consulta.js:267` lista EMITIDO ao cliente sem exigir todas as
+  assinaturas; o campo não deixa editar relatório enviado (`app/campo/Medir.jsx:77`); não há como
+  TROCAR o e-mail de um assinante pendente pela tela.
+  Testes novos: assinaturas-quadros-pdf (5), relatorio-tarja-assinatura (4), inspecoes-lista (+1),
+  vista-desenho-folha-a2 (6), cota-desenho (8), pintura-folha1-cabe (2), dimensional-hora-resultado
+  (3), assinatura-anexo-desenho (1), databook-vinculo-arquivo (3), inspecao-quantidade-canonica (3)
+  — todos vermelhos antes. **3.616 passando**, checar limpo, build ok. Não validado no navegador
+  logado (o dev local escreve na produção); validado regenerando os PDFs reais em leitura.

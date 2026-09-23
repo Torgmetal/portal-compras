@@ -99,7 +99,9 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Não declarar furo nosso em doc do cliente](torg_nao_declarar_furo.md) — data book/carimbo/portal: falta dado = "—", nunca frase; motivo só em tela interna
 - [FORM do SGQ vai no documento](torg_sgq_form_identificacao.md) — carimbo no rodapé/célula G7, NÃO no nome do arquivo (ISO §7.5.2); índice mestre manda, 11 FORMs inativos
 - [Pintura e tinta](torg_pintura_tinta.md) — mede em m² (não kg); PLP dá demãos/cor/SV; caderno de 3 folhas com fórmulas vivas; FEFO; por que "quanto falta" ainda não é afirmável
-- [Pintura tem DUAS telas](torg_pintura_duas_telas.md) — campo (Lais, só QUALIDADE_CAMPO) × computador; ajuste pedido por inspetor vai no de campo
+- [Pintura tem DUAS telas](torg_pintura_duas_telas.md) — campo (Alexandre Stival, stival2112@gmail.com — ex-"Lais" —, só QUALIDADE_CAMPO) × computador; ajuste pedido por inspetor vai no de campo
+- [Quadros de assinatura: uma regra só](torg_relatorio_quadros_assinatura.md) — `quadrosDeAssinatura`: papel do convite pela posição, cada assinatura num quadro, inspetor = aprovador vira um quadro; o dimensional tinha cópia velha
+- [.env.local sem RESEND](torg_env_local_sem_resend.md) — script local não manda e-mail (chave vazia); reenvio de convite por script falhou calado em 21/09
 - [Pintura: condição ambiental por ETAPA](torg_pintura_condicoes_por_etapa.md) — jato/fundo/demais demãos; demão sem leitura herda a do jato (e diz); item 5.4 julga cada etapa
 - [Pintura: numeração das fotos](torg_pintura_fotos_numeracao.md) — "3 de 8" dentro do ENSAIO, em lib/fotos-evidencia.js; legenda não repete o nome do ensaio
 - [Pintura: micragem seca mínima](torg_pintura_micragem_minima.md) — é do RELATÓRIO (editável nas 2 telas); PLP dá o total da obra; fundo ainda é julgado contra o total

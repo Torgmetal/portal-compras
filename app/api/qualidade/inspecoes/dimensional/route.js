@@ -1,4 +1,5 @@
 import {usaQuantidadeInspecao, pecasInformadasSchema, resultadosComPecas} from "@/lib/inspecao-pecas";
+import { pecasReais } from "@/lib/peso-op";
 // POST — cria o relatório dimensional.  { opNumero, escopo, marcas[], titulo, inspetor }
 //
 // ⚠ CRIAR É INSTANTÂNEO, DE PROPÓSITO. Vitor (21/08/2026): "vamos mudar esse caminho para criar o
@@ -138,15 +139,20 @@ export async function POST(req) {
     try {
       const pecas = await prisma.pecaConjunto.findMany({
         where: { opId: op.id, marca: { in: marcas } },
-        select: { marca: true, descricao: true, qte: true, comprimentoMm: true },
+        select: { marca: true, descricao: true, qte: true, comprimentoMm: true, fonte: true, naLE: true, tipoPeca: true, pesoTotalKg: true },
       });
+      // ⚠⚠ A QUANTIDADE PELA LISTA CANÔNICA. A soma abaixo é por conjunto DENTRO de uma lista; somada
+      // sobre a tabela crua ela contava a LE e a LPC juntas — os RID-084 nasceram com 8/2/2/4/2 para
+      // 4/1/1/2/1 (agente da OP-84, 23/09/2026). Tipo e comprimento continuam lendo todas as linhas:
+      // o primeiro texto e o MAIOR comprimento não dobram.
+      const reais = new Set(pecasReais(pecas));
       for (const pc of pecas) {
         const k = String(pc.marca).toUpperCase();
         const t = (pc.descricao || "").trim();
         if (t && !tiposPeca[k]) tiposPeca[k] = t.toUpperCase();
         // ⚠ SOMA as ocorrências: a mesma marca aparece uma vez por conjunto na lista, e a
         // quantidade do relatório é quantas peças daquela marca a OP tem.
-        qtdPeca[k] = (qtdPeca[k] || 0) + (pc.qte || 0);
+        if (reais.has(pc)) qtdPeca[k] = (qtdPeca[k] || 0) + (pc.qte || 0);
         // ⚠ o MAIOR entre as ocorrências, não a soma nem a primeira: a mesma marca pode aparecer em
         // conjuntos diferentes, e a faixa do PO-04 tem de refletir a peça real. Somar comprimento
         // daria uma peça imaginária de dez metros; pegar a primeira daria a menor por acaso da

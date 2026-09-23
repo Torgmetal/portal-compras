@@ -79,7 +79,7 @@ export async function GET(_req, { params }) {
     // sem o filtro, a lista de marcas vira um monte de posição e uma marca repetida somaria a
     // quantidade errada.
     if (opId) quantidadesLista = quantidadesPorMarca(await prisma.pecaConjunto.findMany({
-      where: { opId, OR: [{ tipoPeca: "CONJUNTO" }, { tipoPeca: null }] }, select: { marca: true, qte: true },
+      where: { opId, OR: [{ tipoPeca: "CONJUNTO" }, { tipoPeca: null }] }, select: { marca: true, qte: true, fonte: true, naLE: true, tipoPeca: true, pesoTotalKg: true },
     }));
   } catch {
     avisoQuantidades = "Não foi possível consultar as quantidades da lista da OP. As quantidades já registradas foram mantidas.";

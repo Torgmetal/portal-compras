@@ -15,7 +15,11 @@ outro:
 - `app/qualidade/inspecoes/[id]/FormPintura.jsx` — formulário do computador, para quem **monta** o
   documento (módulo QUALIDADE/ADMIN). É o único que lê o PIT (`escopoDoTipo`).
 
-**Lais Stival** (stival2112@gmail.com) tem **só o módulo `QUALIDADE_CAMPO`** — 04/09/2026. Pedido
+**A conta `stival2112@gmail.com` é do ALEXANDRE STIVAL** (inspetor de campo): foi criada como "Lais
+Stival" e o Vitor a renomeou em 04/09/2026 às 19:30 (`admin_editar_usuario`). Documento antigo ainda traz
+"Lais Stival" como inspetora (RIP-106-002). Tem **só o módulo `QUALIDADE_CAMPO`** — 04/09/2026.
+⚠ Há convites de assinatura para `alexandre_stival@yahoo.com.br`, que NÃO é login de ninguém: o link
+funciona (assinar só exige login de conta CLIENTE), mas a assinatura sai sem a imagem dele. Pedido
 dela ("não apareceu nada na minha tela") quase sempre significa que a mudança foi só para o
 formulário do computador. Rotas que ela usa têm de aceitar `PERFIS_CAMPO` (foi o caso da prévia do
 PDF, que exigia ADMIN/QUALIDADE e dava 403).

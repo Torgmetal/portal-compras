@@ -7,6 +7,7 @@ import { useEffect, useState, useRef } from "react";
 import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2, Camera, X, FileText } from "lucide-react";
 import LeitorQR from "./LeitorQR";
 import VistaCotas from "./VistaCotas";
+import { desenhoDaLinha } from "@/lib/cota-marcacao";
 import { marcaDoQR, TIPOS_RELATORIO, usaCotas } from "@/lib/qualidade-campo";
 import {useStore} from "@/lib/store";
 import PecasInformadasEditor from "../qualidade/inspecoes/[id]/PecasInformadasEditor";
@@ -567,7 +568,10 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           <VistaCotas
             relatorioId={id}
             marca={rel.desenhos[0]?.marca || null}
-            cotas={linhas.filter((l) => l.letra)}
+            // ⚠ só as cotas DESTE desenho (o primeiro): no relatório de avulsas cada marca tem o seu,
+            // e as dos outros cairiam sobre a peça errada — ver `desenhoDaLinha` (23/09/2026, OP-84)
+            cotas={linhas.filter((l) =>
+              l.letra && desenhoDaLinha(l, rel.desenhos) === (rel.desenhos[0]?.marca ?? null))}
             ocultos={rel.resultados?.ocultosDesenho || []}
             linhasOcultas={rel.resultados?.linhasOcultasDesenho || []}
           />

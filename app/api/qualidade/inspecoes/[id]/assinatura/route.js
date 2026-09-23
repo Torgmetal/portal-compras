@@ -14,6 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarTokenForte } from "@/lib/token";
 import { gerarPDFdoRelatorio } from "@/lib/relatorio-render";
+import { baixarDesenho } from "@/lib/relatorio-dimensional";
 import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
 import { TIPO_LABEL, pendenciasParaAssinatura } from "@/lib/qualidade-campo";
 import { sendEmail } from "@/lib/email";
@@ -126,6 +127,11 @@ export async function POST(req, { params }) {
       rel: { ...rel, emitidoEm: rel.emitidoEm || new Date() },
       fotos, assinaturas: null,
       cliente: opDados?.cliente || null, obra: opDados?.obra || null, refCliente: opDados?.refCliente || null,
+      // ⚠⚠ SEM ISTO O ANEXO SAÍA SEM O DESENHO. O dimensional (e a pré-montagem, que sai dele) embute a
+      // vista do PDF de fabricação — e é esta função que o baixa. A tela e o link de assinatura já a
+      // passavam; o e-mail não: o anexo do RPM-103-001 tinha 2 folhas contra 3 no portal, sem a vista
+      // cotada que o cliente precisa para conferir as medidas (varredura de 23/09/2026).
+      desenhoBytes: (d) => baixarDesenho(d?.caminho || d?.url),
     }),
   ).toString("base64");
   const base = baseUrlDe(req);
