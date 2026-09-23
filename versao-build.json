@@ -1,7 +1,12 @@
 {
-  "build": 3415,
-  "gerado": "2026-09-23T02:38:15.792Z",
+  "build": 3416,
+  "gerado": "2026-09-23T02:44:06.671Z",
   "commits": [
+    {
+      "hash": "b0b320a522",
+      "data": "22/09/2026",
+      "titulo": "Fiscal: autocomplete de NCM, a cadeia do art. 406 completa, e um índice na coluna errada"
+    },
     {
       "hash": "025eaff02f",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "3a3643144b",
       "data": "22/09/2026",
       "titulo": "CMR: a planilha manda, e o R passa a ser conferido nos dois lados"
-    },
-    {
-      "hash": "476994019c",
-      "data": "22/09/2026",
-      "titulo": "Compras: a conversão de unidade da cotação — a regra e as colunas (nada aplicado ainda)"
     }
   ]
 }

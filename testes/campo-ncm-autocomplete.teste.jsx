@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { useState } from "react";
 import { render, screen, fireEvent, waitFor, act, cleanup } from "@testing-library/react";
 import CampoNcm from "@/app/fiscal/inteligencia/CampoNcm";
 
@@ -17,7 +18,22 @@ const linha = (ncm, ex = null, tipo = "PERCENTUAL", valor = 3.25) => ({
 });
 
 const responder = (resultados, atraso = 0) => () =>
-  new Promise((r) => setTimeout(() => r({ json: async () => ({ success: true, resultados }) }), atraso));
+  new Promise((r) => setTimeout(() => r({ ok: true, status: 200, json: async () => ({ success: true, resultados }) }), atraso));
+
+/**
+ * ⚠⚠ O PAI COM ESTADO É O QUE FALTAVA NOS TESTES ANTERIORES (achado do Codex, 22/09/2026). Fixando
+ * `valor=""` eu nunca reproduzia o que o formulário de verdade faz: devolver ao campo o valor que
+ * ele acabou de emitir. Era exatamente por esse caminho que escolher um NCM reabria o menu.
+ */
+function ComPai({ inicial = "" }) {
+  const [v, setV] = useState(inicial);
+  return (
+    <>
+      <CampoNcm valor={v} onChange={setV} />
+      <output data-testid="valor">{v}</output>
+    </>
+  );
+}
 
 beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -137,5 +153,140 @@ describe("resposta fora de ordem não sobrescreve a certa", () => {
     await act(async () => { vi.advanceTimersByTime(700); });
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(1));
     expect(screen.getByText("8437.90.00")).toBeTruthy();
+  });
+});
+
+// ─── OS ACHADOS DO CODEX (22/09/2026) ───────────────────────────────────────
+
+describe("escolher, com o formulário devolvendo o valor", () => {
+  // ⚠⚠ O DEFEITO: `escolher` gravava "8437.90.00" no campo e mandava "84379000" ao formulário; o
+  // pai devolvia isso como `valor`, o campo trocava o texto pelos dígitos — string diferente — e a
+  // BUSCA DISPARAVA DE NOVO, reabrindo o menu que acabara de fechar. Fixando `valor=""`, o teste
+  // antigo nunca via isso.
+  it("não reabre o menu nem busca de novo quando o pai devolve o valor", async () => {
+    const f = vi.fn(responder([linha("84379000")]));
+    vi.stubGlobal("fetch", f);
+    render(<ComPai />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "8437" } });
+    await act(async () => { vi.advanceTimersByTime(400); });
+    await waitFor(() => expect(screen.getByText("8437.90.00")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("option").querySelector("button"));
+    await act(async () => { vi.advanceTimersByTime(800); });
+
+    expect(screen.queryByRole("option")).toBeNull();
+    // ⚠ E o campo mantém o código FORMATADO, não é sobrescrito pelos dígitos crus do pai.
+    expect(screen.getByRole("combobox").value).toBe("8437.90.00");
+    expect(screen.getByTestId("valor").textContent).toBe("84379000");
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+
+  // ⚠ O caminho inverso continua valendo: quando o pai muda o valor por fora (limpar o
+  // formulário), o campo acompanha.
+  it("o campo acompanha quando o pai muda o valor por fora", async () => {
+    vi.stubGlobal("fetch", vi.fn(responder([linha("84379000")])));
+    render(<ComPai inicial="12345678" />);
+    expect(screen.getByRole("combobox").value).toBe("12345678");
+  });
+});
+
+describe("limpar o campo com requisição no ar", () => {
+  // ⚠⚠ O DEFEITO: o retorno para termo curto acontecia ANTES de invalidar a vez. A requisição já
+  // disparada continuava válida e resolvia chamando `setAberto(true)` — sugestões reaparecendo
+  // sobre um campo vazio, prontas para serem escolhidas por engano.
+  it("resposta que chega depois de apagar não reabre a lista", async () => {
+    vi.stubGlobal("fetch", vi.fn(responder([linha("84379000")], 400)));
+    render(<ComPai />);
+    const campo = screen.getByRole("combobox");
+    fireEvent.change(campo, { target: { value: "8437" } });
+    await act(async () => { vi.advanceTimersByTime(300); });
+    fireEvent.change(campo, { target: { value: "" } });
+    await act(async () => { vi.advanceTimersByTime(900); });
+    expect(screen.queryByRole("option")).toBeNull();
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+});
+
+describe("a linha de Ex nunca fala pelo NCM", () => {
+  // ⚠⚠ A BUSCA CORTA NO LIMITE ANTES DE AGRUPAR, e na busca por código o Postgres devolve o Ex
+  // ANTES do NULL da geral. Dava para a lista mostrar a ALÍQUOTA DA EXCEÇÃO como se fosse a do
+  // NCM — e o clique manda só os 8 dígitos, jogando fora a exceção de onde o número saiu. Seria o
+  // contrato 2 do módulo ("Ex desconhecido não significa geral") quebrado pela própria tela.
+  it("sem a linha geral na resposta, não sai número", async () => {
+    vi.stubGlobal("fetch", vi.fn(responder([linha("12112000", "01", "PERCENTUAL", 0)])));
+    render(<ComPai />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "1211" } });
+    await act(async () => { vi.advanceTimersByTime(400); });
+    await waitFor(() => expect(screen.getByText("1211.20.00")).toBeTruthy());
+    expect(screen.getByText(/IPI depende do Ex/)).toBeTruthy();
+    expect(screen.queryByText("IPI 0%")).toBeNull();
+  });
+
+  it("com a linha geral, a alíquota é a dela — e o Ex vira marca", async () => {
+    vi.stubGlobal("fetch", vi.fn(responder([
+      linha("12112000", "01", "PERCENTUAL", 0),
+      linha("12112000", null, "NT", null),
+    ])));
+    render(<ComPai />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "1211" } });
+    await act(async () => { vi.advanceTimersByTime(400); });
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(1));
+    expect(screen.getByText("IPI NT — não tributado")).toBeTruthy();
+    expect(screen.getByText("1 Ex TIPI")).toBeTruthy();
+    expect(screen.queryByText(/IPI depende do Ex/)).toBeNull();
+  });
+});
+
+describe("falha de consulta não é ausência de NCM", () => {
+  // ⚠⚠ UM 403 VIRAVA "Nenhum NCM com esse código" — e a pessoa concluía que o código não existe,
+  // quando o que houve foi falha de permissão. São estados diferentes, com conserto diferente.
+  it("403 mostra o erro e oferece nova tentativa", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 403, json: async () => ({ success: false, error: "Forbidden" }) })));
+    render(<ComPai />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "8437" } });
+    await act(async () => { vi.advanceTimersByTime(400); });
+    await waitFor(() => expect(screen.getByText(/Forbidden/)).toBeTruthy());
+    expect(screen.queryByText(/Nenhum NCM/)).toBeNull();
+    expect(screen.getByRole("button", { name: /Tentar de novo/ })).toBeTruthy();
+  });
+
+  it("queda de rede também é erro, não lista vazia", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("Failed to fetch"); }));
+    render(<ComPai />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "8437" } });
+    await act(async () => { vi.advanceTimersByTime(400); });
+    await waitFor(() => expect(screen.getByText(/Failed to fetch/)).toBeTruthy());
+    expect(screen.queryByText(/Nenhum NCM/)).toBeNull();
+  });
+
+  // ⚠ "Tentar de novo" precisa de um contador: repor o MESMO termo não reexecuta o efeito, e o
+  // botão ficaria mudo justamente quando a rede caiu.
+  it("tentar de novo refaz a busca", async () => {
+    let falhar = true;
+    const f = vi.fn(async () => {
+      if (falhar) { falhar = false; throw new Error("rede"); }
+      return { ok: true, status: 200, json: async () => ({ success: true, resultados: [linha("84379000")] }) };
+    });
+    vi.stubGlobal("fetch", f);
+    render(<ComPai />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "8437" } });
+    await act(async () => { vi.advanceTimersByTime(400); });
+    await waitFor(() => expect(screen.getByText(/rede/)).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /Tentar de novo/ }));
+    await act(async () => { vi.advanceTimersByTime(400); });
+    await waitFor(() => expect(screen.getByText("8437.90.00")).toBeTruthy());
+    expect(f).toHaveBeenCalledTimes(2);
+  });
+
+  // ⚠ "Nenhuma TIPI importada" é outra coisa que "esse NCM não existe" — e o conserto é de
+  // administrador, não de quem está digitando.
+  it("ausência de TIPI ativa aparece com o motivo da fonte", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200,
+      json: async () => ({ success: true, resultados: [], motivo: "Nenhuma versão da TIPI foi importada ainda." }) })));
+    render(<ComPai />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "8437" } });
+    await act(async () => { vi.advanceTimersByTime(400); });
+    await waitFor(() => expect(screen.getByText(/Nenhuma versão da TIPI/)).toBeTruthy());
+    expect(screen.queryByText(/Nenhum NCM/)).toBeNull();
   });
 });

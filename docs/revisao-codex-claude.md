@@ -968,3 +968,27 @@ novo, não conserto, e não entra sem o Matheus decidir.
   (RICMS/SP, DN CAT 03/2016, RCs 33732/2026, 33438/2026, 5788/2015), motor de regras com condições
   e fundamento por regra, e validação de referências entre NFs. É trabalho de outra ordem de
   grandeza — não foi iniciado.
+- **(22/09, 23h40) Quatro achados do Codex no autocomplete — todos reais, todos corrigidos.**
+  - ⚠⚠ **Escolher um NCM reabria o menu e buscava de novo.** `escolher` gravava "8437.90.00" no
+    campo e mandava "84379000" ao formulário; o pai devolvia isso como `valor`, o campo trocava o
+    texto pelos dígitos — string diferente — e o efeito de busca disparava outra vez. **E meus
+    testes não pegavam porque fixavam `valor=""`**, nunca reproduzindo o que o formulário de
+    verdade faz. Agora o que se BUSCA (`consulta`) é separado do que se MOSTRA (`termo`), e só quem
+    digita mexe na consulta. O teste passou a usar um pai com `useState`.
+  - ⚠⚠ **Apagar o campo com requisição no ar trazia as sugestões de volta.** O retorno para termo
+    curto acontecia ANTES de invalidar a vez: a requisição já disparada resolvia chamando
+    `setAberto(true)`, com sugestões reaparecendo sobre um campo vazio, prontas para serem
+    escolhidas por engano. `invalidar()` agora roda ao limpar, ao escolher e ao trocar de termo.
+  - ⚠⚠ **A linha de Ex podia falar pelo NCM.** A busca corta no LIMITE antes de agrupar, e na busca
+    por código o Postgres devolve o `Ex 01` antes do NULL da geral — a lista podia mostrar a
+    **alíquota da exceção** como se fosse a do código, e o clique manda só os 8 dígitos, jogando
+    fora a exceção de onde o número saiu. Era o contrato 2 do módulo ("Ex desconhecido não
+    significa geral") quebrado pela própria tela. Sem a linha geral na resposta, a entrada sai
+    **sem número**: "IPI depende do Ex — abra a Consulta NCM".
+  - ⚠⚠ **Falha de consulta virava "Nenhum NCM com esse código".** A resposta era consumida sem
+    olhar `r.ok` nem `d.success`: um 403 ou uma queda de rede levavam a pessoa a concluir que o
+    código não existe. Agora são três estados — erro (com "Tentar de novo"), referência ausente
+    (conserto de administrador) e busca válida sem resultado.
+  **3.373 passando.** Validado logado: escolher não dispara busca extra (0 chamadas), apagar não
+  reabre a lista, e o 9406.10.10 sai com **CST 51** (alíquota zero é tributação) — o mesmo ponto da
+  NF-e 1000. ⚠ **Sem push**, conforme a instrução da rodada.
