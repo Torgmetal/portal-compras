@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle, Upload, ShieldAlert, HelpCircle, Calculator, Ban } from "lucide-react";
+import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, ChevronDown, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle, Upload, ShieldAlert, HelpCircle, Calculator, Ban } from "lucide-react";
 import { useStore } from "@/lib/store";
 import CampoNcm from "./CampoNcm";
 import AbaClassificacoes from "./AbaClassificacoes";
@@ -810,6 +810,9 @@ function AbaSimulador() {
   const [r, setR] = useState(null);
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(false);
+  const [mais, setMais] = useState(false);
+  // ⚠ Campo preenchido escondido faz a pessoa não entender por que o resultado mudou.
+  const maisAberto = mais || Boolean(f.descricaoProduto || f.codigoProduto || f.cstPretendido);
 
   useEffect(() => {
     fetch("/api/fiscal/inteligencia/simular").then((x) => x.json())
@@ -891,47 +894,72 @@ function AbaSimulador() {
             </select>
             {op && <p className="mt-1 text-xs text-torg-gray">{op.cliente} · {op.clienteCidade || "cidade não cadastrada"}{op.clienteUF ? `/${op.clienteUF}` : ""}</p>}
           </div>
-          <div>
-            <label className={rotulo}>UF de destino</label>
-            <select className={campo} value={f.ufDestino} disabled={Boolean(f.opId)}
-              onChange={(e) => setF({ ...f, ufDestino: e.target.value })}>
-              <option value="">{f.opId ? "vem da OP" : "— escolha —"}</option>
-              {UFS.map((u) => <option key={u} value={u}>{u}</option>)}
-            </select>
-          </div>
+          {/* ⚠⚠ CONTROLE DESLIGADO É RUÍDO. Com a obra escolhida, este seletor ficava cinza
+              dizendo "vem da OP" — ocupando uma célula para informar que não faz nada. Ele só
+              existe para quem simula SEM obra, e agora só aparece nesse caso. */}
+          {!f.opId && (
+            <div>
+              <label className={rotulo}>UF de destino</label>
+              <select className={campo} value={f.ufDestino} onChange={(e) => setF({ ...f, ufDestino: e.target.value })}>
+                <option value="">— escolha —</option>
+                {UFS.map((u) => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className={rotulo}>Valor dos produtos (R$)</label>
             <input className={campo} inputMode="decimal" placeholder="0,00" value={f.valor}
               onChange={(e) => setF({ ...f, valor: e.target.value })} />
           </div>
-          {/* ⚠⚠ A DESCRIÇÃO DA PEÇA É CAMPO PRÓPRIO, E NÃO SAI DO NCM. Procurar a classificação
-              registrada pelo NCM que está sendo conferido seria confirmação circular: o registro
-              devolveria exatamente o que a pessoa acabou de digitar. O que localiza a decisão é a
-              natureza da peça — que na TORG mora na descrição do item, nunca no código do produto. */}
-          <div className="md:col-span-2">
-            <label className={rotulo}>Descrição da peça (opcional — procura a classificação já decidida)</label>
-            <input className={campo} placeholder="FLANGE MAIOR CONEXAO SAIDA - DES 71264380" value={f.descricaoProduto}
-              onChange={(e) => setF({ ...f, descricaoProduto: e.target.value })} />
-          </div>
-          {/* ⚠⚠ SEM ESTE CAMPO, VERBETE COM CÓDIGO NUNCA ERA ACHADO (achado do Codex, 23/09/2026).
-              A tela de cadastro deixa amarrar a classificação a um código do Omie, e a API filtra
-              por ele — mas o simulador não mandava nenhum, então todo verbete específico era
-              excluído e a resposta saía "sem classificação" com a classificação existindo. Vazio
-              continua significando "só os que valem para qualquer código". */}
-          <div>
-            <label className={rotulo}>Código do produto no Omie (opcional)</label>
-            <input className={campo} placeholder="ARM000010" value={f.codigoProduto}
-              onChange={(e) => setF({ ...f, codigoProduto: e.target.value })} />
-          </div>
-          <div className="md:col-span-2">
-            <label className={rotulo}>CST de IPI que pretende usar (opcional — o portal confere)</label>
-            <select className={campo} value={f.cstPretendido} onChange={(e) => setF({ ...f, cstPretendido: e.target.value })}>
-              <option value="">— deixar o portal sugerir —</option>
-              {opcoes.cstIpi.map((c) => <option key={c.cst} value={c.cst}>{c.cst} — {c.rotulo}</option>)}
-            </select>
-          </div>
         </div>
+
+        {/* ⚠⚠ QUATRO CAMPOS MANDAM NA SIMULAÇÃO; O RESTO É CONFERÊNCIA. Matheus (23/09/2026):
+            *"está pedindo muitas informações, não tem necessidade"* — e ele tem razão: eu
+            acrescentei dois campos hoje e o formulário passou a pedir oito coisas para responder
+            uma pergunta. NCM, CFOP, obra e valor decidem a simulação inteira. Descrição da peça,
+            código do produto e CST pretendido só servem para CONFERIR algo que a pessoa já tem em
+            mente — ficam a um clique, não na frente de quem só quer simular.
+
+            ⚠ A seção abre sozinha quando qualquer um deles tem valor: campo preenchido escondido
+            faz a pessoa não entender por que o resultado mudou. */}
+        {/* ⚠ `flex w-fit`, não `inline-flex`: inline, o botão Simular subia para a mesma linha e
+            cobria o fim deste texto ("…e CST"). */}
+        <button type="button" onClick={() => setMais((v) => !v)} aria-expanded={maisAberto}
+          className="mt-4 flex w-fit items-center gap-1.5 text-xs font-medium text-torg-blue hover:underline">
+          {maisAberto ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          Conferir também descrição da peça, código do produto e CST
+        </button>
+        {maisAberto && (
+          <div className="mt-3 grid gap-3 rounded-lg border border-gray-100 bg-gray-50/60 p-3 md:grid-cols-3">
+            {/* ⚠⚠ A DESCRIÇÃO DA PEÇA É CAMPO PRÓPRIO, E NÃO SAI DO NCM. Procurar a classificação
+                registrada pelo NCM que está sendo conferido seria confirmação circular: o registro
+                devolveria exatamente o que a pessoa acabou de digitar. O que localiza a decisão é a
+                natureza da peça — que na TORG mora na descrição do item, nunca no código do produto. */}
+            <div className="md:col-span-2">
+              <label className={rotulo}>Descrição da peça (opcional — procura a classificação já decidida)</label>
+              <input className={campo} placeholder="FLANGE MAIOR CONEXAO SAIDA - DES 71264380" value={f.descricaoProduto}
+                onChange={(e) => setF({ ...f, descricaoProduto: e.target.value })} />
+            </div>
+            {/* ⚠⚠ SEM ESTE CAMPO, VERBETE COM CÓDIGO NUNCA ERA ACHADO (achado do Codex, 23/09/2026).
+                A tela de cadastro deixa amarrar a classificação a um código do Omie, e a API filtra
+                por ele — mas o simulador não mandava nenhum, então todo verbete específico era
+                excluído e a resposta saía "sem classificação" com a classificação existindo. Vazio
+                continua significando "só os que valem para qualquer código". */}
+            <div>
+              <label className={rotulo}>Código do produto no Omie (opcional)</label>
+              <input className={campo} placeholder="ARM000010" value={f.codigoProduto}
+                onChange={(e) => setF({ ...f, codigoProduto: e.target.value })} />
+            </div>
+            <div className="md:col-span-2">
+              <label className={rotulo}>CST de IPI que pretende usar (opcional — o portal confere)</label>
+              <select className={campo} value={f.cstPretendido} onChange={(e) => setF({ ...f, cstPretendido: e.target.value })}>
+                <option value="">— deixar o portal sugerir —</option>
+                {opcoes.cstIpi.map((c) => <option key={c.cst} value={c.cst}>{c.cst} — {c.rotulo}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
 
         <button onClick={simular} disabled={carregando}
           className="mt-4 inline-flex items-center gap-2 rounded-lg bg-torg-blue px-4 py-2 text-sm font-medium text-white transition hover:bg-torg-blue/90 disabled:opacity-50">

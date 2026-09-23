@@ -1597,3 +1597,18 @@ operação de receita) não há lista — candidato só aparece onde ele se abst
   foi tocado. É cobertura de unidade, não validação de tela, e eu não vou apagar essa diferença.
   ⚠ Fora do meu diff: `testes/lib/modo-demo.teste.js` tem 2 erros de lint (`global` não definido).
   Pré-existentes e fora do gate `npm run checar`, que só varre `app lib components`.
+  ⚠⚠ **(23/09, 16h05) E EU TINHA ENGORDADO O SIMULADOR.** Matheus, com print: *"está pedindo muitas
+  informações, não tem necessidade"*. Ele tem razão — os dois campos que entraram hoje
+  (`descricaoProduto` e `codigoProduto`) subiram o formulário para **oito** campos para responder
+  UMA pergunta. **Quatro decidem a simulação** (NCM, CFOP, obra, valor); descrição da peça, código
+  do produto e CST pretendido só servem para CONFERIR algo que a pessoa já tem em mente, e foram
+  para trás de um "Conferir também…".
+  ⚠ **A seção abre sozinha quando qualquer um dos três tem valor** — campo preenchido escondido faz
+  a pessoa não entender por que o resultado mudou.
+  ⚠⚠ **CONTROLE DESLIGADO É RUÍDO**: com a obra escolhida, o seletor de UF ficava cinza dizendo
+  *"vem da OP"* — uma célula inteira para informar que não faz nada. Ele só existe para quem simula
+  SEM obra, e agora só aparece nesse caso.
+  ⚠ Defeito meu na mesma mexida, pego no screenshot: com `inline-flex`, o botão **Simular** subia
+  para a linha do link e **cobria o fim do texto**. `flex w-fit`. Conferido por `boundingBox` no
+  teste de tela, não a olho.
+  **3.627 passando**, build EXIT=0, os dois estados validados logados.
