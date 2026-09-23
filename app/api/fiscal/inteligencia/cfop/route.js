@@ -7,7 +7,7 @@ import { buscarCfop, operacoesDoCfop, OPERACOES, CST_IPI, FAMILIA } from "@/lib/
 // `validado: false` e a tela diz isso. Ver o cabeçalho de lib/fiscal/cfop.js.
 export async function GET(req) {
   try {
-    await requireAcesso({ modulos: ["FISCAL"] });
+    await requireAcesso({ modulos: ["FISCAL", "FINANCEIRO"] });
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }

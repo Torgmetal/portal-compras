@@ -14,7 +14,7 @@ const negado = (e) => NextResponse.json({ success: false, error: e.message }, { 
 
 export async function GET(req) {
   try {
-    await requireAcesso({ modulos: ["FISCAL"] });
+    await requireAcesso({ modulos: ["FISCAL", "FINANCEIRO"] });
   } catch (e) { return negado(e); }
 
   const { searchParams } = new URL(req.url);

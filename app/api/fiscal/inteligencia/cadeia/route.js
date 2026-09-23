@@ -21,7 +21,7 @@ const esquema = z.object({ opId: z.string().min(1).max(40), operacaoId: z.string
 
 export async function GET() {
   try {
-    await requireAcesso({ modulos: ["FISCAL"] });
+    await requireAcesso({ modulos: ["FISCAL", "FINANCEIRO"] });
   } catch (e) { return negado(e); }
 
   const ops = await prisma.oP.findMany({
@@ -43,7 +43,7 @@ export async function GET() {
 
 export async function POST(req) {
   try {
-    await requireAcesso({ modulos: ["FISCAL"] });
+    await requireAcesso({ modulos: ["FISCAL", "FINANCEIRO"] });
   } catch (e) { return negado(e); }
 
   let body;

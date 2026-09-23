@@ -32,7 +32,7 @@ const esquema = z.object({
 
 export async function GET(req) {
   try {
-    await requireAcesso({ modulos: ["FISCAL"] });
+    await requireAcesso({ modulos: ["FISCAL", "FINANCEIRO"] });
   } catch (e) { return negado(e); }
 
   const status = new URL(req.url).searchParams.get("status");
@@ -43,7 +43,7 @@ export async function GET(req) {
 export async function POST(req) {
   let user;
   try {
-    user = await requireAcesso({ modulos: ["FISCAL"] });
+    user = await requireAcesso({ modulos: ["FISCAL", "FINANCEIRO"] });
   } catch (e) { return negado(e); }
 
   let dados;

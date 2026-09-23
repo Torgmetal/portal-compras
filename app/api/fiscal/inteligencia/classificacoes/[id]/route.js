@@ -45,7 +45,7 @@ const ERROS = {
 export async function PATCH(req, { params }) {
   let user;
   try {
-    user = await requireAcesso({ modulos: ["FISCAL"] });
+    user = await requireAcesso({ modulos: ["FISCAL", "FINANCEIRO"] });
   } catch (e) { return negado(e); }
 
   let corpo;

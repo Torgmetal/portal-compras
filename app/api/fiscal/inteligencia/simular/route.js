@@ -36,7 +36,7 @@ const schema = z.object({
 
 export async function POST(req) {
   try {
-    await requireAcesso({ modulos: ["FISCAL"] });
+    await requireAcesso({ modulos: ["FISCAL", "FINANCEIRO"] });
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }
@@ -116,7 +116,7 @@ export async function POST(req) {
 
 export async function GET() {
   try {
-    await requireAcesso({ modulos: ["FISCAL"] });
+    await requireAcesso({ modulos: ["FISCAL", "FINANCEIRO"] });
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }

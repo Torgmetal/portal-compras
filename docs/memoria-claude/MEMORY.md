@@ -210,3 +210,4 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Editar relatório já assinado](torg_relatorio_editar_assinado.md) — decisão do Vitor: não exige revisão; auditoria marca `editadoAposAssinatura` e a tarja diz quem assinou; revisão fica para o que já saiu ao cliente
 - [Cotação: converter unidade do fornecedor](torg_cotacao_unidade.md) — 25 CT ↔ 2500 UN; grava CANÔNICO (unidade da RM) e os 25 consumidores não mudam; total é a invariante; preço convertido NÃO se arredonda a 2 casas
 - [Codex: aceito sempre](torg_codex_aceito_sempre.md) — pendência de terceiro/decisão humana não trava mais o fluxo; `corrigir` continua obrigatório, e o P1 dos avulsos é do Vitor
+- [Portão por módulo](torg_portao_modulos.md) — quem entra em cada rota mora em lib/portao-modulos.js; rota sem linha lá quebra em vez de bloquear, e módulo concedido só vale no próximo login

@@ -38,7 +38,7 @@ const TETO_BYTES = 8 * 1024 * 1024;
 export async function POST(req) {
   let user;
   try {
-    user = await requireAcesso({ modulos: ["FISCAL"] });
+    user = await requireAcesso({ modulos: ["FISCAL", "FINANCEIRO"] });
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }

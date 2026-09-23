@@ -9,7 +9,7 @@ export const metadata = {
 };
 
 export default async function InteligenciaFiscalPage() {
-  const user = await requireAcesso({ modulos: ["FISCAL"] });
+  const user = await requireAcesso({ modulos: ["FISCAL", "FINANCEIRO"] });
   // ⚠ A referência vem do SERVIDOR já na primeira pintura: a tela nunca pode aparecer sem dizer de
   // quando é o dado que ela está servindo.
   const referencia = await referenciaAtiva();

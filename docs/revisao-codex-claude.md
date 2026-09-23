@@ -1561,3 +1561,39 @@ operação de receita) não há lista — candidato só aparece onde ele se abst
   ⚠⚠ **O QUE NÃO FOI PROVADO CONTRA DADO REAL: o estado `ENCONTRADO`.** Nenhuma medição do portal
   tem NF hoje — as 25 mais recentes estão "Não Faturado", etapa 10. O caminho positivo está coberto
   por teste de unidade, não por validação logada, e isso é uma diferença que eu não vou apagar.
+
+- **(23/09, 15h45) O PORTÃO POR MÓDULO — a Inteligência Fiscal dava "Algo deu errado".** Matheus
+  (23/09/2026): *"usuário financeiro@torg... tentou acessar a aba inteligência fiscal mas a página
+  deu erro, ela deve ter acesso full"*.
+  ⚠⚠ **A FALHA FOI POR OMISSÃO: `/fiscal` NUNCA TINHA SIDO CADASTRADO NO PORTÃO.** O seletor
+  (`lib/modulos-portal.js`) abre o card Fiscal para `FISCAL` **ou** `FINANCEIRO`; `/fiscal` e
+  `/fiscal/remessa-terceiro` aceitam os dois; a Inteligência Fiscal exigia **só FISCAL**. Sem linha
+  no `moduloNegado`, a recusa vinha do `requireAcesso` DENTRO do Server Component, virava exceção e
+  caía no `app/error.js` — *"Algo deu errado. Tente novamente"*, numa tela em que tentar de novo
+  nunca ia funcionar. A tela `/sem-acesso`, que DIZ qual módulo falta, já existia desde sempre:
+  faltava o Fiscal entrar na tabela.
+  ⚠⚠ **NÃO DAVA PARA CONSERTAR NO `app/error.js`**: em produção o Next **apaga a mensagem** do erro
+  de Server Component (só o `digest` sobrevive), então não há como ramificar "foi permissão" ali. O
+  tratamento tem que ser ANTES, no middleware — que é exatamente onde o mecanismo já estava.
+  ⚠⚠ **OMISSÃO NÃO APARECE EM REVISÃO DE DIFF** — ninguém revisa a linha que não foi escrita. Por
+  isso `moduloNegado` saiu do `middleware.js` (onde o Next reserva os exports e nada podia ser
+  testado) para **`lib/portao-modulos.js`**, e `testes/portao-modulos.teste.js` (23) varre o
+  seletor cobrando portão para cada card. Módulo novo sem portão agora é teste vermelho.
+  ⚠ A varredura achou um SEGUNDO caso, e esse é intencional: `/rm` é aberto a todo mundo logado
+  ("histórico visível para todos") enquanto o card só aparece para quatro módulos. A divergência
+  deliberada mora numa lista `ABERTAS_DE_PROPOSITO` **com o motivo escrito** — a diferença entre
+  ela e o caso do Fiscal é que esta alguém escreveu.
+  ⚠ As guardas da Inteligência Fiscal (página + 11 rotas de API) passaram a aceitar
+  `["FISCAL", "FINANCEIRO"]`, alinhadas com o resto do módulo, **a pedido do Matheus**
+  (*"pode abrir a tela para todos que tenham módulo fiscal e financeiro"*). `sincronizar` segue ADMIN.
+  ⚠ E o módulo FISCAL foi concedido à conta dela, com AuditLog e motivo.
+  ⚠⚠ **MÓDULO CONCEDIDO SÓ VALE NO PRÓXIMO LOGIN.** `token.modulos` é gravado no callback `jwt`
+  apenas dentro do `if (user)` — nunca é relido do banco durante a sessão, que dura **7 dias**.
+  Quem recebe um módulo e não desloga jura que continua sem acesso.
+  **3.627 passando**, build EXIT=0, `/fiscal` e `/fiscal/inteligencia` validadas logadas.
+  ⚠⚠ **O QUE NÃO FOI PROVADO LOGADO: o redirecionamento para `/sem-acesso`.** A conta de teste é
+  ADMIN e passa em tudo, e eu não vou criar usuário em produção só para isso. O que mudou foi UMA
+  linha numa tabela agora coberta por teste; o mecanismo de redirect é o mesmo de ~15 módulos e não
+  foi tocado. É cobertura de unidade, não validação de tela, e eu não vou apagar essa diferença.
+  ⚠ Fora do meu diff: `testes/lib/modo-demo.teste.js` tem 2 erros de lint (`global` não definido).
+  Pré-existentes e fora do gate `npm run checar`, que só varre `app lib components`.

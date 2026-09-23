@@ -7,7 +7,7 @@ import { detalharNcm } from "@/lib/fiscal/consulta";
 // silêncio é o contrato 2 sendo quebrado (ver o bloco fiscal do schema.prisma).
 export async function GET(_req, { params }) {
   try {
-    await requireAcesso({ modulos: ["FISCAL"] });
+    await requireAcesso({ modulos: ["FISCAL", "FINANCEIRO"] });
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }

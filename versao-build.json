@@ -1,7 +1,12 @@
 {
-  "build": 3433,
-  "gerado": "2026-09-23T19:00:28.239Z",
+  "build": 3434,
+  "gerado": "2026-09-23T19:00:34.820Z",
   "commits": [
+    {
+      "hash": "99f932cc04",
+      "data": "23/09/2026",
+      "titulo": "Fiscal: a cadeia de documentos de uma obra — e ela nunca diz \"falta uma nota\""
+    },
     {
       "hash": "b166069fc8",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "bc9eddc2e7",
       "data": "22/09/2026",
       "titulo": "Fiscal: o cron era PRÉ-RENDERIZADO — nunca rodaria em produção"
-    },
-    {
-      "hash": "1667600a3c",
-      "data": "22/09/2026",
-      "titulo": "Inteligência Fiscal: a aba, a sincronização oficial e a consulta de NCM/CFOP"
     }
   ]
 }
