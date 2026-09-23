@@ -1136,3 +1136,34 @@ que a contabilidade possa aprovar uma a uma. E a validação de referências ent
   não estabelece qual redação vigorava quando uma nota de março de 2024 foi emitida.
 
   **3.422 passando.** ⚠ **Sem push** enquanto a rodada de correção estiver aberta.
+
+- **(23/09, 10h30) Rodada 2/2 — três achados, e o terceiro era eu criando falsa confiança.**
+  - ⚠⚠ **`resp.text()` estava FORA do try.** O `try` cobria só o `fetch`: recebidos os cabeçalhos,
+    a leitura do corpo ainda pode rejeitar (o AbortSignal dispara no meio do streaming, a conexão
+    cai). A exceção subia até `importarLegislacao` e **matava o lote inteiro** — sem relatório das
+    fontes restantes e, no cron, **sem heartbeat**, fazendo o monitor alertar por não ter notícia
+    de uma execução que rodou. Corrigido, mais uma rede de segurança por fonte: gravação e parsing
+    também podem estourar, e uma fonte não pode derrubar as outras nove.
+  - ⚠⚠ **O relógio do orçamento começava DEPOIS do `aquecerBanco`.** Os retries de cold start do
+    Neon somam até ~16 s, e o lote ainda recebia 50 s inteiros — estourando os 60 s da rota
+    justamente no dia em que a compute estava dormindo. Orçamento que não conta o que já foi gasto
+    não é orçamento. `t0` passou para a primeira linha da rota.
+  - ⚠⚠⚠ **A DECLARAÇÃO DA TIPI APAGAVA A RESSALVA — erro meu, e dos graves.** Eu gravei
+    `vigenciaInicio: "2022-08-01"` (a data do decreto-base), `vigenciaDeclarada` virou `true` e o
+    aviso **sumiu da tela**. Três problemas de uma vez: **(1)** a data descreve o decreto-base, não
+    a redação consolidada, que inclui atos de **2026**; **(2)** eu troquei "a tabela se identifica
+    como atualizada até o ato X" por "esta redação vigorava na data D" — afirmações diferentes, e
+    só a primeira eu tenho; **(3)** a auditoria e o simulador continuaram lendo a vigência do
+    **banco** (nula) e mantendo a ressalva, então o módulo passou a **discordar de si** sobre o
+    próprio fundamento.
+    ⚠⚠ O conserto foi **diminuir a afirmação**: `VIGENCIA_TIPI` virou `ATUALIZACAO_TIPI`, sem
+    `vigenciaInicio` nenhum; `vigenciaDeclarada` volta a sair só do banco; e a tela mostra a
+    atualização **ao lado** da ressalva, com o aviso "NÃO é vigência" colado. Afirmação menor e
+    verdadeira vale mais que afirmação grande e conveniente.
+    ⚠ A comparação do hash passou a ser do valor **inteiro**: bastava um prefixo para "quase igual"
+    passar, num campo cujo propósito é dizer "é exatamente este arquivo".
+  - ⚠ A ponte reportou 1 falha em `testes/componentes/gantt-salvamento.teste.jsx`, arquivo que
+    **não está no diff**. Rodei 4× aqui: **12/12 passando** nas quatro. Não consigo reproduzir;
+    fica registrado como possivelmente intermitente sob carga, sem atribuição à tarefa.
+  **3.428 passando.** Tela conferida logada: as duas linhas convivem — *"Vigência normativa: não
+  declarada pela fonte"* e *"Atualizada até: ADE RFB nº 1, de 30/01/2026"*.

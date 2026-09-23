@@ -166,3 +166,44 @@ describe("o orçamento de tempo da rota", () => {
     expect(Date.now() - t0).toBeLessThan(2500);
   });
 });
+
+describe("interrupção na LEITURA DO CORPO não derruba o lote", () => {
+  // ⚠⚠ O `try` cobria só o `fetch`. Recebidos os cabeçalhos, `resp.text()` ainda pode rejeitar —
+  // o AbortSignal dispara no meio do streaming, ou a conexão cai. A exceção subia até
+  // `importarLegislacao` e MATAVA O LOTE INTEIRO: sem relatório das fontes restantes e, no cron,
+  // sem heartbeat — o monitor alertaria por não ter notícia de uma execução que rodou.
+  const corpoQueFalha = vi.fn(async () => ({
+    ok: true, status: 200,
+    text: async () => { throw new Error("The operation was aborted due to timeout"); },
+  }));
+
+  it("vira falha DAQUELA fonte, não exceção", async () => {
+    vi.stubGlobal("fetch", corpoQueFalha);
+    const r = await importarNorma(fonte.chave);
+    expect(r.status).toBe("FALHOU");
+    expect(r.mensagem).toMatch(/aborted due to timeout/);
+  });
+
+  it("as outras fontes continuam sendo processadas", async () => {
+    let n = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      n += 1;
+      if (n === 1) return { ok: true, status: 200, text: async () => { throw new Error("conexão caiu"); } };
+      return { ok: true, status: 200, text: async () => valido() };
+    }));
+    const r = await importarLegislacao({ pausaMs: 0 });
+    expect(r.processadas).toBe(2);
+    expect(r.falhas).toHaveLength(1);
+    expect(r.importadas).toBe(1);
+    expect(r.naoProcessadas).toEqual([]);
+  });
+
+  // ⚠ Rede de segurança por fonte: gravação e parsing também podem estourar, e uma fonte não pode
+  // derrubar as outras nove.
+  it("exceção fora do download também fica contida na fonte", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("DNS"); }));
+    const r = await importarLegislacao({ pausaMs: 0 });
+    expect(r.falhas).toHaveLength(2);
+    expect(r.processadas).toBe(2);
+  });
+});

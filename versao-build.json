@@ -1,7 +1,12 @@
 {
-  "build": 3420,
-  "gerado": "2026-09-23T12:12:50.827Z",
+  "build": 3421,
+  "gerado": "2026-09-23T12:20:21.297Z",
   "commits": [
+    {
+      "hash": "92a02cc702",
+      "data": "23/09/2026",
+      "titulo": "Legislação: três achados do Codex, e a TIPI da contabilidade resolve a vigência"
+    },
     {
       "hash": "a61f9e7b9c",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e8f6844850",
       "data": "22/09/2026",
       "titulo": "Expedição: marca pela metade volta a aparecer na próxima carga"
-    },
-    {
-      "hash": "5cf0762129",
-      "data": "22/09/2026",
-      "titulo": "CMR: criar os R que faltam vem antes de remendar observação"
     }
   ]
 }

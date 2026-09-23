@@ -59,6 +59,23 @@ function Procedencia({ referencia }) {
           </span>
         </p>
       )}
+      {/* ⚠⚠ ATUALIZAÇÃO FICA AO LADO DA RESSALVA, NUNCA NO LUGAR DELA (achado do Codex,
+          23/09/2026). "A tabela se identifica como atualizada até o ato X" e "esta redação vigorava
+          na data D" são afirmações diferentes, e só a primeira o portal tem. Na primeira versão eu
+          troquei uma pela outra e a ressalva SUMIU — afirmação maior e conveniente no lugar da
+          menor e verdadeira. */}
+      {t.atualizacao && (
+        <p className="mt-1.5 flex items-start gap-1.5 text-xs text-torg-gray">
+          <Info size={13} className="mt-0.5 shrink-0" />
+          <span>
+            A tabela se identifica como <strong className="text-torg-dark">{t.atualizacao.norma}</strong>,
+            atualizada até o <strong className="text-torg-dark">{t.atualizacao.atualizadaAte}</strong>
+            {" "}({t.atualizacao.atos.length} atos). Declarado por {t.atualizacao.declaradoPor} em{" "}
+            {t.atualizacao.declaradoEm.split("-").reverse().join("/")}; conferido contra o {t.atualizacao.conferidoContra}
+            <span className="mt-0.5 block text-amber-700">⚠ {t.atualizacao.naoProva}</span>
+          </span>
+        </p>
+      )}
     </div>
   );
 }
@@ -404,6 +421,8 @@ function AbaAdmin({ referencia: inicial, ehAdmin }) {
                 <div>Aprovada em <strong className="text-torg-dark">{fmtHora(t.aprovadoEm)}</strong></div>
                 {/* ⚠⚠ As três datas ficam SEPARADAS de propósito — ver o contrato 1. */}
                 <div>Vigência normativa: <strong className="text-amber-700">{t.vigenciaDeclarada ? fmtHora(t.vigenciaInicio) : "não declarada pela fonte"}</strong></div>
+                {/* ⚠ Linha SEPARADA da vigência, de propósito: são afirmações diferentes. */}
+                {t.atualizacao && <div>Atualizada até: <strong className="text-torg-dark">{t.atualizacao.atualizadaAte}</strong></div>}
                 <div className="pt-1 font-mono text-[10px] text-gray-400">sha {t.fonte.sha256.slice(0, 24)}</div>
               </dl>
             </>

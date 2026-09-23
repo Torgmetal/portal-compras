@@ -13,13 +13,17 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(req) {
+  // ⚠⚠ O RELÓGIO COMEÇA NA ENTRADA DA ROTA, NÃO DEPOIS DO AQUECIMENTO (achado do Codex,
+  // 23/09/2026). Eu marcava o `t0` DEPOIS do `aquecerBanco`, cujos retries de cold start somam até
+  // ~16 s — e aí o lote ainda recebia 50 s inteiros, estourando os 60 s da rota justamente no dia
+  // em que a compute do Neon estava dormindo. Orçamento que não conta o que já foi gasto não é
+  // orçamento.
+  const t0 = Date.now();
   if (!temCronSecret(req)) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   // ⚠ Cold start do Neon: o primeiro query estoura antes de a compute acordar.
   await aquecerBanco(prisma);
-  const t0 = Date.now();
-  // ⚠⚠ O ORÇAMENTO DE TEMPO VIAJA JUNTO (achado do Codex, 23/09/2026). São 10 fontes e a rota tem
-  // 60 s: dois downloads esgotando o timeout de 30 s já estouravam o orçamento, e a Vercel matava
-  // a rota no meio do lote — deixando as últimas fontes sem coletar **em silêncio**.
+  // ⚠ Os 5 s que sobram são para gravar o heartbeat e responder — morrer na última linha também é
+  // morrer.
   const r = await importarLegislacao({ ateMs: t0 + 50_000 });
 
   // ⚠⚠ O PONTO É BATIDO MESMO COM FALHA DE COLETA — senão o cron "congela" e o monitor alerta por
