@@ -1,7 +1,12 @@
 {
-  "build": 3410,
-  "gerado": "2026-09-23T00:47:54.917Z",
+  "build": 3411,
+  "gerado": "2026-09-23T00:51:32.082Z",
   "commits": [
+    {
+      "hash": "5ec170c37b",
+      "data": "22/09/2026",
+      "titulo": "Simulador: quantas notas a operação exige, e o FD já responde de quem é o material"
+    },
     {
       "hash": "56525055e8",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "81393b1df2",
       "data": "22/09/2026",
       "titulo": "MES: o cadastro passa a ser só o que está no Gantt"
-    },
-    {
-      "hash": "d58df80a3a",
-      "data": "22/09/2026",
-      "titulo": "MES: o cadastro da fábrica inteira, semeado em produção"
     }
   ]
 }

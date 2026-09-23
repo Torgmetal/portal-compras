@@ -874,6 +874,41 @@ function AbaSimulador() {
             </div>
           )}
 
+          {/* ⚠⚠ PIS/COFINS SAI COM NÚMERO PORQUE O REGIME FOI DECLARADO, e a tela mostra POR QUEM e
+              CONFERIDO CONTRA O QUÊ. Sem a procedência, o número seria indistinguível do chute que
+              o escopo do módulo proíbe — e é justamente a procedência que diz quando questionar. */}
+          {r.pisCofins && (
+            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">PIS / COFINS · estimativa</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {r.pisCofins.linhas.map((t) => (
+                  <div key={t.tributo} className="rounded-lg bg-gray-50 px-3 py-2">
+                    <p className="text-sm text-torg-dark">
+                      <strong>{t.tributo}</strong> <span className="font-mono">{String(t.aliquota).replace(".", ",")}%</span>
+                      <span className="ml-1.5 rounded bg-white px-1.5 py-0.5 text-[10px] font-medium uppercase text-torg-gray">CST {t.cst}</span>
+                    </p>
+                    <p className="mt-0.5 font-mono text-lg font-bold text-torg-dark">
+                      {t.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </p>
+                    <p className="text-[11px] text-torg-gray">{t.rotulo}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-torg-gray">
+                Regime <strong className="text-torg-dark">{r.regime.nome}</strong> (CRT {r.regime.crt}), declarado por {r.regime.declaradoPor} em {r.regime.declaradoEm.split("-").reverse().join("/")} e
+                conferido contra as NF-e {r.regime.conferidoEm.join(", ")} emitidas pelo Omie. {r.pisCofins.baseNota}
+              </p>
+              {/* ⚠⚠ UM NÚMERO SEM AS EXCEÇÕES VIRA CARIMBO. Dizer o que o portal NÃO detecta é o
+                  que mantém o número utilizável por quem sabe reconhecer o próprio caso. */}
+              <div className="mt-2 border-t border-gray-100 pt-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-torg-gray">É a regra geral do regime — o portal não detecta estas exceções</p>
+                <ul className="mt-1 space-y-0.5 text-xs text-amber-700">
+                  {r.pisCofins.ressalvas.map((x) => <li key={x}>⚠ {x}</li>)}
+                </ul>
+              </div>
+            </div>
+          )}
+
           {/* ⚠⚠ O QUE O PORTAL NÃO DETERMINA, DITO COM O MOTIVO. Um número plausível aqui seria pior
               que um campo vazio: o vazio manda perguntar, o plausível vai para a nota. */}
           <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">

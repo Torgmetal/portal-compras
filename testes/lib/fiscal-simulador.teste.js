@@ -83,12 +83,13 @@ describe("simular — o alerta que a NF-e 973 não teve", () => {
 });
 
 describe("simular — o que ele se RECUSA a calcular", () => {
-  // ⚠⚠ O BRIEFING PROÍBE EXPLICITAMENTE: *"não aplicar automaticamente 12% de ICMS a toda venda
-  // interestadual"* e *"não aplicar PIS 1,65% e COFINS 7,6% a todas as operações"*. Um número
-  // plausível aqui é pior que um campo vazio: o vazio manda perguntar, o plausível vai para a nota.
-  it("ICMS, PIS/COFINS e IBS/CBS saem como não determinados, COM motivo", () => {
+  // ⚠⚠ O ICMS CONTINUA CALADO, e não é teimosia: ele depende da UF de destino, de benefício
+  // estadual, de redução de base e de o destinatário ser contribuinte — não de um regime que
+  // alguém possa declarar numa linha. O briefing proíbe *"aplicar automaticamente 12% de ICMS a
+  // toda venda interestadual"*, e um número plausível ali é pior que um campo vazio.
+  it("ICMS e IBS/CBS saem como não determinados, COM motivo", () => {
     const r = simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25)));
-    expect(r.naoDeterminados.map((x) => x.tributo)).toEqual(["ICMS", "PIS/COFINS", "IBS/CBS"]);
+    expect(r.naoDeterminados.map((x) => x.tributo)).toEqual(["ICMS", "IBS/CBS"]);
     for (const nd of r.naoDeterminados) expect(nd.motivo.length).toBeGreaterThan(40);
   });
 
@@ -174,7 +175,7 @@ describe("simular — as perguntas que faltam", () => {
 
 describe("NAO_DETERMINADOS — o motivo é parte do contrato", () => {
   it("cada tributo diz por que não foi determinado", () => {
-    expect(NAO_DETERMINADOS).toHaveLength(3);
+    expect(NAO_DETERMINADOS).toHaveLength(2);
     for (const x of NAO_DETERMINADOS) {
       expect(x.tributo).toBeTruthy();
       expect(x.motivo).toBeTruthy();
@@ -356,5 +357,49 @@ describe("a matéria-prima que o Comercial já respondeu", () => {
     const r = comMp("MISTO");
     expect(r.alertas.some((a) => /4 de 10 itens/.test(a.texto))).toBe(true);
     expect(r.perguntas.some((p) => /insumos são da TORG/i.test(p))).toBe(true);
+  });
+});
+
+describe("PIS/COFINS — regime DECLARADO, não deduzido do histórico", () => {
+  const r = () => simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS", valor: 222769.58 }, tipi(linha(3.25)));
+
+  // ⚠⚠ A PROIBIÇÃO DO BRIEFING É CONTRA A SUPOSIÇÃO, NÃO CONTRA O REGIME. Matheus (22/09/2026):
+  // *"base PIS/COFINS da TORG é LUCRO REAL, então é 1,65 e 7,6"*. Com o regime declarado por quem
+  // responde por ele, a alíquota básica deixa de ser chute e vira a regra geral.
+  it("aplica 1,65% e 7,60% com o CST 01", () => {
+    expect(r().pisCofins.linhas).toEqual([
+      { tributo: "PIS", cst: "01", rotulo: "Operação tributável com alíquota básica", aliquota: 1.65, valor: 3675.70 },
+      { tributo: "COFINS", cst: "01", rotulo: "Operação tributável com alíquota básica", aliquota: 7.60, valor: 16930.49 },
+    ]);
+  });
+
+  // ⚠ O CENTAVO DE DIFERENÇA É REAL E ESPERADO: a nota calcula item a item e soma (16.930,50 nos
+  // 24 itens da 973), e o simulador aplica a alíquota sobre um valor só (16.930,49). Mesma lição
+  // da auditoria — arredondamento por item ≠ arredondamento do total. O simulador estima uma
+  // operação, não confere uma nota.
+
+  // ⚠⚠ O NÚMERO BATE COM A NF-e 973 REAL — é o que separa "declarado e conferido" de
+  // "plausível". Medido em 22/09/2026 no XML: vPIS 3.675,70 e vCOFINS 16.930,50 sobre vProd
+  // 222.769,58, com CRT 3 e CST 01 nos 24 itens.
+  it("o número confere com a nota real de onde o regime foi verificado", () => {
+    expect(r().regime).toMatchObject({ nome: "Lucro Real", crt: "3" });
+    expect(r().regime.conferidoEm).toContain("973");
+  });
+
+  // ⚠⚠ UM NÚMERO SEM AS EXCEÇÕES VIRA CARIMBO. Exportação, suspensão, alíquota zero e monofásico
+  // têm CST próprio, e o portal NÃO os detecta — dizer isso é o que mantém o número utilizável.
+  it("vem com as exceções que o portal não detecta, por nome", () => {
+    const rs = r().pisCofins.ressalvas.join(" ");
+    expect(rs).toMatch(/Exportação/);
+    expect(rs).toMatch(/monofásico|alíquota zero|suspensão/);
+  });
+
+  it("a base é declarada, não suposta", () => {
+    expect(r().pisCofins.baseNota).toMatch(/valor dos produtos/i);
+  });
+
+  // ⚠ Sem valor não há estimativa — e nada de zero disfarçado de resultado.
+  it("sem valor digitado, não há estimativa", () => {
+    expect(simular({ ncm: "84379000", cfop: "6101", ufOrigem: "SP", ufDestino: "RS" }, tipi(linha(3.25))).pisCofins).toBeNull();
   });
 });
