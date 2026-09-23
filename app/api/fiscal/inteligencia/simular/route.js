@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAcesso } from "@/lib/session";
 import { simular } from "@/lib/fiscal/simulador";
 import { CFOPS, FAMILIA, paresDeCfop } from "@/lib/fiscal/cfop";
+import { materiaPrimaDaOP } from "@/lib/faturamento-direto";
 import { CST_IPI } from "@/lib/fiscal/auditoria";
 
 // Simulação fiscal de uma operação, ANTES de a nota existir.
@@ -45,10 +46,17 @@ export async function POST(req) {
   if (body.opId) {
     const op = await prisma.oP.findUnique({
       where: { id: body.opId },
-      select: { numero: true, cliente: true, clienteUF: true, clienteCidade: true, clienteIE: true, clienteCnpj: true },
+      select: {
+        numero: true, cliente: true, clienteUF: true, clienteCidade: true, clienteIE: true, clienteCnpj: true,
+        // ⚠⚠ O FATURAMENTO DIRETO JÁ DIZ DE QUEM É A MATÉRIA-PRIMA — é decisão do Comercial no
+        // fechamento do contrato, e o simulador estava perguntando de novo o que já estava gravado.
+        itens: { select: { faturamentoDireto: true } },
+        aditivos: { select: { itens: { select: { faturamentoDireto: true } } } },
+      },
     });
     if (op) {
-      obra = op;
+      obra = { numero: op.numero, cliente: op.cliente, clienteUF: op.clienteUF, clienteCidade: op.clienteCidade, clienteIE: op.clienteIE, clienteCnpj: op.clienteCnpj };
+      entrada.materiaPrima = materiaPrimaDaOP(op);
       entrada.ufDestino = entrada.ufDestino || op.clienteUF || null;
       // ⚠⚠ A INSCRIÇÃO ESTADUAL É INDÍCIO, NÃO PROVA — e a tela diz isso. Cliente com IE quase sempre
       // é contribuinte, mas "ISENTO" e cadastro desatualizado existem. Tratar o indício como fato

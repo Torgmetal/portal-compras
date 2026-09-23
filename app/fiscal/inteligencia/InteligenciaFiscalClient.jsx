@@ -802,6 +802,69 @@ function AbaSimulador() {
             </div>
           </div>
 
+          {/* ⚠⚠ QUANTAS NOTAS, E QUEM EMITE CADA UMA — a pergunta que vem ANTES do CST. Numa venda à
+              ordem, quem emite só a 5.118 deixou o caminhão sair sem documento; quem emite a 5.923
+              cobrando de novo faturou duas vezes o mesmo aço. */}
+          {r.cfop.sequencias?.length > 0 && (
+            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">Notas que esta operação costuma exigir</p>
+              {r.cfop.sequencias.length > 1 && (
+                <p className="mt-1 text-xs text-amber-700">
+                  ⚠ Este CFOP aparece em {r.cfop.sequencias.length} operações diferentes. São caminhos alternativos — escolher entre eles é decisão de quem conhece o negócio.
+                </p>
+              )}
+              {r.cfop.sequencias.map((seq) => (
+                <div key={seq.operacaoId} className="mt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-torg-dark">{seq.operacao}</p>
+                  <ol className="mt-1.5 space-y-1.5">
+                    {seq.notas.map((n, i) => (
+                      <li key={`${n.cfop}-${n.papel}`} className="flex gap-2.5 rounded-lg bg-gray-50 px-3 py-2">
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-torg-gray">{i + 1}</span>
+                        <div className="min-w-0">
+                          <p className="text-sm text-torg-dark">
+                            {n.cfop && <span className="mr-1.5 font-mono font-semibold">{n.cfop.split("/").map((c) => `${c[0]}.${c.slice(1)}`).join(" / ")}</span>}
+                            {n.papel}
+                          </p>
+                          <p className="text-xs text-torg-gray">{n.de} → {n.para}</p>
+                          {/* ⚠⚠ NEM TODA NOTA DO FLUXO É DA TORG: a remessa de entrada da
+                              industrialização é do cliente ou do fornecedor dele. Sem dizer isso, o
+                              operador procura no Omie uma nota que não é dele para emitir. */}
+                          <p className={`mt-0.5 text-xs ${n.quem === "TORG" ? "text-torg-blue" : "text-amber-700"}`}>
+                            {n.quem === "TORG" ? "Emitida pela TORG" : `Emitida por: ${n.quem} — a TORG recebe`}
+                          </p>
+                          {n.obs && <p className="mt-0.5 text-xs text-torg-gray">{n.obs}</p>}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ))}
+              <p className="mt-3 border-t border-gray-100 pt-2 text-xs text-amber-700">
+                ⚠ É o que a operação da TORG costuma exigir, a partir dos casos reais — não um roteiro fechado. Cada nota tem as suas próprias condições.
+              </p>
+            </div>
+          )}
+
+          {/* ⚠⚠ A RESPOSTA QUE JÁ EXISTIA. O Comercial marca no contrato quem compra a matéria-prima
+              (Faturamento Direto); o simulador perguntava de novo. Mostrar de ONDE veio importa:
+              dado herdado sem procedência é dado que ninguém confere. */}
+          {r.entrada.materiaPrima && (
+            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">Matéria-prima — o Comercial já respondeu</p>
+              <p className="mt-1.5 text-sm text-torg-dark">
+                {r.entrada.materiaPrima.de === "TORG" && "A TORG compra a matéria-prima."}
+                {r.entrada.materiaPrima.de === "CLIENTE" && "Faturamento Direto: o cliente compra a matéria-prima."}
+                {r.entrada.materiaPrima.de === "MISTO" && "Parte da obra é Faturamento Direto e parte não."}
+              </p>
+              <p className="mt-0.5 text-xs text-torg-gray">
+                {r.entrada.materiaPrima.fd} de {r.entrada.materiaPrima.itens} itens marcados como Faturamento Direto no contrato.
+              </p>
+              <p className="mt-2 border-t border-gray-100 pt-2 text-xs text-amber-700">
+                ⚠⚠ Isto responde <strong>de quem são</strong> os insumos, nunca <strong>por onde transitaram</strong> — e é o trânsito que separa o 5.124 do 5.125.
+              </p>
+            </div>
+          )}
+
           {r.perguntas.length > 0 && (
             <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">Ainda precisa ser respondido</p>

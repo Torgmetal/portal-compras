@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { simular, ipiDaTipi, ambitoDe, daEscolhaDoCfop, NAO_DETERMINADOS } from "@/lib/fiscal/simulador";
-import { AMBITO, CFOPS, paresDeCfop } from "@/lib/fiscal/cfop";
+import { AMBITO, CFOPS, OPERACOES, paresDeCfop } from "@/lib/fiscal/cfop";
 
 // ─── O SIMULADOR ─────────────────────────────────────────────────────────────
 //
@@ -271,5 +271,90 @@ describe("simular com o par — impedir o erro em vez de detectá-lo", () => {
   it("o exemplo didático acompanha o CFOP resolvido", () => {
     const r = simular({ ncm: "84379000", cfop: "5101/6101", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
     expect(r.cfop.escolhido.quando).toMatch(/compra o aço/i);
+  });
+});
+
+describe("as notas que a operação exige — a pergunta que vem antes do CST", () => {
+  // ⚠⚠ O PEDIDO. Matheus (22/09/2026): *"a simulação deve informar previamente quais notas devem
+  // ser emitidas geralmente nesse tipo de operação do cliente"*.
+  it("a venda à ordem avisa que são DUAS notas da TORG, e que uma não cobra", () => {
+    const r = simular({ ncm: "84379000", cfop: "5118/6118", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
+    const seq = r.cfop.sequencias.find((s) => s.operacaoId === "venda-a-ordem");
+    expect(seq.notas.map((n) => n.cfop)).toEqual(["5118/6118", "5923/6923", null]);
+    expect(seq.notas[1].obs).toMatch(/NÃO cobra de novo/);
+  });
+
+  // ⚠⚠ NEM TODA NOTA DO FLUXO É DA TORG. Listar a remessa de entrada sem dizer quem emite faria o
+  // operador procurar no Omie uma nota que não é dele para emitir.
+  it("a nota que o cliente emite vem marcada como dele", () => {
+    const r = simular({ ncm: "84379000", cfop: "5124", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
+    const seq = r.cfop.sequencias.find((s) => s.operacaoId === "indust-insumo-direto");
+    expect(seq.notas[0]).toMatchObject({ quem: "Cliente", cfop: null });
+    expect(seq.notas.filter((n) => n.quem === "TORG").map((n) => n.cfop)).toEqual(["5902", "5124"]);
+  });
+
+  it("a venda normal é uma nota só", () => {
+    const r = simular({ ncm: "84379000", cfop: "5101/6101", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
+    expect(r.cfop.sequencias.find((s) => s.operacaoId === "venda-normal").notas).toHaveLength(1);
+  });
+
+  // ⚠⚠ UM CFOP EM DUAS OPERAÇÕES TRAZ AS DUAS SEQUÊNCIAS, e a tela diz que são alternativas. O
+  // 5.101 é tanto a venda simples quanto uma das saídas do "uma venda e dois caminhões" — escolher
+  // entre elas é decisão de quem conhece o negócio, não do portal.
+  it("CFOP que serve a duas operações mostra as duas, sem escolher", () => {
+    const r = simular({ ncm: "84379000", cfop: "5101/6101", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
+    expect(r.cfop.sequencias.map((s) => s.operacaoId)).toEqual(["venda-normal", "dois-caminhoes"]);
+  });
+
+  it("toda nota diz quem emite e qual é o papel dela", () => {
+    for (const o of OPERACOES) {
+      for (const n of o.notas ?? []) {
+        expect(n.quem, o.id).toBeTruthy();
+        expect(n.papel, o.id).toBeTruthy();
+        expect(n.de && n.para, o.id).toBeTruthy();
+      }
+    }
+  });
+
+  it("toda operação real declara a sua sequência de notas", () => {
+    expect(OPERACOES.filter((o) => !o.notas?.length)).toEqual([]);
+  });
+});
+
+describe("a matéria-prima que o Comercial já respondeu", () => {
+  const comMp = (de, extra = {}) => simular(
+    { ncm: "84379000", cfop: "5101/6101", ufOrigem: "SP", ufDestino: "SP", materiaPrima: { de, itens: 10, fd: de === "CLIENTE" ? 10 : de === "MISTO" ? 4 : 0 }, ...extra },
+    tipi(linha(3.25)));
+
+  // ⚠⚠ A PERGUNTA JÁ TINHA RESPOSTA. Matheus (22/09/2026): *"no Comercial eles já definem se a
+  // matéria-prima vai ser a TORG quem compra ou Faturamento Direto quando o cliente vai comprar"*.
+  it("com o FD respondido, o simulador para de perguntar de quem são os insumos", () => {
+    expect(comMp("TORG").perguntas.some((p) => /insumos são da TORG/i.test(p))).toBe(false);
+  });
+
+  // ⚠⚠ O FD RESPONDE DE QUEM SÃO, NUNCA POR ONDE TRANSITARAM — e é o trânsito que separa o 5.124 do
+  // 5.125. Quem paga não define o CFOP da industrialização.
+  it("a pergunta do TRÂNSITO continua de pé", () => {
+    const r = simular({ ncm: "84379000", cfop: "5124", ufOrigem: "SP", ufDestino: "SP", materiaPrima: { de: "CLIENTE", itens: 10, fd: 10 } }, tipi(linha(3.25)));
+    expect(r.perguntas.some((p) => /TRANSITARAM/i.test(p))).toBe(true);
+  });
+
+  it("obra toda em FD com CFOP de venda própria acende alerta ALTO", () => {
+    const a = comMp("CLIENTE").alertas.find((x) => x.nivel === "alto");
+    expect(a.texto).toMatch(/Faturamento Direto/);
+    expect(a.texto).toMatch(/5\.124 \/ 5\.125/);
+    // ⚠ Aponta, não condena — o portal não sabe o que foi combinado no contrato.
+    expect(a.texto).toMatch(/Confirme antes de emitir/);
+  });
+
+  it("obra sem FD e CFOP de venda própria não alarma", () => {
+    expect(comMp("TORG").alertas.filter((a) => /Faturamento Direto/.test(a.texto))).toEqual([]);
+  });
+
+  // ⚠ MISTO é resposta, não ruído: a obra tem as duas naturezas, e elas não saem no mesmo CFOP.
+  it("obra mista avisa e NÃO dispensa a pergunta", () => {
+    const r = comMp("MISTO");
+    expect(r.alertas.some((a) => /4 de 10 itens/.test(a.texto))).toBe(true);
+    expect(r.perguntas.some((p) => /insumos são da TORG/i.test(p))).toBe(true);
   });
 });

@@ -1,7 +1,12 @@
 {
-  "build": 3409,
-  "gerado": "2026-09-23T00:43:00.402Z",
+  "build": 3410,
+  "gerado": "2026-09-23T00:47:54.917Z",
   "commits": [
+    {
+      "hash": "56525055e8",
+      "data": "22/09/2026",
+      "titulo": "Simulador: o par 5.101/6.101 é uma linha só, e cada CFOP diz quando se usa"
+    },
     {
       "hash": "ec409d18ef",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d58df80a3a",
       "data": "22/09/2026",
       "titulo": "MES: o cadastro da fábrica inteira, semeado em produção"
-    },
-    {
-      "hash": "09009caba3",
-      "data": "22/09/2026",
-      "titulo": "US: o cabeçote Doppler era gravado como Mitech"
     }
   ]
 }
