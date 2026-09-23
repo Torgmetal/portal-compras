@@ -1,7 +1,12 @@
 {
-  "build": 3426,
-  "gerado": "2026-09-23T13:33:19.870Z",
+  "build": 3427,
+  "gerado": "2026-09-23T14:11:29.328Z",
   "commits": [
+    {
+      "hash": "65baa3bfa8",
+      "data": "23/09/2026",
+      "titulo": "PIS/COFINS no 5.116: a indeterminação estava só no texto, não no cálculo"
+    },
     {
       "hash": "895bc9259a",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "27594f5d43",
       "data": "22/09/2026",
       "titulo": "CMR e conversão de unidade: os cinco achados P1 do Codex"
-    },
-    {
-      "hash": "498199259d",
-      "data": "22/09/2026",
-      "titulo": "Romaneio: item avulso na carga, sem encostar na Lista de Expedição"
     }
   ]
 }

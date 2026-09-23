@@ -6,6 +6,8 @@ import { simular } from "@/lib/fiscal/simulador";
 import { CFOPS, FAMILIA, paresDeCfop } from "@/lib/fiscal/cfop";
 import { materiaPrimaDaOP } from "@/lib/faturamento-direto";
 import { CST_IPI } from "@/lib/fiscal/auditoria";
+import { verbetesAprovados } from "@/lib/fiscal/registro-classificacao";
+import { verbetesDoCodigo, procurarClassificacao, compararNcm } from "@/lib/fiscal/classificacao-produto";
 
 // Simulação fiscal de uma operação, ANTES de a nota existir.
 export const runtime = "nodejs";
@@ -25,6 +27,11 @@ const schema = z.object({
   destinatarioContribuinte: z.boolean().optional().nullable(),
   valor: z.number().min(0).optional().nullable(),
   cstPretendido: z.string().max(2).optional().nullable(),
+  // ⚠⚠ A DESCRIÇÃO DA PEÇA É CAMPO PRÓPRIO, E NÃO SAI DO NCM (achado do Codex, 23/09/2026).
+  // Procurar o verbete pelo NCM que está sendo conferido seria confirmação circular: o registro
+  // devolveria justamente o que a pessoa digitou. O que localiza a decisão é a NATUREZA da peça.
+  descricaoProduto: z.string().trim().max(300).optional().nullable(),
+  codigoProduto: z.string().trim().max(60).optional().nullable(),
 });
 
 export async function POST(req) {
@@ -83,8 +90,24 @@ export async function POST(req) {
     observadoEm: versao.observadoEm, vigenciaDeclarada: Boolean(versao.vigenciaInicio),
   });
 
+  // ── A DECISÃO HUMANA, SE ALGUÉM JÁ A REGISTROU ────────────────────────────
+  //
+  // ⚠⚠ ISTO NÃO PREENCHE O NCM, E NÃO PODE. Correspondência textual localiza a decisão; ela não
+  // prova que a decisão fala desta peça. A tela mostra o verbete, o aprovador e o trecho que casou
+  // — quem enquadra é quem conhece a peça.
+  const verbetes = await verbetesAprovados();
+  const classificacao = body.descricaoProduto
+    ? (() => {
+        const achado = procurarClassificacao(
+          { descricaoItem: body.descricaoProduto, codigo: body.codigoProduto },
+          verbetes === null ? null : verbetesDoCodigo(verbetes, body.codigoProduto),
+        );
+        return { ...achado, comparacao: compararNcm(achado, ncm) };
+      })()
+    : null;
+
   return NextResponse.json({
-    success: true, ...r, obra,
+    success: true, ...r, obra, classificacao,
     descricaoNcm: daTipi?.geral?.descricaoCompleta ?? null,
     // ⚠ A IE não prova contribuinte: a tela precisa poder dizer de onde tirou o palpite.
     indicioContribuinte: obra ? { ie: obra.clienteIE || null } : null,

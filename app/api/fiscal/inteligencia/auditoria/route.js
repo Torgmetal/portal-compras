@@ -4,6 +4,7 @@ import { requireAcesso } from "@/lib/session";
 import { lerNfe } from "@/lib/fiscal/xml-nfe";
 import { lerPedidoOmie } from "@/lib/fiscal/pedido-omie";
 import { auditar, indiceDaTipi } from "@/lib/fiscal/auditoria";
+import { verbetesAprovados } from "@/lib/fiscal/registro-classificacao";
 import { log } from "@/lib/log";
 
 // Auditoria contra a TIPI de referência — de um XML de NF-e JÁ EMITIDA ou de uma MEDIÇÃO do Omie,
@@ -100,7 +101,13 @@ export async function POST(req) {
     where: { versaoId: versao.id, nivel: "NCM", codigo: { in: ncms } },
   });
 
+  // ⚠⚠ EM LOTE, E `null` QUANDO A LEITURA FALHA. `verbetesAprovados` devolve null em erro, e o
+  // motor transforma isso em "conferência não feita" — nunca em "esta peça não tem classificação",
+  // que seria uma afirmação sobre um cadastro que ninguém conseguiu ler.
+  const classificacoes = await verbetesAprovados();
+
   const r = auditar(doc, indiceDaTipi(linhas), {
+    classificacoes,
     versaoId: versao.id,
     sha256: versao.arquivo.sha256,
     observadoEm: versao.observadoEm,

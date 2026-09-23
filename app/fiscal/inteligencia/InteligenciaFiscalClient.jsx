@@ -1,7 +1,9 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle, Upload, ShieldAlert, HelpCircle, Calculator, Ban } from "lucide-react";
+import { useStore } from "@/lib/store";
 import CampoNcm from "./CampoNcm";
+import AbaClassificacoes from "./AbaClassificacoes";
 import CitacaoLegal from "./CitacaoLegal";
 
 // ─── INTELIGÊNCIA FISCAL ─────────────────────────────────────────────────────
@@ -757,9 +759,52 @@ function copiarFicha(ficha) {
 const campo = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-torg-dark outline-none transition focus:border-torg-blue focus:ring-2 focus:ring-torg-blue/20";
 const rotulo = "text-xs font-medium text-torg-gray";
 
+/**
+ * A CLASSIFICAÇÃO JÁ DECIDIDA — quando alguém registrou uma.
+ *
+ * ⚠⚠ ELE NUNCA PREENCHE O NCM. Correspondência textual LOCALIZA a decisão; ela não prova que a
+ * decisão fala desta peça ("SUPORTE PARA FLANGE" casa o verbete de "FLANGE"). Por isso o cartão
+ * mostra o trecho que casou, o aprovador e a data, e deixa a conclusão com quem conhece a peça.
+ */
+function CartaoClassificacao({ c }) {
+  if (!c) return null;
+  if (c.status === "NAO_AVALIAVEL") return null;
+
+  const cor = c.status === "CORRESPONDENCIA_UNICA" && c.comparacao?.comparavel && !c.comparacao.confere
+    ? "border-red-200 bg-red-50 text-red-800"
+    : c.status === "AMBIGUA" || c.status === "INDISPONIVEL"
+      ? "border-amber-200 bg-amber-50 text-amber-800"
+      : "border-gray-100 bg-white text-torg-dark";
+
+  return (
+    <div className={`rounded-xl border p-4 text-sm shadow-sm ${cor}`}>
+      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
+        <FileText size={14} /> Classificação registrada
+      </p>
+      <p className="mt-1">{c.motivo}</p>
+      {c.verbete && (
+        <div className="mt-2 space-y-0.5 text-xs">
+          <p><strong>NCM decidido:</strong> {c.verbete.ncm} · <strong>padrão:</strong> “{c.verbete.padrao}”</p>
+          <p><strong>Casou em:</strong> {c.verbete.campoRotulo} — “{c.verbete.trecho}”</p>
+          <p><strong>Fundamento:</strong> {c.verbete.fundamento ?? "—"}</p>
+          <p><strong>Aprovada por:</strong> {c.verbete.aprovadoPor ?? "—"}{c.verbete.aprovadoEm ? ` em ${fmtData(c.verbete.aprovadoEm)}` : ""}</p>
+          {c.comparacao?.comparavel && !c.comparacao.confere && (
+            <p className="font-semibold">⚠ O NCM digitado ({c.comparacao.declarado}) não é o registrado ({c.comparacao.registrado}).</p>
+          )}
+        </div>
+      )}
+      {/* ⚠⚠ AS DUAS RESSALVAS NÃO SAEM DO CARTÃO: a busca é textual, e a comparação é com o
+          cadastro de HOJE — `aprovadoEm` é data de registro no portal, não vigência fiscal. */}
+      <p className="mt-2 text-[11px] opacity-80">
+        A correspondência é textual — confira se o verbete fala mesmo desta peça. Comparação com o cadastro de hoje.
+      </p>
+    </div>
+  );
+}
+
 function AbaSimulador() {
   const [opcoes, setOpcoes] = useState({ ops: [], cfops: [], pares: [], familias: [], cstIpi: [] });
-  const [f, setF] = useState({ ncm: "", cfop: "", opId: "", ufDestino: "", valor: "", cstPretendido: "" });
+  const [f, setF] = useState({ ncm: "", cfop: "", opId: "", ufDestino: "", valor: "", cstPretendido: "", descricaoProduto: "" });
   const parEscolhido = opcoes.pares.find((c) => c.chave === f.cfop) ?? null;
   const [r, setR] = useState(null);
   const [erro, setErro] = useState(null);
@@ -780,6 +825,7 @@ function AbaSimulador() {
           ncm: f.ncm, cfop: f.cfop || null, opId: f.opId || null,
           ufDestino: f.ufDestino || null, valor: f.valor ? Number(String(f.valor).replace(",", ".")) : null,
           cstPretendido: f.cstPretendido || null,
+          descricaoProduto: f.descricaoProduto || null,
         }),
       });
       const d = await resp.json();
@@ -857,6 +903,15 @@ function AbaSimulador() {
             <input className={campo} inputMode="decimal" placeholder="0,00" value={f.valor}
               onChange={(e) => setF({ ...f, valor: e.target.value })} />
           </div>
+          {/* ⚠⚠ A DESCRIÇÃO DA PEÇA É CAMPO PRÓPRIO, E NÃO SAI DO NCM. Procurar a classificação
+              registrada pelo NCM que está sendo conferido seria confirmação circular: o registro
+              devolveria exatamente o que a pessoa acabou de digitar. O que localiza a decisão é a
+              natureza da peça — que na TORG mora na descrição do item, nunca no código do produto. */}
+          <div className="md:col-span-3">
+            <label className={rotulo}>Descrição da peça (opcional — procura a classificação já decidida)</label>
+            <input className={campo} placeholder="FLANGE MAIOR CONEXAO SAIDA - DES 71264380" value={f.descricaoProduto}
+              onChange={(e) => setF({ ...f, descricaoProduto: e.target.value })} />
+          </div>
           <div className="md:col-span-2">
             <label className={rotulo}>CST de IPI que pretende usar (opcional — o portal confere)</label>
             <select className={campo} value={f.cstPretendido} onChange={(e) => setF({ ...f, cstPretendido: e.target.value })}>
@@ -888,6 +943,8 @@ function AbaSimulador() {
               ))}
             </div>
           )}
+
+          <CartaoClassificacao c={r.classificacao} />
 
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
@@ -1272,10 +1329,11 @@ function AbaSimulador() {
   );
 }
 
-const ABAS = [{ id: "ncm", rotulo: "Consulta NCM" }, { id: "cfop", rotulo: "Consulta CFOP" }, { id: "simulador", rotulo: "Simulador" }, { id: "auditoria", rotulo: "Auditoria de NF-e" }, { id: "admin", rotulo: "Atualizações Tributárias" }];
+const ABAS = [{ id: "ncm", rotulo: "Consulta NCM" }, { id: "cfop", rotulo: "Consulta CFOP" }, { id: "simulador", rotulo: "Simulador" }, { id: "auditoria", rotulo: "Auditoria de NF-e" }, { id: "classificacoes", rotulo: "Classificação de produtos" }, { id: "admin", rotulo: "Atualizações Tributárias" }];
 
 export default function InteligenciaFiscalClient({ referencia, cfops, operacoes, cstIpi, familias, ehAdmin }) {
   const [aba, setAba] = useState("ncm");
+  const { showToast } = useStore();
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <header>
@@ -1296,6 +1354,7 @@ export default function InteligenciaFiscalClient({ referencia, cfops, operacoes,
       {aba === "cfop" && <AbaCfop cfops={cfops} operacoes={operacoes} cstIpi={cstIpi} familias={familias} />}
       {aba === "simulador" && <AbaSimulador />}
       {aba === "auditoria" && <AbaAuditoria />}
+      {aba === "classificacoes" && <AbaClassificacoes showToast={showToast} />}
       {aba === "admin" && <AbaAdmin referencia={referencia} ehAdmin={ehAdmin} />}
 
       <p className="flex items-center gap-1.5 pt-2 text-xs text-torg-gray">

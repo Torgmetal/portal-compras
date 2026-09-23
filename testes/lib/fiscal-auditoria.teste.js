@@ -254,3 +254,100 @@ describe("o NCM da descrição vale para o XML também", () => {
     expect(d.itens[0].ncmDaDescricao).toBeNull();
   });
 });
+
+// ─── A CONFERÊNCIA CONTRA O REGISTRO DE CLASSIFICAÇÃO (§14) ──────────────────
+//
+// ⚠⚠ O REGISTRO NÃO CLASSIFICA — ele guarda quem classificou. Estes testes defendem o que a
+// conferência NÃO faz: não roda quando não foi pedida, não confunde falha de leitura com ausência,
+// não escolhe entre verbetes sobrepostos e não some quando o NCM está fora da TIPI.
+
+const verbete = (over = {}) => ({
+  id: "v1", status: "APROVADA", codigoProduto: null, padraoDescricao: "FLANGE",
+  ncm: "73072900", fundamento: "RGI 1 — acessório de tubulação.",
+  aprovadoPor: "Matheus", aprovadoEm: "2026-09-23T12:00:00Z", ...over,
+});
+
+const auditarCom = (itens, classificacoes, t = tipi(linha("84379000", 3.25))) =>
+  auditar(lerNfe(nfe(itens)), t, { classificacoes });
+
+const tipos = (r) => r.achados.map((a) => a.tipo);
+
+describe("a conferência contra o registro de classificação", () => {
+  it("não roda quando não foi pedida — nenhum achado de classificação aparece", () => {
+    const r = auditar(lerNfe(nfe(item(1, { cst: "50", pIPI: 3.25 }))), tipi(linha("84379000", 3.25)), {});
+    expect(tipos(r).some((t) => t.includes("CLASSIFICACAO"))).toBe(false);
+  });
+
+  it("aponta quando a nota declara um NCM e o registro classifica outro", () => {
+    const r = auditarCom(item(1, { cst: "50", pIPI: 3.25, desc: "FLANGE MAIOR CONEXAO SAIDA" }), [verbete()]);
+    const a = r.achados.find((x) => x.tipo === "NCM_DIVERGE_DA_CLASSIFICACAO");
+    expect(a.gravidade).toBe(GRAVIDADE.ALTA);
+    expect(a.titulo).toContain("73072900");
+    // ⚠ O aprovador e o fundamento viajam no achado — é a diferença entre "o portal acha" e
+    // "alguém decidiu isto, por este motivo, nesta data".
+    expect(a.detalhe).toContain("Matheus");
+    expect(a.detalhe).toContain("RGI 1");
+    // ⚠⚠ E a ressalva de que a correspondência é TEXTUAL não pode sumir do apontamento.
+    expect(a.detalhe).toContain("textual");
+    expect(a.detalhe).toContain("cadastro de hoje");
+  });
+
+  it("cala quando o NCM declarado bate com o do registro", () => {
+    const r = auditarCom(item(1, { ncm: "73072900", cst: "50", pIPI: 3.25, desc: "FLANGE MAIOR" }),
+      [verbete()], tipi(linha("73072900", 3.25)));
+    expect(tipos(r)).not.toContain("NCM_DIVERGE_DA_CLASSIFICACAO");
+  });
+
+  // ⚠⚠ ESTE É O ACHADO DO CODEX: a conferência não pode viver depois do `continue` do NCM fora da
+  // TIPI — o item cuja classificação está MAIS em dúvida é justamente o que tem NCM desconhecido.
+  it("roda mesmo quando o NCM não existe na TIPI", () => {
+    const r = auditarCom(item(1, { ncm: "99999999", desc: "FLANGE MAIOR" }), [verbete()], tipi(linha("84379000", 3.25)));
+    expect(tipos(r)).toContain("NCM_FORA_DA_TIPI");
+    expect(tipos(r)).toContain("NCM_DIVERGE_DA_CLASSIFICACAO");
+  });
+
+  it("dois verbetes sobrepostos viram ambiguidade, não uma escolha", () => {
+    const r = auditarCom(item(1, { cst: "50", pIPI: 3.25, desc: "FLANGE MAIOR" }),
+      [verbete({ id: "a", padraoDescricao: "FLANGE" }), verbete({ id: "b", padraoDescricao: "FLANGE MAIOR" })]);
+    const a = r.achados.find((x) => x.tipo === "CLASSIFICACAO_AMBIGUA");
+    expect(a.gravidade).toBe(GRAVIDADE.MEDIA);
+    expect(tipos(r)).not.toContain("NCM_DIVERGE_DA_CLASSIFICACAO");
+  });
+
+  // ⚠⚠ UM ACHADO, NÃO VINTE E QUATRO.
+  it("a ausência de classificação sai agregada, com os itens listados", () => {
+    const itens = [1, 2, 3].map((n) => item(n, { cst: "50", pIPI: 3.25, desc: `PECA ${n}` })).join("");
+    const r = auditarCom(itens, [verbete()]);
+    const ausentes = r.achados.filter((x) => x.tipo === "SEM_CLASSIFICACAO_APROVADA");
+    expect(ausentes).toHaveLength(1);
+    expect(ausentes[0].itens).toEqual([1, 2, 3]);
+    expect(ausentes[0].gravidade).toBe(GRAVIDADE.INFO);
+  });
+
+  // ⚠⚠ FALHA DE LEITURA NÃO É AUSÊNCIA.
+  it("registro indisponível vira NAO_AVALIAVEL, nunca “sem classificação”", () => {
+    const r = auditarCom(item(1, { cst: "50", pIPI: 3.25 }), null);
+    expect(tipos(r)).toContain("NAO_AVALIAVEL");
+    expect(tipos(r)).not.toContain("SEM_CLASSIFICACAO_APROVADA");
+  });
+
+  it("proposta não orienta: um verbete não aprovado é como se não existisse", () => {
+    const r = auditarCom(item(1, { cst: "50", pIPI: 3.25, desc: "FLANGE MAIOR" }),
+      [verbete({ status: "PROPOSTA", ncm: "73072900" })]);
+    expect(tipos(r)).not.toContain("NCM_DIVERGE_DA_CLASSIFICACAO");
+    expect(tipos(r)).toContain("SEM_CLASSIFICACAO_APROVADA");
+  });
+
+  it("verbete de outro código de produto não alcança este item", () => {
+    const r = auditarCom(item(1, { cst: "50", pIPI: 3.25, desc: "FLANGE MAIOR" }),
+      [verbete({ codigoProduto: "OUTRO999" })]);
+    expect(tipos(r)).not.toContain("NCM_DIVERGE_DA_CLASSIFICACAO");
+  });
+});
+
+// ⚠⚠ O CADASTRO NÃO VOLTA NA RESPOSTA. Ele entra por `referencia` como insumo; devolvê-lo mandaria
+// o registro inteiro no JSON de cada auditoria — e a evidência que interessa já viaja no achado.
+it("o registro de classificação não vaza na referência do resultado", () => {
+  const r = auditarCom(item(1, { cst: "50", pIPI: 3.25, desc: "FLANGE MAIOR" }), [verbete()]);
+  expect(r.referencia.classificacoes).toBeUndefined();
+});

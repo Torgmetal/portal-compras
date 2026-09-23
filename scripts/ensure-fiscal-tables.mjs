@@ -183,6 +183,46 @@ const sql = [
   // ⚠ O índice por rótulo é o que faz "quem cita o art. 406, II?" ser uma consulta, não uma varredura.
   `CREATE INDEX IF NOT EXISTS "FiscalDispositivo_rotulo_idx" ON "FiscalDispositivo"("rotulo")`,
 
+  // ─── O REGISTRO DE CLASSIFICAÇÃO DE PRODUTO (§14) ──────────────────────────
+  //
+  // ⚠⚠ É REGISTRO DE DECISÃO HUMANA, e por isso o autor vai gravado como NOME, não só como id.
+  // A decisão precisa continuar legível depois que a pessoa sai da empresa ou tem o cadastro
+  // desativado — um `criadoPorId` órfão transformaria "quem aprovou isto" numa consulta que não
+  // responde mais.
+  `CREATE TABLE IF NOT EXISTS "FiscalClassificacaoProduto" (
+     "id" TEXT PRIMARY KEY,
+     "codigoProduto" TEXT,
+     "padraoDescricao" TEXT NOT NULL,
+     "padraoNormalizado" TEXT NOT NULL,
+     "ncm" TEXT NOT NULL,
+     "fundamento" TEXT NOT NULL,
+     "normaChave" TEXT,
+     "observacao" TEXT,
+     "status" TEXT NOT NULL DEFAULT 'PROPOSTA',
+     "substituiId" TEXT,
+     "criadoPorId" TEXT NOT NULL, "criadoPorNome" TEXT NOT NULL,
+     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     "aprovadoPorId" TEXT, "aprovadoPorNome" TEXT, "aprovadoEm" TIMESTAMP(3),
+     "revogadoPorId" TEXT, "revogadoPorNome" TEXT, "revogadoEm" TIMESTAMP(3),
+     "motivoRevogacao" TEXT)`,
+  `CREATE INDEX IF NOT EXISTS "FiscalClassificacaoProduto_status_idx" ON "FiscalClassificacaoProduto"("status")`,
+  `CREATE INDEX IF NOT EXISTS "FiscalClassificacaoProduto_codigoProduto_idx" ON "FiscalClassificacaoProduto"("codigoProduto")`,
+  // ⚠⚠ DOIS ÍNDICES PARCIAIS, PORQUE NULL NÃO COLIDE COM NULL NO POSTGRES (achado do Codex,
+  // 23/09/2026). Um único índice sobre ("codigoProduto","padraoNormalizado") deixaria DOIS
+  // verbetes globais aprovados com o mesmo padrão conviverem em silêncio — e a consulta passaria
+  // a devolver AMBIGUA para sempre, sem ninguém entender por quê. O segundo índice fecha o buraco
+  // sem inventar um código-sentinela, que seria um produto falso no cadastro.
+  //
+  // ⚠ Eles garantem que não há DUPLICATA de escopo. Não garantem — e não têm como garantir — que
+  // dois padrões diferentes não se sobreponham ("FLANGE" e "FLANGE MAIOR"); essa sobreposição é
+  // detectada na leitura e sai como AMBIGUA.
+  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalClassificacaoProduto_aprovada_codigo"
+     ON "FiscalClassificacaoProduto"("codigoProduto","padraoNormalizado")
+     WHERE "status" = 'APROVADA' AND "codigoProduto" IS NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalClassificacaoProduto_aprovada_global"
+     ON "FiscalClassificacaoProduto"("padraoNormalizado")
+     WHERE "status" = 'APROVADA' AND "codigoProduto" IS NULL`,
+
   // ⚠ As FKs vão DEPOIS das tabelas, e cada uma num bloco próprio: `ADD CONSTRAINT` não tem
   // `IF NOT EXISTS` no Postgres, então a repetição é tratada como sucesso (42710 = já existe).
 ];

@@ -1326,3 +1326,65 @@ operação de receita) não há lista — candidato só aparece onde ele se abst
   chamava `cenarioDoCfop` isolado e não via a integração.
   **3.545 passando.** Validado logado: 6.116 com R$ 100.000 sai sem CST e sem valor de PIS/COFINS,
   com os candidatos; 6.101 segue com CST 01 e R$ 1.650 / R$ 7.600.
+
+- **(23/09, 13h20) O REGISTRO DE CLASSIFICAÇÃO DE PRODUTO — §14, a raiz do problema.** Matheus
+  (22/09/2026): *"utilizamos o item ARMAÇÃO DE ESTRUTURA METÁLICA para todos os faturamentos, só
+  alteramos o NCM conforme o cliente solicita; o que é cada um vai na descrição do item no Omie"*.
+  Enquanto essa decisão mora na cabeça de quem emite, **não existe o que auditar** — a varredura
+  acha a divergência e não tem contra o quê comparar.
+  ⚠⚠ **O QUE ELE FAZ É GUARDAR QUEM CLASSIFICOU, NÃO CLASSIFICAR.** `FiscalClassificacaoProduto`
+  guarda natureza da peça → NCM, com **fundamento obrigatório**, aprovador e data. `PROPOSTA` nunca
+  orienta emissão; só `APROVADA` entra no motor.
+  ⚠⚠ **NÃO EXISTE CAMPO DE CLIENTE, DE PROPÓSITO.** Classificação fiscal segue a natureza do
+  produto: gravar "NCM X para o cliente Y" seria o portal carimbando como regra exatamente a
+  prática que o briefing manda questionar.
+  **Parecer do Codex (`architecture`): "Prosseguir com ajustes."** Os quatro que mudaram o desenho:
+  - ⚠⚠⚠ **BUSCAR O VERBETE PELO NCM DIGITADO SERIA CONFIRMAÇÃO CIRCULAR.** O simulador só recebia
+    NCM: procurar a classificação por ele devolveria exatamente o que a pessoa acabou de digitar. A
+    natureza da peça virou **campo próprio** (`descricaoProduto`), e é ele que localiza a decisão.
+  - ⚠⚠⚠ **`contains("FLANGE")` CASA "SUPORTE PARA FLANGE".** Casamento único **não** elimina falso
+    positivo. Por isso o estado se chama `CORRESPONDENCIA_UNICA`, nunca "classificação encontrada";
+    **nenhum caminho preenche NCM**, e o cartão mostra o trecho que casou para quem conferir.
+  - ⚠⚠⚠ **A CONFERÊNCIA NÃO PODE VIVER DEPOIS DO `continue` DO NCM FORA DA TIPI.** Era onde eu ia
+    pôr: o item cuja classificação está **mais** em dúvida — o de NCM desconhecido — nunca seria
+    comparado. Ela roda ANTES, e independe de TIPI e de CST. Tem teste próprio.
+  - ⚠⚠ **NULL NÃO COLIDE COM NULL NO POSTGRES.** Um índice único parcial sobre
+    (`codigoProduto`,`padraoNormalizado`) deixaria dois verbetes **globais** com o mesmo padrão
+    conviverem, e a consulta passaria a devolver AMBIGUA para sempre. São **dois** índices parciais
+    — um para `codigoProduto IS NOT NULL`, outro para `IS NULL` — sem inventar código-sentinela.
+  ⚠⚠ **GLOBAL E ESPECÍFICO CONCORREM, e nenhum ganha por ser mais específico.** Os dois casando é
+  `AMBIGUA` — **mesmo com o NCM igual**, porque a sobreposição é defeito de cadastro que alguém
+  precisa resolver. Inventar precedência pelo padrão mais longo seria o portal decidindo o que a
+  contabilidade não decidiu.
+  ⚠⚠ **AUSÊNCIA VIRA UM ACHADO, NÃO UM POR ITEM.** Hoje o cadastro está vazio: um achado por item
+  devolveria 24 linhas idênticas na NF-e 973 e afogaria os apontamentos que têm o que dizer.
+  Divergência e ambiguidade continuam item a item — essas são da peça.
+  ⚠⚠ **FALHA DE LEITURA NÃO É AUSÊNCIA.** `verbetesAprovados()` devolve `null` em erro, e o motor
+  transforma isso em `NAO_AVALIAVEL` ("a conferência não foi feita"), nunca em "esta peça não tem
+  classificação" — que é uma afirmação sobre um cadastro que ninguém leu. Terceira vez que esta
+  lição aparece (autocomplete, medições, agora aqui) e a primeira em que eu a escrevi antes de o
+  Codex apontar.
+  ⚠⚠ **NÃO EXISTE "EDITAR".** Depois de aprovada, padrão/código/NCM/fundamento são o CONTEÚDO da
+  decisão. Trocar é `substituir`, que revoga a anterior e aprova a nova **na mesma transação** —
+  dois passos soltos deixam ou uma janela sem classificação, ou as duas valendo (e aí bate no
+  índice). O estado anterior é conferido DENTRO da transação (`updateMany` com o status no `where`),
+  não lido antes.
+  ⚠ **Conflito de índice é 409 com explicação, não 500** — senão quem clicou tenta para sempre.
+  ⚠ **Vazamento meu, pego antes de subir**: `referencia` volta inteira no JSON da auditoria, e eu
+  tinha enfiado o registro dentro dela — o cadastro completo sairia na resposta de cada auditoria.
+  Destruturado fora, com teste que trava isso.
+  ⚠ **Quem propõe pode aprovar** (o time são duas pessoas), mas os **dois nomes ficam gravados** e a
+  tela **diz** quando coincidem. E o autor vai como **NOME**, não só id: a decisão precisa continuar
+  legível depois que a pessoa sai.
+  ⚠ **A aba saiu em arquivo próprio** (`AbaClassificacoes.jsx`, 224 linhas) — o Codex avisou que
+  encostar no componente de 1.307 linhas agravaria o excedente que já existe.
+  Arquivos: `lib/fiscal/classificacao-produto.js` (puro), `registro-classificacao.js` (transições),
+  `auditoria-classificacao.js`, `achado.js` (extraído para evitar import circular), rotas
+  `classificacoes` e `classificacoes/[id]`, model + `ensure-fiscal-tables.mjs`.
+  Testes: `fiscal-classificacao-produto` (21) + 10 na auditoria. **3.576 passando**, lint limpo,
+  build local EXIT=0 (as duas rotas saíram `ƒ`), tela validada logada de ponta a ponta: vazio →
+  propor → aprovar → simular com NCM divergente, com o aviso de "proposta e aprovação da mesma
+  pessoa" aparecendo. ⚠ A linha de teste foi **removida da produção** — aprovada, ela já começaria
+  a apontar divergência em auditoria real.
+  ⚠ **AINDA ABERTO**: o registro guarda a decisão, mas **ninguém classificou nada ainda**. A tabela
+  nasce vazia de propósito: quem escreve o primeiro verbete é a contabilidade, não eu.

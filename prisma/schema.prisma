@@ -6842,3 +6842,46 @@ model FiscalDispositivo {
   @@unique([versaoId, rotulo])
   @@index([rotulo])
 }
+
+/// ─── O REGISTRO DE CLASSIFICAÇÃO DE PRODUTO (§14 do briefing) ────────────────
+/// Onde fica gravada a decisão humana sobre o NCM de uma peça — com fundamento, aprovador e data.
+/// ⚠⚠ CORRESPONDÊNCIA TEXTUAL NÃO DETERMINA O NCM: o motor (lib/fiscal/classificacao-produto.js)
+/// devolve EVIDÊNCIA de decisão humana, nunca enquadramento. Nenhum caminho preenche NCM sozinho.
+/// ⚠⚠ APÓS APROVADA A LINHA É IMUTÁVEL: mudar padrão, código, NCM ou fundamento exige nova
+/// proposta, e substituir revoga a anterior e aprova a nova na MESMA transação. Editar em lugar
+/// apagaria a decisão que já orientou emissão — e é justamente o histórico que dá valor ao registro.
+model FiscalClassificacaoProduto {
+  id                String    @id @default(cuid())
+  /// Código do produto no Omie (ARM000010…). NULL = vale para qualquer código.
+  codigoProduto     String?
+  /// O texto que identifica a NATUREZA da peça ("FLANGE", "TORRE DE TRANSMISSÃO").
+  padraoDescricao   String
+  /// ⚠ `normalizar()` do motor. É a chave dos índices únicos PARCIAIS, que moram em
+  /// scripts/ensure-fiscal-tables.mjs porque o Prisma não expressa índice parcial.
+  padraoNormalizado String
+  ncm               String
+  fundamento        String
+  /// Opcional: `chave` de uma FiscalNorma, para citar o dispositivo na tela.
+  normaChave        String?
+  observacao        String?
+  /// PROPOSTA | APROVADA | REVOGADA. ⚠ PROPOSTA nunca orienta emissão.
+  status            String    @default("PROPOSTA")
+  /// Quando esta linha substituiu outra, o id da anterior — a cadeia da decisão.
+  substituiId       String?
+  criadoPorId       String
+  /// ⚠ NOME gravado junto do id: a decisão precisa continuar legível depois que a pessoa sai.
+  criadoPorNome     String
+  criadoEm          DateTime  @default(now())
+  aprovadoPorId     String?
+  aprovadoPorNome   String?
+  /// ⚠⚠ É a data do REGISTRO no portal, NUNCA vigência fiscal — não diz qual decisão existia
+  /// quando uma nota antiga foi emitida.
+  aprovadoEm        DateTime?
+  revogadoPorId     String?
+  revogadoPorNome   String?
+  revogadoEm        DateTime?
+  motivoRevogacao   String?
+
+  @@index([status])
+  @@index([codigoProduto])
+}
