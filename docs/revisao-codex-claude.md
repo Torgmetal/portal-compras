@@ -1509,3 +1509,55 @@ operação de receita) não há lista — candidato só aparece onde ele se abst
   ⚠ **Para revisar:** (a) a remoção por índice confere só a MARCA — duas linhas com a mesma marca na
   mesma posição trocada passariam; (b) CONCLUÍDO só-PDF é regra de TELA, a rota continua aceitando
   (decisão do Vitor de 22/09); (c) não validado logado no navegador (o dev local grava na produção).
+
+- **(23/09, 14h50) A CADEIA DE DOCUMENTOS DE UMA OBRA — PARTE 15.** Até aqui `notasDaOperacao` era
+  só TEXTO: *"estas são as notas que geralmente saem"*. Agora a pergunta é sobre uma obra real —
+  **o que eu localizei, e até onde consegui conferir.**
+  ⚠⚠ **A TELA NUNCA ESCREVE "FALTA UMA NOTA", E É ESSE O RECURSO.** Metade da cadeia do art. 406 é
+  emitida por terceiros e não passa pelo Omie da TORG — a venda da MP pelo fornecedor e a **remessa
+  simbólica do cliente** (art. 406, II), que foi exatamente a etapa que eu tinha omitido e o
+  briefing apontou. Chamar de ausente o que nunca esteve ao alcance é trocar um silêncio por uma
+  afirmação falsa, e afirmação falsa é o que alguém copia para um parecer. São **quatro** estados:
+  `ENCONTRADO`, `NAO_ENCONTRADO` (com o ESCOPO no motivo — "não localizada nas 2 medições da OP",
+  nunca "ausente da OP"), `FORA_DO_ALCANCE` e `NAO_CONSULTADO`.
+  **Parecer do Codex (`architecture`): "Prosseguir com ajustes."** O que mudou o desenho:
+  - ⚠⚠ **NÃO ENTROU BUSCA POR CNPJ + PERÍODO.** Acharia mais e acharia errado: duas obras do mesmo
+    cliente no mesmo mês se misturam, e o vínculo heurístico passaria a ser apresentado como fato.
+    Só medição→pedido→NF e romaneio→remessa, que têm vínculo verificável.
+  - ⚠⚠ **ETAPA CONDICIONAL NÃO É ITEM DE CHECKLIST.** A cadeia de "uma venda e dois caminhões"
+    descreve **dois cenários no mesmo array** e o 5.922 só existe num deles; a remessa do
+    fornecedor tem DISPENSA no parágrafo único do art. 406. Cobrar tudo marcaria como defeito o
+    comportamento correto. Cinco notas ganharam `condicional`, ficam fora da contagem de "não
+    localizadas" e mostram o "só se" na própria etapa.
+  - ⚠ **Casamento por "a nota CONTÉM item com este CFOP"**, nunca "o CFOP da nota"; `5925/6925` são
+    alternativas, não um código fundido. **Nota cancelada é evidência, não cumprimento.**
+  - ⚠ **`remessaNfEmitidaEm` é registro local, não data fiscal** — é gravada com `new Date()` numa
+    troca de status de tela. A evidência diz de que data se trata.
+  - ⚠ Nada é gravado, como na auditoria: o resultado é derivado, e derivado guardado envelhece calado.
+  ⚠⚠⚠ **O DEFEITO QUE EU CRIEI E DEPOIS DESFIZ — E ELE É O ESPELHO DO ANTERIOR.** O Codex apontou
+  que `lib/omie-nfe.js` transformava JSON quebrado em `{}` e `{}` em `{ nf: null }`: **erro virando
+  ausência**. Consertei com `if (!resp.ok) return { error }` — e **medido contra a API**, o Omie
+  responde **HTTP 500 com `faultstring` no corpo** quando o pedido simplesmente não tem nota
+  (`"ERROR: NF não cadastrada para o pedido […]"`). Ou seja: o caso NORMAL chega como 500, e o meu
+  conserto fez **ausência virar erro** — toda medição da obra aparecia como falha de consulta. O
+  corpo manda; o status só fala quando o corpo se cala. `omie-nfe-consulta.teste.js` (8) trava os
+  três desfechos, porque os dois erros já aconteceram neste arquivo, um de cada vez.
+  ⚠⚠⚠ **E EU BLOQUEEI A API DO OMIE POR MEIA HORA MEDINDO ISSO.** 25 `ConsultarNF` seguidas, para
+  saber quantas obras tinham nota, derrubaram a conta inteira:
+  `MISUSE_API_PROCESS — "API bloqueada por consumo indevido. Tente novamente em 1764 segundos"`.
+  Não atinge só esta tela: atinge todo cron e toda tela do portal que fala com o Omie.
+  ⚠ O conserto veio do próprio estrago: **medição que o Omie já marca "Não Faturado" não é
+  consultada** (medido: das 25 mais recentes, 25 estão assim, etapa 10 — 25 chamadas para descobrir
+  o que a coluna já dizia). Teto de 12 e pausa de 600 ms. O status pode estar velho, então isso
+  ENCOLHE a cobertura e é DITO em `fontes`; nunca vira "esta obra não tem nota".
+  ⚠ **Defeito meu pego antes de rodar**: `orfaos` comparava documento por identidade de objeto —
+  depois do JSON isso nunca casa, e toda a obra apareceria como órfã. Saiu por `id`, com teste que
+  faz o `JSON.parse` de propósito.
+  Arquivos: `lib/fiscal/conferencia-cadeia.js` (puro), `coleta-documentos.js`, `AbaCadeia.jsx`,
+  rota `inteligencia/cadeia`, `omie-nfe.js` corrigido, 5 notas de `cfop.js` marcadas `condicional`.
+  Testes: `fiscal-conferencia-cadeia` (16) + `omie-nfe-consulta` (8). **3.604 passando**, lint sem
+  erro, build EXIT=0 (`ƒ`), tela validada logada: a cadeia do art. 406 sai com 3 FORA_DO_ALCANCE e
+  2 NAO_ENCONTRADO, com o "onde procurei" e a ressalva de fecho.
+  ⚠⚠ **O QUE NÃO FOI PROVADO CONTRA DADO REAL: o estado `ENCONTRADO`.** Nenhuma medição do portal
+  tem NF hoje — as 25 mais recentes estão "Não Faturado", etapa 10. O caminho positivo está coberto
+  por teste de unidade, não por validação logada, e isso é uma diferença que eu não vou apagar.

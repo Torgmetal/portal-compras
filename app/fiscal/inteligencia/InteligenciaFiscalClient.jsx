@@ -4,6 +4,7 @@ import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronR
 import { useStore } from "@/lib/store";
 import CampoNcm from "./CampoNcm";
 import AbaClassificacoes from "./AbaClassificacoes";
+import AbaCadeia from "./AbaCadeia";
 import CitacaoLegal from "./CitacaoLegal";
 
 // ─── INTELIGÊNCIA FISCAL ─────────────────────────────────────────────────────
@@ -1340,7 +1341,7 @@ function AbaSimulador() {
   );
 }
 
-const ABAS = [{ id: "ncm", rotulo: "Consulta NCM" }, { id: "cfop", rotulo: "Consulta CFOP" }, { id: "simulador", rotulo: "Simulador" }, { id: "auditoria", rotulo: "Auditoria de NF-e" }, { id: "classificacoes", rotulo: "Classificação de produtos" }, { id: "admin", rotulo: "Atualizações Tributárias" }];
+const ABAS = [{ id: "ncm", rotulo: "Consulta NCM" }, { id: "cfop", rotulo: "Consulta CFOP" }, { id: "simulador", rotulo: "Simulador" }, { id: "auditoria", rotulo: "Auditoria de NF-e" }, { id: "classificacoes", rotulo: "Classificação de produtos" }, { id: "cadeia", rotulo: "Cadeia de documentos" }, { id: "admin", rotulo: "Atualizações Tributárias" }];
 
 export default function InteligenciaFiscalClient({ referencia, cfops, operacoes, cstIpi, familias, ehAdmin }) {
   const [aba, setAba] = useState("ncm");
@@ -1366,6 +1367,7 @@ export default function InteligenciaFiscalClient({ referencia, cfops, operacoes,
       {aba === "simulador" && <AbaSimulador />}
       {aba === "auditoria" && <AbaAuditoria />}
       {aba === "classificacoes" && <AbaClassificacoes showToast={showToast} />}
+      {aba === "cadeia" && <AbaCadeia />}
       {aba === "admin" && <AbaAdmin referencia={referencia} ehAdmin={ehAdmin} />}
 
       <p className="flex items-center gap-1.5 pt-2 text-xs text-torg-gray">
