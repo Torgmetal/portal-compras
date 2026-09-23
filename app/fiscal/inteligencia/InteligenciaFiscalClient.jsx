@@ -519,10 +519,39 @@ function AbaAuditoria() {
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(false);
+  const [medicoes, setMedicoes] = useState([]);
+  const [medicaoId, setMedicaoId] = useState("");
+
+  useEffect(() => {
+    fetch("/api/fiscal/inteligencia/medicoes")
+      .then((r) => r.json())
+      .then((d) => setMedicoes(d.medicoes ?? []))
+      .catch(() => setMedicoes([]));
+  }, []);
+
+  // ⚠⚠ VALIDAR ANTES DE EMITIR É O PONTO INTEIRO. A auditoria de XML acha o erro DEPOIS — a
+  // NF-e 973 custou R$ 7.026,56 e só apareceu quando alguém foi procurar. A medição é o mesmo
+  // documento antes de existir, e o pedido do Omie já traz CST, cEnq e a descrição real do item.
+  const auditarMedicao = async (id) => {
+    setMedicaoId(id);
+    if (!id) return;
+    setCarregando(true); setErro(null); setResultado(null); setArquivo(null);
+    try {
+      const r = await fetch("/api/fiscal/inteligencia/auditoria", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ medicaoId: id }),
+      });
+      const d = await r.json();
+      if (!d.success) setErro(d.error || "Não foi possível auditar a medição.");
+      else setResultado(d);
+    } catch {
+      setErro("Falha de rede ao auditar a medição.");
+    } finally { setCarregando(false); }
+  };
 
   const enviar = async (f) => {
     if (!f) return;
-    setCarregando(true); setErro(null); setResultado(null); setArquivo(f.name);
+    setCarregando(true); setErro(null); setResultado(null); setArquivo(f.name); setMedicaoId("");
     try {
       const fd = new FormData(); fd.append("xml", f);
       const r = await fetch("/api/fiscal/inteligencia/auditoria", { method: "POST", body: fd });
@@ -534,8 +563,38 @@ function AbaAuditoria() {
     } finally { setCarregando(false); }
   };
 
+  const naoFaturadas = medicoes.filter((m) => m.aindaNaoFaturada);
+  const jaFaturadas = medicoes.filter((m) => !m.aindaNaoFaturada);
+  const rotulo = (m) => `Pedido ${m.pedido} · OP ${m.op} · ${m.cliente}${m.uf ? `/${m.uf}` : ""} · ${m.qtdItens} itens · ${(m.valorBruto ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`;
+
   return (
     <div className="space-y-4">
+      {/* ⚠⚠ A MEDIÇÃO VEM ANTES DO XML NA TELA, e a ordem é o argumento: aqui o apontamento ainda
+          EVITA o erro; no XML ele só documenta um que já saiu. */}
+      <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">Validar uma medição do Omie — antes de emitir</p>
+        <select className={`${campo} mt-2`} value={medicaoId} onChange={(e) => auditarMedicao(e.target.value)} disabled={carregando}>
+          <option value="">— escolha a medição —</option>
+          {/* ⚠ "Não faturado" vem primeiro e separado: é a janela em que o achado ainda muda o
+              que vai ser emitido. As já faturadas continuam auditáveis — só muda o que dá para
+              fazer com o resultado. */}
+          {naoFaturadas.length > 0 && (
+            <optgroup label="Ainda não faturadas — dá para corrigir antes">
+              {naoFaturadas.map((m) => <option key={m.id} value={m.id}>{rotulo(m)}</option>)}
+            </optgroup>
+          )}
+          {jaFaturadas.length > 0 && (
+            <optgroup label="Já faturadas — auditoria do que saiu">
+              {jaFaturadas.map((m) => <option key={m.id} value={m.id}>{rotulo(m)}</option>)}
+            </optgroup>
+          )}
+        </select>
+        <p className="mt-1.5 text-xs text-torg-gray">
+          O pedido de venda do Omie já traz <strong>CST</strong>, <strong>enquadramento</strong> e a <strong>descrição real do item</strong> —
+          os três campos que obrigam a auditoria a pedir o XML depois que a nota saiu.
+        </p>
+      </div>
+
       <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white py-10 transition hover:border-torg-blue/40 hover:bg-gray-50/60">
         <input type="file" accept=".xml,text/xml,application/xml" className="hidden"
           onChange={(e) => enviar(e.target.files?.[0])} />
@@ -551,11 +610,34 @@ function AbaAuditoria() {
           <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold text-torg-dark">NF-e {resultado.numero}</h2>
-                <p className="text-xs text-torg-gray">
-                  {resultado.emitente?.nome} → {resultado.destinatario} · {resultado.itens} itens · emitida em {fmtData(resultado.emitidaEm)}
-                </p>
-                <p className="mt-0.5 font-mono text-[10px] text-gray-400">{resultado.chave}</p>
+                {/* ⚠⚠ PEDIDO NÃO É NOTA, E A TELA NÃO DEIXA CONFUNDIR. Chamar o resultado de
+                    "NF-e" faria alguém procurar na Receita um documento que ainda não existe. */}
+                {resultado.origem?.tipo === "MEDICAO" ? (
+                  <>
+                    <h2 className="text-lg font-bold text-torg-dark">
+                      Pedido {resultado.origem.pedido}
+                      <span className="ml-2 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase text-amber-700">
+                        {resultado.origem.status || "pedido do Omie"}
+                      </span>
+                    </h2>
+                    <p className="text-xs text-torg-gray">
+                      OP {resultado.origem.op} · {resultado.origem.cliente}{resultado.origem.uf ? `/${resultado.origem.uf}` : ""} · {resultado.itens} itens
+                      {resultado.origem.etapa ? ` · etapa ${resultado.origem.etapa}` : ""}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-amber-700">
+                      ⚠ Isto é o <strong>pedido de venda</strong>, não a nota: o que for corrigido aqui ainda entra na emissão.
+                      Sincronizado do Omie em {fmtData(resultado.origem.sincronizadoEm)}.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-lg font-bold text-torg-dark">NF-e {resultado.numero}</h2>
+                    <p className="text-xs text-torg-gray">
+                      {resultado.emitente?.nome} → {resultado.destinatario?.nome ?? resultado.destinatario} · {resultado.itens} itens · emitida em {fmtData(resultado.emitidaEm)}
+                    </p>
+                    <p className="mt-0.5 font-mono text-[10px] text-gray-400">{resultado.chave}</p>
+                  </>
+                )}
               </div>
               <div className="text-right">
                 <p className="text-xs uppercase tracking-wide text-torg-gray">Diferença estimada</p>

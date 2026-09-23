@@ -1167,3 +1167,50 @@ que a contabilidade possa aprovar uma a uma. E a validação de referências ent
     fica registrado como possivelmente intermitente sob carga, sem atribuição à tarefa.
   **3.428 passando.** Tela conferida logada: as duas linhas convivem — *"Vigência normativa: não
   declarada pela fonte"* e *"Atualizada até: ADE RFB nº 1, de 30/01/2026"*.
+
+---
+
+## Auditoria de MEDIÇÃO — validar antes de emitir (23/09/2026)
+
+Matheus: *"na Auditoria precisa ser possível selecionar uma medição do Omie para validar ela antes
+de emitir"*.
+
+⚠⚠ **É O PONTO INTEIRO DO MÓDULO.** A auditoria de XML acha o erro DEPOIS — a NF-e 973 custou
+R$ 7.026,56 de IPI não destacado e só apareceu quando alguém foi procurar. O pedido de venda é o
+mesmo documento antes de existir, e ele **já traz os três campos** que obrigavam a pedir o XML:
+`cod_sit_trib_ipi` (CST), `enquadramento_ipi` (cEnq) e `dados_adicionais_item` (a descrição real).
+
+⚠ **As duas entradas produzem o MESMO documento e passam pelo MESMO motor.** `lerPedidoOmie`
+devolve a forma que `lerNfe` já devolvia; um `if (é pedido)` dentro da auditoria faria as duas
+divergirem no primeiro ajuste de regra.
+
+⚠⚠ **PEDIDO NÃO É NOTA, e a tela não deixa confundir**: sem chave, sem número, com a tarja *"Isto
+é o pedido de venda, não a nota: o que for corrigido aqui ainda entra na emissão"*. As medições
+**não faturadas** vêm num optgroup próprio e primeiro — é a janela em que o achado ainda evita o
+erro em vez de documentá-lo.
+
+### O primeiro uso já achou um caso real e aberto
+
+**Pedido 327 · OP 120 · TMSA/RS · R$ 429.877,11 · etapa 10 · NÃO FATURADO** — 18 achados:
+
+| Gravidade | Achado | Itens |
+|---|---|---|
+| ALTA | `ALIQUOTA_DIVERGENTE` — 3,25% declarado × TIPI 0% | 1 |
+| ALTA | `CONTRADICAO_INTERNA` — mesmo NCM com CST 50 e CST 53 | 1 |
+| MÉDIA | `NCM_DIVERGE_DA_DESCRICAO` | **6** |
+| MÉDIA | `CST_INCOMPATIVEL_COM_A_TIPI` — CST 53 sobre alíquota zero | 5 |
+| MÉDIA | `ENQUADRAMENTO_GENERICO` — cEnq 999 com CST 53 | 5 |
+
+⚠⚠ **`NCM_DIVERGE_DA_DESCRICAO` é regra nova, e nasceu deste caso.** Os SEIS itens trazem
+`[NCM: 84313900]` em `dados_adicionais_item` e **9406.90.20** no campo fiscal. É a marca do
+problema que o Matheus já tinha descrito — *"alteramos o NCM conforme o cliente solicita"* — e sem
+comparar os dois campos ninguém vê que o documento diz duas coisas sobre a mesma peça.
+⚠ O achado é de **classificação, não de dinheiro**: aqui os dois códigos são 0% na TIPI. O que ele
+aponta é que a nota afirma um NCM e descreve outro.
+⚠ E o item 1 destaca **R$ 8.061,22** de IPI a 3,25% sobre um NCM que a referência diz **0%** —
+valor que o cliente pagaria sem que a tabela sustente.
+
+⚠ `valor_mercadoria` é a base; `valor_total` já soma o IPI. Usar o total faria o portal calcular
+imposto sobre imposto e acusar divergência onde não há.
+
+**3.451 passando**, build limpo, validado logado (55 medições no seletor; o 327 audita na tela).
