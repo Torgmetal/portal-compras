@@ -281,6 +281,9 @@ function AbaCfop({ cfops, operacoes, cstIpi, familias }) {
               <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase text-torg-gray">{c.ambito === "INTERNA" ? "SP" : "Fora de SP"}</span>
             </div>
             <p className="mt-1.5 text-sm text-torg-dark">{c.resumo}</p>
+            {/* ⚠ O exemplo vem DEPOIS da descrição e com outro peso: ele ajuda a reconhecer o caso,
+                não a fundamentar a nota. Invertido, viraria a definição que o verbete não é. */}
+            {c.quando && <p className="mt-1.5 rounded-lg bg-gray-50 px-2.5 py-1.5 text-xs text-torg-gray"><strong className="text-torg-dark">Quando usar:</strong> {c.quando}</p>}
             {c.nota && <p className="mt-1.5 text-xs text-amber-700">{c.nota}</p>}
             {c.exige?.length > 0 && (
               <div className="mt-2.5 border-t border-gray-100 pt-2">
@@ -605,8 +608,9 @@ const campo = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-
 const rotulo = "text-xs font-medium text-torg-gray";
 
 function AbaSimulador() {
-  const [opcoes, setOpcoes] = useState({ ops: [], cfops: [], familias: [], cstIpi: [] });
+  const [opcoes, setOpcoes] = useState({ ops: [], cfops: [], pares: [], familias: [], cstIpi: [] });
   const [f, setF] = useState({ ncm: "", cfop: "", opId: "", ufDestino: "", valor: "", cstPretendido: "" });
+  const parEscolhido = opcoes.pares.find((c) => c.chave === f.cfop) ?? null;
   const [r, setR] = useState(null);
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(false);
@@ -647,20 +651,31 @@ function AbaSimulador() {
           {/* ⚠⚠ O SELETOR É DE CFOP, NÃO DE "NOME DE OPERAÇÃO". Matheus (22/09/2026): *"tire os nomes,
               deixe os CFOPs e a descrição do CFOP"*. Quem emite pensa no código que vai na nota — e
               um rótulo como "Venda à ordem (ex.: TMSA)" fazia a operação parecer daquele cliente.
-              ⚠ Agrupado por família: são 18 códigos, e "5.101" ao lado de "6.101" num select liso
-              faz escolher o errado por um dígito. */}
+              ⚠⚠ AGRUPADO POR FAMÍLIA E EM PARES DENTRO/FORA DO ESTADO ("5.101 / 6.101 — Venda…"),
+              a pedido do Matheus (22/09/2026). A venda para Campinas e a venda para Caxias são o
+              MESMO negócio: o que separa o 5.101 do 6.101 é o destino, e o destino sai das UFs. O
+              portal resolve o dígito; o operador escolhe a operação. */}
           <div className="md:col-span-2">
             <label className={rotulo}>CFOP da operação</label>
             <select className={campo} value={f.cfop} onChange={(e) => setF({ ...f, cfop: e.target.value })}>
               <option value="">— escolha —</option>
               {opcoes.familias.map((fam) => (
                 <optgroup key={fam} label={fam}>
-                  {opcoes.cfops.filter((c) => c.familia === fam).map((c) => (
-                    <option key={c.codigo} value={c.codigo}>{c.codigoFormatado} — {c.resumo}</option>
+                  {opcoes.pares.filter((c) => c.familia === fam).map((c) => (
+                    <option key={c.chave} value={c.chave}>{c.rotulo} — {c.resumo}</option>
                   ))}
                 </optgroup>
               ))}
             </select>
+            {/* ⚠⚠ O EXEMPLO PRECISA APARECER ANTES DE SIMULAR, não só no resultado. É aqui que a
+                pessoa ainda pode trocar de código — no resultado ela já escolheu. Um `<option>` não
+                comporta duas linhas, então o exemplo mora logo abaixo do seletor. */}
+            {parEscolhido?.quando && (
+              <p className="mt-1.5 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-torg-gray">
+                <strong className="text-torg-dark">Quando usar:</strong> {parEscolhido.quando}
+                <span className="mt-1 block text-[11px] text-amber-700">⚠ Exemplo da operação da TORG — não substitui a descrição oficial do CONFAZ.</span>
+              </p>
+            )}
           </div>
 
           {/* ⚠⚠ A ENTRADA PELA OP FOI O PEDIDO ORIGINAL: "seleciono a OP e já puxa os dados do meu
@@ -756,6 +771,15 @@ function AbaSimulador() {
                     <span className="ml-2 rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase text-torg-gray">{r.cfop.escolhido.familia}</span>
                   </div>
                   <p className="mt-1 text-sm text-torg-gray">{r.cfop.escolhido.resumo}</p>
+                  {/* ⚠ A dedução fica à vista: quem emite confere o raciocínio, não só recebe o código. */}
+                  {r.cfop.resolvidoDoPar && (
+                    <p className="mt-1 text-xs text-torg-gray">
+                      Escolhido entre <span className="font-mono">{r.cfop.resolvidoDoPar}</span> porque {r.entrada.ufOrigem} → {r.entrada.ufDestino} é uma operação {r.cfop.ambito === "INTERNA" ? "interna" : "interestadual"}.
+                    </p>
+                  )}
+                  {r.cfop.escolhido.quando && (
+                    <p className="mt-1.5 rounded-lg bg-gray-50 px-2.5 py-1.5 text-xs text-torg-gray"><strong className="text-torg-dark">Quando usar:</strong> {r.cfop.escolhido.quando}</p>
+                  )}
                   {r.cfop.escolhido.nota && <p className="mt-1 text-xs text-amber-700">{r.cfop.escolhido.nota}</p>}
                   {/* ⚠ Os exemplos reais são CONTEXTO, não determinação — por isso vêm depois do código. */}
                   {r.cfop.operacoes.length > 0 && (
@@ -769,6 +793,10 @@ function AbaSimulador() {
                     </div>
                   )}
                 </>
+              ) : r.cfop.parPendente ? (
+                <p className="mt-2 text-sm text-torg-gray">
+                  <span className="font-mono">{r.cfop.parPendente}</span> — informe a UF de destino para o portal saber qual dos dois vale.
+                </p>
               ) : <p className="mt-2 text-sm text-torg-gray">Escolha o CFOP da operação.</p>}
               <p className="mt-2 border-t border-gray-100 pt-2 text-xs text-amber-700">⚠ {r.cfop.ressalva}</p>
             </div>

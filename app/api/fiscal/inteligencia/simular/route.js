@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAcesso } from "@/lib/session";
 import { simular } from "@/lib/fiscal/simulador";
-import { CFOPS, FAMILIA } from "@/lib/fiscal/cfop";
+import { CFOPS, FAMILIA, paresDeCfop } from "@/lib/fiscal/cfop";
 import { CST_IPI } from "@/lib/fiscal/auditoria";
 
 // Simulação fiscal de uma operação, ANTES de a nota existir.
@@ -12,7 +12,9 @@ export const dynamic = "force-dynamic";
 
 const schema = z.object({
   ncm: z.string().min(1).max(20),
-  cfop: z.string().max(6).optional().nullable(),
+  // ⚠ Aceita o código único ("6101") ou o par dentro/fora do estado ("5101/6101") — neste caso é
+  // o âmbito, derivado das UFs, que decide qual dos dois vale.
+  cfop: z.string().max(12).regex(/^\d{4}(\/\d{4})?$/, "CFOP inválido.").optional().nullable(),
   // ⚠ Quando vem `opId`, a UF de destino e o "é contribuinte?" saem do CADASTRO, não do formulário:
   // Matheus, no primeiro pedido do módulo — *"eu seleciono a OP e já puxa os dados do meu cliente
   // para entender a cidade que vai ser a NF de venda"*. Menos campo digitado é menos campo errado.
@@ -95,10 +97,12 @@ export async function GET() {
   });
   return NextResponse.json({
     success: true, ops,
-    // ⚠ A lista vai AGRUPADA POR FAMÍLIA e com o âmbito — são 18 códigos, e "5.101" e "6.101"
-    // lado a lado num select liso fazem escolher o errado por um dígito.
+    // ⚠ A lista vai AGRUPADA POR FAMÍLIA e em PARES dentro/fora do estado: são 18 códigos, e
+    // "5.101" e "6.101" lado a lado num select liso fazem escolher o errado por um dígito. O par
+    // tira a escolha das mãos de quem emite — o dígito sai das UFs.
     familias: Object.values(FAMILIA),
-    cfops: CFOPS.map((c) => ({ codigo: c.codigo, codigoFormatado: c.codigoFormatado, resumo: c.resumo, familia: c.familia, ambito: c.ambito })),
+    pares: paresDeCfop(),
+    cfops: CFOPS.map((c) => ({ codigo: c.codigo, codigoFormatado: c.codigoFormatado, resumo: c.resumo, quando: c.quando, familia: c.familia, ambito: c.ambito })),
     cstIpi: Object.entries(CST_IPI).map(([cst, v]) => ({ cst, rotulo: v.rotulo })),
   });
 }

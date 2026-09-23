@@ -1,7 +1,12 @@
 {
-  "build": 3408,
-  "gerado": "2026-09-23T00:23:33.533Z",
+  "build": 3409,
+  "gerado": "2026-09-23T00:43:00.402Z",
   "commits": [
+    {
+      "hash": "ec409d18ef",
+      "data": "22/09/2026",
+      "titulo": "Simulador: o seletor passa a ser de CFOP, e isso pega um erro novo"
+    },
     {
       "hash": "96cace4fb8",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "09009caba3",
       "data": "22/09/2026",
       "titulo": "US: o cabeçote Doppler era gravado como Mitech"
-    },
-    {
-      "hash": "d60fb1a607",
-      "data": "22/09/2026",
-      "titulo": "Pintura: a foto ganha número e cada etapa, a sua condição ambiental"
     }
   ]
 }

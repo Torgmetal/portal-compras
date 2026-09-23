@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { simular, ipiDaTipi, ambitoDe, NAO_DETERMINADOS } from "@/lib/fiscal/simulador";
-import { AMBITO } from "@/lib/fiscal/cfop";
+import { simular, ipiDaTipi, ambitoDe, daEscolhaDoCfop, NAO_DETERMINADOS } from "@/lib/fiscal/simulador";
+import { AMBITO, CFOPS, paresDeCfop } from "@/lib/fiscal/cfop";
 
 // ─── O SIMULADOR ─────────────────────────────────────────────────────────────
 //
@@ -179,5 +179,97 @@ describe("NAO_DETERMINADOS — o motivo é parte do contrato", () => {
       expect(x.tributo).toBeTruthy();
       expect(x.motivo).toBeTruthy();
     }
+  });
+});
+
+describe("paresDeCfop — dentro e fora do estado são a MESMA operação", () => {
+  const pares = paresDeCfop();
+
+  // ⚠⚠ O PEDIDO, LITERAL. Matheus (22/09/2026): *"agrupe dentro e fora do estado, deixe dessa forma:
+  // 5101/6101 — Venda…"*. A venda para Campinas e a venda para Caxias são o mesmo negócio.
+  it("5.101 e 6.101 viram uma linha só", () => {
+    const venda = pares.find((p) => p.chave === "5101/6101");
+    expect(venda.rotulo).toBe("5.101 / 6.101");
+    // ⚠ O resumo do par é o do 5.xxx: o do 6.xxx só acrescenta "interestadual", redundante no par.
+    expect(venda.resumo).toBe("Venda de produção do estabelecimento");
+  });
+
+  // ⚠ Aparecer sozinho é INFORMAÇÃO: quem procurar um "6.125" precisa ver que ele não está na lista.
+  it("código sem irmão aparece sozinho, não inventa o par", () => {
+    expect(pares.find((p) => p.chave === "5125").codigos).toEqual(["5125"]);
+    expect(pares.some((p) => p.chave.includes("6125"))).toBe(false);
+  });
+
+  it("nenhum código se perde nem se repete no agrupamento", () => {
+    const todos = pares.flatMap((p) => p.codigos);
+    expect(todos.sort()).toEqual(CFOPS.map((c) => c.codigo).sort());
+  });
+
+  // ⚠⚠ O EXEMPLO DIDÁTICO É O PEDIDO DA MESMA MENSAGEM: *"em cada CFOP dê um exemplo de quando deve
+  // ser usado"*. Os três casos são os que o Matheus escreveu.
+  it.each([
+    ["5101", /compra o aço.*fabrica.*vende/i],
+    ["5125", /fornecedor entrega direto na TORG/i],
+    ["5124", /materiais principais DELE/],
+  ])("o %s traz o exemplo da operação real", (codigo, esperado) => {
+    expect(CFOPS.find((c) => c.codigo === codigo).quando).toMatch(esperado);
+  });
+
+  it("todo CFOP tem o seu exemplo", () => {
+    expect(CFOPS.filter((c) => !c.quando)).toEqual([]);
+  });
+});
+
+describe("daEscolhaDoCfop — o par resolve pelo destino, não pelo operador", () => {
+  it.each([[AMBITO.INTERNA, "5101"], [AMBITO.INTERESTADUAL, "6101"]])("%s escolhe o %s", (ambito, esperado) => {
+    const r = daEscolhaDoCfop("5101/6101", ambito);
+    expect(r.cfop.codigo).toBe(esperado);
+    expect(r.doPar).toBe("5.101 / 6.101");
+  });
+
+  // ⚠⚠ SEM AS UFs NÃO HÁ O QUE RESOLVER, e a pergunta que falta é a das UFs — não "qual dos dois
+  // códigos você quis dizer". Transformar isso em erro mandaria o operador escolher justamente o
+  // dígito que o agrupamento existe para tirar das mãos dele.
+  it("sem âmbito, fica pendente em vez de erro", () => {
+    expect(daEscolhaDoCfop("5101/6101", null)).toMatchObject({ pendente: "ambito" });
+  });
+
+  it("código único continua valendo (API, auditoria, quem digita direto)", () => {
+    expect(daEscolhaDoCfop("6101").cfop.codigo).toBe("6101");
+  });
+
+  it.each(["9999", "5101/9999", ""])("código inexistente é recusado", (c) => {
+    expect(daEscolhaDoCfop(c, AMBITO.INTERNA).erro).toBeTruthy();
+  });
+});
+
+describe("simular com o par — impedir o erro em vez de detectá-lo", () => {
+  // ⚠⚠ ESTE É O GANHO DO AGRUPAMENTO. Mandando o par, o alerta de 5.xxx-com-destino-fora-do-estado
+  // não precisa existir: o portal já escolheu o 6.101. A verificação continua na casa dela, para
+  // quem manda um código único.
+  it("o par com destino no RS resolve para o 6.101 e não alarma", () => {
+    const r = simular({ ncm: "84379000", cfop: "5101/6101", ufOrigem: "SP", ufDestino: "RS" }, tipi(linha(3.25)));
+    expect(r.cfop.escolhido.codigoFormatado).toBe("6.101");
+    expect(r.cfop.resolvidoDoPar).toBe("5.101 / 6.101");
+    expect(r.alertas.filter((a) => /operação INTERNA/.test(a.texto))).toEqual([]);
+  });
+
+  it("o mesmo par dentro de SP resolve para o 5.101", () => {
+    const r = simular({ ncm: "84379000", cfop: "5101/6101", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
+    expect(r.cfop.escolhido.codigoFormatado).toBe("5.101");
+  });
+
+  // ⚠ Sem UF, a tela mostra o par e a pergunta que falta — uma pergunta só, não duas.
+  it("sem UF de destino, o par fica pendente e a pergunta é a das UFs", () => {
+    const r = simular({ ncm: "84379000", cfop: "5101/6101", ufOrigem: "SP" }, tipi(linha(3.25)));
+    expect(r.cfop.escolhido).toBeNull();
+    expect(r.cfop.parPendente).toBe("5.101 / 6.101");
+    expect(r.perguntas.some((p) => /UF de origem e a de destino/.test(p))).toBe(true);
+    expect(r.perguntas.some((p) => /Escolha o CFOP/.test(p))).toBe(false);
+  });
+
+  it("o exemplo didático acompanha o CFOP resolvido", () => {
+    const r = simular({ ncm: "84379000", cfop: "5101/6101", ufOrigem: "SP", ufDestino: "SP" }, tipi(linha(3.25)));
+    expect(r.cfop.escolhido.quando).toMatch(/compra o aço/i);
   });
 });
