@@ -1,7 +1,12 @@
 {
-  "build": 3424,
-  "gerado": "2026-09-23T13:23:06.133Z",
+  "build": 3425,
+  "gerado": "2026-09-23T13:29:30.534Z",
   "commits": [
+    {
+      "hash": "c6c6b02cd2",
+      "data": "23/09/2026",
+      "titulo": "Fiscal: a base de CST — ICMS, PIS/COFINS e origem, com os cenários principais"
+    },
     {
       "hash": "9b0432cbf3",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d2aa947726",
       "data": "22/09/2026",
       "titulo": "Romaneio: a peça sem quantidade parava de sumir calada, e volta a pesar"
-    },
-    {
-      "hash": "fd3bd59c9e",
-      "data": "22/09/2026",
-      "titulo": "Inspeção: a lista de peças da OP volta no relatório já enviado"
     }
   ]
 }

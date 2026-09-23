@@ -110,10 +110,14 @@ describe("remessa e retorno não recebem alíquota de referência", () => {
 
   // ⚠ E o portal NÃO afirma que há suspensão: suspensão tem condições e prazo. Ele se cala e diz
   // por quê — afirmá-la sem conferir seria o mesmo pecado ao contrário.
-  it("o motivo cita a suspensão como possibilidade a confirmar, não como fato", () => {
+  // ⚠⚠ A MENSAGEM GENÉRICA NÃO PODE CITAR O ART. 402 (achado do Codex, 23/09/2026, por tabela).
+  // A família "Remessa" cobre a remessa para industrialização (5.901, art. 402) E a remessa por
+  // conta e ordem da venda à ordem (5.923), que não tem nada a ver com ele — o fundamento
+  // específico é do cenário, que conhece o código.
+  it("o motivo diz que o tratamento depende de QUAL remessa é, sem eleger fundamento", () => {
     const m = icmsDeReferencia("SP", "RS", cfop("Remessa", "6.901")).motivo;
-    expect(m).toMatch(/costuma ter tratamento próprio/i);
-    expect(m).toMatch(/art\. 402 do RICMS\/SP/);
+    expect(m).toMatch(/tratamento próprio, que depende de qual remessa é/i);
+    expect(m).not.toMatch(/art\. 402/);
     expect(m).toMatch(/sem antes confirmar/i);
   });
 

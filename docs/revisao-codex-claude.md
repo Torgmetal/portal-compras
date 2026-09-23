@@ -1287,3 +1287,27 @@ operação de receita) não há lista — candidato só aparece onde ele se abst
 
 **3.527 passando.** Validado logado na remessa 6.901: três candidatos de ICMS com o 50 marcado
 "mais comum", o fundamento do art. 402 e o prefixo de origem.
+
+- **(23/09, 12h15) A FAMÍLIA era grossa demais, e eu propaguei fundamento de uma operação para
+  outra.** Dois achados do Codex, e o P1 é sério.
+  - ⚠⚠⚠ **`5.923/6.923` recebia "CST 50 — suspensão, mais comum" com a justificativa do art. 402.**
+    A família "Remessa" junta a **remessa para industrialização** (5.901, suspensão do art. 402) com
+    a **remessa por conta e ordem da VENDA À ORDEM** (5.923), que não tem nada a ver com ele — e o
+    `fichaDeEmissao` consultava só a família. **Ressalva em texto não desliga destaque**: o "mais
+    comum" continuava ali, apontando para o código errado pelo motivo errado.
+    ⚠ O conserto é `cenarioDoCfop`, que usa a família como base e aplica **ajuste por código**. E o
+    ajuste **nunca inventa um provável no lugar do que tirou**: sem fundamento para eleger, a lista
+    fica sem destaque e o porquê diz de que depende — aqui, *"do que foi destacado na nota de
+    venda, e não da suspensão do art. 402"*.
+    ⚠ O `5.924/6.924` ganhou ajuste próprio: é emitido pelo **FORNECEDOR**, e o CST é do regime dele.
+  - ⚠⚠ **O cenário de "Entrega futura" oferecia o CST 00 com a justificativa da saída física.** Só
+    o `5.922/6.922` (simples faturamento) vive nessa família; o `5.116/6.116` (saída física) está em
+    "Venda". O texto *"qual das duas notas está sendo emitida"* apresentava como desconhecida uma
+    distinção que **o CFOP já resolveu**. Agora o 5.922 oferece `41` e `90`, sem provável, e o
+    5.116 mantém o ICMS 00 mas **perde o provável de PIS/COFINS** — a receita pode já ter sido
+    reconhecida no faturamento, e repetir a alíquota básica correria o risco de contar duas vezes.
+  - ⚠ **A mesma contaminação estava em `lib/fiscal/icms.js`**, que citava o art. 402 para toda
+    remessa. Achei ao validar a tela: o fundamento específico é do CENÁRIO, que conhece o código;
+    na mensagem da família só cabe a razão comum às duas.
+  **3.538 passando.** Validado logado lado a lado: 5.923 sem destaque e com o porquê da venda à
+  ordem; 5.901 com o CST 50 e o art. 402. ⚠ **Sem push** enquanto a rodada estiver aberta.
