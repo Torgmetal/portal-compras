@@ -1,7 +1,12 @@
 {
-  "build": 3416,
-  "gerado": "2026-09-23T02:44:06.671Z",
+  "build": 3417,
+  "gerado": "2026-09-23T02:48:10.795Z",
   "commits": [
+    {
+      "hash": "233171b46f",
+      "data": "22/09/2026",
+      "titulo": "Autocomplete de NCM: quatro achados do Codex, e o pior o teste não pegava"
+    },
     {
       "hash": "b0b320a522",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "8bceb8ffec",
       "data": "22/09/2026",
       "titulo": "CMR: troca de material limpa o que sobrou do anterior, e toda sobrescrita deixa trilha"
-    },
-    {
-      "hash": "3a3643144b",
-      "data": "22/09/2026",
-      "titulo": "CMR: a planilha manda, e o R passa a ser conferido nos dois lados"
     }
   ]
 }

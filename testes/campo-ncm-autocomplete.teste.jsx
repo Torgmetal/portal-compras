@@ -207,6 +207,41 @@ describe("limpar o campo com requisição no ar", () => {
   });
 });
 
+describe("apagar DEPOIS de a lista abrir", () => {
+  // ⚠⚠ O CAMINHO QUE A PESSOA PERCORRE DE VERDADE: digitar, ver as sugestões, apagar. O retorno
+  // para termo curto limpava a lista mas não fechava o menu — sobrava no ar um "Nenhum NCM com
+  // esse código" sobre um campo VAZIO, onde nada foi buscado.
+  // ⚠ O teste anterior apagava ANTES da primeira resposta, com o menu ainda fechado: provava o
+  // caso fácil e deixava passar este.
+  it.each([["", "apagar tudo"], ["8", "reduzir para um caractere"]])("%s (%s) fecha o menu", async (depois) => {
+    vi.stubGlobal("fetch", vi.fn(responder([linha("84379000")])));
+    render(<ComPai />);
+    const campo = screen.getByRole("combobox");
+    fireEvent.change(campo, { target: { value: "8437" } });
+    await act(async () => { vi.advanceTimersByTime(400); });
+    await waitFor(() => expect(screen.getByRole("listbox")).toBeTruthy());
+
+    fireEvent.change(campo, { target: { value: depois } });
+    await act(async () => { vi.advanceTimersByTime(600); });
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.queryByText(/Nenhum NCM/)).toBeNull();
+  });
+
+  // ⚠ E voltar a digitar reabre normalmente — fechar não pode virar trava.
+  it("voltar a digitar reabre a lista", async () => {
+    vi.stubGlobal("fetch", vi.fn(responder([linha("84379000")])));
+    render(<ComPai />);
+    const campo = screen.getByRole("combobox");
+    fireEvent.change(campo, { target: { value: "8437" } });
+    await act(async () => { vi.advanceTimersByTime(400); });
+    fireEvent.change(campo, { target: { value: "" } });
+    await act(async () => { vi.advanceTimersByTime(400); });
+    fireEvent.change(campo, { target: { value: "8437" } });
+    await act(async () => { vi.advanceTimersByTime(400); });
+    await waitFor(() => expect(screen.getByText("8437.90.00")).toBeTruthy());
+  });
+});
+
 describe("a linha de Ex nunca fala pelo NCM", () => {
   // ⚠⚠ A BUSCA CORTA NO LIMITE ANTES DE AGRUPAR, e na busca por código o Postgres devolve o Ex
   // ANTES do NULL da geral. Dava para a lista mostrar a ALÍQUOTA DA EXCEÇÃO como se fosse a do

@@ -101,7 +101,17 @@ export default function CampoNcm({ valor, onChange, classe = "", id = "ncm" }) {
     // acontecia ANTES de incrementar a vez: a requisição já disparada continuava válida, e
     // resolvia depois chamando `setAberto(true)` — sugestões reaparecendo sobre um campo vazio,
     // prontas para serem escolhidas.
-    if (t.length < 2) { invalidar(); setLista([]); setCarregando(false); setErro(null); setMotivo(null); return; }
+    // ⚠⚠ E PRECISA FECHAR O MENU, NÃO SÓ ESVAZIÁ-LO (achado do Codex, 22/09/2026). Limpando só a
+    // lista com `aberto` ainda true, apagar o campo depois de as sugestões aparecerem deixava no ar
+    // um menu dizendo "Nenhum NCM com esse código" — sobre um campo VAZIO, onde nada foi buscado.
+    // ⚠ Meu teste da limpeza apagava ANTES da primeira resposta, com o menu ainda fechado: ele
+    // provava o caso fácil e deixava passar o caminho que a pessoa percorre de verdade.
+    if (t.length < 2) {
+      invalidar();
+      setLista([]); setCarregando(false); setErro(null); setMotivo(null);
+      setAberto(false); setAtivo(-1);
+      return;
+    }
     setCarregando(true);
     invalidar();
     const minha = vez.current;

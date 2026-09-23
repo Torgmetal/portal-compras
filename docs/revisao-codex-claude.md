@@ -992,3 +992,12 @@ novo, não conserto, e não entra sem o Matheus decidir.
   **3.373 passando.** Validado logado: escolher não dispara busca extra (0 chamadas), apagar não
   reabre a lista, e o 9406.10.10 sai com **CST 51** (alíquota zero é tributação) — o mesmo ponto da
   NF-e 1000. ⚠ **Sem push**, conforme a instrução da rodada.
+  ⚠⚠ **(rodada 2/2) E o mesmo ponto cego de novo: apagar o campo DEPOIS de a lista abrir.** O
+  retorno para termo curto limpava a lista mas **não fechava o menu** — sobrava no ar um "Nenhum
+  NCM com esse código" sobre um campo VAZIO, onde nada tinha sido buscado. Meu teste da limpeza
+  apagava ANTES da primeira resposta, com o menu ainda fechado: provava o caso fácil e deixava
+  passar o caminho que a pessoa percorre de verdade (digitar → ver → apagar). Corrigido com
+  `setAberto(false)` e `setAtivo(-1)`, e coberto nos dois sentidos (apagar tudo, reduzir a 1
+  caractere) mais o retorno (voltar a digitar reabre).
+  **3.376 passando.** Validado logado: lista abre com "8437", some ao apagar sem deixar mensagem,
+  reabre com 2 caracteres e fecha com 1.
