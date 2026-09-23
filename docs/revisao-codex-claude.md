@@ -1001,3 +1001,18 @@ novo, não conserto, e não entra sem o Matheus decidir.
   caractere) mais o retorno (voltar a digitar reabre).
   **3.376 passando.** Validado logado: lista abre com "8437", some ao apagar sem deixar mensagem,
   reabre com 2 caracteres e fecha com 1.
+
+---
+
+## O P1 dos avulsos saiu da nossa lista (22/09/2026)
+
+Matheus: *"o P1 do Vitor remova de nossa dependência, isso ele vai seguir ajustando"*.
+
+`app/comercial/[id]/AbaExpedicao.jsx:617` — avulso perde identificação ao reabrir o romaneio
+(commit `498199259d`). **Dono: Vitor.** Não é mais pendência nossa e não entra nas próximas
+rodadas como item a tratar; se o Codex apontar de novo, a resposta é que o dono é ele. O histórico
+das rodadas acima fica como está — reescrever o passado apagaria a procedência do achado.
+
+Matheus também firmou **"Codex: aceito sempre"** para pendência de terceiro e decisão humana.
+⚠⚠ Isso NÃO vale para `resultado: "corrigir"` em código nosso — ver
+`docs/memoria-claude/torg_codex_aceito_sempre.md`.

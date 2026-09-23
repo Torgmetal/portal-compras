@@ -1,7 +1,12 @@
 {
-  "build": 3417,
-  "gerado": "2026-09-23T02:48:10.795Z",
+  "build": 3418,
+  "gerado": "2026-09-23T02:53:10.212Z",
   "commits": [
+    {
+      "hash": "bc78300da3",
+      "data": "22/09/2026",
+      "titulo": "Autocomplete: apagar depois de a lista abrir deixava \"Nenhum NCM\" no ar"
+    },
     {
       "hash": "233171b46f",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "631f70bd36",
       "data": "22/09/2026",
       "titulo": "CMR: a sincronização parou de morrer no meio do caminho"
-    },
-    {
-      "hash": "8bceb8ffec",
-      "data": "22/09/2026",
-      "titulo": "CMR: troca de material limpa o que sobrou do anterior, e toda sobrescrita deixa trilha"
     }
   ]
 }
