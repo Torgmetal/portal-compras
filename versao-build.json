@@ -1,7 +1,12 @@
 {
-  "build": 3435,
-  "gerado": "2026-09-23T19:00:38.606Z",
+  "build": 3436,
+  "gerado": "2026-09-23T19:24:59.252Z",
   "commits": [
+    {
+      "hash": "414826b9d3",
+      "data": "23/09/2026",
+      "titulo": "Simulador: quatro campos decidem; o resto é conferência e foi para trás de um clique"
+    },
     {
       "hash": "d869b9726b",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2d8c507697",
       "data": "22/09/2026",
       "titulo": "Fiscal: auditoria de NF-e por XML, com a 973 como caso de teste"
-    },
-    {
-      "hash": "70904dccd8",
-      "data": "22/09/2026",
-      "titulo": "Fiscal: o painel de Atualizações Tributárias, com o teto da fonte respeitado"
     }
   ]
 }

@@ -1612,3 +1612,52 @@ operação de receita) não há lista — candidato só aparece onde ele se abst
   para a linha do link e **cobria o fim do texto**. `flex w-fit`. Conferido por `boundingBox` no
   teste de tela, não a olho.
   **3.627 passando**, build EXIT=0, os dois estados validados logados.
+
+- **(23/09, 16h25) O MOTOR DE REGRAS — e por que ele NÃO virou tabela.** Última pendência grande do
+  briefing (PARTES 13–15, 21, 24): *"`FiscalRegra` com condições, status de validação e aprovador"*.
+  **Parecer do Codex (`architecture`): opção B, "as regras ficam em código; o banco guarda a
+  VALIDAÇÃO".**
+  ⚠⚠⚠ **ISTO NÃO ENTREGA A LEITURA LITERAL DO BRIEFING, E É DECISÃO DE ESCOPO — não esquecimento.**
+  Regra em tabela sai do alcance do PR, do lint, do teste e da revisão do Codex: uma linha errada
+  passaria a mudar **em silêncio** o que o portal manda emitir, que é o oposto de *"NÃO INVENTE
+  REGRAS"*. **Autoria de regra pela contabilidade fica FORA desta entrega**, e está escrito na tela
+  — esconder faria a contabilidade achar que pode consertar sozinha o que só passa por código.
+  ⚠⚠ **O PROBLEMA REAL ERA OUTRO, E ESTAVA À VISTA O TEMPO TODO**: os 26 CFOPs nasceram
+  `validado: false` e **nenhuma tela mostrava isso** — o flag existia só no código e num comentário
+  de rota. Agora são **56 regras** (CFOPs + etapas de cadeia + cenários de CST), cada uma com
+  estado visível e conferência nominal.
+  ⚠⚠ **A CONFERÊNCIA É DE UMA VERSÃO, NÃO DA REGRA.** `impressao` é o sha256 do conteúdo que
+  valia quando alguém conferiu; mudou o texto, vira **ALTERADA** sozinha. Herdar seria atestar um
+  texto que ninguém leu. ⚠ A impressão cobre condições, efeitos, emitente, âmbito, fundamentos **e
+  o texto que orienta a emissão** — uma vírgula ali pode mudar o sentido, e uma reconferência a
+  mais é mais barata que uma aprovação sobre outro texto.
+  ⚠⚠ **PENDENTE NÃO BLOQUEIA, E ISSO É DECISÃO MINHA.** O Codex sugeriu reservar o preenchimento da
+  ficha às regras validadas e avisou que *"esse impacto precisa constar do aceite"*. Com as 56
+  pendentes, isso desligaria o módulo inteiro no dia em que subisse. Escolhi o lado que não quebra:
+  pendente ORIENTA e a tela **diz** que não foi conferido; só **CONTESTADA** bloqueia.
+  ⚠⚠ **CONTESTADA NÃO ENTREGA FICHA — tarja não bastava** (parecer do Codex). A ficha é o bloco que
+  a pessoa COPIA para o Omie: ela seria copiada com a tarja para trás. Bloqueia só o que DEPENDE da
+  regra — o IPI, que vem da TIPI, continua à vista.
+  ⚠⚠ **APROVAR O CFOP NÃO APROVA O CST**: um resultado usa o verbete do CFOP **e** o cenário da
+  família, conferidos separadamente. Uma bloqueada derruba o conjunto, e o motivo diz qual.
+  ⚠⚠ **EDITAR NÃO APAGA CONTESTAÇÃO**: se mudar o hash virasse "pendente utilizável", um ajuste de
+  vírgula silenciaria quem disse que a regra está errada.
+  ⚠⚠ **E AQUI FALHA DE LEITURA BLOQUEIA** — o inverso do resto do módulo, e é o inverso que
+  protege: recomendar sem saber se o verbete foi contestado é arriscar repetir uma orientação já
+  marcada como errada. A tela diz *suspensa*, não *tudo certo*.
+  ⚠ **O id sai do conteúdo, nunca da posição no array** (parecer do Codex): inserir uma etapa no
+  meio da cadeia renumeraria todas e transferiria a conferência de uma etapa para outra, calada.
+  ⚠ **Histórico, não estado**: cada decisão é uma LINHA NOVA, sem índice único por `regraId` — a
+  vigente é a mais recente. Sobrescrever apagaria a contestação que motivou a revisão.
+  ⚠ **A impressão vem da TELA no POST**, não é recalculada no servidor: ela atesta a versão que a
+  pessoa LEU. Divergiu, é **409**, não "grava assim mesmo".
+  **Dois defeitos meus pegos na validação de tela, não em teste:** (1) o alerta começava com o **id
+  interno** (`cfop:5101: A contabilidade contestou…`) — o título humano passou a viajar na
+  situação; (2) o cartão **não mostrava o nome do estado**, só a cor e o ícone — quem não distingue
+  cores não tinha como saber se estava conferido ou bloqueado.
+  Arquivos: `catalogo-regras.js` (ids estáveis + impressão), `politica-regras.js` (puro),
+  `validacao-regras.js` (persistência), model + ensure, rota `inteligencia/regras`, `AbaRegras.jsx`,
+  e o gate no `simulador.js` + rota `simular`.
+  Testes: `fiscal-regras-validacao` (19). **3.704 passando**, lint sem erro, build EXIT=0 (`ƒ`),
+  validado logado: com tudo pendente a ficha SAI; contestando o 5.101 a ficha SOME, o motivo sobe
+  como alerta alto e o IPI da TIPI continua. ⚠ A linha de teste foi removida da produção.

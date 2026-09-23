@@ -6850,6 +6850,35 @@ model FiscalDispositivo {
 /// ⚠⚠ APÓS APROVADA A LINHA É IMUTÁVEL: mudar padrão, código, NCM ou fundamento exige nova
 /// proposta, e substituir revoga a anterior e aprova a nova na MESMA transação. Editar em lugar
 /// apagaria a decisão que já orientou emissão — e é justamente o histórico que dá valor ao registro.
+/// ─── A VALIDAÇÃO HUMANA DE UMA REGRA DO CÓDIGO ───────────────────────────────
+/// ⚠⚠ ISTO NÃO GUARDA A REGRA — guarda quem a CONFERIU. As regras continuam em `lib/fiscal/`,
+/// revisadas, testadas e versionadas no git; regra em tabela sairia do alcance do PR, do lint e do
+/// teste, e uma linha errada passaria a mudar em silêncio o que o portal manda emitir.
+/// ⚠⚠ A CONFERÊNCIA É DE UMA VERSÃO: `impressao` é o hash do conteúdo que estava valendo quando
+/// alguém conferiu. Mudou o texto, a validação vira ALTERADA sozinha — herdar seria atestar um
+/// texto que ninguém leu.
+/// ⚠⚠ CONTESTADA sobrevive à edição: se mudar o hash virasse "pendente utilizável", um ajuste de
+/// vírgula apagaria o alerta de quem disse que a regra está errada.
+model FiscalValidacaoRegra {
+  id        String   @id @default(cuid())
+  /// Id estável do catálogo: "cfop:5101", "etapa:<operacao>:<quem>:<cfop>:<papel>", "cenario:VENDA".
+  regraId   String
+  /// VALIDADA | CONTESTADA
+  estado    String
+  /// Hash do conteúdo da regra no momento da decisão (lib/fiscal/catalogo-regras.js).
+  impressao String
+  /// Contra o que foi conferido — "Convênio s/nº de 15/12/1970, Anexo", por exemplo.
+  fonte     String?
+  ressalva  String?
+  porId     String
+  /// ⚠ NOME junto do id: a decisão precisa continuar legível depois que a pessoa sai.
+  porNome   String
+  em        DateTime @default(now())
+
+  @@index([regraId, em])
+  @@index([estado])
+}
+
 model FiscalClassificacaoProduto {
   id                String    @id @default(cuid())
   /// Código do produto no Omie (ARM000010…), como foi digitado. NULL = vale para qualquer código.

@@ -234,6 +234,24 @@ const sql = [
      ON "FiscalClassificacaoProduto"("padraoNormalizado")
      WHERE "status" = 'APROVADA' AND "codigoNormalizado" IS NULL`,
 
+  // ─── A VALIDAÇÃO HUMANA DAS REGRAS DO CÓDIGO ───────────────────────────────
+  //
+  // ⚠⚠ HISTÓRICO, NÃO ESTADO. Não há índice único por `regraId`: cada decisão é uma LINHA NOVA, e
+  // a vigente é a mais recente. Sobrescrever apagaria a contestação que motivou a revisão — e é
+  // justamente ela que alguém vai querer ler depois para entender por que a regra mudou.
+  `CREATE TABLE IF NOT EXISTS "FiscalValidacaoRegra" (
+     "id" TEXT PRIMARY KEY,
+     "regraId" TEXT NOT NULL,
+     "estado" TEXT NOT NULL,
+     "impressao" TEXT NOT NULL,
+     "fonte" TEXT,
+     "ressalva" TEXT,
+     "porId" TEXT NOT NULL,
+     "porNome" TEXT NOT NULL,
+     "em" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+  `CREATE INDEX IF NOT EXISTS "FiscalValidacaoRegra_regraId_em_idx" ON "FiscalValidacaoRegra"("regraId","em")`,
+  `CREATE INDEX IF NOT EXISTS "FiscalValidacaoRegra_estado_idx" ON "FiscalValidacaoRegra"("estado")`,
+
   // ⚠ As FKs vão DEPOIS das tabelas, e cada uma num bloco próprio: `ADD CONSTRAINT` não tem
   // `IF NOT EXISTS` no Postgres, então a repetição é tratada como sucesso (42710 = já existe).
 ];

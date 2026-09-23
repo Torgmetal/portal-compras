@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAcesso } from "@/lib/session";
-import { simular } from "@/lib/fiscal/simulador";
+import { simular, ambitoDe, daEscolhaDoCfop } from "@/lib/fiscal/simulador";
 import { CFOPS, FAMILIA, paresDeCfop } from "@/lib/fiscal/cfop";
 import { materiaPrimaDaOP } from "@/lib/faturamento-direto";
 import { CST_IPI } from "@/lib/fiscal/auditoria";
 import { verbetesAprovados } from "@/lib/fiscal/registro-classificacao";
+import { idsDoResultado, regraPorId } from "@/lib/fiscal/catalogo-regras";
+import { decisoesVigentes } from "@/lib/fiscal/validacao-regras";
+import { situacaoDaRegra, situacaoDoConjunto } from "@/lib/fiscal/politica-regras";
 import { verbetesDoCodigo, procurarClassificacao, compararNcm } from "@/lib/fiscal/classificacao-produto";
 
 // Simulação fiscal de uma operação, ANTES de a nota existir.
@@ -85,7 +88,23 @@ export async function POST(req) {
   const linhas = await prisma.fiscalTipiLinha.findMany({ where: { versaoId: versao.id, nivel: "NCM", codigo: ncm } });
   const daTipi = linhas.length ? { geral: linhas.find((l) => !l.ex) ?? null, excecoes: linhas.filter((l) => l.ex) } : undefined;
 
+  // ── A situação das regras que ESTE resultado usa ──────────────────────────
+  //
+  // ⚠⚠ `null` do registro significa "não consegui verificar", e isso SUSPENDE a ficha — o inverso
+  // do resto do módulo, e é o inverso que protege: recomendar sem saber se o verbete foi
+  // contestado é arriscar repetir uma orientação que alguém já marcou como errada.
+  const decisoes = await decisoesVigentes();
+  const escolhido = daEscolhaDoCfop(body.cfop ?? null, ambitoDe(entrada.ufOrigem, entrada.ufDestino))?.cfop ?? null;
+  const ids = idsDoResultado(escolhido);
+  const validacao = ids.length
+    ? situacaoDoConjunto(ids.map((id) => {
+        const regra = regraPorId(id);
+        return regra ? situacaoDaRegra(regra, decisoes?.get(id), { disponivel: decisoes !== null }) : null;
+      }))
+    : null;
+
   const r = simular(entrada, daTipi, {
+    validacao,
     versaoId: versao.id, sha256: versao.arquivo.sha256,
     observadoEm: versao.observadoEm, vigenciaDeclarada: Boolean(versao.vigenciaInicio),
   });
