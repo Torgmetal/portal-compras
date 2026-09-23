@@ -1,7 +1,12 @@
 {
-  "build": 3428,
-  "gerado": "2026-09-23T14:17:28.620Z",
+  "build": 3429,
+  "gerado": "2026-09-23T14:47:36.667Z",
   "commits": [
+    {
+      "hash": "409de29159",
+      "data": "23/09/2026",
+      "titulo": "Classificação: o teste defendia o defeito — três achados do Codex"
+    },
     {
       "hash": "5969682a3f",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "49e1adda25",
       "data": "22/09/2026",
       "titulo": "Registra a pendência aceita da fração composta no CMR"
-    },
-    {
-      "hash": "b80868fd4c",
-      "data": "22/09/2026",
-      "titulo": "Conversão e CMR: os dois achados da rodada seguinte do Codex"
     }
   ]
 }

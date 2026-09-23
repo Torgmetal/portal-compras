@@ -1412,7 +1412,20 @@ operação de receita) não há lista — candidato só aparece onde ele se abst
     então **todo** verbete específico era excluído e a resposta saía "sem classificação" com a
     classificação existindo. O campo entrou na tela.
   **3.580 passando**, lint sem erro, `next build` EXIT=0.
-  ⚠⚠ **PENDENTE DE AUTORIZAÇÃO — a correção exige DDL em produção.** A coluna `codigoNormalizado` e
+  ⚠ **(autorizado por Matheus, 23/09/2026 — "pode seguir. codex: aceito") DDL APLICADO E
+  REVALIDADO.** `ensure-fiscal-tables.mjs` rodado: a coluna `codigoNormalizado` existe, os índices
+  `_aprovada_escopo` e `_aprovada_geral` estão no lugar e os dois antigos **sumiram** (conferido em
+  `pg_indexes`). Tabela em 0 linhas.
+  **Provado contra o banco de verdade**, não só no motor:
+  - o índice **recusou** `ARM000010` + `arm-000010` com o mesmo padrão — que é exatamente o par que
+    antes era aprovado duas vezes e virava AMBIGUA para sempre;
+  - o índice **recusou** dois verbetes globais com o mesmo padrão (o buraco do NULL);
+  - a tela achou o verbete gravado como `arm-000010` ao simular com `ARM000010`;
+  - o aprovador saiu **"Usuário Teste em 23/09/2026"**, não `"—"` — o achado P2 que os meus
+    testes escondiam;
+  - com **outro** código, e também **sem** código, o verbete específico não é alcançado.
+  ⚠ As linhas de teste foram **removidas da produção** (registro e AuditLog); a tabela volta a 0.
+  (Registro histórico) A correção exigia DDL em produção: A coluna `codigoNormalizado` e
   a troca dos dois índices parciais só entram com `node scripts/ensure-fiscal-tables.mjs` (ou o
   `npm run build` completo). A revisão proibiu operação em produção nesta rodada, então **não
   rodei**, e a revalidação logada depende disso. A tabela está **vazia** (0 linhas, conferido), e
