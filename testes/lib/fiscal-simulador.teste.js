@@ -690,7 +690,7 @@ describe("a ficha de emissão — o que vai ser digitado no Omie", () => {
 
   it("o CST de ICMS mostra a alíquota de referência e diz que o CST é outra coisa", () => {
     const l = ficha().linhas.find((x) => x.campo === "CST ICMS");
-    expect(l.motivo).toMatch(/alíquota de referência é 12%/);
+    expect(l.motivo).toMatch(/[Aa]líquota de referência 12%/);
     expect(l.motivo).toMatch(/CST depende do tratamento/);
   });
 
@@ -719,5 +719,81 @@ describe("a ficha de emissão — o que vai ser digitado no Omie", () => {
 
   it("a venda comum não inventa informação adicional", () => {
     expect(ficha().informacoesAdicionais).toEqual([]);
+  });
+});
+
+describe("a base de CST — candidatos por cenário, com o que cada um exige", () => {
+  // ⚠⚠ Matheus (23/09/2026): *"monte essa base legal para você ter o conhecimento dos impostos que
+  // faltam preencher o CST; precisamos ter uma base completa de tudo e os cenários principais"*.
+  // A base NÃO escolhe: ela reduz a tabela inteira aos códigos que cabem naquela operação e diz o
+  // que cada um precisa provar. Onze opções iguais faziam alguém marcar "41 — não tributada"
+  // porque a nota "não tem imposto".
+  const linhaDe = (cfop, campo, valor = 100000) =>
+    simular({ ncm: "84379000", cfop, ufOrigem: "SP", ufDestino: "RS", valor }, tipi(linha(3.25)))
+      .ficha.linhas.find((l) => l.campo === campo);
+
+  it("na venda, o ICMS candidato mais provável é o 00 — tributada integralmente", () => {
+    const l = linhaDe("6101", "CST ICMS");
+    expect(l.candidatos.find((c) => c.provavel).cst).toBe("00");
+    expect(l.candidatos.map((c) => c.cst)).toEqual(["00", "20", "10", "40", "41"]);
+  });
+
+  // ⚠⚠ "MAIS PROVÁVEL" NÃO É "CERTO": a suspensão tem condições e prazo, e a nota que a declara
+  // sem atendê-las é uma nota errada. Por isso `provavel` vem sempre junto de `exige`.
+  it("na remessa, o provável é o 50 — suspensão — e ele diz o que exige", () => {
+    const l = linhaDe("6901", "CST ICMS");
+    const p = l.candidatos.find((c) => c.provavel);
+    expect(p.cst).toBe("50");
+    expect(p.rotulo).toBe("Suspensão");
+    expect(p.exige.join(" ")).toMatch(/[Dd]ispositivo que autoriza a suspensão/);
+    expect(l.porque).toMatch(/art\. 402/);
+  });
+
+  // ⚠ A industrialização NÃO tem caminho único, e o cenário diz isso em vez de eleger um.
+  it("na industrialização, nenhum ICMS é marcado como provável", () => {
+    const l = linhaDe("5125", "CST ICMS");
+    expect(l.candidatos.filter((c) => c.provavel)).toEqual([]);
+    expect(l.porque).toMatch(/arts?\. 402 a 409/);
+  });
+
+  // ⚠⚠ O CST DE ICMS TEM DOIS DÍGITOS: origem + tributação. Na NF-e eles saem grudados, e tratar
+  // só a segunda metade como "o CST" faz peça nacional e importada saírem com o mesmo código.
+  it("a origem declarada entra como prefixo do CST", () => {
+    expect(linhaDe("6101", "CST ICMS").prefixoOrigem).toMatchObject({ codigo: "0" });
+  });
+
+  // ⚠ Onde o portal JÁ determina, não há candidato: a venda tem PIS/COFINS 01 pelo regime.
+  it("na venda, PIS e COFINS vêm preenchidos e sem lista", () => {
+    const l = linhaDe("6101", "CST PIS");
+    expect(l.valor).toBe("01");
+    expect(l.candidatos).toEqual([]);
+  });
+
+  // ⚠ Na remessa não há receita: o portal se abstém e oferece os candidatos, com o 08 provável.
+  it("na remessa, PIS e COFINS viram candidatos com o 08 provável", () => {
+    const l = linhaDe("6901", "CST PIS");
+    expect(l.valor).toBeNull();
+    expect(l.candidatos.find((c) => c.provavel).cst).toBe("08");
+    expect(l.porque).toMatch(/não é auferir receita/i);
+  });
+
+  it("o cenário sai da família do CFOP e vem com o resumo", () => {
+    const f = simular({ ncm: "84379000", cfop: "6901", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25))).ficha;
+    expect(f.cenario).toMatchObject({ familia: "Remessa" });
+    expect(f.cenario.resumo).toMatch(/não é receita/i);
+  });
+
+  // ⚠ Sem CFOP não há cenário — inventar candidato para uma operação desconhecida é o oposto do
+  // ponto desta base.
+  it("sem CFOP, não há candidatos nem cenário", () => {
+    const f = simular({ ncm: "84379000", ufOrigem: "SP", ufDestino: "RS", valor: 1000 }, tipi(linha(3.25))).ficha;
+    expect(f.cenario).toBeNull();
+    expect(f.linhas.find((l) => l.campo === "CST ICMS").candidatos).toEqual([]);
+  });
+
+  // ⚠⚠ O 90 e o 49 existem na tabela mas carregam o aviso de que são último recurso.
+  it("o CST 90 de ICMS carrega o aviso de último recurso", () => {
+    const l = linhaDe("5949", "CST ICMS");
+    expect(l.candidatos.find((c) => c.cst === "90").nota).toMatch(/último recurso/i);
   });
 });

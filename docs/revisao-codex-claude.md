@@ -1246,3 +1246,44 @@ imposto sobre imposto e acusar divergência onde não há.
   `lib/fiscal/regime.js`, `lib/fiscal/icms.js` e nos commits; a tela mostra o regime e a
   conferência, não a autoria.
   **3.478 passando.** Validado logado. ⚠ **Sem push** enquanto a rodada estiver aberta.
+
+---
+
+## A base de CST — ICMS, PIS/COFINS e origem (23/09/2026)
+
+Matheus: *"monte essa base legal para você ter o conhecimento dos impostos que faltam preencher o
+CST; precisamos ter uma base completa de tudo e os cenários principais"*.
+
+**`lib/fiscal/cst.js`** — as tabelas oficiais, completas:
+- **Tabela A (origem)**: 9 códigos — Convênio s/nº de 15/12/1970, redação do Ajuste SINIEF 03/2010.
+- **Tabela B (CST de ICMS)**: 11 códigos, do `00` ao `90`.
+- **CST de PIS/COFINS na saída**: 10 códigos — tabela 4.3.3 do SPED, a mesma da NF-e.
+
+⚠⚠ **ISTO É TABELA OFICIAL, NÃO INTERPRETAÇÃO.** Os códigos e o que cada um significa são públicos
+e fixos; guardá-los não é o portal decidindo nada — é ele parando de fingir que não sabe o que "41"
+quer dizer.
+
+⚠⚠ **MAS SABER O QUE O CÓDIGO SIGNIFICA NÃO É SABER QUAL USAR.** Cada verbete leva `exige`: o que
+precisa estar demonstrado para aquele código se sustentar. **Sem isso a tabela vira um menu — e
+menu é o que faz alguém marcar "41 — não tributada" porque a nota "não tem imposto".**
+
+**`lib/fiscal/cenarios.js`** — os seis cenários, por família de CFOP (Venda, Industrialização,
+Remessa, Retorno, Entrega futura, Outras saídas). Cada um reduz a tabela inteira aos códigos que
+cabem, com o **porquê** escrito — *"uma lista sem motivo é um chute com aparência de regra"*.
+
+⚠⚠ **"MAIS COMUM" NÃO É "CERTO", e nunca aparece sozinho.** A remessa para industrialização
+normalmente corre com suspensão (CST 50), mas a suspensão tem condições e prazo, e a nota que a
+declara sem atendê-las é uma nota errada. `provavel` vem sempre colado ao `exige`.
+⚠ A **industrialização não tem provável nenhum**: a disciplina paulista (arts. 402 a 409) admite
+tributado, diferido e redução conforme o caso, e eleger um seria inventar caminho único.
+⚠ No máximo **um** provável por tributo — dois "prováveis" é o mesmo que nenhum.
+
+⚠⚠ **O CST DE ICMS TEM DOIS DÍGITOS: origem + tributação.** Na NF-e saem grudados (`0` + `41` =
+`041`), e tratar só a segunda metade como "o CST" é o engano que faz peça nacional e importada
+saírem com o mesmo código. A ficha mostra o prefixo da origem declarada.
+
+⚠ Onde o portal **já determina** (CFOP, CST de IPI pela TIPI, CST de PIS/COFINS pelo regime em
+operação de receita) não há lista — candidato só aparece onde ele se abstém.
+
+**3.527 passando.** Validado logado na remessa 6.901: três candidatos de ICMS com o 50 marcado
+"mais comum", o fundamento do art. 402 e o prefixo de origem.

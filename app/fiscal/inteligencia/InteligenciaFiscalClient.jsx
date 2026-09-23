@@ -1054,7 +1054,10 @@ function AbaSimulador() {
           {r.ficha && (
             <div className="rounded-xl border border-torg-blue/20 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">Ficha de emissão</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">
+                  Ficha de emissão
+                  {r.ficha.cenario && <span className="ml-2 font-normal normal-case text-torg-gray">· {r.ficha.cenario.resumo}</span>}
+                </p>
                 <button type="button" onClick={() => copiarFicha(r.ficha)}
                   className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-torg-blue transition hover:bg-gray-50">
                   Copiar
@@ -1072,7 +1075,33 @@ function AbaSimulador() {
                     ) : (
                       // ⚠⚠ CAMPO SEM FUNDAMENTO SAI VAZIO, COM O MOTIVO — nunca preenchido "por
                       // padrão". Vazio manda perguntar; preenchido vai para a nota.
-                      <dd className="flex-1 text-xs text-amber-700">a definir — {l.motivo}</dd>
+                      // ⚠⚠ MAS COM OS CANDIDATOS DO CENÁRIO: onze opções iguais faziam alguém
+                      // marcar "41 — não tributada" porque a nota "não tem imposto".
+                      <dd className="flex-1">
+                        <span className="text-xs text-amber-700">a definir — {l.motivo}</span>
+                        {l.candidatos?.length > 0 && (
+                          <ul className="mt-1 space-y-0.5">
+                            {l.candidatos.map((c) => (
+                              <li key={c.cst} className="text-xs">
+                                <span className={`font-mono ${c.provavel ? "font-semibold text-torg-dark" : "text-torg-gray"}`}>{c.cst}</span>
+                                <span className={c.provavel ? "text-torg-dark" : "text-torg-gray"}> — {c.rotulo}</span>
+                                {/* ⚠ "Mais provável" nunca aparece sem o que ele EXIGE: a
+                                    suspensão tem condições e prazo, e declará-la sem atendê-las
+                                    é uma nota errada. */}
+                                {c.provavel && <span className="ml-1 rounded bg-torg-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-torg-blue">mais comum</span>}
+                                {c.exige?.length > 0 && <span className="text-[11px] text-torg-gray"> · exige: {c.exige.join("; ")}</span>}
+                                {c.nota && <span className="block text-[11px] text-amber-700">{c.nota}</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {l.porque && <p className="mt-0.5 text-[11px] text-torg-gray">{l.porque}</p>}
+                        {l.prefixoOrigem && (
+                          <p className="mt-0.5 text-[11px] text-torg-gray">
+                            ⚠ Na NF-e o código sai com a origem na frente: <span className="font-mono">{l.prefixoOrigem.codigo}</span> — {l.prefixoOrigem.rotulo}.
+                          </p>
+                        )}
+                      </dd>
                     )}
                   </div>
                 ))}

@@ -1,7 +1,12 @@
 {
-  "build": 3423,
-  "gerado": "2026-09-23T13:16:26.248Z",
+  "build": 3424,
+  "gerado": "2026-09-23T13:23:06.133Z",
   "commits": [
+    {
+      "hash": "9b0432cbf3",
+      "data": "23/09/2026",
+      "titulo": "Simulador: a ficha de emissão e a prévia dos impostos — e quatro achados do Codex"
+    },
     {
       "hash": "43b1b3b083",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "fd3bd59c9e",
       "data": "22/09/2026",
       "titulo": "Inspeção: a lista de peças da OP volta no relatório já enviado"
-    },
-    {
-      "hash": "8dd0cde00f",
-      "data": "22/09/2026",
-      "titulo": "Cliente: o relatório fechado fica disponível para consulta"
     }
   ]
 }
