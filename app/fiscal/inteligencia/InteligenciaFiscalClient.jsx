@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle, Upload, ShieldAlert, HelpCircle } from "lucide-react";
+import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle, Upload, ShieldAlert, HelpCircle, Calculator, Ban } from "lucide-react";
 
 // ─── INTELIGÊNCIA FISCAL ─────────────────────────────────────────────────────
 //
@@ -599,7 +599,189 @@ function AbaAuditoria() {
   );
 }
 
-const ABAS = [{ id: "ncm", rotulo: "Consulta NCM" }, { id: "cfop", rotulo: "Consulta CFOP" }, { id: "auditoria", rotulo: "Auditoria de NF-e" }, { id: "admin", rotulo: "Atualizações Tributárias" }];
+
+const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
+const campo = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-torg-dark outline-none transition focus:border-torg-blue focus:ring-2 focus:ring-torg-blue/20";
+const rotulo = "text-xs font-medium text-torg-gray";
+
+function AbaSimulador() {
+  const [opcoes, setOpcoes] = useState({ ops: [], operacoes: [], cstIpi: [] });
+  const [f, setF] = useState({ ncm: "", operacao: "", opId: "", ufDestino: "", valor: "", cstPretendido: "" });
+  const [r, setR] = useState(null);
+  const [erro, setErro] = useState(null);
+  const [carregando, setCarregando] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/fiscal/inteligencia/simular").then((x) => x.json())
+      .then((d) => { if (d.success) setOpcoes(d); }).catch(() => {});
+  }, []);
+
+  const simular = async () => {
+    if (!f.ncm.trim()) { setErro("Informe o NCM."); return; }
+    setCarregando(true); setErro(null);
+    try {
+      const resp = await fetch("/api/fiscal/inteligencia/simular", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ncm: f.ncm, operacao: f.operacao || null, opId: f.opId || null,
+          ufDestino: f.ufDestino || null, valor: f.valor ? Number(String(f.valor).replace(",", ".")) : null,
+          cstPretendido: f.cstPretendido || null,
+        }),
+      });
+      const d = await resp.json();
+      if (!d.success) { setErro(d.error); setR(null); } else setR(d);
+    } catch { setErro("Falha de rede."); } finally { setCarregando(false); }
+  };
+
+  const op = opcoes.ops.find((o) => o.id === f.opId);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="md:col-span-1">
+            <label className={rotulo}>NCM</label>
+            <input className={`${campo} font-mono`} placeholder="8437.90.00" value={f.ncm}
+              onChange={(e) => setF({ ...f, ncm: e.target.value })} />
+          </div>
+          <div className="md:col-span-2">
+            <label className={rotulo}>Natureza da operação</label>
+            <select className={campo} value={f.operacao} onChange={(e) => setF({ ...f, operacao: e.target.value })}>
+              <option value="">— escolha —</option>
+              {opcoes.operacoes.map((o) => <option key={o.id} value={o.id}>{o.titulo}{o.cliente ? ` (ex.: ${o.cliente})` : ""}</option>)}
+            </select>
+          </div>
+
+          {/* ⚠⚠ A ENTRADA PELA OP FOI O PEDIDO ORIGINAL: "seleciono a OP e já puxa os dados do meu
+              cliente para entender a cidade que vai ser a NF de venda". Campo que o cadastro já
+              sabe é campo que ninguém digita errado. */}
+          <div className="md:col-span-2">
+            <label className={rotulo}>Obra (OP) — preenche o destino pelo cadastro do cliente</label>
+            <select className={campo} value={f.opId} onChange={(e) => setF({ ...f, opId: e.target.value, ufDestino: "" })}>
+              <option value="">— informar a UF na mão —</option>
+              {opcoes.ops.map((o) => <option key={o.id} value={o.id}>OP {o.numero} · {o.cliente}{o.clienteUF ? ` (${o.clienteUF})` : ""}</option>)}
+            </select>
+            {op && <p className="mt-1 text-xs text-torg-gray">{op.cliente} · {op.clienteCidade || "cidade não cadastrada"}{op.clienteUF ? `/${op.clienteUF}` : ""}</p>}
+          </div>
+          <div>
+            <label className={rotulo}>UF de destino</label>
+            <select className={campo} value={f.ufDestino} disabled={Boolean(f.opId)}
+              onChange={(e) => setF({ ...f, ufDestino: e.target.value })}>
+              <option value="">{f.opId ? "vem da OP" : "— escolha —"}</option>
+              {UFS.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className={rotulo}>Valor dos produtos (R$)</label>
+            <input className={campo} inputMode="decimal" placeholder="0,00" value={f.valor}
+              onChange={(e) => setF({ ...f, valor: e.target.value })} />
+          </div>
+          <div className="md:col-span-2">
+            <label className={rotulo}>CST de IPI que pretende usar (opcional — o portal confere)</label>
+            <select className={campo} value={f.cstPretendido} onChange={(e) => setF({ ...f, cstPretendido: e.target.value })}>
+              <option value="">— deixar o portal sugerir —</option>
+              {opcoes.cstIpi.map((c) => <option key={c.cst} value={c.cst}>{c.cst} — {c.rotulo}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <button onClick={simular} disabled={carregando}
+          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-torg-blue px-4 py-2 text-sm font-medium text-white transition hover:bg-torg-blue/90 disabled:opacity-50">
+          {carregando ? <Loader2 size={15} className="animate-spin" /> : <Calculator size={15} />} Simular
+        </button>
+      </div>
+
+      {erro && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erro}</div>}
+
+      {r && (
+        <>
+          {/* ⚠⚠ OS ALERTAS VÊM PRIMEIRO. É o alerta que a NF-e 973 não teve — enterrá-lo no fim da
+              página seria repetir o defeito que a tela existe para impedir. */}
+          {r.alertas.length > 0 && (
+            <div className="space-y-2">
+              {r.alertas.map((a, i) => (
+                <div key={i} className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${a.nivel === "alto" ? "border-red-200 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+                  <ShieldAlert size={16} className="mt-0.5 shrink-0" />
+                  <span>{a.texto}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">IPI — da TIPI oficial</p>
+              {r.ipi.determinado ? (
+                <>
+                  <div className="mt-2 flex items-center gap-3">
+                    <span className="text-2xl font-bold text-torg-dark">{r.ipi.rotulo}</span>
+                    <span className="rounded-lg border border-torg-blue/20 bg-torg-blue/10 px-2 py-1 text-xs font-medium text-torg-blue">
+                      CST {r.ipi.cstSugerido} — {r.ipi.cstRotulo}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-torg-gray">{r.ipi.nota}</p>
+                  {r.ipi.estimativa && (
+                    <p className="mt-2 text-sm text-torg-dark">
+                      {moeda(r.ipi.estimativa.base)} × {String(r.ipi.estimativa.aliquota).replace(".", ",")}% = <strong>{moeda(r.ipi.estimativa.valor)}</strong>
+                      <span className="ml-1 text-xs text-torg-gray">(estimativa)</span>
+                    </p>
+                  )}
+                  {/* ⚠⚠ O ENQUADRAMENTO NÃO É SUGERIDO — sugerir seria inventar fundamento legal. */}
+                  <p className="mt-2 border-t border-gray-100 pt-2 text-xs text-amber-700">⚠ {r.ipi.cEnqNota}</p>
+                </>
+              ) : <p className="mt-2 text-sm text-amber-700">{r.ipi.motivo}</p>}
+              {r.descricaoNcm && <p className="mt-2 text-xs text-torg-gray">{r.descricaoNcm}</p>}
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">
+                CFOP sugerido {r.cfop.ambito ? `· operação ${r.cfop.ambito === "INTERNA" ? "interna" : "interestadual"}` : ""}
+              </p>
+              {r.cfop.candidatos.length ? (
+                <ul className="mt-2 space-y-1.5">
+                  {r.cfop.candidatos.map((c) => (
+                    <li key={c.codigo} className="text-sm">
+                      <span className="font-mono font-semibold text-torg-dark">{c.codigoFormatado}</span>
+                      <span className="text-torg-gray"> — {c.resumo}</span>
+                      {c.nota && <span className="block text-xs text-amber-700">{c.nota}</span>}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="mt-2 text-sm text-torg-gray">Escolha a natureza da operação.</p>}
+              <p className="mt-2 border-t border-gray-100 pt-2 text-xs text-amber-700">⚠ {r.cfop.ressalva}</p>
+            </div>
+          </div>
+
+          {r.perguntas.length > 0 && (
+            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">Ainda precisa ser respondido</p>
+              <ul className="mt-2 space-y-1 text-sm text-torg-dark">
+                {r.perguntas.map((p) => <li key={p} className="flex gap-2"><HelpCircle size={14} className="mt-0.5 shrink-0 text-torg-gray" />{p}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {/* ⚠⚠ O QUE O PORTAL NÃO DETERMINA, DITO COM O MOTIVO. Um número plausível aqui seria pior
+              que um campo vazio: o vazio manda perguntar, o plausível vai para a nota. */}
+          <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-torg-gray">O portal NÃO determina</p>
+            <ul className="mt-2 space-y-2">
+              {r.naoDeterminados.map((n) => (
+                <li key={n.tributo} className="flex gap-2 text-sm">
+                  <Ban size={14} className="mt-0.5 shrink-0 text-torg-gray" />
+                  <span><strong className="text-torg-dark">{n.tributo}</strong> <span className="text-torg-gray">— {n.motivo}</span></span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const ABAS = [{ id: "ncm", rotulo: "Consulta NCM" }, { id: "cfop", rotulo: "Consulta CFOP" }, { id: "simulador", rotulo: "Simulador" }, { id: "auditoria", rotulo: "Auditoria de NF-e" }, { id: "admin", rotulo: "Atualizações Tributárias" }];
 
 export default function InteligenciaFiscalClient({ referencia, cfops, operacoes, cstIpi, familias, ehAdmin }) {
   const [aba, setAba] = useState("ncm");
@@ -621,6 +803,7 @@ export default function InteligenciaFiscalClient({ referencia, cfops, operacoes,
 
       {aba === "ncm" && <AbaNcm referencia={referencia} />}
       {aba === "cfop" && <AbaCfop cfops={cfops} operacoes={operacoes} cstIpi={cstIpi} familias={familias} />}
+      {aba === "simulador" && <AbaSimulador />}
       {aba === "auditoria" && <AbaAuditoria />}
       {aba === "admin" && <AbaAdmin referencia={referencia} ehAdmin={ehAdmin} />}
 

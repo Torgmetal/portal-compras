@@ -1,7 +1,12 @@
 {
-  "build": 3406,
-  "gerado": "2026-09-23T00:06:31.951Z",
+  "build": 3407,
+  "gerado": "2026-09-23T00:14:27.730Z",
   "commits": [
+    {
+      "hash": "2d8c507697",
+      "data": "22/09/2026",
+      "titulo": "Fiscal: auditoria de NF-e por XML, com a 973 como caso de teste"
+    },
     {
       "hash": "70904dccd8",
       "data": "22/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f471f43ade",
       "data": "22/09/2026",
       "titulo": "Registra a decisão sobre as propostas em PDF da GERDAU"
-    },
-    {
-      "hash": "20cca28918",
-      "data": "22/09/2026",
-      "titulo": "MES: trazer a barra para um posto parado deixa de apagar a parada"
     }
   ]
 }

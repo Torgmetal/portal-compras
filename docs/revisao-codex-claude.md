@@ -781,3 +781,27 @@ novo, não conserto, e não entra sem o Matheus decidir.
   e depender de transitiva é depender de algo que some quando o pai atualiza. DOM de verdade e não
   regex: é documento com valor legal.
   Testes: `fiscal-auditoria` (18), novo. **3.185 passando**, tela validada logada com o XML real.
+- **(22/09, 21h15) Simulador Fiscal — a metade preventiva, e o fecho do pedido original.**
+  ⚠⚠ **É O PONTO DO MÓDULO INTEIRO.** Matheus (22/09/2026): *"o operador não sabia que o NCM
+  precisava destacar IPI, por isso estamos criando essa tela, para ajudar ele"*. O teste-chave do
+  arquivo reproduz a operação que gerou a NF-e 973 com o CST 53 que o operador usou — e o alerta
+  ALTO acende, que é o alerta que ninguém teve na hora.
+  ⚠⚠ **A REGRA É LITERALMENTE A MESMA DA AUDITORIA** (`CST_IPI` importado de `lib/fiscal/auditoria`,
+  não copiado). Se o simulador tivesse cópia própria, abençoaria hoje o que a auditoria condena
+  amanhã — e quem seguiu a tela levaria o apontamento.
+  ⚠⚠ **ELE SE CALA ONDE NÃO SABE.** ICMS, PIS/COFINS e IBS/CBS saem como NÃO DETERMINADOS **com o
+  motivo escrito**, porque o briefing proíbe *"aplicar automaticamente 12% de ICMS a toda venda
+  interestadual"* e *"PIS 1,65% e COFINS 7,6% a todas as operações"*. E o `cEnq` nunca é sugerido:
+  sugerir seria o portal inventando fundamento legal.
+  ⚠ **Entrada pela OP** — o pedido original de Matheus (*"seleciono a OP e já puxa os dados do meu
+  cliente para entender a cidade que vai ser a NF de venda"*). A UF de destino vem do cadastro.
+  ⚠ A IE é INDÍCIO de contribuinte, não prova: "ISENTO" e cadastro velho existem, e a tela diz de
+  onde tirou o palpite.
+  ⚠ **Defeito de UX pego na validação da tela**: a lista "ainda precisa ser respondido" pedia a UF
+  que acabara de ser preenchida, porque os `exige` de cada CFOP são estáticos. Lista que repete o
+  que a pessoa digitou ensina a IGNORAR a lista, e aí a pergunta que importa some junto. O filtro é
+  conservador: na dúvida, a pergunta fica.
+  Testes: `fiscal-simulador` (26), novo. **3.211 passando**, tela validada logada.
+  ⚠ **AINDA ABERTO**: "Produtos da TORG" (§14 do briefing) — classificar o `ARM000010` por peça
+  real, com responsável e data. É a raiz do problema: enquanto um código serve para tudo, o NCM
+  segue sendo escolhido caso a caso. E o P1 do Vitor em `AbaExpedicao.jsx` continua sem toque.
