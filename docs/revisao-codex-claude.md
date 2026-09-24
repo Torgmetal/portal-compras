@@ -1979,3 +1979,11 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   corte/preparação — conferido: o Syneco só tem Corte, Preparação, Montagem, Solda, Acabamento, Jato e
   Pintura, nenhum antes do corte; (b) livro ACEITO
   remontado muda de conteúdo (pré-existente a esta mudança, mas agora com 5 peças na OP-106).
+- **(24/09, noite) Rastreabilidade: a NF deixou de ser cobrada.** Vitor: *"vamos tirar essa regra de ter a
+  NF informada, pois principalmente esses da Aços Maq acaba sendo um problema"* — perguntado qual das três
+  regras de NF, escolheu só a do rastreio. `conferir` (lib/rastreio-tratativa.js) não gera mais a lacuna
+  "nf" (e o rótulo saiu do `PainelRastreabilidade`). Não mexia na situação (EM_DIA/PENDENTE), só no aviso
+  "falta NF" — que ficava aceso para sempre em faturamento direto. Teste: `rastreio-tratativa-nf` (4).
+  **3.936 passando**, `checar` limpo. De carona, corrigido na memória um diagnóstico meu errado: o pedido
+  1719 não estava "sem nota de entrada" como impedimento do R — é FD, teve a entrega registrada em 30/08,
+  e o que falta é a linha no CMR.

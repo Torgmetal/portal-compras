@@ -1,7 +1,12 @@
 {
-  "build": 3458,
-  "gerado": "2026-09-24T18:54:23.731Z",
+  "build": 3459,
+  "gerado": "2026-09-24T19:15:44.641Z",
   "commits": [
+    {
+      "hash": "b39e3ab1",
+      "data": "24/09/2026",
+      "titulo": "Rastreio: corte no dia do recebimento conta; corte provado pela etapa seguinte"
+    },
     {
       "hash": "08fc4cde",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e5129356",
       "data": "23/09/2026",
       "titulo": "Classificação: DDL aplicado e as três correções provadas contra o banco"
-    },
-    {
-      "hash": "409de291",
-      "data": "23/09/2026",
-      "titulo": "Classificação: o teste defendia o defeito — três achados do Codex"
     }
   ]
 }

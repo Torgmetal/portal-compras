@@ -7,7 +7,7 @@ const fmtN = (v) => Number(v || 0).toLocaleString("pt-BR");
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : null);
 
 const ROTULO_FALTA = { arquivo: "certificado não digitalizado", certificado: "sem nº de certificado", corrida: "sem corrida" };
-const ROTULO_LACUNA = { nf: "NF", pedido: "pedido", data: "data", op: "OP" };
+const ROTULO_LACUNA = { pedido: "pedido", data: "data", op: "OP" }; // NF não é cobrada (lib/rastreio-tratativa.js)
 
 // ⚠ ESTA LISTA É FECHADA. Vitor (22/08/2026): "não podemos em hipótese alguma mencionar que o
 // fornecedor não entrega certificado". Toda opção aqui diz ONDE o certificado está, ou que ele

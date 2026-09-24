@@ -97,13 +97,24 @@ Medido: 1.879 peças ganham R em 17 obras (OP-067: 1.662, livro EM_MONTAGEM). Li
 só a OP-106 (5 peças) — e a rota do PDF remonta o livro a cada download.
 
 **OP-102 depois da correção:** §02 com 152 de 277 posições com R (eram 117). O que falta é LANÇAMENTO:
-- **chapas** (85 croquis cortados, 104 posições): a chapa comprada para a obra (RM T102-002, **pedido
-  1719** da AÇOS MAQ) não tem nota de entrada nem linha no CMR; a fábrica cortou de outra chapa. Na
-  Liberação de material as chapas aparecem "estoque · aguardando entrega" com um R SUGERIDO de outra
-  obra — o certo é o da chapa que foi para o corte, e isso só o Almoxarifado sabe;
+- **chapas** (85 croquis cortados entre 12/08 e 24/08, 104 posições): a chapa comprada para a obra
+  (RM T102-002, **pedido 1719** da AÇOS MAQ) é **FATURAMENTO DIRETO** (nota para a QWS) e teve a entrega
+  registrada à mão em 30/08 (`REGISTRAR_ENTREGA_PEDIDO`) — o que falta é a **LINHA NO CMR**
+  (certificado → R). ⚠⚠ Eu disse ao Vitor que faltava "nota de entrada": ERRADO — o R não depende de NF
+  em lugar nenhum; `statusEntrega "ATRASADO"` gravado pelo sync é "entregue com atraso". Se a chapa
+  chegou antes de 12/08 (registro atrasado), lançar no CMR com a obra 102 e a data real resolve pelo
+  FIFO; se chegou em 30/08, as peças saíram de outra chapa → "informar o R usado" na Liberação de
+  material (que sugere um R de outra obra — o certo é o da chapa que foi para o corte);
 - L6" (a RM diz ATENDIDO_ESTOQUE), HP250X62, TB 8" SCH40, W150X29,8: de estoque, sem R informado;
 - 10 peças W cortadas em 12/08 com o CMR dizendo recebido em 13/08 — ou a data do CMR está um dia
   atrasada, ou saiu de outro aço.
 ⚠ A troca (`TrocaRastreabilidade`) é por PERFIL DA PEÇA, e na chapa o perfil leva a largura
 (CH12.50X113, CH12.50X69…): informar o R da chapa de 12,5 é uma confirmação por largura.
+
+⚠ **A NF não é cobrada no rastreio** (Vitor, 24/09/2026: *"vamos tirar essa regra de ter a NF informada,
+pois principalmente esses da Aços Maq acaba sendo um problema"*). `conferir` (lib/rastreio-tratativa.js)
+não põe mais "nf" nas lacunas do painel de rastreabilidade — faturamento direto nunca terá NF de
+entrada da Torg. Pedido, data e OP continuam como aviso; certificado e corrida continuam bloqueando.
+As outras NF obrigatórias (botão Receber do pedido; "já foi entregue" no link do fornecedor) ele NÃO
+pediu para tirar.
 
