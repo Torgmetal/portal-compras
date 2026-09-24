@@ -1,7 +1,12 @@
 {
-  "build": 3440,
-  "gerado": "2026-09-23T23:35:47.690Z",
+  "build": 3441,
+  "gerado": "2026-09-24T10:35:29.675Z",
   "commits": [
+    {
+      "hash": "9e3d2b82",
+      "data": "23/09/2026",
+      "titulo": "PDF do relatório: o botão grava o que está pendente antes de abrir"
+    },
     {
       "hash": "1411cd4e",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "04e3a36d",
       "data": "22/09/2026",
       "titulo": "Simulador: PIS/COFINS sai com número, porque o regime foi DECLARADO"
-    },
-    {
-      "hash": "5ec170c3",
-      "data": "22/09/2026",
-      "titulo": "Simulador: quantas notas a operação exige, e o FD já responde de quem é o material"
     }
   ]
 }

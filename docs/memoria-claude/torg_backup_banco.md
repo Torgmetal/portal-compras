@@ -19,3 +19,15 @@ metadata:
 **Documentos**: Vercel Blob (sem versionamento nem lixeira) **com segunda cópia no SharePoint** para Qualidade e RH (`lib/qualidade-doc-backup.js`, `lib/rh-doc-backup.js` — best-effort com registro no AuditLog quando falha). SharePoint tem lixeira de 93 dias e histórico de versões.
 
 **Ponto cego que continua**: a janela de restauração do Neon (point-in-time) nunca foi confirmada — depende do plano e só dá para ver no console. Ver [[torg_seguranca_pendencias]].
+
+**Medido em 24/09/2026 (Vitor: "como está nossos backups?"):**
+- Dump em dia: 5 pastas (29/08 a 20/09), todas com manifesto e 0 falhas; a de 20/09 tem 175 tabelas,
+  395 mil linhas, 21,5 MB. ⚠⚠ **O TEMPO ESTÁ CHEGANDO NO TETO**: 192 s (30/08) → 236 → 234 → 249 s
+  (20/09), contra `maxDuration` de 300 s — eram 104 s quando isto foi escrito. Estourar = pasta sem
+  manifesto; o monitor acusa em até 192 h.
+- Segunda cópia dos arquivos: RH 185/185 ✓; Qualidade pela tela de Documentos 59/59 ✓;
+  ⚠ **anexos do Data Book (`origem: anexo_databook`) 323 só no Blob, nenhum com cópia** — esse caminho
+  de upload não chama `backupISODocumentoQualidade`; ⚠ **293 fotos de inspeção só no Blob**.
+- Código fora do GitHub, só no Mac do Vitor: o checkout principal (branch do Codex, dezenas de
+  arquivos sem commit), `codex/login-unificado` e duas `claude/*` com commits locais.
+- Neon point-in-time: segue sem confirmação — o projeto não tem `NEON_API_KEY`, só `NEON_PROJECT_ID`.
