@@ -22,8 +22,10 @@ export function AcoesDaTarefa({
   tipoDias,
 }) {
   return (
-    <div className="flex items-center gap-2 shrink-0">
-      <span className="text-[10px] text-torg-gray whitespace-nowrap">
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-5 gap-y-2 border-t border-gray-200/60 pt-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5">
+      <span className="text-[11px] text-torg-gray">
+        <span className="mr-1 font-medium">Previsto:</span>
         {fmtData(t.dataInicioPrevista)} — {fmtData(t.dataFimPrevista)}
         {t.duracaoDias > 0 && (readOnly || t.isSummary) && (
           <span className="ml-1 text-torg-blue font-semibold" title={`Duração: ${t.duracaoDias} ${(tipoDias || "DU") === "DU" ? "dias úteis" : "dias corridos"}`}>
@@ -38,7 +40,7 @@ export function AcoesDaTarefa({
       </span>
 
       {(t.dataInicioReal || t.dataFimReal) && (
-        <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded whitespace-nowrap" title="Execução real (a data prevista não muda)">
+        <span className="text-[11px] text-emerald-700" title="Execução real (a data prevista não muda)">
           Real: {t.dataInicioReal ? fmtData(t.dataInicioReal) : "…"} — {t.dataFimReal ? fmtData(t.dataFimReal) : "em andamento"}
         </span>
       )}
@@ -49,6 +51,8 @@ export function AcoesDaTarefa({
         </span>
       )}
 
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-2 sm:ml-auto">
       {!readOnly && !editing && !t.isSummary && (
         <DuracaoInline tarefa={t} tipoDias={tipoDias} onSaved={onRefresh} />
       )}
@@ -116,6 +120,7 @@ export function AcoesDaTarefa({
           </button>
         </>
       )}
+      </div>
     </div>
   );
 }

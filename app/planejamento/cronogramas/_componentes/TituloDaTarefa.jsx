@@ -2,7 +2,7 @@
 import { corDaArea } from "@/lib/cronograma-area-cor";
 import { AlertTriangle, CheckCircle2, Clock, Layers, Link2, Lock } from "lucide-react";
 
-// Identificacao da tarefa na linha: nome, area, datas e barra de progresso.
+// Identificação e avisos com espaço próprio para textos longos.
 export function TituloDaTarefa({
   allTarefas,
   antecessorasIncompletas,
@@ -18,7 +18,8 @@ export function TituloDaTarefa({
   t,
 }) {
   return (
-    <div className="flex items-center gap-2 flex-1 min-w-0">
+    <div className="min-w-0 space-y-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
       {concluida ? (
         <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
       ) : bloqueada ? (
@@ -35,7 +36,7 @@ export function TituloDaTarefa({
           className="text-xs font-medium px-1.5 py-0.5 border border-torg-blue/30 rounded bg-white flex-1 min-w-0 outline-none focus:border-torg-blue"
         />
       ) : (
-        <span className={`text-xs font-medium truncate ${concluida ? "text-torg-gray line-through" : "text-torg-dark"}`}>
+        <span className={`min-w-0 text-xs font-semibold [overflow-wrap:anywhere] ${concluida ? "text-torg-gray line-through" : "text-torg-dark"}`}>
           {t.nome}
         </span>
       )}
@@ -58,11 +59,13 @@ export function TituloDaTarefa({
         </>
       )}
       {!editing && t.area && (() => { const c = corDaArea(t.area, areas); return (
-        <span className="text-[9px] px-1.5 py-0.5 rounded border flex items-center gap-0.5 shrink-0" style={{ backgroundColor: c.bg, borderColor: c.border, color: c.text }} title={`Área: ${t.area}`}>
-          <Layers size={8} /> {t.area}
+        <span className="text-[10px] px-1.5 py-0.5 rounded border inline-flex min-w-0 max-w-full items-center gap-1 [overflow-wrap:anywhere]" style={{ backgroundColor: c.bg, borderColor: c.border, color: c.text }} title={`Área: ${t.area}`}>
+          <Layers size={10} className="shrink-0" /> <span className="min-w-0">{t.area}</span>
         </span>
       ); })()}
       {t.isSummary && <span className="text-[9px] text-torg-gray bg-gray-100 px-1 rounded">grupo</span>}
+      </div>
+      <div className="flex min-w-0 flex-wrap items-start gap-1.5 empty:hidden">
       {!editing && bloqueada && (() => {
         const nomes = antecessorasIncompletas.map((aid) => {
           const ant = (allTarefas || []).find((x) => x.id === aid);
@@ -71,10 +74,10 @@ export function TituloDaTarefa({
         const visiveis = nomes.slice(0, 2).join(", ");
         const extra = nomes.length > 2 ? ` +${nomes.length - 2}` : "";
         return (
-          <span className="text-[9px] text-white bg-amber-500 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 font-semibold max-w-[340px]"
+          <span className="text-[10px] text-amber-800 bg-amber-100 px-2 py-1 rounded-md flex min-w-0 max-w-full items-start gap-1 font-medium"
             title={`Não é possível executar esta atividade — aguardando: ${nomes.join(", ")}`}>
             <Lock size={9} className="shrink-0" />
-            <span className="truncate">Não pode iniciar — aguardando: {visiveis}{extra}</span>
+            <span className="min-w-0 [overflow-wrap:anywhere]">Não pode iniciar — aguardando: {visiveis}{extra}</span>
           </span>
         );
       })()}
@@ -89,8 +92,8 @@ export function TituloDaTarefa({
         </span>
       )}
       {t.motivoBloqueio && !t.dataLiberacao && !editing && (
-        <span className="text-[9px] text-white bg-red-500 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 font-semibold animate-pulse" title={t.motivoBloqueio}>
-          <Lock size={9} /> Bloqueado — {t.motivoBloqueio.length > 25 ? t.motivoBloqueio.slice(0, 25) + "…" : t.motivoBloqueio}
+        <span className="text-[10px] text-red-700 bg-red-100 px-2 py-1 rounded-md flex min-w-0 max-w-full items-start gap-1 font-medium [overflow-wrap:anywhere]" title={t.motivoBloqueio}>
+          <Lock size={9} className="shrink-0" /> <span className="min-w-0">Bloqueado — {t.motivoBloqueio}</span>
         </span>
       )}
       {t.dataLiberacao && !editing && (
@@ -98,6 +101,7 @@ export function TituloDaTarefa({
           <CheckCircle2 size={8} /> Liberada {new Date(t.dataLiberacao).toLocaleDateString("pt-BR")}
         </span>
       )}
+      </div>
     </div>
   );
 }

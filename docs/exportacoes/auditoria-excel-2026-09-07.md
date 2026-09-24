@@ -165,3 +165,32 @@ Não é uma conciliação de todos os registros de todas as OPs com sistemas ext
 - `lib/resumo-fd-excel.js`
 - `lib/romaneio-form22.js`
 - `lib/romaneio-terceiro-form22.js`
+
+## Segunda revisão visual — pacote v2
+
+- O cabeçalho dos relatórios gerados mantém três linhas e passa a separar marca,
+  título em largura integral e identificação do documento. Código, revisão,
+  data/hora e referência de formulário continuam presentes, sem deslocar a tabela.
+- Corpo padrão em 10 pontos e bordas verticais discretas; tamanhos explícitos
+  das instruções de trabalho e cabeçalhos compactos são respeitados.
+- Relatórios com largura total superior a 210 unidades de coluna usam A3 em
+  paisagem quando estavam no A4 padrão. Formulários oficiais e modelos de
+  importação preservam sua configuração. Configurações explícitas de repetição
+  de cabeçalho permanecem; tabelas simples passam a repetir também a identificação.
+- Colunas do relatório por OP passam a ter larguras próprias para texto,
+  quantidade, peso, percentual e data, preservando as sete abas e seus valores.
+- 48 testes locais passaram (modelos de importação, fórmulas, proteção, tipos,
+  filtros, relatórios de produção e cabeçalho). Comparação dos 76 exemplos com
+  o pacote anterior não encontrou alterações nos valores/fórmulas fora das
+  três linhas do cabeçalho; nos modelos de importação a comparação foi integral.
+- Pacote de revisão v2: 23 exemplos executados pelos geradores e 53 amostras
+  estruturais, identificados no índice. As amostras não validam todos os cenários
+  dos exportadores. Nenhuma publicação foi feita nesta revisão.
+
+## Validação para publicação — 08/09/2026
+
+- Pacote integrado sobre a versão atual de produção, sem incluir prévias locais.
+- 63 testes passaram em oito arquivos, incluindo seis regressões adicionais de fontes externas.
+- Download verificado no Chrome pelo servidor local: Excel reaberto com código 00097, percentual, data, peso, logo e configuração de impressão preservados.
+- A conversão externa passa a detectar linhas/colunas ocultas. Fontes XLSX com proteção, validações ou formatos numéricos específicos são mantidas no original quando autorizado; se exigida remoção de peso, permanecem bloqueadas para revisão. Não se altera o arquivo arquivado.
+- Revisão de código concluída sem bloqueadores restantes.

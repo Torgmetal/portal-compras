@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import ModalEnviarCronograma from "@/components/planejamento/ModalEnviarCronograma";
-import { Archive, Calendar, FileDown, GanttChart, History, Loader2, Milestone, Package, Send, Trash2, Weight } from "lucide-react";
+import { GanttChart, History, Loader2, Package, Weight } from "lucide-react";
+import { CabecalhoCronograma } from "./CabecalhoCronograma";
 import { CronogramaDetail } from "./CronogramaDetail";
 import { HistoricoTab } from "./HistoricoTab";
 import { ProducaoTab } from "./ProducaoTab";
@@ -128,158 +129,25 @@ export function CronogramaExpandido({ detail, loadingDetail, onRefreshDetail, cr
 
   return (
     <div className="border-t border-gray-100">
-      {/* Data Base badge + ações */}
-      {detail && (
-        <div className={`px-4 py-2 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2 ${readOnly ? "bg-gray-100/70" : "bg-gray-50/60"}`}>
-          <div className="flex items-center gap-3">
-            {readOnly && (
-              <span className="text-[9px] bg-gray-200 text-torg-gray px-2 py-0.5 rounded font-semibold flex items-center gap-1">
-                <Archive size={9} /> Somente consulta
-              </span>
-            )}
-            <div className="flex items-center gap-1.5">
-              <Milestone size={13} className="text-torg-blue" />
-              <span className="text-xs font-medium text-torg-dark">Data Base:</span>
-              {detail.dataBase ? (
-                <span className="text-xs font-bold text-torg-blue">{new Date(detail.dataBase).toLocaleDateString("pt-BR")}</span>
-              ) : (
-                <span className="text-xs text-torg-gray italic">Não definida</span>
-              )}
-            </div>
-            {!readOnly && (
-              <button
-                onClick={definirDataBase}
-                disabled={settingBase}
-                className="px-2 py-0.5 text-[10px] font-medium text-torg-blue bg-torg-blue-50 border border-torg-blue/20 rounded hover:bg-torg-blue-100 disabled:opacity-50"
-              >
-                {settingBase ? "..." : detail.dataBase ? "Redefinir" : "Definir"}
-              </button>
-            )}
-            {detail.dataBase && (
-              <span className="text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
-                Datas do cronograma travadas
-              </span>
-            )}
-            {/* Libera as tarefas pros setores — só depois que o cronograma está fechado. */}
-            <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-gray-200">
-              <Send size={12} className={detail.tarefasEnviadasEm ? "text-green-600" : "text-torg-gray"} />
-              <span className="text-xs font-medium text-torg-dark">Tarefas:</span>
-              {detail.tarefasEnviadasEm ? (
-                <span className="text-[11px] font-semibold text-green-700"
-                  title="As tarefas deste cronograma aparecem na aba Sequência de cada setor">
-                  enviadas em {new Date(detail.tarefasEnviadasEm).toLocaleDateString("pt-BR")}
-                </span>
-              ) : (
-                <span className="text-[11px] text-torg-gray italic">não enviadas — os setores não veem</span>
-              )}
-              {!readOnly && (
-                <button
-                  onClick={() => enviarTarefas(!!detail.tarefasEnviadasEm)}
-                  disabled={enviandoTarefas}
-                  title={detail.tarefasEnviadasEm
-                    ? "Recolher: as tarefas somem da Sequência dos setores"
-                    : "Enviar as tarefas pros setores — elas passam a aparecer na aba Sequência"}
-                  className={`px-2 py-0.5 text-[10px] font-medium rounded border disabled:opacity-50 ${
-                    detail.tarefasEnviadasEm
-                      ? "text-torg-gray bg-gray-50 border-gray-200 hover:bg-gray-100"
-                      : "text-white bg-torg-blue border-torg-blue hover:bg-torg-blue/90"
-                  }`}
-                >
-                  {enviandoTarefas ? "..." : detail.tarefasEnviadasEm ? "Recolher" : "Enviar tarefas"}
-                </button>
-              )}
-            </div>
-            {/* Toggle DU / DC */}
-            <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-gray-200">
-              <Calendar size={12} className="text-torg-gray" />
-              {!readOnly ? (
-                <div className="flex rounded-md overflow-hidden border border-gray-200">
-                  <button
-                    onClick={() => alterarTipoDias("DU")}
-                    disabled={savingTipoDias || (detail.tipoDias || "DU") === "DU"}
-                    className={`px-2 py-0.5 text-[10px] font-semibold transition-colors ${
-                      (detail.tipoDias || "DU") === "DU"
-                        ? "bg-torg-blue text-white"
-                        : "bg-white text-torg-gray hover:bg-gray-50"
-                    } disabled:opacity-70`}
-                    title="Dias Úteis (seg-sex)"
-                  >
-                    DU
-                  </button>
-                  <button
-                    onClick={() => alterarTipoDias("DC")}
-                    disabled={savingTipoDias || detail.tipoDias === "DC"}
-                    className={`px-2 py-0.5 text-[10px] font-semibold transition-colors border-l border-gray-200 ${
-                      detail.tipoDias === "DC"
-                        ? "bg-torg-blue text-white"
-                        : "bg-white text-torg-gray hover:bg-gray-50"
-                    } disabled:opacity-70`}
-                    title="Dias Corridos (todos os dias)"
-                  >
-                    DC
-                  </button>
-                </div>
-              ) : (
-                <span className="text-[10px] font-semibold text-torg-blue bg-torg-blue-50 px-2 py-0.5 rounded">
-                  {(detail.tipoDias || "DU") === "DU" ? "DU" : "DC"}
-                </span>
-              )}
-              <span className="text-[9px] text-torg-gray">
-                {(detail.tipoDias || "DU") === "DU" ? "Dias Úteis" : "Dias Corridos"}
-              </span>
-            </div>
-          </div>
-          {!readOnly && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => window.open(`/api/planejamento/cronogramas/${cronogramaId}/pdf`, "_blank")}
-                className="px-3 py-1 text-[10px] font-medium text-white bg-torg-blue rounded-lg hover:bg-torg-blue-700 flex items-center gap-1.5"
-                title="Gera o cronograma em PDF (visão de Gantt) para apresentar ou enviar ao cliente."
-              >
-                <FileDown size={12} /> Exportar Gantt (PDF)
-              </button>
-              <button
-                onClick={() => setModalEnviar(true)}
-                className="px-3 py-1 text-[10px] font-medium text-torg-blue bg-white border border-torg-blue rounded-lg hover:bg-torg-blue-50 flex items-center gap-1.5"
-                title="Envia o cronograma em PDF por e-mail para o cliente e/ou para a equipe."
-              >
-                <Send size={12} /> Enviar ao cliente
-              </button>
-              <button
-                onClick={encerrarCronograma}
-                disabled={encerrando}
-                className="px-3 py-1 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 flex items-center gap-1.5 disabled:opacity-50"
-                title="Encerrar e mover para histórico"
-              >
-                {encerrando ? <Loader2 size={12} className="animate-spin" /> : <Archive size={12} />}
-                Encerrar
-              </button>
-              <button
-                onClick={excluirCronograma}
-                disabled={deleting}
-                className="px-3 py-1 text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                Excluir
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      {detail && <CabecalhoCronograma detail={detail} readOnly={readOnly} cronogramaId={cronogramaId}
+        definirDataBase={definirDataBase} settingBase={settingBase} alterarTipoDias={alterarTipoDias} savingTipoDias={savingTipoDias}
+        enviarTarefas={enviarTarefas} enviandoTarefas={enviandoTarefas} abrirEnvio={() => setModalEnviar(true)}
+        encerrarCronograma={encerrarCronograma} encerrando={encerrando} excluirCronograma={excluirCronograma} deleting={deleting}
+      />}
 
       {modalEnviar && (
         <ModalEnviarCronograma cronogramaId={cronogramaId} onClose={() => setModalEnviar(false)} />
       )}
 
-      <div className="flex items-center justify-between border-b border-gray-100">
-        <div className="flex">
+      <div className="border-b border-gray-200/70 overflow-x-auto">
+        <div className="flex min-w-max px-2 sm:px-3">
           {tabs.map((t) => {
             const Icon = t.icon;
             return (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`px-4 py-2 text-xs font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
+                className={`px-3 sm:px-4 py-3.5 whitespace-nowrap text-xs font-medium flex items-center gap-2 border-b-2 transition-colors ${
                   tab === t.key
                     ? "border-torg-blue text-torg-blue"
                     : "border-transparent text-torg-gray hover:text-torg-dark"

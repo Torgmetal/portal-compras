@@ -29,6 +29,31 @@ describe('apresentação dos relatórios Excel',()=>{
   expect(r.views[0].showGridLines).toBe(false);expect(r.pageSetup.fitToHeight).toBe(0);
   expect(r.getImages().length).toBe(1);
  });
+ it('título longo ocupa toda a largura e mantém código, revisão e formulário sem deslocar dados',async()=>{
+  const titulo='Resumo de Compras — Faturamento Direto por fornecedor';
+  const {workbook,sheet,linhaInicio}=await criarRelatorioTorg({titulo,totalColunas:6,codigoDoc:'REL-CMP-002',revisao:'03',form:21});
+  sheet.columns=[16,52,12,7,16,18].map(width=>({width}));
+  adicionarHeaderTabela(sheet,linhaInicio,['Código','Descrição','Qtd','Un','Preço','Total']);
+  adicionarLinhaTabela(sheet,linhaInicio+1,['00001','Perfil',2,'un',12.5,25]);
+  const r=(await reabrir(workbook)).worksheets[0];
+  expect(r.getCell('F2').master.address).toBe('A2');
+  expect(r.getCell('A2').value).toBe(titulo);
+  expect(r.getCell('A3').value).toMatch(/REL-CMP-002.*Revisão 03.*FORM 21/);
+  expect(r.getCell(linhaInicio+1,1).value).toBe('00001');
+  expect(r.getCell(linhaInicio+1,6).value).toBe(25);
+  expect(r.pageSetup.printTitlesRow).toBe(`1:${linhaInicio}`);
+ });
+ it('impressão larga usa A3 sem alterar largura de colunas ou a escolha de um formulário',async()=>{
+  const {workbook,sheet,linhaInicio}=await criarRelatorioTorg({titulo:'Controle de produção',totalColunas:16});
+  sheet.columns=Array.from({length:16},()=>({width:18}));
+  adicionarHeaderTabela(sheet,linhaInicio,Array.from({length:16},(_,i)=>`Setor ${i}`));
+  adicionarLinhaTabela(sheet,linhaInicio+1,Array.from({length:16},()=>10));
+  const r=(await reabrir(workbook)).worksheets[0];
+  expect(r.pageSetup.paperSize).toBe(8);expect(r.pageSetup.orientation).toBe('landscape');
+  expect(r.getColumn(1).width).toBe(18);
+  sheet._torgPreservarValores=true;sheet.pageSetup.paperSize=9;
+  expect((await reabrir(workbook)).worksheets[0].pageSetup.paperSize).toBe(9);
+ });
  it('mantém códigos e fórmulas, converte datas/percentuais explícitos e mostra descrições completas',async()=>{
   const wb=await criarExcelTabular({titulo:'Controle da produção',abas:[{nome:'Produção',headers:['Marca','Descrição','Execução','Data prevista','Peso (kg)','Calculado'],linhas:[['00097','Chapa de ligação com furos oblongos e acabamento especial '.repeat(4),'12,5%','07/09/2026',1250.7,{formula:'E6*2',result:2501.4}]],larguras:[16,35,16,18,18,18],totais:['TOTAL','','','',1250.7,'']}]});
   const t=wb.worksheets[0]._torgTabelas[0],row=t.headerRow+1;
@@ -78,6 +103,24 @@ describe('apresentação dos relatórios Excel',()=>{
 });
 
 describe('arquivos de engenharia recebidos',()=>{
+ it.each(['proteção','validação','código formatado','percentual formatado'])('preserva o original quando a conversão não mantém %s',async(tipo)=>{
+  const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('LPC');
+  ws.addRows([['Marca','Quantidade'],[97,2]]);
+  if(tipo==='proteção')await ws.protect('teste');
+  if(tipo==='validação')ws.getCell('B2').dataValidation={type:'whole',operator:'greaterThan',formulae:[0]};
+  if(tipo==='código formatado')ws.getCell('A2').numFmt='00000';
+  if(tipo==='percentual formatado'){ws.getCell('B2').value=.25;ws.getCell('B2').numFmt='0%';}
+  const convertido=await padronizarPlanilha(Buffer.from(await wb.xlsx.writeBuffer()));
+  expect(convertido===null).toBe(true);
+ });
+
+ it.each(['linha','coluna'])('recusa arquivo externo com %s oculta sem revelar seu conteúdo',async(tipo)=>{
+  const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('LPC');
+  ws.addRows([['Marca','Quantidade','Observação'],['C1',2,'Público'],['C2',3,'Conteúdo oculto']]);
+  if(tipo==='linha')ws.getRow(3).hidden=true;else ws.getColumn(3).hidden=true;
+  expect(await padronizarPlanilha(Buffer.from(await wb.xlsx.writeBuffer()))).toBeNull();
+ });
+
  it('preserva todas as abas e mais de 20 colunas',async()=>{
   const headers=['Marca','Quantidade',...Array.from({length:23},(_,i)=>`Campo ${i}`)];
   const linha=['C1',2,...Array.from({length:23},(_,i)=>`Dado ${i}`)];

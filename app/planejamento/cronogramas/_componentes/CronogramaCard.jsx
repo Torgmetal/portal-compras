@@ -1,73 +1,36 @@
 "use client";
 import { fmtOP } from "@/lib/utils";
-import { AlertTriangle, ChevronRight, Clock, Factory } from "lucide-react";
-import { fmtData } from "../_lib/formatos";
-import { DEPT_COLORS, DEPT_ICONS, DEPT_LABEL } from "../_lib/rotulos";
+import { AlertTriangle, ChevronRight, Clock } from "lucide-react";
 
-export function CronogramaCard({ cronograma, onToggle }) {
-  const c = cronograma;
-  const now = new Date();
-  const diasRestantes = c.dataFim
-    ? Math.ceil((new Date(c.dataFim) - now) / (1000 * 60 * 60 * 24))
-    : null;
+const dataCurta = valor => valor ? new Date(valor).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
+
+export function CronogramaCard({ cronograma: c, onToggle }) {
+  const diasRestantes = c.dataFim ? Math.ceil((new Date(c.dataFim) - new Date()) / 86400000) : null;
+  const prazo = diasRestantes === null ? null : diasRestantes < 0 ? `${Math.abs(diasRestantes)}d de atraso` : diasRestantes === 0 ? "Término hoje" : `${diasRestantes}d restantes`;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <button onClick={onToggle} className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50/50 transition-colors">
-        <div className="flex items-center gap-3">
-          <ChevronRight size={16} className="text-torg-gray" />
-          <span className="text-sm font-bold text-torg-blue font-mono">{fmtOP(c.opNumero)}</span>
-          <span className="text-sm text-torg-dark font-medium truncate max-w-xs">{c.titulo}</span>
-          {c.op && <span className="text-xs text-torg-gray">({c.op.cliente})</span>}
-          {c.op?.status === "ENCERRADA" && (
-            <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-semibold">OP Encerrada</span>
-          )}
-          {c.op?.status === "CANCELADA" && (
-            <span className="text-[9px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded font-semibold">OP Cancelada</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {c.atrasados > 0 && (
-            <span className="px-2 py-0.5 bg-red-50 text-red-600 text-[10px] font-semibold rounded-full flex items-center gap-1">
-              <AlertTriangle size={10} /> {c.atrasados} atrasado{c.atrasados > 1 ? "s" : ""}
-            </span>
-          )}
-          {diasRestantes !== null && (
-            <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full flex items-center gap-1 ${
-              diasRestantes < 0 ? "bg-red-50 text-red-600"
-              : diasRestantes <= 14 ? "bg-amber-50 text-amber-700"
-              : "bg-gray-100 text-torg-gray"
-            }`}>
-              <Clock size={10} />
-              {diasRestantes < 0 ? `${Math.abs(diasRestantes)}d atrasado` : `${diasRestantes}d restantes`}
-            </span>
-          )}
-          <span className="text-[10px] text-torg-gray">
-            {fmtData(c.dataInicio)} — {fmtData(c.dataFim)}
+    <button onClick={onToggle} aria-label={`Abrir cronograma ${fmtOP(c.opNumero)} — ${c.titulo}`} className="group block w-full px-4 sm:px-5 py-5 text-left hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-torg-blue transition-colors">
+      <span className="flex flex-col lg:flex-row lg:items-start justify-between gap-3 lg:gap-6">
+        <span className="flex min-w-0 items-start gap-3">
+          <span className="shrink-0 whitespace-nowrap rounded-md border border-torg-blue/10 bg-torg-blue-50/70 px-2.5 py-1 text-sm font-semibold tabular-nums text-torg-blue">{fmtOP(c.opNumero)}</span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold leading-6 text-torg-dark" title={c.titulo}>{c.titulo}</span>
+            <span className="mt-0.5 block truncate text-xs text-torg-gray" title={c.op?.cliente || ""}>{c.op?.cliente || "Cliente não informado"}</span>
+            {c.op?.status === "ENCERRADA" && <span className="mt-1 block text-xs text-torg-gray">OP encerrada</span>}
+            {c.op?.status === "CANCELADA" && <span className="mt-1 block text-xs text-red-600">OP cancelada</span>}
           </span>
-        </div>
-      </button>
-
-      {/* Department summary pills */}
-      {c.deptSummary?.length > 0 && (
-        <div className="px-4 pb-3 flex flex-wrap gap-1.5">
-          {c.deptSummary.map((d, i) => {
-            const Icon = DEPT_ICONS[d.departamento] || Factory;
-            return (
-              <span
-                key={i}
-                className={`px-2 py-0.5 text-[10px] font-medium rounded-full border flex items-center gap-1 ${
-                  d.atrasado ? "bg-red-50 text-red-600 border-red-200" : (DEPT_COLORS[d.departamento] || "bg-gray-50 text-torg-gray border-gray-200")
-                }`}
-              >
-                <Icon size={10} />
-                {DEPT_LABEL[d.departamento] || d.nome}
-                <span className="font-bold">{d.percentual}%</span>
-              </span>
-            );
-          })}
-        </div>
-      )}
-    </div>
+        </span>
+        <span className="flex shrink-0 items-center justify-between lg:justify-end gap-3">
+          <span className="flex flex-wrap lg:flex-col items-center lg:items-end gap-x-3 gap-y-1">
+            <span className="text-xs tabular-nums whitespace-nowrap text-torg-gray">{dataCurta(c.dataInicio)} <span className="mx-1 text-slate-400">→</span> {dataCurta(c.dataFim)}</span>
+            <span className="flex items-center gap-3">
+              {prazo && <span className={`inline-flex items-center gap-1 text-xs whitespace-nowrap ${diasRestantes < 0 ? "text-red-600" : diasRestantes <= 14 ? "text-amber-700" : "text-torg-gray"}`}><Clock size={12}/>{prazo}</span>}
+              {c.atrasados > 0 && <span className="inline-flex items-center gap-1 text-xs text-red-600 whitespace-nowrap"><AlertTriangle size={12}/>{c.atrasados} tarefa{c.atrasados > 1 ? "s" : ""} em atraso</span>}
+            </span>
+          </span>
+          <ChevronRight size={17} className="shrink-0 text-slate-400 group-hover:text-torg-blue" />
+        </span>
+      </span>
+    </button>
   );
 }

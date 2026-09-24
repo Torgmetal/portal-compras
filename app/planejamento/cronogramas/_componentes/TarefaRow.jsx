@@ -179,8 +179,8 @@ export function TarefaRow({ tarefa, now, onRefresh, allTarefas, dataBase, tipoDi
   };
 
   return (
-    <div className={`group rounded-lg border ${bloqueada ? "border-amber-200 bg-amber-50/20" : atrasada ? "border-red-200 bg-red-50/30" : "border-gray-100 bg-white"} p-2.5`} style={{ marginLeft: `${indent * 16}px` }}>
-      <div className="flex items-center justify-between gap-2">
+    <div className={`group rounded-lg border ${bloqueada ? "border-amber-200 bg-amber-50/20" : atrasada ? "border-red-200 bg-red-50/30" : "border-gray-100 bg-white"} p-3 sm:p-3.5 min-w-0`} style={{ marginLeft: `${indent * 16}px` }}>
+      <div className="flex min-w-0 flex-col gap-3">
         <TituloDaTarefa
           allTarefas={allTarefas}
           antecessorasIncompletas={antecessorasIncompletas}
