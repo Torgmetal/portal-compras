@@ -144,3 +144,33 @@ colocadas uma em cima da outra, o que não pode é ficar voando as coisas"*.
 - ⚠ Resolução importa: a célula do motor é 10 cm, e a célula arredondada passa da borda da peça — o aço do
   VIZINHO caía nela e contava como apoio (achado pelo medidor). Por isso o caibro só olha `celulasDoCaibro`.
 - ⚠ Pendente: virar a peça 180° (coluna com chapa empilharia com as chapas em pontas opostas).
+
+## Pacotes de até 1,14 m e aço sempre sobre caibro (24/09/2026, tarde)
+
+Vitor: *"precisamos fazer pacotes das peças com no máximo 1,2 de largura para facilitar o carregamento, travar com
+madeiras no meio, cintas, e nunca podemos colocar as peças diretamente no assoalho, sempre com madeira para conseguir
+retirar com facilidade"*. O desenho de referência do PDF (`embalagem-isometrica.js`) já mostrava caibro embaixo e
+entre as fileiras — quem estava fora do padrão era o motor (feixe com 12 mm de folga, aço com y = 0).
+
+- **Largura = `larguraDoPacote()` = 1,14 m**, não 1,20: é o que deixa DOIS pacotes lado a lado na carreta de 2,45 m com a
+  folga de 3 cm de cada um na grade de 10 cm. Pacote de 1,2 m cheio ia um por fileira.
+- **Toda peça estrutural que cabe na largura vai em pacote** (`unidades.js › pacotesPlanosEFeixes`), não só a "barra"
+  de seção até 50 cm. 1º agrupa por descrição + faixa de 2 m (a descrição traz o nível, "VIGAT EL. +14880"); o que
+  ficou sozinho junta pela FAMÍLIA (1ª palavra: VIGA, COLUNA, SE…). Solta só: mais larga que o pacote, longarina em V,
+  a que passa da carreta (coluna de 12,5–14 m nunca em feixe) e quadro vazado sem par do mesmo tamanho.
+- ⚠⚠ **Pacote em FILEIRAS** (`empacotarGrupo`): cada fileira enche até a largura com as peças que couberem, a seguinte
+  vai em cima com caibro de 5 cm (`PAC.madeira`), até 60 cm de altura e 2,5 t. A grade de passo único (a MAIOR peça do
+  grupo ditando o espaço de todas) deixava um grupo de vigas de 26 cm inteiro solto por causa de uma de 60 cm.
+- **Aço no assoalho = sobre caibro (y = 10 cm)**; caixa, engradado e palete assentam direto (base própria:
+  `temBaseDeMadeira`). "No chão" deixou de ser `y === 0`: é `nivelPilha === 0`, e a camada é `nivelPilha`.
+- ⚠⚠ **Dois retratos do aço na grade** (`perfilNaGrade`): `topo/fundo` pelo CENTRO da coluna (apoio — 2 cm de borda não
+  seguram caibro) e `topoMax/fundoMin` por toda célula tocada (colisão, `c.alto`). E o volume cheio é preenchido
+  célula a célula, exato: amostrando de 25 em 25 a partir de +5, a última faixa ficava fora e duas caixas sobre palete
+  (OP-107, perfil Vale) ficaram 30 mm uma dentro da outra.
+- `versaoMontagem` 8; 6 e 7 mostram o aviso azul de "simule de novo".
+- Medido (IFC real, medidor independente, zero voando e zero aço no piso): OP-118 5 (4 carretas + toco com as 10
+  caixas de miúdos) · OP-102 2 · OP-107 1 · OP-085 1.
+- ⚠ **Duas alavancas pendentes de decisão do Vitor**: (a) caixa só vai no assoalho ou sobre caixa (regra do Codex em
+  15/09, resposta a "caixas sem os devidos apoios"); liberando caixa sobre pacote com caibro conferido no aço, a OP-118
+  cai para 4 carretas. (b) Pacote de 1 m de altura (hoje 60 cm, premissa do protótipo): mesmas viagens nas quatro
+  obras medidas, e menos peça solta (OP-102 de 28 para 17; OP-118 de 7 para 6) — fica 60 cm até o Vitor decidir.

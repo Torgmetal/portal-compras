@@ -52,7 +52,7 @@ describe("empilhar pelo aço, não pela caixa envolvente", () => {
     const veic = caminhao(3200, 2150); // só a moldura cabe no assoalho
     expect(carregar(pecas(), {}, veic).cargas).toHaveLength(1); // sem a malha, a caixa cheia deixava subir
     const { cargas, us } = carregar(pecas(), malhas, veic);
-    expect(cargas).toHaveLength(2); expect(us[1].y).toBe(0);
+    expect(cargas).toHaveLength(2); expect(us[1].y).toBe(MEDIDAS.MADEIRA); // no assoalho da outra carga, sobre caibro
   });
 
   it("barra sobre a moldura sobe, com cada caibro sobre as barras dela (aço, não o vão)", () => {
@@ -60,7 +60,7 @@ describe("empilhar pelo aço, não pela caixa envolvente", () => {
     const malhas = { SUPORTE: MOLDURA, BARRA: malha([0, 0, 0, 2000, 150, 150]) };
     const { cargas, us } = carregar(pecas, malhas, caminhao(3200, 2150));
     expect(cargas).toHaveLength(1);
-    const b = us[1]; expect(b.y).toBe(300);
+    const b = us[1]; expect(b.y).toBe(MEDIDAS.MADEIRA + 200 + MEDIDAS.MADEIRA); // moldura sobre caibro, barra sobre caibro
     expect(b.caibros.length).toBeGreaterThanOrEqual(2);
     for (const cb of b.caibros) expect(cb.segs.some(([, , base]) => cb.y0 - base <= MEDIDAS.CALCO)).toBe(true);
   });
@@ -72,7 +72,7 @@ describe("empilhar pelo aço, não pela caixa envolvente", () => {
     const { cargas, us } = carregar(pecas, { COL: col }, caminhao(4800, 700)); // uma coluna de largura: tem de empilhar
     expect(cargas).toHaveLength(1);
     const [c1, c2] = us;
-    expect(c2.y).toBeGreaterThan(0); expect(c2.y).toBeLessThan(550 + MEDIDAS.MADEIRA); // pela caixa: 650
+    expect(c2.y).toBeGreaterThan(c1.y); expect(c2.y).toBeLessThan(c1.y + 550 + MEDIDAS.MADEIRA); // pela caixa: 750
     expect(Math.abs(c2.x - c1.x)).toBeGreaterThan(25); // as chapas de base não caem uma sobre a outra
     for (const cb of c2.caibros) { // caibro encostado no corpo da de cima, calço de no máximo 15 cm sobre o corpo da de baixo
       expect(cb.y0).toBe(c2.y + 125 - MEDIDAS.MADEIRA);
@@ -84,7 +84,7 @@ describe("empilhar pelo aço, não pela caixa envolvente", () => {
     const pecas = [peca("b", "BARRA", 3000, 100, 100, 100), peca("c", "CHAPA", 2500, 1000, 20, 60, { classe: 2 })];
     const malhas = { BARRA: malha([0, 0, 0, 3000, 100, 100]), CHAPA: malha([0, 0, 0, 2500, 20, 1000]) };
     const { us } = carregar(pecas, malhas, caminhao(3200, 2150));
-    expect(us[1].y).toBe(0); // vai para o assoalho, ao lado da barra
+    expect(us[1].nivelPilha).toBe(0); expect(us[1].y).toBe(MEDIDAS.MADEIRA); // vai para o assoalho (sobre caibro), ao lado da barra
   });
 });
 

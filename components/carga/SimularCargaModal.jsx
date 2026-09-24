@@ -240,8 +240,8 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
                 {pdf?.url && <a href={pdf.url} download={pdf.nome} className="sm:ml-auto text-torg-blue font-semibold hover:underline inline-flex items-center gap-1.5 min-h-9"><FileText size={15} /> Baixar PDF gerado</a>}
               </div>
               {carga && !(carga.versaoMontagem >= 6) && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Esta montagem é anterior à verificação dos apoios pela geometria real. Não use esta versão para orientar o carregamento. Clique em <b>Simular de novo</b> para aplicar as correções.</p>}
-              {/* ⚠ a versão 6 (18 a 24/09/2026) proibia empilhar em quase tudo: é segura, mas gasta caminhão */}
-              {carga && carga.versaoMontagem === 6 && <p className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">Esta simulação é de antes de 24/09, quando o simulador quase não empilhava. Clique em <b>Simular de novo</b>: agora ele apoia os caibros no aço real das peças e costuma precisar de menos viagens.</p>}
+              {/* ⚠ versões 6 e 7 (até 24/09/2026): seguras, mas sem os pacotes de 1,14 m e com aço direto no assoalho */}
+              {carga && (carga.versaoMontagem === 6 || carga.versaoMontagem === 7) && <p className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">Esta simulação é de uma versão anterior do simulador. Clique em <b>Simular de novo</b>: agora as peças vão em pacotes de até 1,14 m com madeira entre as camadas, nada de aço fica direto no assoalho e os caibros são conferidos no aço real.</p>}
               {ajustesMudaram && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Os ajustes mudaram. Clique em <b>Simular de novo</b> para atualizar a disposição da carga.</p>}
               <AvisosSimulacao resultado={resultado} />
               <div className="grid lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">

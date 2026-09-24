@@ -1800,3 +1800,26 @@ modelo de ponta a ponta, e isso só dá para fazer em produção ou com a chave 
   (b) o motor não vira peça 180°: coluna com chapa de base empilharia melhor com as chapas em pontas
   opostas (a OP-118 tem 2 carretas finais com colunas no chão); (c) a regra de "encaixe" entre as caixas
   envolventes é 2,5D (coluna de aço) — correta para peça deitada, conservadora para peça com balanço.
+
+- **(24/09, tarde) Simulador: pacotes de até 1,2 m, madeira entre as camadas e aço sempre sobre caibro.** Vitor:
+  *"precisamos fazer pacotes das peças com no máximo 1,2 de largura para facilitar o carregamento, travar com madeiras
+  no meio, cintas, e nunca podemos colocar as peças diretamente no assoalho, sempre com madeira para conseguir retirar
+  com facilidade"*. Antes: 55 peças soltas na OP-118 (vigas com descrição única e colunas de 55 cm, fora da "barra"),
+  feixe sem madeira entre as fileiras, todo aço com y = 0.
+  **Correção:** (1) `larguraDoPacote()` = 1,14 m — dois lado a lado na carreta com a folga de cada um (1,2 m não cabe
+  em dupla na grade); (2) toda peça estrutural que cabe vai em pacote — descrição + faixa de 2 m, e a sobra junta pela
+  família; ficam soltas a mais larga, a longarina em V, a que passa da carreta e o quadro vazado sem par igual;
+  (3) pacote em FILEIRAS com caibro de 5 cm entre elas (a grade de passo único deixava o grupo inteiro solto por causa
+  de uma peça larga); (4) aço no assoalho sobre caibro (y = 10 cm), caixa/engradado/palete direto; "no chão" passou a
+  ser `nivelPilha === 0`; (5) 3D desenha o caibro entre as camadas, a madeira conta, o PDF traz a regra, o editor avisa
+  aço direto no piso; `versaoMontagem` 8.
+  **Achado no caminho (defeito também no deploy da manhã):** o volume cheio (caixa, engradado, peça sem malha) era
+  amostrado de 25 em 25 a partir de +5 e a última faixa ficava fora do mapa — na OP-107 (perfil Vale) duas caixas sobre
+  palete ficaram 30 mm uma dentro da outra. Agora é célula a célula, exato, com dois retratos: colisão por toda célula
+  tocada (`c.alto`), apoio só pela célula coberta até o centro (`c.apoio`).
+  **Resultado** (zero voando, zero aço no piso, zero sólido cruzando): OP-118 5 (4 carretas + toco de caixas; eram
+  19–20 de manhã) · OP-102 2 · OP-107 1 · OP-085 1. Testes: `carga-pacotes` (9, novos) + 4 arquivos atualizados
+  (y +10 cm no chão, vigas em pacote). 
+  ⚠ **Para revisar / decidir:** (a) caixa só no assoalho ou sobre caixa (regra de 15/09) — liberar caixa sobre pacote
+  com caibro conferido leva a OP-118 a 4; (b) altura do pacote 60 cm — com 1 m, mesmas viagens e menos peça solta
+  (OP-102 de 28 para 17); (c) caibro de 5 cm entre camadas é premissa.

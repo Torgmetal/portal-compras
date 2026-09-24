@@ -5,7 +5,7 @@ import { orientarPeca, expandirPecas } from "@/lib/carga/geometria";
 import { montarUnidades } from "@/lib/carga/unidades";
 import { novoContexto } from "@/lib/carga/empacotar";
 import { simularCarga } from "@/lib/carga/simular";
-import { PERFIS, perfilDaLqc, GRADE_CARGA } from "@/lib/carga/premissas";
+import { PERFIS, perfilDaLqc, GRADE_CARGA, MEDIDAS, larguraDoPacote } from "@/lib/carga/premissas";
 import { hashItens } from "@/lib/carga/hash-itens";
 
 const geo = (dims) => ({ dimsEixos: dims, temGeo: true });
@@ -43,7 +43,7 @@ describe("expandirPecas", () => {
 
 describe("montarUnidades — a peça vira pacote, caixa ou peça solta", () => {
   const ctx = novoContexto({ prefixo: "T118" });
-  it("viga pesada é peça solta; miúdos da mesma marca vão numa caixa de madeira; guarda-corpo em pacote; degraus em pacote de 4 fileiras", () => {
+  it("vigas vão em pacote de até 1,14 m; miúdos da mesma marca vão numa caixa de madeira; guarda-corpo em pacote; degraus em pacote de 4 fileiras", () => {
     const lista = [
       { marca: "T118A1", desc: "VIGA", qtd: 2, kgUn: kgViga },
       { marca: "T118C7", desc: "CANTONEIRA", qtd: 10, kgUn: 4 },
@@ -52,7 +52,9 @@ describe("montarUnidades — a peça vira pacote, caixa ou peça solta", () => {
     ];
     const g = { T118A1: geo([12000, 550, 300]), T118C7: geo([800, 50, 50]), T118D1: geo([3000, 1100, 60]), T118DG1: geo([999, 70, 250]) };
     const un = montarUnidades(expandirPecas(lista, g), PERFIS.recomendado, "topo", ctx);
-    expect(un.filter((u) => u.tipo === "PECA")).toHaveLength(2);
+    // Vitor (24/09/2026): "pacotes das peças com no máximo 1,2 de largura" — as duas vigas lado a lado (300 + 12 + 300)
+    expect(un.filter((u) => u.tipo === "PECA")).toHaveLength(0);
+    const pac = un.find((u) => u.membros.some((m) => m.marca === "T118A1")); expect(pac.tipo).toBe("PACOTE"); expect(pac.membros).toHaveLength(2); expect(pac.L).toBeLessThanOrEqual(larguraDoPacote());
     const caixa = un.find((u) => u.tipo === "CAIXA"); expect(caixa.membros).toHaveLength(10); expect(caixa.rotulo).toContain("T118C7");
     const gc = un.find((u) => u.gc); expect(gc.membros).toHaveLength(3); expect(gc.rotulo).toContain("fase D");
     const deg = un.find((u) => u.degrau); expect(deg.membros).toHaveLength(8); expect(deg.col).toBe(4); expect(deg.L).toBeGreaterThan(900); // 4 × 250 lado a lado
@@ -68,13 +70,16 @@ describe("montarUnidades — a peça vira pacote, caixa ou peça solta", () => {
 describe("simularCarga", () => {
   const vigas = (n, marca = "T118A1") => [{ marca, desc: "VIGA", qtd: n, kgUn: kgViga }];
   const gv = { T118A1: geo([12000, 550, 300]) };
-  it("12 vigas de 12 m cabem numa carreta só, numeradas do chão para cima", () => {
+  it("12 vigas de 12 m cabem numa carreta só, em 4 pacotes de 3, numerados do chão para cima e sobre caibro", () => {
     const r = simularCarga({ lista: vigas(12), geometria: gv, perfil: "recomendado", prefixo: "T118" });
     expect(r.resumo.viagens).toBe(1);
     const c = r.cargas[0];
-    expect(c.veiculo.chave).toBe("carreta"); expect(c.volumes).toBe(12); expect(c.altura).toBeLessThanOrEqual(2900);
-    expect(c.romaneio.map((v) => v.volume)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-    expect(c.passos).toHaveLength(12); expect(c.madeira.pecas.caibro).toBeGreaterThan(0);
+    expect(c.veiculo.chave).toBe("carreta"); expect(c.volumes).toBe(4); expect(c.altura).toBeLessThanOrEqual(2900);
+    expect(c.itens.reduce((t, u) => t + u.membros.length, 0)).toBe(12);
+    expect(c.romaneio.map((v) => v.volume)).toEqual([1, 2, 3, 4]);
+    expect(c.passos).toHaveLength(4); expect(c.madeira.pecas.caibro).toBeGreaterThan(0);
+    for (const u of c.itens) { expect(u.tipo).toBe("PACOTE"); expect(u.L).toBeLessThanOrEqual(larguraDoPacote()); }
+    for (const u of c.itens.filter((x) => !(x.nivelPilha > 0))) { expect(u.y).toBe(MEDIDAS.MADEIRA); expect(u.caibros.length).toBeGreaterThanOrEqual(2); }
   });
   it("40 vigas passam do peso da carreta: a lista não cabe num veículo e a resposta diz quantas cargas", () => {
     const r = simularCarga({ lista: vigas(40), geometria: gv, perfil: "recomendado", prefixo: "T118" });
@@ -87,8 +92,8 @@ describe("simularCarga", () => {
     expect(r.resumo.viagens).toBe(1);
     const c = r.cargas[0];
     expect(c.grupo).toBe("grades de piso"); expect(c.altura).toBeLessThanOrEqual(GRADE_CARGA.teto);
-    const chao = c.itens.filter((u) => u.y === 0), acima = c.itens.filter((u) => u.y > 0);
-    expect(chao.length).toBeGreaterThan(0);
+    const chao = c.itens.filter((u) => !(u.nivelPilha > 0)), acima = c.itens.filter((u) => u.nivelPilha > 0);
+    expect(chao.length).toBeGreaterThan(0); for (const u of chao) expect(u.y).toBe(MEDIDAS.MADEIRA); // grade também vai sobre caibro
     for (const u of acima) expect(u.sobre.length).toBeGreaterThan(0);
   });
   it("carga pequena vai no menor veículo em que cabe (HR); marca sem geometria entra estimada e parafuso sem peso fica listado", () => {
@@ -222,9 +227,9 @@ describe("ajustes por marca", () => {
   it("no chão: a viga marcada fica no assoalho mesmo com lugar em cima; nada em cima: nada sobe nela", () => {
     const lista = [{ marca: "T118A1", desc: "VIGA", qtd: 3, kgUn: 700 }, { marca: "T118D1", desc: "G.C", qtd: 3, kgUn: 60 }];
     const r1 = simularCarga({ lista, geometria: g, perfil: "recomendado", prefixo: "T118", ajustes: { T118A1: { posicao: "chao" } } });
-    for (const v of r1.cargas[0].itens.filter((u) => u.membros[0].marca === "T118A1")) expect(v.y).toBe(0);
+    for (const v of r1.cargas[0].itens.filter((u) => u.membros.some((m) => m.marca === "T118A1"))) { expect(v.nivelPilha).toBe(0); expect(v.y).toBe(MEDIDAS.MADEIRA); } // no assoalho, sobre caibro
     const r2 = simularCarga({ lista, geometria: g, perfil: "recomendado", prefixo: "T118", ajustes: { T118A1: { posicao: "nadaEmCima" } } });
-    const vigas = r2.cargas.flatMap((c) => c.itens).filter((u) => u.membros[0].marca === "T118A1").map((v) => v.id);
+    const vigas = r2.cargas.flatMap((c) => c.itens).filter((u) => u.membros.some((m) => m.marca === "T118A1")).map((v) => v.id);
     for (const u of r2.cargas.flatMap((c) => c.itens).filter((u) => u.y > 0)) for (const id of u.sobre) expect(vigas).not.toContain(id);
   });
   it("medidas à mão: marca sem IFC entra com a medida informada, em caixa, sem estimativa", () => {

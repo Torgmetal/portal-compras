@@ -75,7 +75,7 @@ it('dimensiona cada caixa pelo conteúdo dela, sem herdar o vazio da caixa anter
 it('a longarina em V deitada pode usar uma base nivelada e larga, sem reservar piso à força',()=>{
  const itens=[u('base',{C:3900,L:2200,kg:800}),u('v',{C:2800,L:617,A:164,kg:55,baseEmV:true,almaVertical:false})];
  expect(empacotar(itens,'teste',PERFIS.recomendado,ctx(),[],'empilhar')).toHaveLength(1);
- expect(itens[1].y).toBe(400);expect(itens[1].sobre).toEqual(['base']);
+ expect(itens[1].y).toBe(500);expect(itens[1].sobre).toEqual(['base']); // base sobre caibro (100) + 300 + caibro (100)
 });
 it('considera o peso combinado das caixas que compartilham a mesma base',()=>{
  const itens=[u('base',{tipo:'CAIXA',C:3900,L:2200,kg:500}),...['a','b'].map(id=>u(id,{tipo:'CAIXA',C:1800,L:1000,kg:300}))];
@@ -92,7 +92,7 @@ it('avisa no ajuste manual quando a soma das caixas ultrapassa o critério da ba
 it('prefere a base inteira a avançar a pilha para fora do apoio disponível',()=>{
  const itens=[u('vizinho',{C:600,L:2200,A:100}),u('base',{C:2800,L:1000,kg:600}),u('cima',{C:2500,L:900,kg:200})];
  empacotar(itens,'teste',PERFIS.recomendado,ctx(),[],'empilhar');
- const [,b,a]=itens;expect(a.y).toBe(400);
+ const [,b,a]=itens;expect(a.y).toBe(500); // a base também vai sobre caibro: 100 + 300 + 100
  expect(a.x).toBeGreaterThanOrEqual(b.x);expect(a.x+a.fx).toBeLessThanOrEqual(b.x+b.fx);
  expect(a.z).toBeGreaterThanOrEqual(b.z);expect(a.z+a.fz).toBeLessThanOrEqual(b.z+b.fz);
 });
