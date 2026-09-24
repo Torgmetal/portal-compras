@@ -12,6 +12,9 @@ import { FRETES } from "@/lib/frete-cotacao";
 import PropostaDePrazo from "./PropostaDePrazo";
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
+// ⚠ PRAZO se formata em UTC (vem de `<input type="date">`); o carimbo de QUANDO algo aconteceu, em
+// São Paulo — senão uma alteração às 21h48 de 24/09 apareceria como 25/09.
+const fmtDia = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—");
 const moeda = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export const CHIP = {
@@ -129,41 +132,52 @@ function TagFrete({ frete }) {
 }
 
 /**
- * De onde veio a data que está valendo, e o que o fornecedor declarou.
- *
- * ⚠⚠ O CARTÃO MOSTRAVA SÓ A DATA NOVA, indistinguível da original. Quem olha a tela precisa
- * diferenciar "esta data veio do fornecedor ontem, depois de cobrarmos" de "esta data sempre foi
- * essa" — senão o fornecedor empurra o prazo, o pedido sai do vermelho e ninguém percebe que nada
- * de fato melhorou (Matheus, 18/09/2026: "pode fechar as duas").
+ * O que o fornecedor declarou sobre a entrega.
  *
  * ⚠⚠ "INFORMOU ENTREGA" NÃO É "CHEGOU". É declaração de terceiro sem login: o pedido continua
  * cobrável e na mesma situação até alguém conferir a nota. Por isso âmbar, e não verde.
+ * (A previsão vinda do fornecedor mora em `HistoricoPrevisao`, junto das remarcações internas.)
  */
 function DoFornecedor({ p }) {
-  const prev = p.previsaoDoFornecedor;
   const ent = p.entregaDeclarada;
-  if (!prev && !ent) return null;
+  if (!ent) return null;
   return (
-    <>
-      {prev && (
-        <p className="text-[11px] text-amber-700 mt-0.5 flex items-start gap-1">
-          <MessageSquare size={10} className="mt-0.5 shrink-0" />
+    <p className="text-[11px] text-amber-800 mt-0.5 flex items-start gap-1 font-medium">
+      <FileText size={10} className="mt-0.5 shrink-0" />
+      <span>
+        fornecedor informou entrega{ent.nfNumero ? ` na NF ${ent.nfNumero}` : ""} em {fmt(ent.em)} ·
+        aguardando conferência
+      </span>
+    </p>
+  );
+}
+
+/**
+ * Cada remarcação da data de entrega, uma por linha: de/para, observação e quem.
+ *
+ * ⚠⚠ A INTERNA NÃO APARECIA (24/09/2026) — só a do fornecedor. Matheus alterou o #1977 com a
+ * observação "TUBO 26,90MM ATÉ 02/10" e o cartão mostrou só a data nova. ⚠ A do fornecedor segue
+ * em âmbar e dizendo de onde veio: recado de terceiro não pode parecer decisão da Torg.
+ */
+function HistoricoPrevisao({ p }) {
+  const hist = p.historicoPrevisao || [];
+  if (hist.length === 0) return null;
+  return (
+    <ul className="mt-0.5 space-y-0.5">
+      {hist.map((h) => (
+        <li key={h.id} className={`text-[11px] flex items-start gap-1 ${h.doFornecedor ? "text-amber-700" : "text-torg-gray"}`}>
+          {h.doFornecedor
+            ? <MessageSquare size={10} className="mt-[3px] shrink-0" />
+            : <CalendarClock size={10} className="mt-[3px] shrink-0" />}
           <span>
-            previsão informada pelo fornecedor em {fmt(prev.em)}
-            {prev.motivo ? <> — <i>“{prev.motivo}”</i></> : null}
+            {h.doFornecedor ? "Previsão informada pelo fornecedor" : "Data de entrega alterada"}
+            {h.de ? ` de ${fmt(h.de)}` : ""} para {fmt(h.para)} em {fmtDia(h.em)}
+            {h.motivo && <> — <span className={h.doFornecedor ? "italic" : "text-torg-dark"}>“{h.motivo}”</span></>}
+            {h.por && <span className="text-gray-400"> · {h.por}</span>}
           </span>
-        </p>
-      )}
-      {ent && (
-        <p className="text-[11px] text-amber-800 mt-0.5 flex items-start gap-1 font-medium">
-          <FileText size={10} className="mt-0.5 shrink-0" />
-          <span>
-            fornecedor informou entrega{ent.nfNumero ? ` na NF ${ent.nfNumero}` : ""} em {fmt(ent.em)} ·
-            aguardando conferência
-          </span>
-        </p>
-      )}
-    </>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -200,6 +214,7 @@ function LinhaPedido({ p, mostrarFD, mostrarFrete, onDecidido }) {
           <CalendarClock size={11} /> Previsão: <b className="font-medium text-torg-dark">{fmt(p.previsao)}</b>
           <span>·</span> <Quando p={p} />
         </p>
+        <HistoricoPrevisao p={p} />
         <DoFornecedor p={p} />
         {/* ⚠ A proposta fica logo abaixo da previsão, e não no topo do cartão: a decisão é de UM
             pedido, e quem olha precisa ver ao lado dela a data que vale hoje. */}
