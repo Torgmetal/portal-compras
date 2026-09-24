@@ -171,7 +171,11 @@ function HistoricoPrevisao({ p }) {
             : <CalendarClock size={10} className="mt-[3px] shrink-0" />}
           <span>
             {h.doFornecedor ? "Previsão informada pelo fornecedor" : "Data de entrega alterada"}
-            {h.de ? ` de ${fmt(h.de)}` : ""} para {fmt(h.para)} em {fmtDia(h.em)}
+            {/* ⚠ A data ANTERIOR em destaque (Matheus, 24/09/2026: "destaque um pouco mais a data original
+                de entrega para saber qual era a data inicial mais fácil"). A nova já está na linha
+                "Previsão" logo acima; o que a pessoa procura aqui é de onde ela saiu. */}
+            {h.de && <> de <b data-data-anterior className="font-semibold text-torg-dark bg-amber-50 border border-amber-200 rounded px-1">{fmt(h.de)}</b></>}
+            {" "}para {fmt(h.para)} em {fmtDia(h.em)}
             {h.motivo && <> — <span className={h.doFornecedor ? "italic" : "text-torg-dark"}>“{h.motivo}”</span></>}
             {h.por && <span className="text-gray-400"> · {h.por}</span>}
           </span>

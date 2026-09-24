@@ -61,16 +61,22 @@ describe("historicoDaPrevisao", () => {
 describe("o cartão mostra a data de entrega remarcada", () => {
   it("⚠⚠ caso real #1977: de/para e a observação escrita", () => {
     const [linha] = agruparPorRM([pedido([hist("h1", "2026-09-08", "2026-09-29", "TUBO 26,90MM ATÉ 02/10", "2026-09-24T21:48:00Z")])], AGORA);
-    render(<CartaoRM l={linha} onDecidido={() => {}} />);
-    expect(screen.getByText(/Data de entrega alterada de 08\/09\/2026 para 29\/09\/2026/)).toBeTruthy();
+    const { container } = render(<CartaoRM l={linha} onDecidido={() => {}} />);
+    expect(container.textContent).toMatch(/Data de entrega alterada de 08\/09\/2026 para 29\/09\/2026/);
     expect(screen.getByText(/TUBO 26,90MM ATÉ 02\/10/)).toBeTruthy();
     expect(screen.getByText(/Matheus/)).toBeTruthy();
   });
 
+  it("a data anterior sai destacada, para achar a original de relance", () => {
+    const [linha] = agruparPorRM([pedido([hist("h1", "2026-09-08", "2026-09-29", null, "2026-09-24T21:48:00Z")])], AGORA);
+    const { container } = render(<CartaoRM l={linha} onDecidido={() => {}} />);
+    expect(container.querySelector("[data-data-anterior]")?.textContent).toBe("08/09/2026");
+  });
+
   it("caso real #2010: sem observação, a alteração aparece mesmo assim", () => {
     const [linha] = agruparPorRM([pedido([hist("h1", "2026-09-09", "2026-10-30", null, "2026-09-24T21:50:00Z")])], AGORA);
-    render(<CartaoRM l={linha} onDecidido={() => {}} />);
-    expect(screen.getByText(/Data de entrega alterada de 09\/09\/2026 para 30\/10\/2026/)).toBeTruthy();
+    const { container } = render(<CartaoRM l={linha} onDecidido={() => {}} />);
+    expect(container.textContent).toMatch(/Data de entrega alterada de 09\/09\/2026 para 30\/10\/2026/);
   });
 
   it("a do fornecedor continua dizendo que veio do fornecedor", () => {

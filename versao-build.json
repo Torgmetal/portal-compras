@@ -1,7 +1,12 @@
 {
-  "build": 3464,
-  "gerado": "2026-09-24T22:18:42.675Z",
+  "build": 3465,
+  "gerado": "2026-09-24T22:28:33.908Z",
   "commits": [
+    {
+      "hash": "6460d54aa1",
+      "data": "24/09/2026",
+      "titulo": "Assistente fiscal: reenvio depois de queda repete a tentativa inteira, não só a chave"
+    },
     {
       "hash": "3b01fcb84b",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "414826b9d3",
       "data": "23/09/2026",
       "titulo": "Simulador: quatro campos decidem; o resto é conferência e foi para trás de um clique"
-    },
-    {
-      "hash": "d869b9726b",
-      "data": "23/09/2026",
-      "titulo": "Portão por módulo: /fiscal nunca esteve na tabela, e por isso quebrava"
     }
   ]
 }
