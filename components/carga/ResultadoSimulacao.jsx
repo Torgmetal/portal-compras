@@ -1,7 +1,8 @@
 "use client";
 // Leitura da carga escolhida, pendências de conferência e volumes para separação.
 import { useState } from "react";
-import { AlertTriangle, Package, Truck, Search, X, Check, Layers, Clock3, Ruler, ChevronDown } from "lucide-react";
+import { AlertTriangle, Package, Truck, Search, X, Check, Layers, Clock3, Ruler, ChevronDown, ArrowLeftToLine } from "lucide-react";
+import { textoTravamento } from "@/lib/carga/travamento";
 
 const fmtKg = (v) => `${Math.round(v || 0).toLocaleString("pt-BR")} kg`;
 const metros = (v) => `${((v || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} m`;
@@ -68,6 +69,9 @@ export function AvisosSimulacao({ resultado: r }) {
 export function VolumesDaCarga({ carga, onAjustar, ajustes }) {
   const [busca, setBusca] = useState("");
   const rom = carga?.romaneio || [], itens = new Map((carga?.itens || []).map((u) => [u.id, u]));
+  // o romaneio leva o travamento; o item cobre a montagem editada à mão antes de ir ao romaneio
+  const trav = (v) => v.travamento || itens.get(v.id)?.travamento || null;
+  const nTrav = (tipo) => rom.filter((v) => trav(v)?.tipo === tipo).length;
   const q = busca.trim().toLocaleLowerCase("pt-BR");
   const filtrados = rom.filter((v) => !q || [v.volume, v.tipo, v.rotulo, ...(v.marcas || []), ...(itens.get(v.id)?.membros || []).flatMap((m) => [m.marca, m.desc])].join(" ").toLocaleLowerCase("pt-BR").includes(q));
   const marcas = (v) => {
@@ -87,7 +91,7 @@ export function VolumesDaCarga({ carga, onAjustar, ajustes }) {
           <thead className="bg-gray-50/60 sticky top-0 text-torg-gray max-sm:hidden"><tr>{["Volume / embalagem", "Marcas e quantidades", "Peças", "Peso bruto", "C × L × A (cm)", "Camada"].map((h, i) => <th key={h} className={`px-4 py-3 font-medium whitespace-nowrap ${i < 2 ? "text-left" : "text-right"}`}>{h}</th>)}</tr></thead>
           <tbody className="divide-y divide-gray-100 max-sm:block">
             {filtrados.map((v) => <tr key={v.volume} className="hover:bg-slate-50/60 max-sm:block max-sm:p-4">
-              <td className="px-4 py-3 max-sm:p-0 max-sm:block"><b className="text-torg-dark">Volume {String(v.volume).padStart(2, "0")}</b><span className={`block w-fit mt-1.5 px-2 py-1 rounded-md text-xs ${TIPO_COR[v.tipo] || "bg-gray-100 text-gray-800"}`}>{v.tipo}</span></td>
+              <td className="px-4 py-3 max-sm:p-0 max-sm:block"><b className="text-torg-dark">Volume {String(v.volume).padStart(2, "0")}</b><span className={`block w-fit mt-1.5 px-2 py-1 rounded-md text-xs ${TIPO_COR[v.tipo] || "bg-gray-100 text-gray-800"}`}>{v.tipo}</span>{trav(v) && <span className={`flex w-fit max-w-[18rem] items-start gap-1 mt-1.5 px-2 py-1 rounded-md text-xs font-medium ${trav(v).tipo === "escorar" ? "bg-amber-50 text-amber-900" : "bg-red-50 text-red-800"}`}><ArrowLeftToLine size={14} className="shrink-0 mt-px" aria-hidden="true" />{textoTravamento(trav(v), (id) => itens.get(id)?.volume)}</span>}</td>
               <td className="px-4 py-3 max-sm:px-0 max-sm:block">{marcas(v)}</td>
               <td className="px-4 py-3 text-right tabular-nums text-torg-dark max-sm:inline-block max-sm:pl-0 max-sm:py-1"><span className="sm:hidden text-torg-gray mr-1">Peças:</span>{v.pecas}</td>
               <td className="px-4 py-3 text-right tabular-nums text-torg-dark whitespace-nowrap max-sm:inline-block max-sm:pl-0 max-sm:py-1">{fmtKg(v.kgBruto)}</td>
@@ -100,6 +104,7 @@ export function VolumesDaCarga({ carga, onAjustar, ajustes }) {
       </div>
       <div className="px-4 sm:px-5 py-3 bg-slate-50 border-t border-slate-100 text-xs text-torg-gray flex flex-wrap gap-x-5 gap-y-2">
         <b className="text-torg-dark">Madeira para esta carga</b><span>{carga?.madeira?.pecas?.caibro || 0} caibros</span><span>{carga?.madeira?.pecas?.sarrafo || 0} sarrafos</span><span>{carga?.madeira?.pecas?.tabua || 0} tábuas</span><span>Peças de 3 m</span>
+        {(nTrav("escorar") > 0 || nTrav("amarrar") > 0) && <span className="basis-full flex flex-wrap gap-x-3 gap-y-1"><b className="text-torg-dark">Travar para a frente</b>{nTrav("escorar") > 0 && <span className="text-amber-900">{nTrav("escorar")} {nTrav("escorar") === 1 ? "volume escorado" : "volumes escorados"} (caibros já na conta)</span>}{nTrav("amarrar") > 0 && <span className="text-red-800">{nTrav("amarrar")} {nTrav("amarrar") === 1 ? "volume amarrado" : "volumes amarrados"} com cinta e catraca</span>}</span>}
       </div>
     </section>
   );

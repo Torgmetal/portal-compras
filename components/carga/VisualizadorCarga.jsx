@@ -8,7 +8,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Tag, Box, Move, MoveVertical, RotateCw, ZoomIn, ZoomOut, Focus } from "lucide-react";
 import { enquadrarCameraCarga } from "@/lib/carga/enquadramento";
 import { montarCaminhao } from "@/lib/carga/caminhao-3d";
-import { MATERIAL_CINZA, montarCaibros, montarUnidade, rotuloVolume } from "@/lib/carga/cena-carga";
+import { MATERIAL_CINZA, montarCaibros, montarEscoras, montarUnidade, rotuloVolume } from "@/lib/carga/cena-carga";
 
 import { ajustarVolume, recalcularMontagem, posicaoDoArraste, sobreposicaoNoArraste, rotacaoDaUnidade, girarVolumeNoCentro, limitesRotacionados } from "@/lib/carga/montagem-manual";
 
@@ -52,7 +52,7 @@ const VisualizadorCarga = forwardRef(function VisualizadorCarga({ carga, malhas,
     const grupo = new THREE.Group(), grupoRot = new THREE.Group(); scene.add(grupo, grupoRot);
     const unidades = [], madeiras = [];
     const porId = new Map(carga.itens.map((u) => [u.id, u]));
-    for (const u of carga.itens) { const g = montarUnidade({...u,rotacaoManual:rotacaoDaUnidade(u)}, malhas); grupo.add(g); unidades.push(g); for (const m of montarCaibros(u, madeira, (u.sobre || []).map((id) => porId.get(id)).filter(Boolean))) { grupo.add(m); madeiras.push(m); } }
+    for (const u of carga.itens) { const g = montarUnidade({...u,rotacaoManual:rotacaoDaUnidade(u)}, malhas); grupo.add(g); unidades.push(g); for (const m of [...montarCaibros(u, madeira, (u.sobre || []).map((id) => porId.get(id)).filter(Boolean)), ...montarEscoras(u, madeira, porId)]) { grupo.add(m); madeiras.push(m); } }
     const caixaCena = new THREE.Box3().setFromObject(veiculo3d.grupo).union(new THREE.Box3().setFromObject(limite)).union(new THREE.Box3().setFromObject(grupo));
     const enquadrar = (nome = "iso") => {
       setVista(nome);

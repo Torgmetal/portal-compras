@@ -1927,3 +1927,14 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   voando. Teste: `carga-pacotes › carga encostada na cabeceira` (vermelho com o sinal antigo: 1º volume a 3,13 m).
   ⚠ **Para revisar / decidir:** os vãos grandes que sobram são degraus (pilha de trás mais alta que a da frente) —
   carga em escada ou travamento/amarração marcados por volume.
+- **(24/09, noite) Simulador: travamento por volume, e a cinta deixou de ser placa.** Vitor aprovou a regra do vão à
+  frente (*"concordo com sua regra, podemos adotar"*) e estranhou as cintas (*"essas madeiras pretas que vc coloca (…)
+  não vejo a forma de conseguirmos fazer aqui"*). `lib/carga/travamento.js`: vão à frente na mesma faixa de altura e
+  largura — até 30 cm nada; até 1,5 m contra volume (ou contra a cabeceira, no assoalho) **escorar** com 2 caibros do
+  vão (entram na madeira e no 3D); acima disso ou no degrau **amarrar** com cinta e catraca. Roda no motor e na
+  montagem editada; vai ao romaneio, à tabela de volumes e ao PDF. De carona: o PDF dizia "Apoio não identificado" para
+  todo aço no assoalho (y = 10 cm desde a versão 8, e o texto testava `u.y > 0`). A cinta virou laço de fita de
+  32 × 8 mm (`cintar`). Testes: `carga-travamento` (13). **3.899 passando**, `checar` limpo, build EXIT=0.
+  ⚠ **Para revisar:** a regra de sobreposição (>30% da menor dimensão, em altura e largura) decide quem "segura" quem
+  — volume estreito encostado num largo conta como apoio; e o 3D não desenha a amarração de propósito (não há ponto
+  de ancoragem modelado).

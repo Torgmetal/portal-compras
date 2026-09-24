@@ -187,7 +187,30 @@ Medido na OP-118 (regras do portal): de 82 volumes, só 3 a até 10 cm de algo �
   cabeceira. Agora `+ ix * 2`: cada volume encosta no da frente, a carga vai da cabine para trás.
 - Resultado: OP-118 **5 → 4 carretas**, vãos de 30 cm–1 m 20 → 3, acima de 1 m 30 → 21; OP-102/107/085 mesmas viagens.
 - ⚠ **O que sobra de vão grande é DEGRAU** (13 de 21 na OP-118): a pilha de trás mais alta que a da frente — o volume
-  de cima não tem nada na altura dele até a cabine. Resolver pede carga "em escada" (alta na frente, descendo) ou
-  travamento/amarração marcados por volume — pendente de decisão do Vitor.
+  de cima não tem nada na altura dele até a cabine. O travamento por volume (seção abaixo) foi adotado; carga "em
+  escada" (alta na frente, descendo) segue como proposta, sem decisão.
 - Teste: `carga-pacotes › carga encostada na cabeceira` (só a carreta no catálogo: numa HR só existe um lugar e o
   teste passava com o defeito).
+
+## Travamento por volume — escorar ou amarrar (24/09/2026)
+
+Vitor aprovou a regra proposta para o vão à frente: *"concordo com sua regra, podemos adotar"*. `lib/carga/travamento.js`
+(`travamentoDaCarga`), função pura sobre as posições — roda no motor (`simular.js`, antes da madeira) e na montagem
+editada à mão (`recalcularMontagem` refaz a cada edição). Mede o vão livre à FRENTE (−x) na mesma faixa de altura e de
+largura (sobreposição > 30% das duas):
+
+- **até 30 cm**: nada (folga entre volumes + calço);
+- **até 1,5 m contra outro volume**, ou contra a cabeceira quando está NO ASSOALHO: **escorar** — 2 caibros do tamanho
+  do vão, que entram na conta de madeira (`madeiraDaUnidade`) e aparecem no 3D (`montarEscoras`);
+- **acima disso, ou sem nada na altura dele até a cabine** (o degrau): **amarrar para a frente com cinta e catraca**.
+  O 3D não desenha a amarração (não há onde ancorar sem inventar); fica no texto.
+
+Aparece no romaneio (`travamento`), na tabela de volumes (etiqueta âmbar/vermelha + contagem no rodapé) e no PDF
+(linha na página de cada volume). ⚠ **"No assoalho" é `noAssoalho(u)`**: aço sobre o caibro do piso tem y = 10 cm; o PDF
+dizia "Apoio não identificado" para todo aço no chão desde a versão 8, porque testava `u.y > 0`.
+
+⚠ **Cinta é fita, não placa.** Desenhada como caixa de 5 cm × altura × largura em `0x222222`, virava uma placa preta
+atravessando o pacote, e o Vitor leu como madeira: *"essas madeiras pretas que vc coloca (…) não vejo a forma de
+conseguirmos fazer aqui"*. Agora `cintar()` (cena-carga) faz um laço de fita de 32 mm × 8 mm em volta do volume, verde
+das cintas do PDF, e o contorno do pacote ficou claro e translúcido.
+

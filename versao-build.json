@@ -1,7 +1,12 @@
 {
-  "build": 3452,
-  "gerado": "2026-09-24T15:13:25.259Z",
+  "build": 3453,
+  "gerado": "2026-09-24T15:36:34.825Z",
   "commits": [
+    {
+      "hash": "ec93769c",
+      "data": "24/09/2026",
+      "titulo": "Simulador de carga: carga encostada na cabeceira — sem vão para correr na frenagem"
+    },
     {
       "hash": "17977e85",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "9b0432cb",
       "data": "23/09/2026",
       "titulo": "Simulador: a ficha de emissão e a prévia dos impostos — e quatro achados do Codex"
-    },
-    {
-      "hash": "43b1b3b0",
-      "data": "23/09/2026",
-      "titulo": "Auditoria: validar a medição do Omie ANTES de emitir — e o primeiro uso já achou um caso"
     }
   ]
 }
