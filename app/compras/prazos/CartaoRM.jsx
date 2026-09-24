@@ -205,16 +205,32 @@ function LinhaPedido({ p, mostrarFD, mostrarFrete, onDecidido }) {
             pedido, e quem olha precisa ver ao lado dela a data que vale hoje. */}
         <PropostaDePrazo pedido={p} onDecidido={onDecidido} />
         {/* ⚠ As etapas já lançadas aparecem aqui como rastro curto: quem varre a lista quer saber
-            se alguém já mexeu no pedido, sem ter que abrir a RM para descobrir. */}
+            se alguém já mexeu no pedido, sem ter que abrir a RM para descobrir.
+
+            ⚠⚠ E A OBSERVAÇÃO VEM JUNTO — ela não aparecia (24/09/2026). Matheus: *"o usuário Compras
+            ajustou algumas datas e escreveu umas observações na frente, mas não veio as
+            observações, somente as datas"*. A API já trazia o texto; o cartão escrevia só
+            "{etapa} em {data}" e jogava fora o resto. O custo apareceu no banco: o pedido #1976 foi
+            lançado DUAS vezes em dois minutos — a primeira sem observação, a segunda com —, porque
+            quem lançou não viu o texto aparecer e tentou de novo.
+
+            ⚠ Uma etapa por LINHA, não corridas numa linha só: com a observação junto, duas etapas
+            lado a lado viram um parágrafo em que não se sabe qual texto é de qual data. */}
         {p.etapas.length > 0 && (
-          <p className="text-[11px] text-torg-gray mt-0.5 flex items-center gap-1 flex-wrap">
+          <ul className="mt-0.5 space-y-0.5">
             {p.etapas.map((e) => (
-              <span key={e.id} className="inline-flex items-center gap-1">
-                {e.etapa === "MATERIAL_RECEBIDO" ? <PackageCheck size={10} className="text-emerald-600" /> : <Truck size={10} />}
-                {e.titulo} em {fmt(e.data)}
-              </span>
+              <li key={e.id} className="text-[11px] text-torg-gray flex items-start gap-1">
+                {e.etapa === "MATERIAL_RECEBIDO"
+                  ? <PackageCheck size={10} className="mt-[3px] shrink-0 text-emerald-600" />
+                  : <Truck size={10} className="mt-[3px] shrink-0" />}
+                <span>
+                  {e.titulo} em {fmt(e.data)}
+                  {e.observacao && <> — <span className="text-torg-dark">“{e.observacao}”</span></>}
+                  {e.por && <span className="text-gray-400"> · {e.por}</span>}
+                </span>
+              </li>
             ))}
-          </p>
+          </ul>
         )}
       </div>
       <span className="text-sm text-torg-orange-700 font-semibold tabular-nums">{moeda(p.total)}</span>

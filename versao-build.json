@@ -1,156 +1,156 @@
 {
-  "build": 3454,
-  "gerado": "2026-09-24T16:44:18.313Z",
+  "build": 3455,
+  "gerado": "2026-09-24T16:56:13.103Z",
   "commits": [
     {
-      "hash": "51754018",
+      "hash": "8c92271d65",
+      "data": "24/09/2026",
+      "titulo": "Simulador de carga: a cabeceira tem altura (Resolução CONTRAN 945/2022, art. 8º)"
+    },
+    {
+      "hash": "51754018e7",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: travamento por volume (escorar/amarrar) e cinta como fita"
     },
     {
-      "hash": "ec93769c",
+      "hash": "ec93769cef",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: carga encostada na cabeceira — sem vão para correr na frenagem"
     },
     {
-      "hash": "17977e85",
+      "hash": "17977e8564",
       "data": "24/09/2026",
       "titulo": "Assistente fiscal: XML de NF-e no chat — e o código da nota não é recomendação"
     },
     {
-      "hash": "b79fbe23",
+      "hash": "b79fbe234d",
       "data": "24/09/2026",
       "titulo": "Assistente fiscal: o prazo do modelo conta desde a entrada da rota"
     },
     {
-      "hash": "6f71adcd",
+      "hash": "6f71adcd86",
       "data": "24/09/2026",
       "titulo": "Assistente fiscal: quatro achados do Codex — dinheiro, idempotência, versão e prazo"
     },
     {
-      "hash": "81ecb9ee",
+      "hash": "81ecb9eee3",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: pacotes de até 1,14 m com madeira entre as camadas; aço sempre sobre caibro"
     },
     {
-      "hash": "0271778a",
+      "hash": "0271778aae",
       "data": "24/09/2026",
       "titulo": "Prazos das RMs: o link estava na sidebar que o almoxarifado nunca abre"
     },
     {
-      "hash": "e883f93b",
+      "hash": "e883f93bbb",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: empilha pelo aço real — caibro sobre aço, calço até 15 cm"
     },
     {
-      "hash": "70bc11fd",
+      "hash": "70bc11fd23",
       "data": "24/09/2026",
       "titulo": "Prazos das RMs: o almoxarifado vê a lista — a caneta continua no Compras"
     },
     {
-      "hash": "12562caa",
+      "hash": "12562caa27",
       "data": "24/09/2026",
       "titulo": "Memória: recuperar backup local numa pasta separada, nunca com switch na pasta principal"
     },
     {
-      "hash": "1424d155",
+      "hash": "1424d1553e",
       "data": "24/09/2026",
       "titulo": "Memória: o código que só existia no Mac foi para refs/backup no GitHub — por que não branch, e como recuperar"
     },
     {
-      "hash": "07a529f0",
+      "hash": "07a529f0cf",
       "data": "24/09/2026",
       "titulo": "Backups: o dump do banco longe do teto, e cópia do que só existia no Blob"
     },
     {
-      "hash": "74fa9db4",
+      "hash": "74fa9db450",
       "data": "24/09/2026",
       "titulo": "Memória: o estado dos backups medido em 24/09 — tempo do dump perto do teto, anexos do data book e fotos sem cópia"
     },
     {
-      "hash": "9e3d2b82",
+      "hash": "9e3d2b8226",
       "data": "23/09/2026",
       "titulo": "PDF do relatório: o botão grava o que está pendente antes de abrir"
     },
     {
-      "hash": "1411cd4e",
+      "hash": "1411cd4e96",
       "data": "23/09/2026",
       "titulo": "Relatórios de LP e EVS: a junta soldada sai da EPS escolhida"
     },
     {
-      "hash": "5c56fc98",
+      "hash": "5c56fc98d3",
       "data": "23/09/2026",
       "titulo": "Prazos: a data de entrega faltava no seletor, e ela não é uma etapa"
     },
     {
-      "hash": "390aa8b9",
+      "hash": "390aa8b918",
       "data": "23/09/2026",
       "titulo": "Assistente Fiscal: a IA orquestra, a ferramenta é que determina"
     },
     {
-      "hash": "a1840903",
+      "hash": "a18409031f",
       "data": "23/09/2026",
       "titulo": "Fiscal: a validação das regras — e por que elas não viraram tabela"
     },
     {
-      "hash": "414826b9",
+      "hash": "414826b9d3",
       "data": "23/09/2026",
       "titulo": "Simulador: quatro campos decidem; o resto é conferência e foi para trás de um clique"
     },
     {
-      "hash": "d869b972",
+      "hash": "d869b9726b",
       "data": "23/09/2026",
       "titulo": "Portão por módulo: /fiscal nunca esteve na tabela, e por isso quebrava"
     },
     {
-      "hash": "99f932cc",
+      "hash": "99f932cc04",
       "data": "23/09/2026",
       "titulo": "Fiscal: a cadeia de documentos de uma obra — e ela nunca diz \"falta uma nota\""
     },
     {
-      "hash": "b166069f",
+      "hash": "b166069fc8",
       "data": "23/09/2026",
       "titulo": "Portal de campo: o que o inspetor digitava deixava de aparecer"
     },
     {
-      "hash": "bf88a11c",
+      "hash": "bf88a11cc3",
       "data": "23/09/2026",
       "titulo": "Relatórios de inspeção: assinatura sem duplicar, cor da tinta, desenho no anexo"
     },
     {
-      "hash": "1c2b990f",
+      "hash": "1c2b990f4d",
       "data": "23/09/2026",
       "titulo": "Desenho do dimensional: o carimbo do A2 deixa de cortar a coluna ao meio"
     },
     {
-      "hash": "e5129356",
+      "hash": "e512935662",
       "data": "23/09/2026",
       "titulo": "Classificação: DDL aplicado e as três correções provadas contra o banco"
     },
     {
-      "hash": "409de291",
+      "hash": "409de29159",
       "data": "23/09/2026",
       "titulo": "Classificação: o teste defendia o defeito — três achados do Codex"
     },
     {
-      "hash": "5969682a",
+      "hash": "5969682a3f",
       "data": "23/09/2026",
       "titulo": "Fiscal: o registro de classificação de produto — §14, a raiz do problema"
     },
     {
-      "hash": "65baa3bf",
+      "hash": "65baa3bfa8",
       "data": "23/09/2026",
       "titulo": "PIS/COFINS no 5.116: a indeterminação estava só no texto, não no cálculo"
     },
     {
-      "hash": "895bc925",
+      "hash": "895bc9259a",
       "data": "23/09/2026",
       "titulo": "Cenários: a família era grossa demais, e propagou fundamento de uma operação para outra"
-    },
-    {
-      "hash": "c6c6b02c",
-      "data": "23/09/2026",
-      "titulo": "Fiscal: a base de CST — ICMS, PIS/COFINS e origem, com os cenários principais"
     }
   ]
 }
