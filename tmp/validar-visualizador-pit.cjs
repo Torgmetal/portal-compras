@@ -1,0 +1,21 @@
+const {chromium}=require('playwright');
+const fs=require('fs');
+(async()=>{
+ const b=await chromium.launch({headless:true});const p=await b.newPage({viewport:{width:1280,height:900}});
+ p.on('pageerror',e=>console.log('PAGEERROR',e.message));
+ await p.route('**/api/qualidade/pit/validacao**',r=>r.request().url().includes('arquivo=')?r.fulfill({contentType:'application/pdf',body:fs.readFileSync('output/pdf/PIT-OP-122-Torg-R0.pdf')}):r.fulfill({json:r.request().url().endsWith('/cliente')?{documentos:[{id:'teste',nome:'PIT do cliente — padrão Torg',arquivoNome:'pit.pdf'}]}:{podeGerenciar:false,padrao:null,opcoes:[]}}));
+ await p.goto('http://localhost:3000/estrutura-3d/validacao-pit');
+ await p.getByRole('button',{name:'Visualizar',exact:true}).click();
+ await p.getByRole('img',{name:'Página 1 do PIT',exact:true}).waitFor({timeout:90000});
+ await p.screenshot({path:'/tmp/pit-visualizador-desktop.png'});
+ await p.getByRole('button',{name:'Próxima página'}).click();
+ await p.getByRole('img',{name:'Página 2 do PIT',exact:true}).waitFor();
+ await p.setViewportSize({width:390,height:844});
+ await p.waitForTimeout(500);
+ if(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Overflow mobile');
+ await p.getByLabel('Zoom do PDF').selectOption('2');
+ await p.waitForTimeout(500);
+ if(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Overflow zoom');
+ await p.screenshot({path:'/tmp/pit-visualizador-mobile.png'});
+ console.log('PDF real renderizado, navegação e zoom mobile verificados.');await b.close();
+})().catch(e=>{console.error(e);process.exit(1)});

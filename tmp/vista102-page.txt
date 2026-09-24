@@ -1,0 +1,4 @@
+'use client';
+import {useEffect,useState} from 'react';import dynamic from 'next/dynamic';
+const View=dynamic(()=>import('@/components/carga/VisualizadorCarga'),{ssr:false});
+export default function Pagina(){const[d,setD]=useState(null);useEffect(()=>{Promise.all([fetch('/estrutura-3d/validacao-carga102/dados').then(r=>r.json()),fetch('/estrutura-3d/validacao-carga102/malhas').then(r=>r.json())]).then(([r,m])=>setD({r,m}));},[]);return d?<main>{d.r.cargas.map((c,i)=><section key={i}><h2>Carga {i+1}</h2><View carga={c} malhas={d.m} altura={600}/></section>)}</main>:<p>Carregando</p>}

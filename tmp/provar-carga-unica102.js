@@ -1,0 +1,5 @@
+import fs from 'node:fs';import {expandirPecas} from '../lib/carga/geometria';import {montarUnidades} from '../lib/carga/unidades';import {novoContexto} from '../lib/carga/empacotar';import {PERFIS,VEICULOS} from '../lib/carga/premissas';import {encaixarNoPiso} from './encaixe-piso-op102';
+const geometria=JSON.parse(fs.readFileSync('/tmp/carga102/geometria.json'));
+for(const n of [1,2]){const e=JSON.parse(fs.readFileSync(`/tmp/carga102/entrada-${n}.json`));const orig=montarUnidades(expandirPecas(e.lista,geometria),PERFIS.economico,'topo',novoContexto());for(const C of [12400,14000])for(const L of [2450,2850,3000]){const v={...VEICULOS.carreta,C,L};let best=99,counts;
+for(const [k,cmp]of Object.entries({area:(a,b)=>b.C*b.L-a.C*a.L,comp:(a,b)=>b.C-a.C,larg:(a,b)=>b.L-a.L})){const us=orig.map(u=>({...u,ocupacao:geometria[u.marca || u.rotulo]?.ocupacao,facesApoio:undefined}));const cs=encaixarNoPiso(us.sort(cmp),v);const score=cs.length+us.filter(u=>u.semLugar).length*10;if(score<best){best=score;counts=cs.map(c=>c.itens.length);fs.writeFileSync(`/tmp/carga102/unica-${n}-${C}-${L}.json`,JSON.stringify(cs));}}
+console.log({n,C,L,best,counts,total:orig.length});}}

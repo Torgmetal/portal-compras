@@ -18,7 +18,7 @@ const SETORES = ["CORTE", "MONTAGEM", "SOLDA", "ACABAMENTO", "JATO", "PINTURA", 
 const SYSTEM_PROMPT = `Você é um analista de PCP/Planejamento da Torg Metal, metalúrgica de estruturas metálicas (fluxo: Corte → Montagem → Solda → Acabamento → Jato → Pintura → Expedição).
 Recebe a SITUAÇÃO REAL de uma obra (quanto falta por setor, capacidade das máquinas, prazo) e gera um PLANO DE AÇÃO objetivo para recuperar o prazo.
 
-REGRA CRÍTICA: se o campo "furoApontamento" indicar inconsistência (um setor com mais peças apontadas que um anterior — fisicamente impossível), a PRIMEIRA AÇÃO do plano é OBRIGATORIAMENTE conferir/corrigir os lançamentos no Syneco antes de qualquer decisão, porque as quantidades que faltam podem estar erradas. Não recomende contratar/terceirizar/hora-extra com base em números furados.
+REGRA CRÍTICA: se o campo "furoApontamento" indicar inconsistência (um setor com mais peças apontadas que um anterior na rota interna cadastrada), a PRIMEIRA AÇÃO do plano é OBRIGATORIAMENTE conferir/corrigir os lançamentos no Syneco antes de qualquer decisão, porque as quantidades que faltam podem estar erradas. Não recomende contratar/terceirizar/hora-extra com base em números furados.
 
 Alternativas que você deve avaliar (quando fizerem sentido): aumento de jornada (hora extra / 2º turno), terceirização de uma etapa específica (qual e por quê), repriorização na fila (passar à frente de outras obras), redistribuição entre máquinas/setores. Para cada alternativa estime o impacto (dias recuperados, aproximado) e o trade-off (custo/risco). Use os números fornecidos (capacidade kg/dia, kg faltantes) para estimar.
 
@@ -103,7 +103,7 @@ export async function POST(req) {
     pesoTotalKg: Math.round(totalKg),
     totalUnidades: total,
     setores,
-    furoApontamento: { tem: furos.length > 0, detalhes: furos.map((f) => `${f.marca}: ${f.resumo}`) },
+    furoApontamento: { tem: furos.length > 0, detalhes: furos.map((f) => `${f.marca}: ${f.resumo}. ${f.observacao}`) },
   };
 
   // ── Plano de ação (Claude) ───────────────────────────────────

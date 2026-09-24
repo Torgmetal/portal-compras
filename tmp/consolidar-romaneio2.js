@@ -1,0 +1,4 @@
+import fs from 'node:fs';import {encaixarNoPiso} from './encaixe-piso-op102';
+const sim=JSON.parse(fs.readFileSync('/tmp/carga102/config.json')).sims[1],g=JSON.parse(fs.readFileSync('/tmp/carga102/geometria.json'));
+const orig=sim.cargas.flatMap(c=>c.itens),veic=sim.cargas[0].veiculo;let seed=5,best=99;const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+for(let k=0;k<600;k++){const us=orig.map(u=>({...u,ocupacao:g[u.rotulo]?.ocupacao,facesApoio:undefined}));const maior=us.find(u=>u.rotulo==='T102B45');const outros=us.filter(u=>u!==maior).map(u=>({u,key:(u.C*u.L)*(0.05+rand()*2)})).sort((a,b)=>b.key-a.key).map(x=>x.u);const cs=encaixarNoPiso([maior,...outros],veic,k%2===0);const score=cs.length+(cs.at(-1)?.itens.length||0)/100;if(score<best){best=score;console.log(k,cs.length,cs.map(c=>c.itens.length));fs.writeFileSync('/tmp/carga102/romaneio2-consolidacao.json',JSON.stringify(cs));}if(cs.length===1)break;}

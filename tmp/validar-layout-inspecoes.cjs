@@ -1,0 +1,5 @@
+const {chromium}=require('playwright');const assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({headless:true});try{const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.route('**/api/qualidade/inspecoes',route=>route.fulfill({json:{soltas:[],relatorios:[{id:'demo1',codigo:'RID-084-001',tipo:'DIMENSIONAL',opNumero:'084',marcas:['T84A1','T84A2','T84A3','T84A4','T84A5'],inspetor:'Vitor Costa',assinaturas:[],fotos:0},{id:'demo2',codigo:'RLP-105-001',tipo:'LP',opNumero:'105',marcas:['105A15'],inspetor:'Geraldo',assinaturas:[],fotos:18}]}}));
+for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.goto('http://localhost:3000/estrutura-3d/previa-inspecoes');await page.getByText('RID-084-001').waitFor();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));await page.screenshot({path:`/tmp/inspecoes-${width}.png`,fullPage:true});}
+assert.equal(errors.length,0);console.log('Desktop e celular sem overflow nem erros JS. Dados simulados; nenhuma mutação.');}finally{await browser.close();}})();

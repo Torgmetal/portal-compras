@@ -1,0 +1,2 @@
+import fs from 'node:fs/promises';import env from '@next/env';env.loadEnvConfig(process.cwd());const {prisma}=await import('../lib/prisma.js');
+try{const sims=JSON.parse(await fs.readFile('/tmp/carga102-simulacoes.json'));const ps=await prisma.romaneioPrevio.findMany({where:{opId:'cmrpbuom1000bla04whl6k4kw'}});await fs.writeFile('/tmp/carga102/previos.json',JSON.stringify(ps));console.log(ps.map(p=>({id:p.id,numero:p.numero,itens:p.itens.length})));}finally{await prisma.$disconnect()}

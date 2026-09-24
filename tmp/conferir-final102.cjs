@@ -1,0 +1,6 @@
+const fs=require('fs'),{chromium}=require('playwright');
+(async()=>{const b=await chromium.launch({headless:true,args:['--enable-unsafe-swiftshader']});const p=await b.newPage({viewport:{width:1400,height:800}});
+for(const n of [1,2]){const r=JSON.parse(fs.readFileSync(`/tmp/carga102/antes-${n}.json`));const e=JSON.parse(fs.readFileSync(`/tmp/carga102/entrada-${n}.json`));const qtd=e.lista.reduce((s,x)=>s+x.qtd,0),postos=r.cargas.flatMap(c=>c.itens).reduce((s,x)=>s+x.membros.length,0)+r.especiais.length;if(qtd!==postos)throw Error('Peças omitidas');
+for(const c of r.cargas)for(const u of c.itens){if(u.emPe)throw Error('Em pé');if(u.x+u.fx>c.veiculo.C||u.z+u.fz>c.veiculo.L||u.y+u.A>c.veiculo.alturaUtil)throw Error('Fora');for(const id of u.sobre||[]){const apoio=c.itens.find(b=>b.id===id);if(apoio?.topoVazado)throw Error('Apoio vazado');}}
+await p.goto(`http://localhost:3000/estrutura-3d/validacao-carga102?n=${n}`);await p.locator('canvas').first().waitFor({timeout:60000});await p.waitForTimeout(1500);await p.screenshot({path:`/tmp/carga102/final-${n}.png`,fullPage:true});console.log('Romaneio',n,':',qtd,'peças preservadas, limites e apoios conferidos, 3D local renderizado.');}
+await b.close()})().catch(e=>{console.error(e);process.exit(1)});

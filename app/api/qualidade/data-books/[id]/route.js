@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/session";
 import { calcStatusValidade, diasAlertaCategoria, usaMesInteiro } from "@/lib/qualidade-status";
 import { secaoUsaModulo1 , secaoCertaDoDoc, foraDoLivro } from "@/lib/databook-secoes";
 import { fichasPorR, comFicha } from "@/lib/databook-ficha-r";
+import { resolverPitDataBook } from "@/lib/databook-pit";
 
 export const runtime = "nodejs";
 
@@ -38,6 +39,12 @@ async function montarDetalhe(id) {
   });
   if (!book) return null;
 
+  const op = await prisma.oP.findFirst({
+    where: book.opId ? { id: book.opId } : { numero: book.opNumero },
+    select: { pitPadrao: true, pitRevisao: true },
+  });
+  const pitDaOp = resolverPitDataBook(null, op?.pitPadrao, op?.pitRevisao);
+
   // resolve todos os documentos vinculados + candidatos da OP
   const idsVinculados = [...new Set(book.secoes.flatMap((s) => s.documentos.map((d) => d.documentoId)))];
   const candidatos = await prisma.documentoQualidade.findMany({
@@ -68,12 +75,16 @@ async function montarDetalhe(id) {
       .map((d) => ({ ...d, secaoCerta: secaoCertaDoDoc(d, s.numero), foraDoLivro: foraDoLivro(d) }));
     const temVencido = docs.some((d) => d.status === "VENCIDO");
     const usaM1 = secaoUsaModulo1(s.fonte);
+    const conteudoJson = s.numero === "10"
+      ? resolverPitDataBook(s.conteudoJson, op?.pitPadrao, op?.pitRevisao)
+      : s.conteudoJson || null;
+    const estado = s.numero === "10" && conteudoJson?.itens?.length ? "ANEXADO" : s.estado;
     return {
       id: s.id, numero: s.numero, titulo: s.titulo, norma: s.norma, fonte: s.fonte,
-      estado: s.estado, observacao: s.observacao, usaModulo1: usaM1,
-      conteudoJson: s.conteudoJson || null,
+      estado, observacao: s.observacao, usaModulo1: usaM1,
+      conteudoJson,
       documentos: docs, temVencido,
-      bloqueada: s.estado === "ANEXADO" && temVencido, // anexada mas com doc vencido
+      bloqueada: estado === "ANEXADO" && temVencido, // anexada mas com doc vencido
     };
   });
 
@@ -93,7 +104,7 @@ async function montarDetalhe(id) {
     aprovacoes: book.aprovacoes.map((a) => ({ id: a.id, userId: a.userId, nome: a.nome, papel: a.papel, aprovadoEm: a.aprovadoEm })),
     clienteEmail: book.clienteEmail, enviadoClienteEm: book.enviadoClienteEm,
     aceiteEm: book.aceiteEm, aceiteNome: book.aceiteNome, tokenCliente: book.tokenCliente,
-    secoes, candidatos: candidatosResolvidos,
+    secoes, candidatos: candidatosResolvidos, pitDaOp,
     resumo: {
       total: secoes.length, anexadas, na: secoes.filter((s) => s.estado === "NA").length,
       obrigatorias: naoNA.length, pendentes: pendentes.length, bloqueadas: bloqueadas.length,
