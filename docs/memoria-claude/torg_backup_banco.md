@@ -47,3 +47,18 @@ metadata:
   `BACKUP_FOTO_INSPECAO_OK` (sem DDL). Primeira leva: 616 arquivos, ~250 MB — uma ou duas noites.
 - **O Data Book usa a cópia** se o arquivo sumir do Blob (`baixarDocumento`): antes, Blob 404 era erro
   seco mesmo com cópia existindo.
+
+**Código que só existia no Mac — salvo em 24/09/2026 (Vitor: "sobre o código desse Mac poderia ajustar
+isso?")** como `refs/backup/2026-09-24/<nome>` no GitHub: `codex-corrigir-planilha-syneco` (a pasta
+principal), `codex-login-unificado`, `codex-edicao-manual-carga`, `claude-fervent-kapitsa-49946b`,
+`claude-practical-hofstadter-8b89a4` — commits locais + alterações não commitadas.
+- ⚠⚠ **NÃO É BRANCH, DE PROPÓSITO.** Branch nova no GitHub = deploy de pré-visualização na Vercel =
+  cópia do banco criada pela integração do Neon (foi o que estourou o limite em 15/06, ver
+  [[torg_vercel_neon_deploy]]). `refs/backup/*` a Vercel ignora e o `git clone` comum não baixa.
+- ⚠ **Snapshot num índice temporário** (`GIT_INDEX_FILE`): a pasta, o índice e a branch da outra sessão
+  ficam intactos — conferido antes/depois. Fora: `output/`, `outputs/`, `previews/` (artefatos, ~120 MB,
+  com JSON de permissões do SharePoint que tem e-mail de gente) e `testes/__*` (scripts de uso único que
+  GRAVAM EM PRODUÇÃO se a bateria de testes rodar depois de restaurar).
+- **Recuperar:** `git fetch origin 'refs/backup/*:refs/backup/*'` e `git switch -c recuperado refs/backup/2026-09-24/<nome>`.
+- ⚠ No zsh, laço `for x in $LISTA` NÃO separa por espaço, e `"$C:refs/…"` vira modificador `:r` —
+  os dois morderam nesta operação. Laço explícito, e `${C}` com chaves.

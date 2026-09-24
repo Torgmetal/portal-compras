@@ -1,7 +1,12 @@
 {
-  "build": 3442,
-  "gerado": "2026-09-24T10:53:26.680Z",
+  "build": 3443,
+  "gerado": "2026-09-24T11:06:05.698Z",
   "commits": [
+    {
+      "hash": "07a529f0",
+      "data": "24/09/2026",
+      "titulo": "Backups: o dump do banco longe do teto, e cópia do que só existia no Blob"
+    },
     {
       "hash": "74fa9db4",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "2593f1bb",
       "data": "22/09/2026",
       "titulo": "Fiscal: eu tinha consertado a metade errada do Ex TIPI — e mais duas lacunas"
-    },
-    {
-      "hash": "c4defd79",
-      "data": "22/09/2026",
-      "titulo": "Fiscal: o parecer de arquitetura achou 6 defeitos reais, e o ICMS entra como referência"
     }
   ]
 }
