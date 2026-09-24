@@ -16,6 +16,7 @@ import CartaoRM from "./CartaoRM";
 import BarraFiltros from "./BarraFiltros";
 import BotaoSincronizar from "./BotaoSincronizar";
 import ModalCobrarAtrasados from "./ModalCobrarAtrasados";
+import { usarPodeAgir } from "./usar-pode-agir";
 
 /** O que dizer quando o recorte atual não deixou nada na tela. */
 function textoVazio({ filtro, obra, fornecedor, fornecedores }) {
@@ -37,6 +38,7 @@ export default function PrazosRMClient() {
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [cobrando, setCobrando] = useState(false);
+  const podeAgir = usarPodeAgir();
   const f = usarFiltrosPrazos(dados);
 
   // ⚠⚠ `silencioso` existe para o botão Sincronizar e para a cobrança. Recarregando com o spinner
@@ -85,16 +87,22 @@ export default function PrazosRMClient() {
         {/* ⚠ No cabeçalho, e não na barra de filtros: filtro muda o que você VÊ; sincronizar e
             cobrar mudam o MUNDO (o que o portal sabe, e a caixa de entrada do fornecedor). Entre
             os chips, pareceriam mais dois recortes da lista. */}
-        <div className="flex flex-col sm:flex-row sm:items-start gap-2">
-          {/* ⚠⚠ ABRE UM MODAL, NÃO DISPARA NADA. O botão que manda e-mail para gente de fora não
-              pode ser o mesmo clique que escolhe para quem — e-mail não tem desfazer. */}
-          <button type="button" onClick={() => setCobrando(true)}
-            title="Enviar um e-mail para cada fornecedor com pedido vencido, perguntando a previsão"
-            className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 bg-white text-torg-dark hover:bg-gray-50">
-            <Mail size={15} /> Cobrar atrasados
-          </button>
-          <BotaoSincronizar onPronto={() => buscar(true)} />
-        </div>
+        {/* ⚠⚠ QUEM SÓ VÊ NÃO RECEBE OS BOTÕES. O Almoxarifado entra aqui para acompanhar a chegada
+            do material; sincronizar bate no Omie (trava compartilhada com os crons) e cobrar manda
+            e-mail para fornecedor. As rotas já recusam — deixar os botões à vista só entregaria um
+            403 sem explicação a quem não fez nada de errado. */}
+        {podeAgir && (
+          <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+            {/* ⚠⚠ ABRE UM MODAL, NÃO DISPARA NADA. O botão que manda e-mail para gente de fora não
+                pode ser o mesmo clique que escolhe para quem — e-mail não tem desfazer. */}
+            <button type="button" onClick={() => setCobrando(true)}
+              title="Enviar um e-mail para cada fornecedor com pedido vencido, perguntando a previsão"
+              className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 bg-white text-torg-dark hover:bg-gray-50">
+              <Mail size={15} /> Cobrar atrasados
+            </button>
+            <BotaoSincronizar onPronto={() => buscar(true)} />
+          </div>
+        )}
       </div>
 
       <BarraFiltros r={f.resumo} obras={f.obras} obra={f.obra} setObra={f.setObra}

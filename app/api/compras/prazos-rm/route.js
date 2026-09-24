@@ -13,7 +13,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    await requireRole(["ADMIN", "COMPRAS"]);
+    // ⚠⚠ SÓ A LEITURA ABRE PARA O ALMOXARIFADO (Matheus, 24/09/2026). `sincronizar`, `cobrar` e
+    // `prazo-proposto` continuam em `["ADMIN","COMPRAS"]` — bater no Omie, mandar e-mail a
+    // fornecedor e aceitar remarcação de prazo não são "ver quando chega o material".
+    await requireRole(["ADMIN", "COMPRAS", "ALMOXARIFADO"]);
   } catch (e) {
     const status = e.message === "Unauthorized" ? 401 : 403;
     return NextResponse.json({ error: e.message }, { status });

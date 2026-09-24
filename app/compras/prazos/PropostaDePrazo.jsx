@@ -11,12 +11,14 @@
 import { useState } from "react";
 import { Loader2, Check, X, CalendarClock } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { usarPodeAgir } from "./usar-pode-agir";
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 const fmtEm = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—");
 
 export default function PropostaDePrazo({ pedido, onDecidido }) {
   const proposta = pedido.propostaPendente;
+  const podeAgir = usarPodeAgir();
   const { showToast } = useStore();
   const [enviando, setEnviando] = useState(null); // "aprovar" | "recusar"
   const [recusando, setRecusando] = useState(false);
@@ -73,7 +75,15 @@ export default function PropostaDePrazo({ pedido, onDecidido }) {
         </span>
       </p>
 
-      {recusando && (
+      {/* ⚠⚠ QUEM SÓ OLHA VÊ A PROPOSTA, MAS NÃO DECIDE. A proposta em si é informação útil para o
+          Almoxarifado — ela diz que a data pode mudar —, e esconder o bloco inteiro tiraria dele
+          justamente o aviso. O que sai são os botões: aprovar muda o prazo e avisa o fornecedor
+          por e-mail, e isso é ato do Compras. */}
+      {!podeAgir && (
+        <p className="mt-1.5 text-[11px] text-violet-700">Aguardando decisão do Compras.</p>
+      )}
+
+      {podeAgir && recusando && (
         <input
           value={motivo}
           onChange={(e) => setMotivo(e.target.value)}
@@ -83,6 +93,10 @@ export default function PropostaDePrazo({ pedido, onDecidido }) {
         />
       )}
 
+      {/* ⚠⚠ NÃO RENDERIZA — NÃO É `hidden` POR CSS. Escondido por classe continua no DOM: navegável
+          pelo teclado, lido por leitor de tela e clicável por script. O primeiro teste que escrevi
+          pegou isso, e o defeito seria real, não de teste. */}
+      {podeAgir && (
       <div className="mt-2 flex items-center gap-2">
         <button
           onClick={() => decidir("aprovar")}
@@ -106,6 +120,7 @@ export default function PropostaDePrazo({ pedido, onDecidido }) {
           </button>
         )}
       </div>
+      )}
     </div>
   );
 }

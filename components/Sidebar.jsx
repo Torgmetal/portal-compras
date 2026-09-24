@@ -28,7 +28,10 @@ const menu = [
   // lista PEDIDOS (kanban por situação, filtro por fornecedor) — é de quem cobra fornecedor; esta
   // agrupa por RM e responde "o que a engenharia pediu já está chegando?". Matheus (16/09/2026):
   // "preciso de uma aba fora para ver todas as RMs de uma vez, seus pedidos e prazos de cada".
-  { href: "/compras/prazos", label: "Prazos das RMs", icon: CalendarClock },
+  // ⚠ O Almoxarifado vê o LINK porque precisa saber quando o material chega (Matheus, 24/09/2026).
+  // Sem esta lista ele cairia no padrão `["COMPRAS"]`: entraria digitando a URL e nunca acharia a
+  // tela pelo menu — que é o mesmo que não ter acesso.
+  { href: "/compras/prazos", label: "Prazos das RMs", icon: CalendarClock, modulos: ["COMPRAS", "ALMOXARIFADO"] },
   { href: "/compras/estoque", label: "Estoque", icon: Boxes },
   { href: "/compras/materiais", label: "Materiais por OP", icon: Layers },
   { href: "/compras/vendorlist", label: "Vendor List", icon: Building2 },

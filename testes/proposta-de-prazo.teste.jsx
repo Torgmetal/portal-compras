@@ -12,6 +12,11 @@ import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/re
 
 const mocks = vi.hoisted(() => ({ showToast: vi.fn() }));
 vi.mock("@/lib/store", () => ({ useStore: () => ({ showToast: mocks.showToast }) }));
+// ⚠ A partir de 24/09/2026 o bloco lê a sessão: aprovar e recusar são do Compras, e o
+// Almoxarifado — que passou a enxergar esta tela para acompanhar a chegada do material — vê a
+// proposta sem os botões. Estes testes são o fluxo do COMPRAS; quem cobre o outro lado é
+// `testes/prazos-almoxarifado.teste.jsx`.
+vi.mock("next-auth/react", () => ({ useSession: () => ({ data: { user: { modulos: ["COMPRAS"] } } }) }));
 
 import PropostaDePrazo from "@/app/compras/prazos/PropostaDePrazo";
 
