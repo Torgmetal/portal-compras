@@ -124,7 +124,8 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
       finally { if(worker.current===w){worker.current=null;w.terminate();setFase("pronto");} }
     };
     w.onerror = (e) => { if(worker.current!==w)return;worker.current=null;w.terminate();setErro(e.message || "Falha no simulador"); setFase("pronto"); };
-    w.postMessage({ lista: dados.lista.filter((i) => !marcaEhAC(i.marca)), geometria: geo.geometria, perfil, prefixo: prefixoDaOp(opNumero), opcoes: dados.opcoes || {}, ajustes });
+    // a malha vai junto: é dela que o motor tira onde o caibro assenta no aço de verdade (lib/carga/perfil-apoio.js)
+    w.postMessage({ lista: dados.lista.filter((i) => !marcaEhAC(i.marca)), geometria: geo.geometria, malhas: geo.malhas, perfil, prefixo: prefixoDaOp(opNumero), opcoes: dados.opcoes || {}, ajustes });
   };
 
   // PDF do modelo: fotografa o 3D (carga pronta + cada camada) e monta o A4 AQUI, no navegador.
@@ -135,7 +136,7 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
   const gerarPdf = async () => {
     if(montando||salvandoMontagem){setErro("Salve a montagem antes de gerar o PDF.");return;}
     const v = viz.current, c = resultado?.cargas?.[cargaSel]; if (!c || !dados?.op) return;
-    if(c.versaoMontagem !== 6){setErro("Simule de novo para verificar os apoios antes de gerar o PDF.");return;}
+    if(!(c.versaoMontagem >= 6)){setErro("Simule de novo para verificar os apoios antes de gerar o PDF.");return;}
     // ⚠ nunca falhar em silêncio: se o 3D não entregou a API (ver apiRef no VisualizadorCarga), a tela diz
     if (!v?.capturar) { setErro("O 3D ainda não está pronto para fotografar — espere o modelo aparecer e clique de novo."); return; }
     setPdf({ gerando: true }); setErro(null);
@@ -238,7 +239,9 @@ export default function SimularCargaModal({ opId, opNumero, previo, onClose }) {
                 {resultado.gcModo && <span>Guarda-corpo: {resultado.gcModo === "engradado" ? "em pé em engradado" : "deitado em pacote"}</span>}
                 {pdf?.url && <a href={pdf.url} download={pdf.nome} className="sm:ml-auto text-torg-blue font-semibold hover:underline inline-flex items-center gap-1.5 min-h-9"><FileText size={15} /> Baixar PDF gerado</a>}
               </div>
-              {carga && carga.versaoMontagem !== 6 && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Esta montagem é anterior à verificação dos apoios pela geometria real. Não use esta versão para orientar o carregamento. Clique em <b>Simular de novo</b> para aplicar as correções.</p>}
+              {carga && !(carga.versaoMontagem >= 6) && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Esta montagem é anterior à verificação dos apoios pela geometria real. Não use esta versão para orientar o carregamento. Clique em <b>Simular de novo</b> para aplicar as correções.</p>}
+              {/* ⚠ a versão 6 (18 a 24/09/2026) proibia empilhar em quase tudo: é segura, mas gasta caminhão */}
+              {carga && carga.versaoMontagem === 6 && <p className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">Esta simulação é de antes de 24/09, quando o simulador quase não empilhava. Clique em <b>Simular de novo</b>: agora ele apoia os caibros no aço real das peças e costuma precisar de menos viagens.</p>}
               {ajustesMudaram && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Os ajustes mudaram. Clique em <b>Simular de novo</b> para atualizar a disposição da carga.</p>}
               <AvisosSimulacao resultado={resultado} />
               <div className="grid lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">

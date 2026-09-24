@@ -1767,3 +1767,36 @@ modelo de ponta a ponta, e isso só dá para fazer em produção ou com a chave 
   ⚠ **Para revisar:** (a) o AuditLog como controle do que foi copiado (foto); (b) a foto ainda não tem
   caminho de recuperação automática — a cópia existe, a troca da URL seria manual; (c) primeira leva
   real só na madrugada — não disparei o cron em produção.
+
+- **(24/09) Simulador de carga: empilhar pelo AÇO real — nem pela caixa envolvente, nem proibindo.**
+  Vitor: *"hoje ele está separando demais as cargas (…) volte a lógica que fizemos nos testes (…) hoje
+  vc deixa pouca peça"*. A simulação da OP-118 de hoje: **20 carretas** para 55 t, 3 a 7 peças cada.
+  **Causa (medida):** `7174e7f0` (18/09) marcava "topo vazado" toda marca cujo topo da malha não fosse
+  ≥ 80% plano — pelo IFC real, **270 de 297 marcas da OP-118** e 65 de 77 da OP-102 — e nada subia nelas.
+  Foi a resposta a *"temos peças de pé, peças voando"*; o próprio Vitor reprovou em seguida (*"o que era
+  para ser levado em 2 caminhões vc transformou em 5 (…) elas podem ser colocadas uma em cima da outra,
+  o que não pode é ficar voando as coisas"*), e o ajuste prometido nunca foi publicado.
+  **Medidor independente** (malha do IFC em colunas de 5 cm, fora do motor): a lógica dos testes
+  (`a0f140b3`) fazia 4 carretas na OP-118 com **50 volumes voando**; a de 15/09, 46; a de hoje, 0 voando
+  e 19 carretas. Nenhuma servia.
+  **Correção** (`lib/carga/perfil-apoio.js`, `empacotar.js`): o motor recebe a malha e tira o topo e o
+  fundo do aço de cada peça (grade de 5 cm). (1) A **altura** sai do aço: o volume desce até ficar um
+  caibro acima do aço de baixo — coluna com chapa de base 550 × 550 e corpo de 30 cm desencontra da de
+  baixo e assenta corpo sobre corpo, em vez de ficar 37 cm no ar pela caixa. (2) **Apoio** = caibro a
+  cada ~1,5 m (correndo até 75 cm), encostado no aço do volume, com aço de OUTRO volume embaixo a até
+  15 cm de calço (a premissa CALCO do protótipo), as duas pontas + 60%; o assoalho não conta; o ponto de
+  carga (meio, se é embalado; o contato, se é peça solta) cai entre os apoios — senão é gangorra; nada de
+  baixo fura a faixa do caibro. (3) Os caibros vão na saída (`u.caibros`: x, face de baixo, trecho,
+  calços) e o 3D desenha **esses**, com calço (`cena-carga.js`); o editor manual confia neles enquanto
+  ninguém mexe no volume nem nos apoios (`apoio-motor.js`), senão volta a regra da caixa. `versaoMontagem`
+  7; a 6 continua aceita para PDF, com aviso de "simule de novo". Saíram `apoio-malha.js` e o
+  `topoVazado`. Regras do Vitor mantidas: nada em pé sem ajuste, quadro vazado só recebe o igual,
+  longarina em V e palete no chão, caixa só sobre caixa.
+  **Resultado** (medidor: 0 voando nas quatro): OP-102 **2 carretas** (hoje 5) · OP-118 **5** (hoje 19–20)
+  · OP-107 **1** (hoje 3) · OP-085 **1** (hoje 2). Tempo da OP-118: 57 s em Node (15/09: 85 s).
+  Testes: `carga-perfil-apoio` (7, novos: vão da moldura, coluna com chapa, gangorra, 3D e editor);
+  `carga-apoio-malha` removido com o módulo.
+  ⚠ **Para revisar:** (a) CALCO de 15 cm e o critério de gangorra são premissa — conferir com a Expedição;
+  (b) o motor não vira peça 180°: coluna com chapa de base empilharia melhor com as chapas em pontas
+  opostas (a OP-118 tem 2 carretas finais com colunas no chão); (c) a regra de "encaixe" entre as caixas
+  envolventes é 2,5D (coluna de aço) — correta para peça deitada, conservadora para peça com balanço.

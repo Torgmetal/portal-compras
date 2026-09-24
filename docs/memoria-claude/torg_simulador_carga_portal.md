@@ -118,3 +118,29 @@ branco), a lista por fase estourava a coluna e a legenda invadia a foto. Estrutu
 5. Anexo: separação por fase em 4 colunas; fase "?" vira "Sem fase (marca do cliente)".
 - ⚠ WinAnsi não tem "→" nem "≤" (saía "?"): usar "·", "até".
 - OP-107: 14 páginas (eram 22), 1,9 MB, 5 s no navegador.
+
+## Empilhar pelo AÇO real (24/09/2026)
+
+Vitor: *"hoje ele está separando demais as cargas (…) volte a lógica que fizemos nos testes"* — a OP-118 saía
+em 20 carretas de 3 a 7 peças. A regra de 18/09 (`topoVazado`: nada sobe em topo que não seja ≥ 80% plano pela
+malha) barrava **91% das marcas** da obra. Antes dela, a caixa envolvente deixava volume "voando" (medido:
+50 volumes na OP-118 com a lógica do protótipo). As duas coisas que o Vitor disse valem juntas: *"elas podem ser
+colocadas uma em cima da outra, o que não pode é ficar voando as coisas"*.
+
+- **O motor recebe a malha** (`simularCarga({ …, malhas })`, o modal passa `geo.malhas` ao worker) e tira, por
+  peça, o topo e o fundo do aço numa grade de 5 cm (`lib/carga/perfil-apoio.js`).
+- **Altura pelo aço**: o volume desce até ficar um caibro acima do aço de baixo, coluna a coluna. As caixas
+  envolventes podem se cruzar no vão — é assim que coluna com chapa de base desencontra e assenta corpo sobre
+  corpo. No assoalho, não: o retângulo tem de estar livre.
+- **Apoio = caibro sobre aço** (`caibrosApoiados`): um a cada ~1,5 m, correndo até 75 cm; encosta no aço do
+  volume; aço de OUTRO volume embaixo a até 15 cm de calço (CALCO); as duas pontas + 60% (80% na carga de
+  grades); o assoalho não é apoio; o ponto de carga cai entre os apoios (senão é gangorra); nada de baixo fura
+  a faixa do caibro, que vai de folga a folga (largura + 3 cm de cada lado).
+- **O 3D desenha os caibros do motor** (`u.caibros`: x, `y0`, `z0..z1`, calços) — `cena-carga.montarCaibros`.
+  O editor manual confia neles enquanto ninguém mexe (`lib/carga/apoio-motor.js`); mexeu → regra da caixa.
+- `versaoMontagem` 7. A 6 (18–24/09) segue aceita para PDF, com aviso azul de "simule de novo".
+- Medido com um medidor independente (malha em 5 cm, fora do motor): OP-102 2 carretas (eram 5), OP-118 5
+  (eram 19–20), OP-107 1 (3), OP-085 1 (2) — **zero voando** nas quatro. OP-118 leva ~57 s.
+- ⚠ Resolução importa: a célula do motor é 10 cm, e a célula arredondada passa da borda da peça — o aço do
+  VIZINHO caía nela e contava como apoio (achado pelo medidor). Por isso o caibro só olha `celulasDoCaibro`.
+- ⚠ Pendente: virar a peça 180° (coluna com chapa empilharia com as chapas em pontas opostas).

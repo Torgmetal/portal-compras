@@ -1,5 +1,5 @@
 // Web Worker do simulador de carga: roda o motor fora da thread da tela (uma carga grande leva
-// dezenas de segundos). Entrada: { lista, geometria, perfil, prefixo, opcoes }. Saída: o resultado
+// dezenas de segundos). Entrada: { lista, geometria, malhas, perfil, prefixo, opcoes, ajustes }. Saída: o resultado
 // de simularCarga, ou { erro }.
 import { simularCarga } from "@/lib/carga/simular";
 

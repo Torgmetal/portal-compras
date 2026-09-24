@@ -37,7 +37,7 @@ export async function POST(req, { params }) {
   if (!sim) return NextResponse.json({ error: "Simule a carga antes de gerar o modelo." }, { status: 400 });
   const cargas = Array.isArray(sim.cargas) ? sim.cargas : [], carga = cargas[body.indice];
   if (!carga) return NextResponse.json({ error: "Carga não encontrada na simulação." }, { status: 404 });
-  if (carga.versaoMontagem !== 6) return NextResponse.json({error:"Simule de novo para verificar os apoios antes de gerar o PDF."}, {status:409});
+  if (!(carga.versaoMontagem >= 6)) return NextResponse.json({error:"Simule de novo para verificar os apoios antes de gerar o PDF."}, {status:409});
   const estimadas = Array.isArray(sim.avisos?.estimadas) ? sim.avisos.estimadas.filter((e) => carga.itens?.some((u) => (u.membros || []).some((m) => m.marca === e.marca))) : [];
   let logo = null; try { logo = fs.readFileSync(path.join(process.cwd(), "public", "torg-logo-white.png")); } catch { logo = null; }
   const { bytes, filename } = await gerarModeloCargaPDF({ op, previo, carga, indice: body.indice, total: cargas.length, perfilNome: sim.perfilNome || sim.perfil, prefixo: prefixoDaOp(op.numero), imagens: body.imagens, estimadas, ajustes: sim.avisos?.ajustes || {}, logo });

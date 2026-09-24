@@ -1,156 +1,156 @@
 {
-  "build": 3445,
-  "gerado": "2026-09-24T12:41:52.233Z",
+  "build": 3446,
+  "gerado": "2026-09-24T13:49:51.273Z",
   "commits": [
     {
-      "hash": "12562caa27",
+      "hash": "70bc11fd",
+      "data": "24/09/2026",
+      "titulo": "Prazos das RMs: o almoxarifado vê a lista — a caneta continua no Compras"
+    },
+    {
+      "hash": "12562caa",
       "data": "24/09/2026",
       "titulo": "Memória: recuperar backup local numa pasta separada, nunca com switch na pasta principal"
     },
     {
-      "hash": "1424d1553e",
+      "hash": "1424d155",
       "data": "24/09/2026",
       "titulo": "Memória: o código que só existia no Mac foi para refs/backup no GitHub — por que não branch, e como recuperar"
     },
     {
-      "hash": "07a529f0cf",
+      "hash": "07a529f0",
       "data": "24/09/2026",
       "titulo": "Backups: o dump do banco longe do teto, e cópia do que só existia no Blob"
     },
     {
-      "hash": "74fa9db450",
+      "hash": "74fa9db4",
       "data": "24/09/2026",
       "titulo": "Memória: o estado dos backups medido em 24/09 — tempo do dump perto do teto, anexos do data book e fotos sem cópia"
     },
     {
-      "hash": "9e3d2b8226",
+      "hash": "9e3d2b82",
       "data": "23/09/2026",
       "titulo": "PDF do relatório: o botão grava o que está pendente antes de abrir"
     },
     {
-      "hash": "1411cd4e96",
+      "hash": "1411cd4e",
       "data": "23/09/2026",
       "titulo": "Relatórios de LP e EVS: a junta soldada sai da EPS escolhida"
     },
     {
-      "hash": "5c56fc98d3",
+      "hash": "5c56fc98",
       "data": "23/09/2026",
       "titulo": "Prazos: a data de entrega faltava no seletor, e ela não é uma etapa"
     },
     {
-      "hash": "390aa8b918",
+      "hash": "390aa8b9",
       "data": "23/09/2026",
       "titulo": "Assistente Fiscal: a IA orquestra, a ferramenta é que determina"
     },
     {
-      "hash": "a18409031f",
+      "hash": "a1840903",
       "data": "23/09/2026",
       "titulo": "Fiscal: a validação das regras — e por que elas não viraram tabela"
     },
     {
-      "hash": "414826b9d3",
+      "hash": "414826b9",
       "data": "23/09/2026",
       "titulo": "Simulador: quatro campos decidem; o resto é conferência e foi para trás de um clique"
     },
     {
-      "hash": "d869b9726b",
+      "hash": "d869b972",
       "data": "23/09/2026",
       "titulo": "Portão por módulo: /fiscal nunca esteve na tabela, e por isso quebrava"
     },
     {
-      "hash": "99f932cc04",
+      "hash": "99f932cc",
       "data": "23/09/2026",
       "titulo": "Fiscal: a cadeia de documentos de uma obra — e ela nunca diz \"falta uma nota\""
     },
     {
-      "hash": "b166069fc8",
+      "hash": "b166069f",
       "data": "23/09/2026",
       "titulo": "Portal de campo: o que o inspetor digitava deixava de aparecer"
     },
     {
-      "hash": "bf88a11cc3",
+      "hash": "bf88a11c",
       "data": "23/09/2026",
       "titulo": "Relatórios de inspeção: assinatura sem duplicar, cor da tinta, desenho no anexo"
     },
     {
-      "hash": "1c2b990f4d",
+      "hash": "1c2b990f",
       "data": "23/09/2026",
       "titulo": "Desenho do dimensional: o carimbo do A2 deixa de cortar a coluna ao meio"
     },
     {
-      "hash": "e512935662",
+      "hash": "e5129356",
       "data": "23/09/2026",
       "titulo": "Classificação: DDL aplicado e as três correções provadas contra o banco"
     },
     {
-      "hash": "409de29159",
+      "hash": "409de291",
       "data": "23/09/2026",
       "titulo": "Classificação: o teste defendia o defeito — três achados do Codex"
     },
     {
-      "hash": "5969682a3f",
+      "hash": "5969682a",
       "data": "23/09/2026",
       "titulo": "Fiscal: o registro de classificação de produto — §14, a raiz do problema"
     },
     {
-      "hash": "65baa3bfa8",
+      "hash": "65baa3bf",
       "data": "23/09/2026",
       "titulo": "PIS/COFINS no 5.116: a indeterminação estava só no texto, não no cálculo"
     },
     {
-      "hash": "895bc9259a",
+      "hash": "895bc925",
       "data": "23/09/2026",
       "titulo": "Cenários: a família era grossa demais, e propagou fundamento de uma operação para outra"
     },
     {
-      "hash": "c6c6b02cd2",
+      "hash": "c6c6b02c",
       "data": "23/09/2026",
       "titulo": "Fiscal: a base de CST — ICMS, PIS/COFINS e origem, com os cenários principais"
     },
     {
-      "hash": "9b0432cbf3",
+      "hash": "9b0432cb",
       "data": "23/09/2026",
       "titulo": "Simulador: a ficha de emissão e a prévia dos impostos — e quatro achados do Codex"
     },
     {
-      "hash": "43b1b3b083",
+      "hash": "43b1b3b0",
       "data": "23/09/2026",
       "titulo": "Auditoria: validar a medição do Omie ANTES de emitir — e o primeiro uso já achou um caso"
     },
     {
-      "hash": "333701e992",
+      "hash": "333701e9",
       "data": "23/09/2026",
       "titulo": "Legislação: a declaração da TIPI estava apagando a ressalva — e mais dois"
     },
     {
-      "hash": "92a02cc702",
+      "hash": "92a02cc7",
       "data": "23/09/2026",
       "titulo": "Legislação: três achados do Codex, e a TIPI da contabilidade resolve a vigência"
     },
     {
-      "hash": "a61f9e7b9c",
+      "hash": "a61f9e7b",
       "data": "23/09/2026",
       "titulo": "Fiscal: a base jurídica — 10 normas oficiais coletadas, hasheadas e citáveis"
     },
     {
-      "hash": "7c9724d1a8",
+      "hash": "7c9724d1",
       "data": "22/09/2026",
       "titulo": "Revisão: o P1 dos avulsos sai da nossa lista, e \"Codex: aceito sempre\" fica registrado"
     },
     {
-      "hash": "bc78300da3",
+      "hash": "bc78300d",
       "data": "22/09/2026",
       "titulo": "Autocomplete: apagar depois de a lista abrir deixava \"Nenhum NCM\" no ar"
     },
     {
-      "hash": "233171b46f",
+      "hash": "233171b4",
       "data": "22/09/2026",
       "titulo": "Autocomplete de NCM: quatro achados do Codex, e o pior o teste não pegava"
-    },
-    {
-      "hash": "b0b320a522",
-      "data": "22/09/2026",
-      "titulo": "Fiscal: autocomplete de NCM, a cadeia do art. 406 completa, e um índice na coluna errada"
     }
   ]
 }
