@@ -2026,5 +2026,6 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   Teste novo `testes/api/buscar-produto-inativo.teste.js` (3; o 1º falha sem a correção). **4.019
   passando**, `checar` limpo, build ok. Achado separado (tarefa aberta): `sincronizarMovimentacoes` chama
   `ListarMovEstoque`, que não existe no Omie — `EstoqueMovimentacao` tem 0 linhas.
-  ⚠ **Para revisar:** (a) a chamada de piloto marcou "alterado em 24/09" no PRD00005 (sem mudar campo);
-  (b) produto sem o campo `inativo` na resposta conta como ativo.
+  ⚠ **Para revisar:** (a) a chamada de piloto não deixou rastro no PRD00005 — nem a data de "última
+  alteração" mudou (reconferido 1 h depois: segue 13/10/2025); (b) produto sem o campo `inativo` na
+  resposta conta como ativo.

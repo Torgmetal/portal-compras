@@ -47,7 +47,8 @@ cuidado para não inativar o que estamos usando hoje"*.
   com sucesso!" e o `inativo` continua "N" — a doc diz que o campo "não deve ser informado na
   inclusão/alteração", e não há método próprio (lista: Alterar/Associar/Consultar/Excluir/Incluir/
   IncluirPorLote/Listar/ListarResumido/Upsert/UpsertPorLote). Piloto no PRD00005 (sobra de "Cópia de"):
-  nada mais mudou no cadastro, conferido campo a campo (só a data de alteração). **Inativar é pela TELA
+  nada mudou no cadastro, conferido campo a campo — nem a data de "última alteração" (segue 13/10/2025,
+  reconferido 1 h depois). **Inativar é pela TELA
   do Omie.** Não tentar de novo pela API; excluir (`ExcluirProduto`) está fora — apaga dado.
 - ⚠⚠ **"EM USO" TEM DE OLHAR A ENTRADA DE NOTA, NÃO SÓ O PORTAL.** O portal (RM, `PedidoOmie`) dizia "sem
   uso" para códigos que o RECEBIMENTO usa: a linha do CMR traz a descrição do produto do Omie lançado na
