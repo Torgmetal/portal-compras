@@ -1,7 +1,12 @@
 {
-  "build": 3461,
-  "gerado": "2026-09-24T21:33:44.086Z",
+  "build": 3462,
+  "gerado": "2026-09-24T22:05:22.341Z",
   "commits": [
+    {
+      "hash": "7f5778d4",
+      "data": "24/09/2026",
+      "titulo": "Tekla: planilha nova também quando um código sai ou muda de descrição"
+    },
     {
       "hash": "244a50f4",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b166069f",
       "data": "23/09/2026",
       "titulo": "Portal de campo: o que o inspetor digitava deixava de aparecer"
-    },
-    {
-      "hash": "bf88a11c",
-      "data": "23/09/2026",
-      "titulo": "Relatórios de inspeção: assinatura sem duplicar, cor da tinta, desenho no anexo"
     }
   ]
 }

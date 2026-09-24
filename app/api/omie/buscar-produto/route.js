@@ -42,6 +42,8 @@ function tokensSig(q) {
   const sig = toks.filter((t) => /[a-z]/.test(t) && !/^\d+(?:[.,]\d+)?(?:mm|cm|m|kg|g|l|ml|pol|")?$/.test(t));
   return sig.length ? sig : toks;
 }
+// Cadastro do Omie ATIVO — sem o campo (resposta antiga) conta como ativo.
+const ativoNoOmie = (p) => String(p?.inativo || "N").toUpperCase() !== "S";
 // Produto casa com a busca (por palavras na descrição).
 function casaDesc(descricao, sig) {
   const d = norm(descricao);
@@ -166,6 +168,10 @@ export async function GET(req) {
 
   // 3) Por CÓDIGO via ConsultarProduto — acha qualquer produto pelo código exato,
   //    inclusive SEM estoque (a listagem ListarProdutos retorna 0 nesta conta Omie).
+  //    ⚠ INCLUSIVE O INATIVO — e o inativo não pode voltar para a RM. Os duplicados do cadastro
+  //    são limpos INATIVANDO no Omie (Vitor, 24/09/2026); quem copia o código de uma RM antiga e
+  //    cola aqui cairia justamente no código aposentado, que nem a busca local nem a posição de
+  //    estoque devolvem mais.
   if (porCodigo) {
     try {
       const key = process.env.OMIE_APP_KEY, secret = process.env.OMIE_APP_SECRET;
@@ -176,7 +182,7 @@ export async function GET(req) {
         signal: AbortSignal.timeout(15000),
       });
       const p = await res.json();
-      if (!p.faultstring && (p.descricao || p.codigo)) {
+      if (!p.faultstring && (p.descricao || p.codigo) && ativoNoOmie(p)) {
         return NextResponse.json({
           itens: [{
             codigo: String(p.codigo || q),

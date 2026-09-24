@@ -2014,3 +2014,17 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   arquivo "Descrição alterada" à toa; (b) o limite de sumiço é heurístico; (c) nada mudou no
   `sincronizarProdutos` (estoque), que marca `ativo:true` em produto com saldo ≠ 0 — a orientação dada é
   zerar saldo antes de inativar.
+- **(24/09, noite) Inativar duplicados do Omie: a API não inativa; busca da RM não devolve mais inativo.**
+  Vitor pediu que eu inativasse os duplicados, "tomando cuidado para não inativar o que estamos usando".
+  Verificação ao vivo (só leitura) de 18 candidatos: pedidos de compra em aberto NO OMIE (96, não só os do
+  portal), saldo, data de cadastro, RMs e CMR. O CMR mostrou que 6 "sem uso no portal" são usados na
+  ENTRADA DE NOTA (ex.: chapa 12,70 com 5 entradas desde maio) — ficaram de fora; 3 já estavam apagados no
+  Omie; 2 criados em 18/09. Piloto no PRD00005: `AlterarProduto{inativo:"S"}` responde sucesso e IGNORA o
+  campo (como diz a doc); nada mais mudou (diff campo a campo). Inativação fica para a tela do Omie (4
+  códigos seguros passados ao Vitor). Correção no portal: `/api/omie/buscar-produto` — o último recurso
+  (`ConsultarProduto` pelo código exato) devolvia produto inativo para a RM; agora filtra `inativo === "S"`.
+  Teste novo `testes/api/buscar-produto-inativo.teste.js` (3; o 1º falha sem a correção). **4.019
+  passando**, `checar` limpo, build ok. Achado separado (tarefa aberta): `sincronizarMovimentacoes` chama
+  `ListarMovEstoque`, que não existe no Omie — `EstoqueMovimentacao` tem 0 linhas.
+  ⚠ **Para revisar:** (a) a chamada de piloto marcou "alterado em 24/09" no PRD00005 (sem mudar campo);
+  (b) produto sem o campo `inativo` na resposta conta como ativo.
