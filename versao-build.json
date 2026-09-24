@@ -1,7 +1,12 @@
 {
-  "build": 3459,
-  "gerado": "2026-09-24T19:15:44.641Z",
+  "build": 3460,
+  "gerado": "2026-09-24T20:04:25.454Z",
   "commits": [
+    {
+      "hash": "30b6e233",
+      "data": "24/09/2026",
+      "titulo": "Rastreabilidade: a NF deixa de ser cobrada"
+    },
     {
       "hash": "b39e3ab1",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "1c2b990f",
       "data": "23/09/2026",
       "titulo": "Desenho do dimensional: o carimbo do A2 deixa de cortar a coluna ao meio"
-    },
-    {
-      "hash": "e5129356",
-      "data": "23/09/2026",
-      "titulo": "Classificação: DDL aplicado e as três correções provadas contra o banco"
     }
   ]
 }

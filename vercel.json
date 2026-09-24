@@ -74,6 +74,10 @@
       "schedule": "0 5 * * 1"
     },
     {
+      "path": "/api/cron/materiais-tekla",
+      "schedule": "30 9,15 * * 1-6"
+    },
+    {
       "path": "/api/cron/monitor",
       "schedule": "0 10 * * *"
     },

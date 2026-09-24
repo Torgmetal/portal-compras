@@ -1987,3 +1987,15 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   **3.936 passando**, `checar` limpo. De carona, corrigido na memória um diagnóstico meu errado: o pedido
   1719 não estava "sem nota de entrada" como impedimento do R — é FD, teve a entrega registrada em 30/08,
   e o que falta é a linha no CMR.
+- **(24/09, noite) Planilha de perfis e parafusos do Omie para o Tekla.** Vitor pediu uma pasta na
+  Engenharia que "alimenta o Tekla", com planilha nova sempre que um perfil for cadastrado no Omie, só
+  perfis e parafusos. `lib/materiais-tekla.js` (puro: classificação por família + descrição, leitura de
+  designação/peso/material/norma, xlsx com a tabela na linha 1) e `lib/materiais-tekla-publicar.js` (lê o
+  Omie direto, compara com os códigos da ÚLTIMA planilha da pasta, publica arquivo novo se houver código
+  novo). Cron `/api/cron/materiais-tekla` (6h30/12h30 seg–sáb) cadastrado no monitor; POST manual
+  ADMIN/ENGENHARIA com `forcar`. Primeira planilha publicada em 24/09 17h02 (673 perfis, 414 parafusos);
+  segunda rodada conferida: não publica sem novidade. Testes: `materiais-tekla` (71). **4.008 passando**,
+  `checar` limpo, build ok.
+  ⚠ **Para revisar:** (a) a pasta é o estado — se alguém renomear/apagar os arquivos, o próximo cron
+  publica de novo (comportamento seguro, mas sai arquivo); (b) última planilha ilegível LANÇA em vez de
+  publicar; (c) o POST manual escreve no SharePoint — só ADMIN/ENGENHARIA.
