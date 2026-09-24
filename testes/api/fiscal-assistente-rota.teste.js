@@ -7,9 +7,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const requireAcesso = vi.fn();
 vi.mock("@/lib/session", () => ({ requireAcesso: (...a) => requireAcesso(...a) }));
 
-const reservar = vi.fn(), conciliar = vi.fn();
+const reservar = vi.fn(), conciliar = vi.fn(), devolver = vi.fn();
 vi.mock("@/lib/fiscal/assistente/orcamento", () => ({
-  reservar: (...a) => reservar(...a), conciliar: (...a) => conciliar(...a),
+  reservar: (...a) => reservar(...a), conciliar: (...a) => conciliar(...a), devolver: (...a) => devolver(...a),
 }));
 
 const configurado = vi.fn(() => true);
@@ -106,6 +106,40 @@ describe("POST /api/fiscal/assistente/mensagem", () => {
     const j = await r.json();
     expect(j.repetida).toBe(true);
     expect(responder).not.toHaveBeenCalled();
+  });
+
+  // ⚠⚠⚠ ACHADO DO CODEX (24/09/2026): reenvio e 404 RETINHAM a reserva. Numa rede instável, o
+  // navegador reenvia várias vezes — a pessoa seria barrada pelo próprio mecanismo que existe para
+  // não cobrá-la duas vezes, e o teto do portal se esgotaria sem uma única consulta à IA.
+  it("reenvio da mesma chave DEVOLVE a reserva, porque não chamou o modelo", async () => {
+    abrirExecucao.mockResolvedValue({ repetida: true, conversa: { id: "c1" }, resposta: { id: "m1" } });
+    lerConversa.mockResolvedValue({ mensagens: [] });
+    await pedir(CORPO);
+    expect(devolver).toHaveBeenCalledWith("u1", { dia: "2026-09-23", micros: 250000 });
+    expect(responder).not.toHaveBeenCalled();
+  });
+
+  it("conversa inexistente (404) DEVOLVE a reserva", async () => {
+    abrirExecucao.mockResolvedValue({ erro: "Conversa não encontrada." });
+    const r = await pedir(CORPO);
+    expect(r.status).toBe(404);
+    expect(devolver).toHaveBeenCalledWith("u1", { dia: "2026-09-23", micros: 250000 });
+  });
+
+  // ⚠⚠ E A EXECUÇÃO NORMAL NÃO DEVOLVE — ela CONCILIA com o custo real. Devolver aqui faria toda
+  // pergunta sair de graça do teto.
+  it("execução normal NÃO devolve: concilia com o custo real", async () => {
+    await lerFluxo(await pedir(CORPO));
+    expect(devolver).not.toHaveBeenCalled();
+    expect(conciliar).toHaveBeenCalled();
+  });
+
+  // ⚠⚠ FALHA DO MODELO TAMBÉM NÃO DEVOLVE: a chamada pode ter sido cobrada antes de falhar, e o
+  // custo real é desconhecido. É a regra "reserva interrompida não volta sozinha".
+  it("falha do modelo NÃO devolve a reserva — o custo real é desconhecido", async () => {
+    responder.mockRejectedValue(new Error("timeout"));
+    await lerFluxo(await pedir(CORPO));
+    expect(devolver).not.toHaveBeenCalled();
   });
 
   it("falha do modelo marca a execução e avisa, sem derrubar a rota", async () => {

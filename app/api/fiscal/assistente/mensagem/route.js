@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAcesso } from "@/lib/session";
 import { responder } from "@/lib/fiscal/assistente/orquestrador";
 import { abrirExecucao, concluirExecucao, falharExecucao, lerConversa } from "@/lib/fiscal/assistente/conversas";
-import { reservar, conciliar } from "@/lib/fiscal/assistente/orcamento";
+import { reservar, conciliar, devolver } from "@/lib/fiscal/assistente/orcamento";
 import { configurado } from "@/lib/fiscal/assistente/provedor";
 import { log } from "@/lib/log";
 
@@ -62,10 +62,22 @@ export async function POST(req) {
     conversaId: body.conversaId ?? null, userId: user.id,
     userNome: user.name ?? user.email, pergunta: body.pergunta, chave: body.chave,
   });
-  if (aberta.erro) return NextResponse.json({ success: false, error: aberta.erro }, { status: 404 });
+  // ⚠⚠⚠ OS DOIS CAMINHOS ABAIXO SAEM SEM CHAMAR O MODELO, E POR ISSO DEVOLVEM A RESERVA (achado do
+  // Codex, 24/09/2026). Antes, um 404 de conversa apagada e — pior — cada reenvio da MESMA chave
+  // retinham R$ 0,25 do teto de quem não tinha perguntado nada de novo. Numa rede instável, o
+  // navegador reenvia várias vezes: a pessoa seria barrada pelo próprio mecanismo que existe para
+  // não cobrá-la duas vezes, e o teto do portal se esgotaria sem uma única consulta à IA.
+  //
+  // ⚠ Devolver AQUI é seguro e no `finally` do fluxo não seria: aqui é certo que `responder()`
+  // nunca foi chamado.
+  if (aberta.erro) {
+    await devolver(user.id, { dia: vez.dia, micros: vez.reservado });
+    return NextResponse.json({ success: false, error: aberta.erro }, { status: 404 });
+  }
 
   // ⚠⚠ REENVIO DA MESMA CHAVE NÃO COBRA DE NOVO — devolve o que já existe, concluído ou em curso.
   if (aberta.repetida) {
+    await devolver(user.id, { dia: vez.dia, micros: vez.reservado });
     const c = await lerConversa(aberta.conversa.id, user.id);
     return NextResponse.json({ success: true, repetida: true, conversaId: aberta.conversa.id, conversa: c });
   }

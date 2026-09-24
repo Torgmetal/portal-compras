@@ -107,6 +107,40 @@ describe("o laço do assistente", () => {
     expect(r.referencias.resolvidoEm).toBeTruthy();
   });
 
+  // ⚠⚠⚠ ACHADO DO CODEX (24/09/2026): as ferramentas reconsultavam "a TIPI ATIVA agora". Uma
+  // sincronização terminando entre duas ferramentas misturava versões dentro da MESMA resposta — e o
+  // carimbo gravado descrevia uma leitura diferente da que de fato aconteceu.
+  it("troca de versão ATIVA entre duas ferramentas não muda a versão que a resposta usa", async () => {
+    const v1 = {
+      id: "tipi-v1", totalNcm: 11103, parserVersao: "1", observadoEm: new Date("2026-09-22"),
+      aprovadoEm: null, vigenciaInicio: null, vigenciaFundamento: null,
+      arquivo: { url: "https://tipi", sha256: "sha-da-v1", bytes: 1, baixadoEm: new Date("2026-09-22") },
+    };
+    const v2 = { ...v1, id: "tipi-v2", arquivo: { ...v1.arquivo, sha256: "sha-da-v2" } };
+    // A PRIMEIRA leitura devolve a v1; qualquer leitura posterior já vê a v2 — é a sincronização
+    // terminando no meio da resposta.
+    // ⚠ Zera o histórico de chamadas: `mock.calls` acumula entre os testes deste arquivo, e o "v1"
+    // da fixture padrão apareceria aqui como se esta execução o tivesse lido.
+    mockPrisma.fiscalTipiLinha.findMany.mockClear();
+    mockPrisma.fiscalTipiVersao.findFirst.mockReset();
+    mockPrisma.fiscalTipiVersao.findFirst.mockResolvedValueOnce(v1).mockResolvedValue(v2);
+
+    rodada
+      .mockResolvedValueOnce(comFerramenta("consultar_ncm", { ncm: "84379000" }))
+      .mockResolvedValueOnce(comFerramenta("simular_operacao", { ncm: "84379000", cfop: "5101", ufDestino: "SP" }))
+      .mockResolvedValueOnce(semFerramenta("pronto"));
+    const r = await responder({ historico: [], pergunta: "x" });
+
+    // O carimbo diz v1…
+    expect(r.referencias.tipiVersaoId).toBe("tipi-v1");
+    // …e as DUAS ferramentas leram as linhas da v1 — nenhuma consulta foi para a v2.
+    const versoesLidas = mockPrisma.fiscalTipiLinha.findMany.mock.calls.map((c) => c[0]?.where?.versaoId);
+    expect(versoesLidas.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(versoesLidas)).toEqual(new Set(["tipi-v1"]));
+    // E a TIPI ATIVA foi lida UMA vez só, no começo da execução.
+    expect(mockPrisma.fiscalTipiVersao.findFirst).toHaveBeenCalledTimes(1);
+  });
+
   it("resposta vazia do modelo vira mensagem honesta, não string vazia", async () => {
     rodada.mockResolvedValueOnce(semFerramenta(""));
     const r = await responder({ historico: [], pergunta: "x" });

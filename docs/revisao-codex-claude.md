@@ -1823,3 +1823,42 @@ modelo de ponta a ponta, e isso só dá para fazer em produção ou com a chave 
   ⚠ **Para revisar / decidir:** (a) caixa só no assoalho ou sobre caixa (regra de 15/09) — liberar caixa sobre pacote
   com caibro conferido leva a OP-118 a 4; (b) altura do pacote 60 cm — com 1 m, mesmas viagens e menos peça solta
   (OP-102 de 28 para 17); (c) caibro de 5 cm entre camadas é premissa.
+
+## 24/09/2026 — Assistente Fiscal: rodada de correção 2/2 (quatro P2)
+
+Os quatro achados foram aceitos sem discordância; cada um ganhou um teste que o **prova**, e dois
+deles foram conferidos vermelhos contra o código antigo antes de eu aceitar o verde.
+
+- **P2 — reenvio e 404 retinham a reserva.** `reservar()` vinha antes de `abrirExecucao()`, e os
+  caminhos `aberta.erro` e `aberta.repetida` saíam sem devolver. Numa rede instável o navegador
+  reenvia várias vezes: a pessoa seria barrada pelo próprio mecanismo que existe para não cobrá-la
+  duas vezes. Agora `devolver()` roda **só** nesses dois pontos — os únicos em que é CERTO que o
+  modelo não foi chamado. ⚠ Falha do modelo continua **não** devolvendo: o custo real é
+  desconhecido, e isso tem teste próprio.
+- **P2 — a primeira pergunta não era idempotente.** A conversa nascia antes da busca pela chave, e a
+  busca só olhava dentro dela. Agora: `pg_advisory_xact_lock(hashtext('fiscal-ia:<user>:<chave>'))`
+  **antes de tudo**, e a busca é por chave em **todas** as conversas do usuário. ⚠ Escolhi trava em
+  vez de índice único `(userId, chave)` porque `FiscalMensagem` não tem `userId`, e acrescentá-lo
+  seria **DDL em produção — que esta rodada proíbe**. Mesmo padrão da Conferência de Peça.
+- **P2 — versões misturadas entre ferramentas.** A execução resolvia as versões e gravava o
+  carimbo, mas as ferramentas reconsultavam por conta própria. Agora `referenciasDaExecucao()`
+  devolve `referencias` (o carimbo) **e** `contexto` (referência TIPI/NCM, corpus, decisões da
+  contabilidade, verbetes), e `executar(nome, args, contexto)` repassa. `detalharNcm`, `buscarNcm` e
+  `buscarLegislacao` ganharam parâmetro **opcional** — chamador antigo não muda. Teste: a TIPI ATIVA
+  troca de v1 para v2 no meio da resposta, e as duas ferramentas continuam lendo a v1; **conferido
+  vermelho** devolvendo a simulação ao `findFirst({status:"ATIVA"})` antigo.
+- **P2 — o SDK retentava além do prazo.** `maxRetries: 0` + `AbortSignal.timeout` amarrado ao prazo
+  absoluto, e o orçamento do modelo caiu de 55 s para **42 s** com 8 s reservados para gravar.
+  Teste com transporte simulado: uma chamada que nunca responde é **cortada** pelo sinal e chamada
+  **uma** vez só.
+
+Também: o carimbo passou a ler `decisoes`/`verbetes` **pelo tipo** (`instanceof Map`, `Array.isArray`)
+— um formato inesperado ali derrubava a resposta inteira depois de a chamada já ter sido paga.
+
+⚠⚠ **Limite desta rodada:** a concorrência real da trava (dois POSTs simultâneos) não foi provada
+contra o Postgres — a rodada proíbe operação em produção, e o teste mocka o Prisma. O que está
+provado é a ORDEM (trava → busca → criação) e o escopo da busca. É o mesmo mecanismo que a
+Conferência de Peça já usa em produção.
+
+Testes: `fiscal-assistente-idempotencia` (5), `fiscal-assistente-provedor` (5), +4 na rota, +1 no
+laço. **3.833 passando**, `checar` limpo, build EXIT=0. **Sem push**, como a rodada determina.
