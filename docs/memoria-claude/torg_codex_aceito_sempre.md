@@ -27,3 +27,13 @@ reabrir o romaneio. **É do Vitor e ele está ajustando.** Não aparece mais com
 `docs/revisao-codex-claude.md`; se o Codex apontar de novo, a resposta é que o dono é ele.
 
 Ver [[torg_codex_aprova_antes]] e [[torg_revisao_codex_fluxo]].
+
+## Corrigir também não precisa de autorização (24/09/2026)
+
+Matheus: *"Não preciso ficar autorizando o Codex, você tem liberdade para falar pro Claude
+corrigir."* Quando o Codex apontar **defeito concreto em código nosso** — inclusive depois do
+limite de 2 ciclos, quando o hook encaminha como `decisao_humana` —, **corrija direto**, com teste
+vermelho→verde, e relate no fim. Não pare para pedir `codex: corrigir`.
+
+⚠ Continua valendo: o hook não se altera nem se desliga; falha de terceiro (P1 do Vitor) não é
+nossa; e se a correção não fechar depois de tentar, reporte em vez de insistir em círculo.

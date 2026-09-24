@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Send, Plus, Loader2, MessageSquare, Bot, Trash2, AlertTriangle, Paperclip, FileCode2, X } from "lucide-react";
 import Mensagem from "./Mensagem";
+import { tentativaPara } from "./tentativa";
 
 // ─── O ASSISTENTE FISCAL TORG ────────────────────────────────────────────────
 //
@@ -21,8 +22,9 @@ const SUGESTOES = [
   { titulo: "Conferir uma regra", texto: "O CFOP 5.101 já foi conferido pela contabilidade?" },
 ];
 
-/** ⚠ Uma chave por TENTATIVA, num ref: reenviar depois de uma falha manda a MESMA chave, e a rota
- *  devolve a execução que já existe em vez de cobrar outra chamada à API. */
+/** ⚠ Uma chave por TENTATIVA, num ref: reenviar depois de uma falha manda a MESMA chave — e o MESMO
+ *  conteúdo (ver `tentativa.js`) —, e a rota devolve a execução que já existe em vez de cobrar outra
+ *  chamada à API. */
 const novaChave = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 export default function AssistenteFiscal({ showToast }) {
@@ -35,7 +37,7 @@ export default function AssistenteFiscal({ showToast }) {
   const [ambiente, setAmbiente] = useState({ disponivel: true, consumo: null });
   const [arquivo, setArquivo] = useState(null);
   const seletor = useRef(null);
-  const chave = useRef(null);
+  const pendente = useRef(null);
   const fim = useRef(null);
   const campo = useRef(null);
 
@@ -51,12 +53,12 @@ export default function AssistenteFiscal({ showToast }) {
   useEffect(() => { fim.current?.scrollIntoView({ behavior: "smooth" }); }, [mensagens, etapa]);
 
   const abrir = async (id) => {
-    setAtual(id); setEtapa(null);
+    setAtual(id); setEtapa(null); pendente.current = null;
     const r = await fetch(`/api/fiscal/assistente/conversas/${id}`).then((x) => x.json()).catch(() => null);
     setMensagens(r?.success ? r.conversa.mensagens : []);
   };
 
-  const nova = () => { setAtual(null); setMensagens([]); setPergunta(""); setEtapa(null); campo.current?.focus(); };
+  const nova = () => { pendente.current = null; setAtual(null); setMensagens([]); setPergunta(""); setEtapa(null); campo.current?.focus(); };
 
   const arquivar = async (id, e) => {
     e.stopPropagation();
@@ -72,36 +74,38 @@ export default function AssistenteFiscal({ showToast }) {
     if (f.size > TETO_XML) { showToast?.("O XML passa de 4 MB.", "erro"); return; }
     setArquivo(f);
     // ⚠ Trocar o anexo é OUTRA tentativa: a chave antiga, reusada com outro arquivo, daria 409.
-    chave.current = null;
+    pendente.current = null;
   };
 
   async function enviar(texto) {
     const p = String(texto ?? pergunta).trim();
     if (!p || enviando) return;
-    chave.current ??= novaChave();
-    const anexado = arquivo;
+    const t = tentativaPara(pendente.current, { pergunta: p, conversaId: atual, arquivo }, novaChave);
+    pendente.current = t;
+    const anexado = t.arquivo;
     setEnviando(true); setEtapa({ etapa: "inicio" }); setPergunta("");
     setMensagens((m) => [...m, { id: `tmp-${Date.now()}`, papel: "USUARIO", conteudo: p, estado: "CONCLUIDA", anexo: anexado?.name ?? null }]);
 
+    let recusada = false;
     try {
       // ⚠ Sem anexo continua JSON; com anexo, multipart — o servidor aceita os dois e termina no
-      // mesmo lugar.
+      // mesmo lugar. ⚠ Tudo sai de `t`, nunca do estado da tela: ver `tentativa.js`.
       let requisicao;
       if (anexado) {
         const form = new FormData();
-        form.append("pergunta", p);
-        form.append("chave", chave.current);
-        if (atual) form.append("conversaId", atual);
+        form.append("pergunta", t.pergunta);
+        form.append("chave", t.chave);
+        if (t.conversaId) form.append("conversaId", t.conversaId);
         form.append("xml", anexado);
         requisicao = { method: "POST", body: form };
       } else {
-        requisicao = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pergunta: p, conversaId: atual, chave: chave.current }) };
+        requisicao = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pergunta: t.pergunta, conversaId: t.conversaId, chave: t.chave }) };
       }
       const resp = await fetch("/api/fiscal/assistente/mensagem", requisicao);
       if (!resp.ok) {
         const e = await resp.json().catch(() => ({}));
         // ⚠ 409 = esta chave já foi usada com outro conteúdo. A próxima tentativa precisa de chave nova.
-        if (resp.status === 409) chave.current = null;
+        if (resp.status === 409) { pendente.current = null; recusada = true; }
         throw new Error(e.error || "Não foi possível falar com o assistente.");
       }
       setArquivo(null);
@@ -109,15 +113,20 @@ export default function AssistenteFiscal({ showToast }) {
       if (resp.headers.get("content-type")?.includes("application/json")) {
         const j = await resp.json();
         if (j.conversa) { setAtual(j.conversaId); setMensagens(j.conversa.mensagens); }
-        chave.current = null;
+        pendente.current = null;
         return;
       }
       await consumirFluxo(resp);
-      chave.current = null;
+      pendente.current = null;
       carregarLista();
     } catch (e) {
       showToast?.(e.message, "erro");
       setMensagens((m) => [...m, { id: `err-${Date.now()}`, papel: "ASSISTENTE", estado: "FALHOU", erro: e.message }]);
+      // ⚠ A pergunta volta para o campo: reenviar é um Enter, e com o mesmo texto a tentativa
+      // guardada é reaproveitada — sem nova cobrança.
+      // O anexo volta junto, para a tela mostrar o que o reenvio vai mandar; tirá-lo pelo X é
+      // tentativa nova.
+      if (!recusada) { setPergunta((atualCampo) => atualCampo || p); if (t.arquivo) setArquivo(t.arquivo); }
     } finally {
       setEnviando(false); setEtapa(null);
     }
@@ -235,7 +244,7 @@ export default function AssistenteFiscal({ showToast }) {
             <FileCode2 size={13} className="shrink-0 text-torg-blue" />
             <span className="truncate">{arquivo.name}</span>
             <span className="shrink-0 text-torg-gray">{(arquivo.size / 1024).toFixed(0)} KB</span>
-            <button type="button" onClick={() => { setArquivo(null); chave.current = null; }} disabled={enviando}
+            <button type="button" onClick={() => { setArquivo(null); pendente.current = null; }} disabled={enviando}
               className="shrink-0 text-torg-gray hover:text-red-600" title="Remover anexo"><X size={13} /></button>
           </div>
         )}
