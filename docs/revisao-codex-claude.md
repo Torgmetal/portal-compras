@@ -1751,3 +1751,19 @@ modelo de ponta a ponta, e isso só dá para fazer em produção ou com a chave 
   ⚠ Pedido anterior da mesma conversa, NÃO executado: trocar o soldador da junta T102B62 (EVS-102-001)
   para o Eberton — a gravação direta no banco foi bloqueada pela proteção do Claude Code; ficou para a
   tela (um clique: escolher o soldador preenche sinete e EPS).
+
+- **(24/09) Backups: o dump do banco longe do teto, e a segunda cópia do que só existia no Blob.**
+  Vitor: *"como está nossos backups?"* → *"pode atacar"*. Medido antes: dump de 192 → 249 s em quatro
+  domingos contra 300 s; 323 anexos de Data Book e 293 fotos de inspeção só no Vercel Blob.
+  **Banco** (`lib/backup-banco.js`): 4 tabelas por vez, gzip em fluxo, parada própria aos 270 s com o
+  que faltou em `falhas`; P2021 (modelo sem tabela — 13 do MES hoje) listado à parte em vez de falha.
+  Ensaio só de leitura na produção: 177 tabelas / 405 mil linhas lidas em 11 s — o tempo era upload.
+  **Arquivos** (`lib/backup-arquivos.js` + cron diário 03:30 UTC, cadastrado no monitor): copia para
+  `Backup - Portal › Arquivos` por OP; anexo grava `sharepointUrl/ItemId`, foto registra no AuditLog;
+  só Blob público (SSRF), pastas criadas nível a nível com a promessa memorizada (4 em paralelo não
+  colidem). **Data Book** (`baixarDocumento`): Blob 404 com cópia → usa a cópia.
+  Testes: backup-banco (6), backup-arquivos (6), databook-baixar-documento (+3). **3.803 passando**,
+  checar limpo, build ok.
+  ⚠ **Para revisar:** (a) o AuditLog como controle do que foi copiado (foto); (b) a foto ainda não tem
+  caminho de recuperação automática — a cópia existe, a troca da URL seria manual; (c) primeira leva
+  real só na madrugada — não disparei o cron em produção.

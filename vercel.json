@@ -110,6 +110,10 @@
       "schedule": "0 4 * * 0"
     },
     {
+      "path": "/api/cron/backup-arquivos",
+      "schedule": "30 3 * * *"
+    },
+    {
       "path": "/api/engenharia/grd/sincronizar",
       "schedule": "0 11,17,21 * * 1-5"
     },

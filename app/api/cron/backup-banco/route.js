@@ -17,7 +17,8 @@ import { aquecerBanco } from "@/lib/db-retry";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 // o teto da plataforma: o backup inteiro leva alguns minutos e não há como partir em dois sem que
-// o resultado deixe de ser um retrato do mesmo instante.
+// o resultado deixe de ser um retrato do mesmo instante. ⚠ Desde 24/09/2026 são quatro tabelas por
+// vez e ele PARA sozinho aos 270 s (lib/backup-banco.js) — morto aqui, sumiria sem manifesto.
 export const maxDuration = 300;
 
 export async function GET(req) {
@@ -39,7 +40,8 @@ export async function GET(req) {
     await registrarExecucao("backup-banco", {
       ok: !manifesto.falhas.length,
       duracaoMs: Date.now() - t0,
-      mensagem: `${manifesto.totalTabelas} tabelas · ${manifesto.totalLinhas} linhas · ${mb} MB`
+      mensagem: `${manifesto.totalTabelas} tabelas · ${manifesto.totalLinhas} linhas · ${mb} MB · ${manifesto.duracaoSegundos}s`
+        + (manifesto.modelosSemTabela?.length ? ` · ${manifesto.modelosSemTabela.length} modelo(s) ainda sem tabela no banco` : "")
         + (manifesto.falhas.length ? ` · FALHOU em ${manifesto.falhas.map((f) => f.tabela).join(", ")}` : ""),
     }).catch(() => {});
     return NextResponse.json({

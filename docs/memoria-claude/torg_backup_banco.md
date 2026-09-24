@@ -31,3 +31,19 @@ metadata:
 - Código fora do GitHub, só no Mac do Vitor: o checkout principal (branch do Codex, dezenas de
   arquivos sem commit), `codex/login-unificado` e duas `claude/*` com commits locais.
 - Neon point-in-time: segue sem confirmação — o projeto não tem `NEON_API_KEY`, só `NEON_PROJECT_ID`.
+
+**Corrigido em 24/09/2026 (Vitor: "pode atacar"):**
+- **Dump do banco**: quatro tabelas por vez, gzip em fluxo (a tabela não vira texto inteiro em
+  memória antes de comprimir) e parada própria aos 270 s — o que faltar vai para `falhas` com
+  "tempo esgotado", o manifesto sobe e o heartbeat sai vermelho no mesmo domingo. Ensaio só de
+  leitura contra a produção: a LEITURA inteira (177 tabelas, 405 mil linhas) leva **11 s** — os 249 s
+  eram quase todos os uploads em fila; estimativa com 4 em paralelo ~75 s.
+  ⚠ **Modelo sem tabela no banco (P2021) não é falha** — 13 modelos novos do MES estavam no código e
+  não no banco, e o domingo seguinte sairia vermelho à toa. Vão para `modelosSemTabela` no manifesto.
+- **Arquivos só no Blob**: cron diário `/api/cron/backup-arquivos` (03:30 UTC, `lib/backup-arquivos.js`)
+  copia anexos do Data Book e fotos de inspeção para `Backup - Portal › Arquivos › {Data Book | Fotos
+  de inspeção} › OP-nnn`, com nome fixo por id (`replace`, nunca duplica), 4 por vez, parando aos
+  240 s. Anexo: grava `sharepointUrl`/`sharepointItemId` no documento. Foto: o registro é o AuditLog
+  `BACKUP_FOTO_INSPECAO_OK` (sem DDL). Primeira leva: 616 arquivos, ~250 MB — uma ou duas noites.
+- **O Data Book usa a cópia** se o arquivo sumir do Blob (`baixarDocumento`): antes, Blob 404 era erro
+  seco mesmo com cópia existindo.

@@ -1,7 +1,12 @@
 {
-  "build": 3441,
-  "gerado": "2026-09-24T10:35:29.675Z",
+  "build": 3442,
+  "gerado": "2026-09-24T10:53:26.680Z",
   "commits": [
+    {
+      "hash": "74fa9db4",
+      "data": "24/09/2026",
+      "titulo": "Memória: o estado dos backups medido em 24/09 — tempo do dump perto do teto, anexos do data book e fotos sem cópia"
+    },
     {
       "hash": "9e3d2b82",
       "data": "23/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c4defd79",
       "data": "22/09/2026",
       "titulo": "Fiscal: o parecer de arquitetura achou 6 defeitos reais, e o ICMS entra como referência"
-    },
-    {
-      "hash": "04e3a36d",
-      "data": "22/09/2026",
-      "titulo": "Simulador: PIS/COFINS sai com número, porque o regime foi DECLARADO"
     }
   ]
 }

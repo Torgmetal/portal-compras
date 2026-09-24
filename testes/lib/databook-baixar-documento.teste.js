@@ -174,3 +174,28 @@ describe("baixarDocumento — a escada, degrau por degrau", () => {
     expect(downloadRhItem).not.toHaveBeenCalled();
   });
 });
+
+// ⚠ O BLOB NÃO TEM LIXEIRA (24/09/2026). Os anexos do Data Book ganharam cópia no SharePoint
+// (lib/backup-arquivos.js); se o arquivo some do Blob, o livro usa a cópia em vez de perder o anexo.
+describe("baixarDocumento — anexo do Blob com cópia de backup", () => {
+  const BLOB = "https://abc123.public.blob.vercel-storage.com/databook/cert.pdf";
+  const anexo = (extra = {}) => ({ arquivoUrl: BLOB, sharepointUrl: null, sharepointItemId: null, origem: "anexo_databook", opNumero: "102", ...extra });
+
+  it("Blob vivo: usa o Blob, nem olha a cópia", async () => {
+    globalThis.fetch.mockResolvedValue({ ok: true, arrayBuffer: async () => new TextEncoder().encode("DO BLOB").buffer });
+    expect((await baixarDocumento(anexo({ sharepointItemId: "copia-1" }))).toString()).toBe("DO BLOB");
+    expect(downloadRhItem).not.toHaveBeenCalled();
+  });
+
+  it("sumiu do Blob e há cópia: o livro sai com a cópia do backup", async () => {
+    globalThis.fetch.mockResolvedValue({ ok: false, status: 404 });
+    expect((await baixarDocumento(anexo({ sharepointItemId: "copia-1" }))).toString()).toBe("PADRAO");
+    expect(downloadRhItem).toHaveBeenCalledWith("copia-1");
+  });
+
+  it("sumiu do Blob e não há cópia: o erro de sempre", async () => {
+    globalThis.fetch.mockResolvedValue({ ok: false, status: 404 });
+    await expect(baixarDocumento(anexo())).rejects.toThrow("HTTP 404");
+    expect(downloadRhItem).not.toHaveBeenCalled();
+  });
+});
