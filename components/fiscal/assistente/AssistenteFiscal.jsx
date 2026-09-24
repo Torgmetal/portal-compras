@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Send, Plus, Loader2, MessageSquare, Bot, Trash2, AlertTriangle } from "lucide-react";
+import { Send, Plus, Loader2, MessageSquare, Bot, Trash2, AlertTriangle, Paperclip, FileCode2, X } from "lucide-react";
 import Mensagem from "./Mensagem";
 
 // ─── O ASSISTENTE FISCAL TORG ────────────────────────────────────────────────
@@ -8,6 +8,9 @@ import Mensagem from "./Mensagem";
 // ⚠⚠ A TELA NÃO CALCULA NADA E NÃO GUARDA NADA. Ela manda a pergunta, mostra o progresso e desenha
 // o que o servidor gravou. Todo número fiscal chega pronto dentro de `blocos` — o navegador nunca
 // deriva alíquota, CFOP nem citação, pela mesma razão que a Conferência de Peça nunca soma saldo.
+
+/** ⚠ O mesmo teto do servidor (`LIMITES.bytes`): recusar aqui poupa o envio de 4 MB que voltaria 413. */
+const TETO_XML = 4 * 1024 * 1024;
 
 const SUGESTOES = [
   { titulo: "IPI de um NCM", texto: "Qual é a alíquota de IPI do NCM 8437.90.00?" },
@@ -30,6 +33,8 @@ export default function AssistenteFiscal({ showToast }) {
   const [enviando, setEnviando] = useState(false);
   const [etapa, setEtapa] = useState(null);
   const [ambiente, setAmbiente] = useState({ disponivel: true, consumo: null });
+  const [arquivo, setArquivo] = useState(null);
+  const seletor = useRef(null);
   const chave = useRef(null);
   const fim = useRef(null);
   const campo = useRef(null);
@@ -59,22 +64,47 @@ export default function AssistenteFiscal({ showToast }) {
     if (r?.success) { if (atual === id) nova(); carregarLista(); showToast?.("Conversa arquivada.", "sucesso"); }
   };
 
+  /** ⚠ Conferência de conveniência, não de segurança — quem decide é o servidor. Poupa a espera de
+   *  subir 4 MB para ouvir "não é XML". */
+  const escolherArquivo = (f) => {
+    if (!f) return;
+    if (!/\.xml$/i.test(f.name)) { showToast?.("Anexe o arquivo XML da NF-e.", "erro"); return; }
+    if (f.size > TETO_XML) { showToast?.("O XML passa de 4 MB.", "erro"); return; }
+    setArquivo(f);
+    // ⚠ Trocar o anexo é OUTRA tentativa: a chave antiga, reusada com outro arquivo, daria 409.
+    chave.current = null;
+  };
+
   async function enviar(texto) {
     const p = String(texto ?? pergunta).trim();
     if (!p || enviando) return;
     chave.current ??= novaChave();
+    const anexado = arquivo;
     setEnviando(true); setEtapa({ etapa: "inicio" }); setPergunta("");
-    setMensagens((m) => [...m, { id: `tmp-${Date.now()}`, papel: "USUARIO", conteudo: p, estado: "CONCLUIDA" }]);
+    setMensagens((m) => [...m, { id: `tmp-${Date.now()}`, papel: "USUARIO", conteudo: p, estado: "CONCLUIDA", anexo: anexado?.name ?? null }]);
 
     try {
-      const resp = await fetch("/api/fiscal/assistente/mensagem", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pergunta: p, conversaId: atual, chave: chave.current }),
-      });
+      // ⚠ Sem anexo continua JSON; com anexo, multipart — o servidor aceita os dois e termina no
+      // mesmo lugar.
+      let requisicao;
+      if (anexado) {
+        const form = new FormData();
+        form.append("pergunta", p);
+        form.append("chave", chave.current);
+        if (atual) form.append("conversaId", atual);
+        form.append("xml", anexado);
+        requisicao = { method: "POST", body: form };
+      } else {
+        requisicao = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pergunta: p, conversaId: atual, chave: chave.current }) };
+      }
+      const resp = await fetch("/api/fiscal/assistente/mensagem", requisicao);
       if (!resp.ok) {
         const e = await resp.json().catch(() => ({}));
+        // ⚠ 409 = esta chave já foi usada com outro conteúdo. A próxima tentativa precisa de chave nova.
+        if (resp.status === 409) chave.current = null;
         throw new Error(e.error || "Não foi possível falar com o assistente.");
       }
+      setArquivo(null);
       // ⚠ Resposta de reenvio idêntico volta como JSON, não como fluxo: a execução já existia.
       if (resp.headers.get("content-type")?.includes("application/json")) {
         const j = await resp.json();
@@ -125,6 +155,7 @@ export default function AssistenteFiscal({ showToast }) {
     consultar_cfop: "Consultando a tabela de CFOP…", buscar_legislacao: "Procurando o fundamento legal…",
     consultar_regra_e_situacao: "Conferindo a situação da regra…", simular_operacao: "Simulando a operação…",
     consultar_classificacao: "Consultando o registro de classificação…",
+    ler_documento_anexado: "Lendo a nota anexada…",
   };
 
   return (
@@ -197,7 +228,26 @@ export default function AssistenteFiscal({ showToast }) {
           <div ref={fim} />
         </div>
 
+        {/* ⚠ O anexo aparece ANTES de enviar, com nome e tamanho: quem anexou a nota errada precisa ver
+            isso antes de pagar por uma resposta sobre ela. */}
+        {arquivo && (
+          <div className="mt-3 inline-flex max-w-full items-center gap-2 self-start rounded-lg border border-torg-blue/20 bg-torg-blue/5 px-2.5 py-1.5 text-xs text-torg-dark">
+            <FileCode2 size={13} className="shrink-0 text-torg-blue" />
+            <span className="truncate">{arquivo.name}</span>
+            <span className="shrink-0 text-torg-gray">{(arquivo.size / 1024).toFixed(0)} KB</span>
+            <button type="button" onClick={() => { setArquivo(null); chave.current = null; }} disabled={enviando}
+              className="shrink-0 text-torg-gray hover:text-red-600" title="Remover anexo"><X size={13} /></button>
+          </div>
+        )}
+
         <form onSubmit={(e) => { e.preventDefault(); enviar(); }} className="mt-3 flex items-end gap-2">
+          <input ref={seletor} type="file" accept=".xml,text/xml,application/xml" className="hidden"
+            onChange={(e) => { escolherArquivo(e.target.files?.[0]); e.target.value = ""; }} />
+          <button type="button" onClick={() => seletor.current?.click()} disabled={enviando || !ambiente.disponivel}
+            title="Anexar o XML de uma NF-e"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-torg-gray transition hover:border-torg-blue/40 hover:text-torg-blue disabled:opacity-40">
+            <Paperclip size={17} />
+          </button>
           <textarea
             ref={campo} rows={2} value={pergunta} onChange={(e) => setPergunta(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } }}

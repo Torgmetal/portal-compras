@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Bot, User, AlertTriangle, Copy, Check, Wrench, ChevronDown, ChevronRight } from "lucide-react";
+import { Bot, User, AlertTriangle, Copy, Check, Wrench, ChevronDown, ChevronRight, FileCode2, Info } from "lucide-react";
 import TextoFormatado from "./TextoFormatado";
 import BlocoFiscal from "./BlocoFiscal";
 
@@ -12,17 +12,25 @@ const ROTULO_FERRAMENTA = {
   consultar_regra_e_situacao: "conferiu a situação da regra",
   simular_operacao: "simulou a operação",
   consultar_classificacao: "consultou o registro de classificação",
+  ler_documento_anexado: "leu a nota anexada",
 };
 
 export default function Mensagem({ m }) {
   const [abrir, setAbrir] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const meu = m.papel === "USUARIO";
+  const semFonte = (m.avisos ?? []).filter((a) => !a.soDocumento);
+  const soDocumento = (m.avisos ?? []).filter((a) => a.soDocumento);
 
   if (meu) {
     return (
       <div className="flex justify-end gap-2">
         <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-torg-blue px-4 py-2.5 text-sm text-white shadow-sm">
+          {m.anexo && (
+            <p className="mb-1.5 inline-flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-0.5 text-[11px]">
+              <FileCode2 size={11} />{m.anexo}
+            </p>
+          )}
           <p className="whitespace-pre-wrap leading-relaxed">{m.conteudo}</p>
         </div>
         <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-torg-dark/10 text-torg-dark"><User size={14} /></span>
@@ -46,12 +54,26 @@ export default function Mensagem({ m }) {
 
         {/* ⚠⚠⚠ A TARJA DE CITAÇÃO SEM LASTRO. É o resultado de `conferirProsa`: o portal conferiu o
             que o modelo escreveu contra as fontes que ele consultou, e este número não estava lá. */}
-        {Boolean(m.avisos?.length) && (
+        {Boolean(semFonte.length) && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
             <p className="flex items-center gap-1.5 font-semibold"><AlertTriangle size={13} />Citação sem fonte</p>
             <p className="mt-1">
-              O texto abaixo menciona {m.avisos.map((a) => `${a.tipo} ${a.citado}`).join(", ")} sem que isso tenha vindo de
+              O texto abaixo menciona {semFonte.map((a) => `${a.tipo} ${a.citado}`).join(", ")} sem que isso tenha vindo de
               nenhuma fonte consultada. <strong>Desconsidere esse trecho</strong> — vale o que está nos blocos.
+            </p>
+          </div>
+        )}
+        {/* ⚠⚠ O CÓDIGO QUE SÓ EXISTE NA NOTA ANEXADA TEM AVISO PRÓPRIO, em âmbar e não em vermelho. Ele
+            pode estar sendo TRANSCRITO ("a nota foi emitida com o 5.915") — legítimo — ou RECOMENDADO
+            ("use o 5.915 no retorno") — o erro que o §16 proíbe. O portal não distingue as duas frases,
+            então não acusa de invenção nem cala: diz de onde o código veio e deixa a leitura com a pessoa. */}
+        {Boolean(soDocumento.length) && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <p className="flex items-center gap-1.5 font-semibold"><Info size={13} />Vem da nota anexada, não de uma regra</p>
+            <p className="mt-1">
+              {soDocumento.map((a) => `${a.tipo} ${a.citado}`).join(", ")} aparece{soDocumento.length > 1 ? "m" : ""} na nota que você anexou,
+              mas nenhuma regra consultada {soDocumento.length > 1 ? "os" : "o"} recomenda para <strong>esta</strong> operação.
+              Se o texto estiver sugerindo usar {soDocumento.length > 1 ? "esses códigos" : "esse código"} na próxima nota, confira antes.
             </p>
           </div>
         )}

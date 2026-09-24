@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { requireAcesso } from "@/lib/session";
 import { responder } from "@/lib/fiscal/assistente/orquestrador";
-import { abrirExecucao, concluirExecucao, falharExecucao, lerConversa } from "@/lib/fiscal/assistente/conversas";
+import { abrirExecucao, concluirExecucao, falharExecucao, lerConversa, gravarAnexo } from "@/lib/fiscal/assistente/conversas";
+import { lerPedido, hashDaTentativa, CorpoRecusado } from "@/lib/fiscal/assistente/pedido";
+import { PARSER_VERSAO } from "@/lib/fiscal/assistente/anexo-nfe";
 import { reservar, conciliar, devolver } from "@/lib/fiscal/assistente/orcamento";
 import { configurado } from "@/lib/fiscal/assistente/provedor";
 import { log } from "@/lib/log";
@@ -23,14 +24,6 @@ const registro = log("api/fiscal/assistente");
 export const runtime = "nodejs";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
-
-const schema = z.object({
-  pergunta: z.string().trim().min(2, "Escreva a sua pergunta.").max(4000, "A pergunta passou de 4.000 caracteres."),
-  conversaId: z.string().max(40).optional().nullable(),
-  // ⚠⚠ UMA CHAVE POR TENTATIVA, gerada pelo navegador. Reenvio com a MESMA chave devolve a
-  // execução que já existe em vez de cobrar outra chamada — cada tentativa aqui é dinheiro.
-  chave: z.string().trim().min(8).max(64),
-});
 
 const sse = (evento, dados) => `event: ${evento}\ndata: ${JSON.stringify(dados)}\n\n`;
 
@@ -55,11 +48,15 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: "O assistente fiscal está desligado: a chave da API de IA não está configurada neste ambiente." }, { status: 503 });
   }
 
+  // ⚠⚠ O CORPO É LIDO E O XML É VALIDADO ANTES DO ORÇAMENTO: arquivo inválido ou grande demais é
+  // recusado sem tocar no teto de ninguém. E com teto de BYTES de verdade — ver `multipart.js`.
   let body;
+  let anexo;
   try {
-    body = schema.parse(await req.json());
+    ({ corpo: body, anexo } = await lerPedido(req));
   } catch (e) {
-    return NextResponse.json({ success: false, error: e.issues?.[0]?.message ?? "Dados inválidos." }, { status: 400 });
+    if (e instanceof CorpoRecusado) return NextResponse.json({ success: false, error: e.message }, { status: e.status });
+    throw e;
   }
 
   // 1. O ORÇAMENTO PRIMEIRO. ⚠ Recusar depois de chamar não desfaz a chamada.
@@ -70,7 +67,13 @@ export async function POST(req) {
   const aberta = await abrirExecucao({
     conversaId: body.conversaId ?? null, userId: user.id,
     userNome: user.name ?? user.email, pergunta: body.pergunta, chave: body.chave,
+    tentativaHash: hashDaTentativa(body, anexo),
   });
+  // ⚠⚠ MESMA CHAVE, OUTRO CONTEÚDO: 409, e a reserva volta — nenhuma chamada foi feita.
+  if (aberta.conflito) {
+    await devolver(user.id, { dia: vez.dia, micros: vez.reservado });
+    return NextResponse.json({ success: false, conflito: true, error: "Esta tentativa já foi usada com outro conteúdo. Envie de novo." }, { status: 409 });
+  }
   // ⚠⚠⚠ OS DOIS CAMINHOS ABAIXO SAEM SEM CHAMAR O MODELO, E POR ISSO DEVOLVEM A RESERVA (achado do
   // Codex, 24/09/2026). Antes, um 404 de conversa apagada e — pior — cada reenvio da MESMA chave
   // retinham R$ 0,25 do teto de quem não tinha perguntado nada de novo. Numa rede instável, o
@@ -97,6 +100,15 @@ export async function POST(req) {
   // ⚠ A última é a própria pergunta que acabou de ser gravada — o orquestrador a recebe à parte.
   const anteriores = historico.filter((m) => m.conteudo !== body.pergunta || m.papel !== "USUARIO");
 
+  // ⚠ O XML fica guardado (privado, no Postgres) ANTES da chamada: se ela falhar, o documento que a
+  // pessoa anexou continua recuperável. Falha ao gravar não derruba a resposta — vai para o carimbo.
+  const guardado = anexo ? await gravarAnexo({
+    userId: user.id, nome: anexo.nome, tamanho: anexo.tamanho, sha256: anexo.sha256,
+    conteudo: anexo.conteudo, parserVersao: PARSER_VERSAO, chaveNfe: anexo.doc.chave,
+  }) : null;
+  // ⚠ O orquestrador NÃO recebe o texto cru do XML — só o documento já lido e validado.
+  const anexoParaModelo = anexo ? { doc: anexo.doc, problemas: anexo.problemas, suspeito: anexo.suspeito, nome: anexo.nome, tamanho: anexo.tamanho, sha256: anexo.sha256, guardado } : null;
+
   const fluxo = new ReadableStream({
     async start(ctrl) {
       const env = (e, d) => { try { ctrl.enqueue(new TextEncoder().encode(sse(e, d))); } catch { /* cliente saiu */ } };
@@ -107,7 +119,9 @@ export async function POST(req) {
           historico: anteriores, pergunta: body.pergunta,
           aoProgredir: (p) => env("etapa", p),
           ateMs: ateModelo,
+          anexo: anexoParaModelo,
         });
+        if (r.referencias?.anexo) r.referencias.anexo.guardado = guardado;
         // 4. CONCLUSÃO E CONCILIAÇÃO.
         await concluirExecucao(aberta.resposta.id, { ...r, conversaId: aberta.conversa.id });
         await conciliar(user.id, { dia: vez.dia, reservado: vez.reservado, micros: r.custoMicros, tokensEntrada: r.uso.entrada, tokensSaida: r.uso.saida });

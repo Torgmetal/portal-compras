@@ -6981,6 +6981,10 @@ model FiscalMensagem {
   erro          String?
   iniciadoEm    DateTime       @default(now())
   terminadoEm   DateTime?
+  /// ⚠⚠ A IDENTIDADE DO CONTEÚDO DA TENTATIVA: sha256 de pergunta + conversa + anexo (parecer de
+  /// segurança do Codex, 24/09/2026). A MESMA chave com OUTRO conteúdo — outro arquivo, outra
+  /// pergunta — é conflito (409), e não pode devolver em silêncio a resposta de uma nota diferente.
+  tentativaHash String?
 
   @@unique([conversaId, seq])
   @@unique([conversaId, chave])
@@ -7006,4 +7010,31 @@ model FiscalUsoIa {
 
   @@unique([userId, dia])
   @@index([dia])
+}
+
+/// ─── O XML ANEXADO NO ASSISTENTE ─────────────────────────────────────────────
+///
+/// ⚠⚠ GUARDADO, AO CONTRÁRIO DA ABA AUDITORIA, E A DIFERENÇA É O BRIEFING. A Auditoria decidiu não
+/// persistir o XML ("documento do cliente, já está na Receita e no Omie"). Para o Assistente o
+/// briefing é explícito: §21 *"Armazenar: … Arquivos anexados"* e §23 *"Armazenamento privado"*. E o
+/// Codex lembrou que hash identifica mas não recupera: sem o arquivo, uma resposta antiga não se
+/// reconstrói.
+/// ⚠⚠ PRIVADO DE VERDADE: fica no Postgres, sem URL pública — o Vercel Blob do portal serve arquivo
+/// por URL não adivinhável, que é "público para quem tiver o link". Nota fiscal de cliente não vai
+/// para lá.
+/// ⚠ Único por (usuário, sha256): reenviar o mesmo arquivo não duplica a linha.
+model FiscalAnexo {
+  id           String   @id @default(cuid())
+  userId       String
+  /// ⚠ Metadado não confiável — veio do navegador. Saneado, nunca usado como caminho.
+  nome         String
+  tamanho      Int
+  sha256       String
+  conteudo     String
+  parserVersao String
+  chaveNfe     String?
+  criadoEm     DateTime @default(now())
+
+  @@unique([userId, sha256])
+  @@index([userId, criadoEm])
 }

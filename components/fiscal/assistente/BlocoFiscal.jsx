@@ -20,6 +20,10 @@ const CORES = {
   SIMULACAO: "border-emerald-200 bg-emerald-50/50",
   CLASSIFICACAO: "border-gray-200 bg-gray-50",
   CADEIA: "border-gray-200 bg-gray-50",
+  // ⚠ O documento anexado tem cor PRÓPRIA, neutra: é o que a nota DIZ, e não pode parecer um bloco de
+  // recomendação do portal (azul) nem de conferência (âmbar).
+  DOCUMENTO: "border-slate-300 bg-slate-50",
+  AUDITORIA: "border-orange-200 bg-orange-50/60",
 };
 
 function Copiar({ texto }) {

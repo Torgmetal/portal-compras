@@ -1,7 +1,12 @@
 {
-  "build": 3450,
-  "gerado": "2026-09-24T14:54:36.471Z",
+  "build": 3451,
+  "gerado": "2026-09-24T15:13:23.821Z",
   "commits": [
+    {
+      "hash": "b79fbe234d",
+      "data": "24/09/2026",
+      "titulo": "Assistente fiscal: o prazo do modelo conta desde a entrada da rota"
+    },
     {
       "hash": "6f71adcd86",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "333701e992",
       "data": "23/09/2026",
       "titulo": "Legislação: a declaração da TIPI estava apagando a ressalva — e mais dois"
-    },
-    {
-      "hash": "92a02cc702",
-      "data": "23/09/2026",
-      "titulo": "Legislação: três achados do Codex, e a TIPI da contabilidade resolve a vigência"
     }
   ]
 }

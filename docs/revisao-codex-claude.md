@@ -1882,3 +1882,39 @@ com o cálculo antigo); sem margem, o modelo não é chamado; o prazo é reconfe
 ⚠ Tropeço de teste: `vi.restoreAllMocks()` apagava também o histórico do `rodada` e a asserção lia
 zero chamadas — restauro agora só o espião do relógio.
 **3.837 passando**, `checar` limpo, build EXIT=0.
+
+## 24/09/2026 — XML anexado no Assistente Fiscal (§16), com parecer de segurança prévio
+
+Parecer `security` pedido ANTES de codar. Nada crítico; dois HIGH e quatro MEDIUM — todos tratados:
+
+- **HIGH — contaminação do lastro.** Com a nota de uma REMESSA anexada, o CFOP 5.915 entrava no lastro
+  igual ao de uma regra, e "use o 5.915 no retorno" passaria sem aviso — o erro exato do §16. Agora
+  todo bloco carrega `lastro` **tipado e com origem** (`REGRA | LEI | TIPI | DOCUMENTO`), preenchido
+  dos campos, e `conferirProsa` avisa `soDocumento` quando o código só existe na nota. Teste conferido
+  **vermelho** marcando o documento como regra.
+  ⚠ **E isso fechou um furo antigo**: o lastro saía de `JSON.stringify(blocos)` — qualquer número no
+  TEXTO de um artigo virava "comprovado" (o 406 cita o 407 no corpo). Agora o artigo sai do rótulo.
+  CST entrou na conferência, só quando rotulado ("CST 53"), porque dois dígitos soltos são quantidade.
+- **HIGH — memória antes do controle.** `req.formData()` materializa o corpo antes de conferir o
+  tamanho (a aba Auditoria faz isso). `multipart.js` conta os bytes enquanto chegam e cancela no
+  primeiro acima do teto; lista fechada de campos, um arquivo só. ⚠ Teto de **4 MB, não 8**: o corpo
+  de função da Vercel para em 4,5 MB. Medido: 990 itens (o máximo do leiaute) = 3 MB, 74 ms de parse.
+- **MEDIUM — validação estrutural.** `anexo-nfe.js` recusa DTD, notas múltiplas, XML fundo/largo,
+  erros de parse (coletados, não silenciados) e anota campo fora de formato. `lerNfe` NÃO mudou — a
+  aba Auditoria segue igual. A tela diz "autenticidade não verificada".
+- **MEDIUM — injeção.** O modelo recebe resumo tipado + texto livre com teto por campo **e total**
+  (12 mil), dentro de `<documento_anexado>` com o aviso colado. Heurística de "possível instrução"
+  só avisa. Nenhuma ferramenta aceita CNPJ/ID vindo do documento — todas leem base de referência.
+- **MEDIUM — rastreabilidade.** O briefing pede *"Armazenar: arquivos anexados"* (§21) e
+  *"armazenamento privado"* (§23): o XML vai para `FiscalAnexo` no Postgres (sem URL pública; Blob é
+  público-por-link), único por (usuário, sha256), via `prismaDirect`. Carimbo: hash dos bytes, nome
+  saneado, versão do leitor, build do código, TIPI fixada e o resumo que o modelo de fato leu.
+  ⚠ **Divergência deliberada da aba Auditoria**, que não guarda o XML — a diferença é o briefing.
+- **MEDIUM — vínculo anexo × tentativa.** `tentativaHash` = sha256(pergunta + conversa + anexo). Mesma
+  chave com outro conteúdo é **409** com a reserva devolvida.
+
+DDL aplicado e conferido: `FiscalAnexo` + `FiscalMensagem.tentativaHash`.
+Testes novos: `fiscal-anexo-nfe` (16), `fiscal-assistente-multipart` (7), +7 no contrato, +6 na rota,
++3 na idempotência. **3.885 passando**, `checar` limpo, build EXIT=0, tela validada (botão + chip).
+⚠ **Limite**: a análise ponta a ponta com o modelo não roda aqui — sem a chave local o assistente
+aparece desligado. O caminho inteiro até a chamada está testado.

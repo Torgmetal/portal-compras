@@ -56,6 +56,30 @@ describe("a primeira pergunta é idempotente", () => {
     expect(sql.slice(1)).toContain("fiscal-ia:u1:chave-1");
   });
 
+  // ⚠⚠ MESMA CHAVE, OUTRO CONTEÚDO = CONFLITO. Sem isto, trocar o arquivo e reenviar com a chave
+  // antiga devolveria em silêncio a resposta de OUTRA nota.
+  it("mesma chave com OUTRA tentativa (outro anexo) é conflito, não reenvio", async () => {
+    mockPrisma.fiscalMensagem.findFirst.mockImplementation(async (a) =>
+      (a?.where?.chave ? { id: "m-antiga", chave: "chave-1", tentativaHash: "hash-da-nota-A", conversa: { id: "c1" } } : null));
+    const r = await abrirExecucao({ ...ARGS, tentativaHash: "hash-da-nota-B" });
+    expect(r.conflito).toBe(true);
+    expect(r.repetida).toBeUndefined();
+    expect(mockPrisma.fiscalMensagem.create).not.toHaveBeenCalled();
+  });
+
+  it("mesma chave com a MESMA tentativa é reenvio legítimo", async () => {
+    mockPrisma.fiscalMensagem.findFirst.mockImplementation(async (a) =>
+      (a?.where?.chave ? { id: "m-antiga", chave: "chave-1", tentativaHash: "hash-A", conversa: { id: "c1" } } : null));
+    const r = await abrirExecucao({ ...ARGS, tentativaHash: "hash-A" });
+    expect(r.repetida).toBe(true);
+  });
+
+  it("a tentativa nova grava o próprio hash, para o próximo reenvio poder comparar", async () => {
+    await abrirExecucao({ ...ARGS, tentativaHash: "hash-X" });
+    const resposta = mockPrisma.fiscalMensagem.create.mock.calls.find((c) => c[0].data.papel === "ASSISTENTE");
+    expect(resposta[0].data.tentativaHash).toBe("hash-X");
+  });
+
   it("conversa de outro usuário continua sendo 404, não criação", async () => {
     mockPrisma.fiscalConversa.findFirst.mockResolvedValue(null);
     const r = await abrirExecucao({ ...ARGS, conversaId: "c-de-outro" });

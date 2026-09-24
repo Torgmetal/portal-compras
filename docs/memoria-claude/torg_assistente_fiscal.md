@@ -71,4 +71,22 @@ Para testar local é preciso colar a chave à mão no `.env.local`.
 streaming e prompt caching (beta header). **NÃO tem leitura nativa de PDF** — entrou em versão
 posterior, e é por isso que o upload de PDF do §17 ficou para a segunda etapa.
 
+## XML anexado (§16) — 24/09/2026
+
+⚠⚠⚠ **O CÓDIGO DA NOTA NÃO É RECOMENDAÇÃO.** Todo bloco carrega `lastro` tipado com ORIGEM
+(`REGRA | LEI | TIPI | DOCUMENTO`). O CFOP da remessa anexada respalda "a nota declara 5.915", nunca
+"use 5.915 no retorno" — `conferirProsa` avisa `soDocumento` em âmbar. ⚠ O lastro NÃO sai mais de
+`JSON.stringify(blocos)`: número dentro do texto de um artigo (o 406 cita o 407) virava "comprovado".
+
+⚠⚠ **`req.formData()` materializa o corpo antes de conferir o tamanho** — o teto real está em
+`multipart.js`, que conta bytes enquanto chegam. ⚠ **4 MB, não 8**: função da Vercel para em 4,5 MB.
+Parse DOM é síncrono e nenhum timeout o interrompe: 990 itens = 3 MB = 74 ms, e o teto de bytes é o
+único controle real de CPU.
+
+⚠ O XML **é guardado** (`FiscalAnexo`, Postgres, privado) — ao contrário da aba Auditoria, porque o
+briefing pede (§21/§23). Blob não serve: é público para quem tiver o link.
+
+⚠ `lerNfe` NÃO mudou: a validação de arquivo de terceiro mora em `anexo-nfe.js` (recusa DTD, notas
+múltiplas, XML fundo/largo; coleta erros de parse em vez de silenciar).
+
 Ver [[torg_codex_aceito_sempre]], [[torg_portao_modulos]].

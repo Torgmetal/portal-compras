@@ -305,6 +305,23 @@ const sql = [
   `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalUsoIa_userId_dia_key" ON "FiscalUsoIa"("userId","dia")`,
   `CREATE INDEX IF NOT EXISTS "FiscalUsoIa_dia_idx" ON "FiscalUsoIa"("dia")`,
 
+  // ⚠ A identidade do conteúdo da tentativa (pergunta + conversa + anexo). Coluna NOVA em tabela que
+  // já existe: `ADD COLUMN IF NOT EXISTS` é idempotente e não reescreve a tabela (nullable, sem default).
+  `ALTER TABLE "FiscalMensagem" ADD COLUMN IF NOT EXISTS "tentativaHash" TEXT`,
+
+  `CREATE TABLE IF NOT EXISTS "FiscalAnexo" (
+     "id" TEXT PRIMARY KEY,
+     "userId" TEXT NOT NULL,
+     "nome" TEXT NOT NULL,
+     "tamanho" INTEGER NOT NULL,
+     "sha256" TEXT NOT NULL,
+     "conteudo" TEXT NOT NULL,
+     "parserVersao" TEXT NOT NULL,
+     "chaveNfe" TEXT,
+     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalAnexo_userId_sha256_key" ON "FiscalAnexo"("userId","sha256")`,
+  `CREATE INDEX IF NOT EXISTS "FiscalAnexo_userId_criadoEm_idx" ON "FiscalAnexo"("userId","criadoEm")`,
+
   // ⚠ As FKs vão DEPOIS das tabelas, e cada uma num bloco próprio: `ADD CONSTRAINT` não tem
   // `IF NOT EXISTS` no Postgres, então a repetição é tratada como sucesso (42710 = já existe).
 ];

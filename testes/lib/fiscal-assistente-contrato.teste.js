@@ -7,7 +7,11 @@ import { conferirProsa, lastroDosBlocos, blocoNcm, blocoLegislacao, blocoRegra, 
 const blocosDoNcm = () => [blocoNcm({
   ncmFormatado: "8437.90.00",
   descricaoCompleta: "Partes de máquinas para limpeza de grãos",
-  geral: { ipi: { rotulo: "5%" } },
+  // ⚠⚠ A FORMA QUE `aliquotaParaTela` DEVOLVE DE VERDADE — tipo, valor, rótulo. A fixture antiga só
+  // tinha o rótulo, e passava porque o lastro varria o JSON inteiro e achava "5%" no texto. Com o
+  // lastro tipado (24/09/2026), fixture fora de forma vira teste vermelho — que é o certo.
+  ncm: "84379000",
+  geral: { ipi: { tipo: "PERCENTUAL", valor: 5, rotulo: "5%" } },
   excecoes: [],
   referencia: { tipi: { fonte: { sha256: "abc123", url: "https://x" } } },
 })];
@@ -49,7 +53,7 @@ describe("conferirProsa — o que o modelo escreve tem de ter lastro", () => {
   // CFOP, todo NCM legítimo viraria um CFOP inventado.
   it("não confunde o NCM com um CFOP escondido dentro dele", () => {
     const blocos = [blocoNcm({
-      ncmFormatado: "5101.00.00", descricaoCompleta: "Lã", geral: { ipi: { rotulo: "0%" } }, excecoes: [],
+      ncm: "51010000", ncmFormatado: "5101.00.00", descricaoCompleta: "Lã", geral: { ipi: { tipo: "PERCENTUAL", valor: 0, rotulo: "0%" } }, excecoes: [],
       referencia: { tipi: { fonte: { sha256: "a", url: "u" } } },
     })];
     const { avisos } = conferirProsa("O NCM 5101.00.00 é lã.", blocos);
@@ -62,7 +66,7 @@ describe("conferirProsa — o que o modelo escreve tem de ter lastro", () => {
   });
 });
 
-describe("lastroDosBlocos — a evidência sai do conteúdo, não de uma lista paralela", () => {
+describe("lastroDosBlocos — a evidência sai do lastro TIPADO de cada bloco", () => {
   it("extrai alíquota, NCM e artigo dos blocos", () => {
     const l = lastroDosBlocos([
       ...blocosDoNcm(),
@@ -103,3 +107,63 @@ describe("classificação nunca vira enquadramento", () => {
     expect(JSON.stringify(b.linhas)).toContain("CORRESPONDENCIA_UNICA");
   });
 });
+
+// ─── O CÓDIGO DA NOTA NÃO É RECOMENDAÇÃO ─────────────────────────────────────
+//
+// ⚠⚠⚠ O ACHADO HIGH DO PARECER DE SEGURANÇA (24/09/2026). Com o XML de uma REMESSA anexado, o CFOP
+// 5.915 entra na conversa. Se ele valesse como lastro igual ao de uma regra, "use o 5.915 no
+// retorno" passaria sem aviso — o erro exato que o §16 do briefing proíbe.
+import { lastro, ORIGEM, BLOCO } from "@/lib/fiscal/assistente/contrato";
+import { blocoDocumento } from "@/lib/fiscal/assistente/blocos-documento";
+import { lerAnexoNfe } from "@/lib/fiscal/assistente/anexo-nfe";
+import { nfe } from "@/testes/apoio/nfe-exemplo";
+
+describe("o que a nota declara × o que uma regra recomenda", () => {
+  const docDaRemessa = () => blocoDocumento(lerAnexoNfe(nfe()).doc, { nome: "remessa.xml" });
+
+  it("o CFOP que SÓ existe na nota vira aviso próprio (`soDocumento`), não passa calado", () => {
+    const { avisos } = conferirProsa("Para o retorno, use o CFOP 5.915.", [docDaRemessa()]);
+    expect(avisos).toContainEqual({ tipo: "CFOP", citado: "5.915", soDocumento: true });
+  });
+
+  it("…e também não é acusado de INVENTADO — ele existe, só não é recomendação", () => {
+    const { avisos } = conferirProsa("A nota foi emitida com o CFOP 5.915.", [docDaRemessa()]);
+    expect(avisos.filter((a) => a.tipo === "CFOP" && !a.soDocumento)).toEqual([]);
+  });
+
+  it("quando uma REGRA também respalda o código, não há aviso nenhum", () => {
+    const regra = { tipo: BLOCO.CFOP, linhas: [], fontes: [], lastro: lastro(ORIGEM.REGRA, { cfops: ["5916"] }) };
+    const { avisos } = conferirProsa("O retorno usa o CFOP 5.916.", [docDaRemessa(), regra]);
+    expect(avisos).toEqual([]);
+  });
+
+  it("o CFOP de retorno que NINGUÉM consultou continua acusado como sem fonte", () => {
+    const { avisos } = conferirProsa("O retorno usa o CFOP 5.916.", [docDaRemessa()]);
+    expect(avisos).toContainEqual({ tipo: "CFOP", citado: "5.916" });
+  });
+});
+
+describe("o lastro lê o campo tipado, nunca o texto do bloco", () => {
+  // ⚠⚠ O FURO ANTIGO: varrendo o JSON, o art. 407 citado DENTRO do corpo do 406 virava "comprovado".
+  it("artigo citado dentro do TRECHO de outro artigo não conta como recuperado", () => {
+    const b = blocoLegislacao([{ rotulo: "Artigo 406", trecho: "…observado o disposto no artigo 407…", norma: "RICMS", url: "u", sha256: "s", peso: "VINCULANTE" }]);
+    const { avisos } = conferirProsa("Conforme o artigo 407.", [b]);
+    expect(avisos).toContainEqual({ tipo: "artigo", citado: "art. 407" });
+  });
+
+  it("número no texto livre da nota não vira lastro de nada", () => {
+    const doc = blocoDocumento(lerAnexoNfe(nfe({ natOp: "RETORNO CONFORME CFOP 6107" })).doc, {});
+    const { avisos } = conferirProsa("Use o CFOP 6.107.", [doc]);
+    expect(avisos).toContainEqual({ tipo: "CFOP", citado: "6.107" });
+  });
+
+  it("CST rotulado é conferido; dois dígitos soltos não", () => {
+    const { avisos } = conferirProsa("Emita com CST 53. São 50 peças.", [docDaRemessaSemCst()]);
+    expect(avisos).toContainEqual({ tipo: "CST", citado: "CST 53" });
+    expect(avisos.some((a) => a.citado === "CST 50")).toBe(false);
+  });
+});
+
+function docDaRemessaSemCst() {
+  return { tipo: BLOCO.NCM, linhas: [], fontes: [], lastro: lastro(ORIGEM.TIPI, {}) };
+}
