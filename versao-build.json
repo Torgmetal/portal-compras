@@ -1,7 +1,12 @@
 {
-  "build": 3453,
-  "gerado": "2026-09-24T15:36:34.825Z",
+  "build": 3454,
+  "gerado": "2026-09-24T16:44:18.313Z",
   "commits": [
+    {
+      "hash": "51754018",
+      "data": "24/09/2026",
+      "titulo": "Simulador de carga: travamento por volume (escorar/amarrar) e cinta como fita"
+    },
     {
       "hash": "ec93769c",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c6c6b02c",
       "data": "23/09/2026",
       "titulo": "Fiscal: a base de CST — ICMS, PIS/COFINS e origem, com os cenários principais"
-    },
-    {
-      "hash": "9b0432cb",
-      "data": "23/09/2026",
-      "titulo": "Simulador: a ficha de emissão e a prévia dos impostos — e quatro achados do Codex"
     }
   ]
 }

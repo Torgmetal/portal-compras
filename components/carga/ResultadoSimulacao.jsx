@@ -2,7 +2,7 @@
 // Leitura da carga escolhida, pendências de conferência e volumes para separação.
 import { useState } from "react";
 import { AlertTriangle, Package, Truck, Search, X, Check, Layers, Clock3, Ruler, ChevronDown, ArrowLeftToLine } from "lucide-react";
-import { textoTravamento } from "@/lib/carga/travamento";
+import { alturaDaCabeceira, textoTravamento } from "@/lib/carga/travamento";
 
 const fmtKg = (v) => `${Math.round(v || 0).toLocaleString("pt-BR")} kg`;
 const metros = (v) => `${((v || 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} m`;
@@ -42,7 +42,7 @@ export function ResumoSimulacao({ resultado, cargaSel, onCarga }) {
         <dl className="grid grid-cols-2 gap-x-4 gap-y-5 text-sm">
           {[[Ruler, "Altura da carga", metros(c.altura)], [Layers, "Camadas", c.camadas ?? new Set((c.itens || []).map((u) => u.camada || 0)).size], [Package, "Peças", (c.itens || []).reduce((t, u) => t + (u.membros?.length || 1), 0)], [Clock3, "Tempo estimado", c.tempo?.minutos == null ? "—" : `${c.tempo.minutos} min`]].map(([Icon, label, value]) => <div key={label}><dt className="text-xs text-torg-gray flex items-center gap-1.5"><Icon size={14} />{label}</dt><dd className="font-semibold text-torg-dark mt-1 text-base">{value}</dd></div>)}
         </dl>
-        <div className="rounded-lg bg-slate-50 p-3 text-xs text-torg-gray leading-relaxed"><span className="font-semibold text-torg-dark block">Medidas úteis do veículo</span>{metros(c.veiculo?.C)} × {metros(c.veiculo?.L)} × {metros(c.veiculo?.alturaUtil)}<span className="block">comprimento × largura × altura</span></div>
+        <div className="rounded-lg bg-slate-50 p-3 text-xs text-torg-gray leading-relaxed"><span className="font-semibold text-torg-dark block">Medidas úteis do veículo</span>{metros(c.veiculo?.C)} × {metros(c.veiculo?.L)} × {metros(c.veiculo?.alturaUtil)}<span className="block">comprimento × largura × altura</span>{alturaDaCabeceira(c.veiculo) > 0 && <span className="block mt-1">Cabeceira: {metros(alturaDaCabeceira(c.veiculo))} acima do assoalho</span>}</div>
         </div>
       </div> : <p className="p-5 text-sm text-torg-gray">Nenhuma carga foi montada. Confira as pendências da simulação.</p>}
     </section>

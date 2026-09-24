@@ -214,3 +214,36 @@ atravessando o pacote, e o Vitor leu como madeira: *"essas madeiras pretas que v
 conseguirmos fazer aqui"*. Agora `cintar()` (cena-carga) faz um laço de fita de 32 mm × 8 mm em volta do volume, verde
 das cintas do PDF, e o contorno do pacote ficou claro e translúcido.
 
+### A cabeceira tem altura — e o que a norma diz (24/09/2026, noite)
+
+Vitor perguntou o que a norma fala da forma de carregar ("em escada ou de outra maneira?"). **Nenhuma norma manda
+escada.** A lei é a **Resolução CONTRAN 945/2022** (vigente desde 01/04/2022; revogou a 552/2015, a 631/2016 e a
+676/2017):
+- art. 3º: nada pode se mexer (manobra, solavanco, curva, frenagem);
+- art. 4º: amarração dimensionada para ≥ 2× o peso da carga no sentido longitudinal; calço, manta de atrito e bloqueador
+  são complemento; **corda é proibida**;
+- art. 5º: em carroceria aberta, **cada volume** amarrado na estrutura metálica ou no chassi com **≥ 4 pontas**;
+- art. 6º: cinta por dentro das guardas laterais quando houver espaço (por fora é infração);
+- art. 7º: vão na frente ou atrás da carga → **dispositivos diagonais**, além da amarração;
+- art. 8º: **proibido rodar com carga acima do painel frontal se a parte de cima puder escorregar** (art. 235 do CTB);
+- Anexo: só os pontos de amarração do veículo (≤ 1,2 m por lado; 2.000 daN cada acima de 12 t de PBT).
+
+A referência técnica é o **Guia Europeu de Boas Práticas** (EN 12195-1: 0,8 g à frente, 0,5 g atrás e aos lados): a
+cabeceira EN 12642 aguenta 40% da carga, no máximo 5.000 daN; para **perfis longos (seção 6.8)**, a carga toda como um
+bloco, encostada na cabeceira ou bloqueada, **nunca mais alta que a cabeceira**, o mais pesado embaixo e nenhuma camada
+maior que a de baixo; para o **degrau entre camadas (3.1.2)**, "threshold blocking" (calçar a pilha da frente até ela
+travar a camada de cima) ou "panel blocking"; peso por eixo pelo plano de carga do veículo (8.1).
+
+- ⚠⚠ **A regra tratava a cabeceira como parede até o teto da carga.** Agora cada veículo tem `cabeceira` (mm acima do
+  assoalho): acima dela, sem volume à frente na altura dele, é **amarrar** por menor que seja o vão; na altura dela,
+  encostar basta e vão de até 1,5 m se escora contra ela. Mesma sobreposição de 30% usada entre volumes.
+- **Carreta = graneleira** (Vitor: *"usamos carretas graneleiras"*): cabeceira padrão **1,8 m** — nas fichas, as tampas
+  vão de 2 × 700 a 2 × 1.000 mm e a combinação comum é 800 + 1.000. ⚠ Premissa: a medida real entra na tela
+  **Planejamento › Configuração da expedição** (coluna Cabeceira), que vence o padrão do código. Veículo sem cabeceira
+  informada: só a camada do assoalho conta como encostada nela (a regra que o Vitor aprovou).
+- A altura é lida também pela chave do catálogo (`alturaDaCabeceira`): simulação salva antes da premissa existir usa o
+  padrão ao ser editada.
+- O nome do catálogo virou "Carreta graneleira 3 eixos" — mas a configuração gravada no banco vence o código, então o
+  nome que aparece é o de lá. O 3D continua com a carroceria baixa (tampas de 1,8 m esconderiam a carga).
+- OP-118: amarrados **19 → 29** — 10 volumes saíam como "encostados, nada a fazer" apoiados só na cabeceira acima dela.
+

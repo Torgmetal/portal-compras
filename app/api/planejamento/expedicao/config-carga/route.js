@@ -23,6 +23,8 @@ const veiculo = z.object({
   nome: z.string().min(1).max(80),
   C: z.number().min(1000).max(30000), L: z.number().min(1000).max(3000), alturaUtil: z.number().min(500).max(4000),
   pesoMax: z.number().min(100).max(60000), assoalho: z.number().min(300).max(2000),
+  // altura da cabeceira acima do assoalho; 0 = não informada (vale o padrão do código, ou só o assoalho encosta)
+  cabeceira: z.number().min(0).max(4000).optional(),
   frete: z.number().min(1).max(100000), ativo: z.boolean(),
 });
 const schema = z.object({ veiculos: z.array(veiculo).min(1).max(10) });

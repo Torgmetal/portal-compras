@@ -1938,3 +1938,13 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** a regra de sobreposição (>30% da menor dimensão, em altura e largura) decide quem "segura" quem
   — volume estreito encostado num largo conta como apoio; e o 3D não desenha a amarração de propósito (não há ponto
   de ancoragem modelado).
+- **(24/09, noite) Simulador: a cabeceira tem altura (Resolução CONTRAN 945/2022, art. 8º).** Vitor perguntou o que a
+  norma diz da forma de carregar; a 945/2022 proíbe rodar com carga acima do painel frontal quando a parte de cima pode
+  escorregar, e o travamento tratava a cabeceira como parede até o teto da carga. Agora `VEICULOS[…].cabeceira` (mm acima
+  do assoalho): carreta graneleira 1,8 m (Vitor: *"usamos carretas graneleiras"*), editável na Configuração da
+  expedição (API + tela + `catalogoDeVeiculos`); acima dela, sem volume à frente na altura dele, é amarrar mesmo
+  encostado; sem cabeceira informada, só o assoalho encosta. OP-118: amarrados 19 → 29. Testes: `carga-travamento` (20)
+  e `config-carga-cabeceira` (tela). **3.907 passando**, `checar` limpo.
+  ⚠ **Para revisar:** (1) a PUT da configuração aceita `cabeceira` 0 = não informada (vale o padrão do código); (2) o
+  volume encostado atrás de um que está acima da cabeceira não é marcado — quem segura é a amarração do da frente;
+  (3) o nome novo da carreta só aparece se a configuração gravada no banco não tiver outro.

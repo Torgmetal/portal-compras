@@ -4,7 +4,7 @@
 // vejo a forma de conseguirmos fazer aqui".
 import { describe, it, expect } from "vitest";
 import { extractText } from "unpdf";
-import { travamentoDaCarga, textoTravamento, TRAVA } from "@/lib/carga/travamento";
+import { travamentoDaCarga, textoTravamento, alturaDaCabeceira, TRAVA } from "@/lib/carga/travamento";
 import { madeiraDaUnidade } from "@/lib/carga/madeira";
 import { simularCarga } from "@/lib/carga/simular";
 import { recalcularMontagem } from "@/lib/carga/montagem-manual";
@@ -55,7 +55,58 @@ describe("vão à frente de cada volume", () => {
     expect(textoTravamento({ tipo: "escorar", vao: 800, contra: "a", cabeceira: false }, de)).toBe("Escorar: 2 caibros de 0,8 m até o volume 01");
     expect(textoTravamento({ tipo: "escorar", vao: 1000, contra: null, cabeceira: true }, de)).toBe("Escorar: 2 caibros de 1 m até a cabeceira");
     expect(textoTravamento({ tipo: "amarrar", vao: 2000, contra: "a", cabeceira: false }, de)).toBe("Amarrar para a frente (cinta e catraca): 2 m livres até o volume 01");
-    expect(textoTravamento({ tipo: "amarrar", vao: 3030, contra: null, cabeceira: true }, de)).toContain("até a cabine, nada na altura dele");
+    expect(textoTravamento({ tipo: "amarrar", vao: 2000, contra: null, cabeceira: true }, de)).toBe("Amarrar para a frente (cinta e catraca): 2 m livres até a cabeceira");
+    expect(textoTravamento({ tipo: "amarrar", vao: 30, contra: null, cabeceira: true, acima: true, alturaCabeceira: 1800 }, de))
+      .toBe("Amarrar para a frente (cinta e catraca): está acima da cabeceira (1,8 m), nada na frente na altura dele");
+    expect(textoTravamento({ tipo: "amarrar", vao: 3030, contra: null, cabeceira: true, acima: true, alturaCabeceira: null }, de))
+      .toBe("Amarrar para a frente (cinta e catraca): nada na frente na altura dele até a cabine");
+  });
+});
+
+// Resolução CONTRAN 945/2022, art. 8º, parágrafo único: proibido rodar com carga acima do painel frontal quando a parte
+// de cima pode escorregar. Vitor (24/09/2026): "usamos carretas graneleiras" — cabeceira de 1,8 m (tampas 800 + 1.000 mm).
+describe("a cabeceira só segura na altura dela", () => {
+  const GRANELEIRA = VEICULOS.carreta;
+  it("a carreta do catálogo é a graneleira, com cabeceira de 1,8 m", () => {
+    expect(GRANELEIRA.nome).toContain("graneleira"); expect(alturaDaCabeceira(GRANELEIRA)).toBe(1800);
+    expect(alturaDaCabeceira(VEICULOS.truck)).toBeNull();
+  });
+
+  it("volume acima da cabeceira, sem nada à frente na altura dele, é amarrado mesmo encostado", () => {
+    const t = travamentoDaCarga([vol("a", 30, { y: 1900 })], { veiculo: GRANELEIRA });
+    expect(t.get("a")).toEqual({ tipo: "amarrar", vao: 30, contra: null, cabeceira: true, acima: true, alturaCabeceira: 1800 });
+  });
+
+  it("na altura da cabeceira, encostar nela basta, e o vão até 1,5 m se escora contra ela", () => {
+    expect(travamentoDaCarga([vol("a", 30, { y: 600 })], { veiculo: GRANELEIRA }).size).toBe(0);
+    expect(travamentoDaCarga([vol("a", 1000, { y: 600 })], { veiculo: GRANELEIRA }).get("a")).toEqual({ tipo: "escorar", vao: 1000, contra: null, cabeceira: true });
+  });
+
+  it("vale a mesma sobreposição de 30% dos volumes: passar um pouco da cabeceira ainda encosta, passar muito não", () => {
+    expect(travamentoDaCarga([vol("a", 30, { y: 1500 })], { veiculo: GRANELEIRA }).size).toBe(0); // 1,5–1,9 m: 30 cm de 40 na cabeceira
+    expect(travamentoDaCarga([vol("a", 30, { y: 1700 })], { veiculo: GRANELEIRA }).get("a")).toMatchObject({ tipo: "amarrar", acima: true }); // só 10 cm
+  });
+
+  it("veículo sem a altura da cabeceira: só a camada do assoalho conta como encostada nela", () => {
+    expect(travamentoDaCarga([vol("a", 30)], { veiculo: VEICULOS.truck }).size).toBe(0);
+    expect(travamentoDaCarga([vol("a", 30, { y: 600 })], { veiculo: VEICULOS.truck }).get("a")).toMatchObject({ tipo: "amarrar", acima: true, alturaCabeceira: null });
+  });
+
+  it("a altura vem da configuração da Expedição, com o padrão do código por baixo", async () => {
+    const { catalogoDeVeiculos, linhasDeConfiguracao } = await import("@/lib/carga/config-carga");
+    expect(catalogoDeVeiculos(null).veiculos.carreta.cabeceira).toBe(1800);
+    expect(catalogoDeVeiculos(null).veiculos.truck.cabeceira).toBeNull();
+    expect(linhasDeConfiguracao(null).find((l) => l.chave === "carreta").cabeceira).toBe(1800);
+    const cat = catalogoDeVeiculos({ veiculos: [{ chave: "carreta", cabeceira: 2000 }, { chave: "truck", cabeceira: 1200 }, { chave: "toco", cabeceira: 0 }] }).veiculos;
+    expect(cat.carreta.cabeceira).toBe(2000); expect(cat.truck.cabeceira).toBe(1200); expect(cat.toco.cabeceira).toBeNull();
+    // configurada no truck, a 2ª camada dentro da altura dela passa a encostar
+    expect(travamentoDaCarga([vol("a", 30, { y: 600 })], { veiculo: cat.truck }).size).toBe(0);
+  });
+
+  it("montagem salva antes da premissa lê a cabeceira pelo catálogo", () => {
+    const salvo = { chave: "carreta", nome: "Carreta 3 eixos (carga seca)", C: 12400, L: 2450, alturaUtil: 2900 };
+    const r = recalcularMontagem({ veiculo: salvo, itens: [vol("a", 30, { volume: 1, y: 1900 })], passos: ["a"], romaneio: [] });
+    expect(r.romaneio[0].travamento).toMatchObject({ tipo: "amarrar", acima: true, alturaCabeceira: 1800 });
   });
 });
 
@@ -71,7 +122,7 @@ describe("travamento na carga", () => {
     const r = simularCarga({ lista: [{ marca: "T118B1", desc: "VIGA", qtd: 4, kgUn: 80 }, { marca: "T118C1", desc: "SUPORTE", qtd: 3, kgUn: 400 }],
       geometria: { T118B1: { dimsEixos: [4000, 200, 400], temGeo: true }, T118C1: { dimsEixos: [3000, 400, 1300], temGeo: true } }, perfil: "recomendado", prefixo: "T118" });
     for (const c of r.cargas) {
-      const esperado = travamentoDaCarga(c.itens);
+      const esperado = travamentoDaCarga(c.itens, { veiculo: c.veiculo });
       for (const v of c.romaneio) { expect(v).toHaveProperty("travamento"); expect(v.travamento).toEqual(esperado.get(v.id) || null); }
     }
   });

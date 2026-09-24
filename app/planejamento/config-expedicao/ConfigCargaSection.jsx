@@ -2,11 +2,12 @@
 // Veículos e índice de frete do simulador de carga. As medidas são PREMISSAS a confirmar com a
 // Expedição (carreta e truck verificados; toco, 3/4 e HR "típicos") — por isso são editáveis aqui e
 // não no código. Frete é um índice relativo (carreta = 100): só ordena e compara; o simulador escolhe
-// o menor veículo em que a carga cabe inteira.
+// o menor veículo em que a carga cabe inteira. Cabeceira: altura do painel da frente — o travamento
+// (lib/carga/travamento.js) só conta como encostado nela o volume na altura que ela cobre.
 import { useEffect, useState } from "react";
 import { Truck, Loader2, Save, RotateCcw, AlertCircle, CheckCircle2 } from "lucide-react";
 
-const CAMPOS = [["nome", "Veículo", "text", 220], ["C", "Compr. (mm)", "number", 84], ["L", "Larg. (mm)", "number", 78], ["alturaUtil", "Alt. útil (mm)", "number", 84], ["pesoMax", "Carga (kg)", "number", 84], ["assoalho", "Assoalho (mm)", "number", 84], ["frete", "Frete (índice)", "number", 84]];
+const CAMPOS = [["nome", "Veículo", "text", 220], ["C", "Compr. (mm)", "number", 84], ["L", "Larg. (mm)", "number", 78], ["alturaUtil", "Alt. útil (mm)", "number", 84], ["pesoMax", "Carga (kg)", "number", 84], ["assoalho", "Assoalho (mm)", "number", 84], ["cabeceira", "Cabeceira (mm)", "number", 84], ["frete", "Frete (índice)", "number", 84]];
 
 export default function ConfigCargaSection() {
   const [linhas, setLinhas] = useState(null), [erro, setErro] = useState(""), [ok, setOk] = useState(""), [salvando, setSalvando] = useState(false), [quando, setQuando] = useState(null);
@@ -15,7 +16,7 @@ export default function ConfigCargaSection() {
   const salvar = async () => {
     setSalvando(true); setErro(""); setOk("");
     try {
-      const veiculos = linhas.map((l) => ({ chave: l.chave, nome: String(l.nome || "").trim(), C: Number(l.C), L: Number(l.L), alturaUtil: Number(l.alturaUtil), pesoMax: Number(l.pesoMax), assoalho: Number(l.assoalho), frete: Number(l.frete), ativo: !!l.ativo }));
+      const veiculos = linhas.map((l) => ({ chave: l.chave, nome: String(l.nome || "").trim(), C: Number(l.C), L: Number(l.L), alturaUtil: Number(l.alturaUtil), pesoMax: Number(l.pesoMax), assoalho: Number(l.assoalho), cabeceira: Number(l.cabeceira) || 0, frete: Number(l.frete), ativo: !!l.ativo }));
       const r = await fetch("/api/planejamento/expedicao/config-carga", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ veiculos }) });
       const j = await r.json(); if (!r.ok) throw new Error(j.error || "Erro ao salvar");
       setLinhas(j.veiculos); setQuando(j.atualizadoEm); setOk("Salvo. Vale para as próximas simulações de carga.");
@@ -31,6 +32,8 @@ export default function ConfigCargaSection() {
           Medidas da carroceria e capacidade de cada veículo que a Expedição contrata. O <span className="font-semibold text-torg-dark">Simular carga</span> do romaneio prévio
           monta a carga na carreta e depois tenta o menor veículo em que ela cabe inteira. O <span className="font-semibold text-torg-dark">frete</span> é um índice relativo
           (carreta = 100) só para comparar — troque pela tabela real quando tiver. Desmarque um veículo para tirá-lo das simulações; a carreta (base do cálculo) e a de 14 m (peças longas) não saem.
+          A <span className="font-semibold text-torg-dark">cabeceira</span> é a altura do painel da frente acima do assoalho: até ali ele segura a carga numa frenagem, e o volume acima dela,
+          sem nada à frente, sai como “amarrar” (Resolução CONTRAN 945/2022, art. 8º). Em branco, só a camada do assoalho conta como encostada nela.
         </p>
       </div>
       <div className="px-6 py-4 overflow-x-auto">
