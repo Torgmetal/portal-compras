@@ -59,6 +59,8 @@ principal), `codex-login-unificado`, `codex-edicao-manual-carga`, `claude-ferven
   ficam intactos — conferido antes/depois. Fora: `output/`, `outputs/`, `previews/` (artefatos, ~120 MB,
   com JSON de permissões do SharePoint que tem e-mail de gente) e `testes/__*` (scripts de uso único que
   GRAVAM EM PRODUÇÃO se a bateria de testes rodar depois de restaurar).
-- **Recuperar:** `git fetch origin 'refs/backup/*:refs/backup/*'` e `git switch -c recuperado refs/backup/2026-09-24/<nome>`.
+- **Recuperar:** `git fetch origin 'refs/backup/*:refs/backup/*'` e abrir numa PASTA SEPARADA:
+  `git worktree add ../recuperado refs/backup/2026-09-24/<nome>`. ⚠ Nunca `git switch` na pasta
+  principal: ela tem trabalho não commitado de outra sessão, e o switch o carregaria para outra branch.
 - ⚠ No zsh, laço `for x in $LISTA` NÃO separa por espaço, e `"$C:refs/…"` vira modificador `:r` —
   os dois morderam nesta operação. Laço explícito, e `${C}` com chaves.

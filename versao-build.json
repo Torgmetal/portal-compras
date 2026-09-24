@@ -1,7 +1,12 @@
 {
-  "build": 3443,
-  "gerado": "2026-09-24T11:06:05.698Z",
+  "build": 3444,
+  "gerado": "2026-09-24T11:10:17.833Z",
   "commits": [
+    {
+      "hash": "1424d155",
+      "data": "24/09/2026",
+      "titulo": "Memória: o código que só existia no Mac foi para refs/backup no GitHub — por que não branch, e como recuperar"
+    },
     {
       "hash": "07a529f0",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "025eaff0",
       "data": "22/09/2026",
       "titulo": "Fiscal: oito CFOPs estavam sem o par de fora do estado"
-    },
-    {
-      "hash": "2593f1bb",
-      "data": "22/09/2026",
-      "titulo": "Fiscal: eu tinha consertado a metade errada do Ex TIPI — e mais duas lacunas"
     }
   ]
 }
