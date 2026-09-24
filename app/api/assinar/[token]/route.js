@@ -14,6 +14,7 @@ import { cabecalhoEmail } from "@/lib/email-layout";
 import { baseUrlDe } from "@/lib/databook-assinaturas";
 import { ehTipoDePlano, docDoTipo, tudoAprovado, arquivarPlano, DOCS } from "@/lib/planos-aceite";
 import { log } from "@/lib/log";
+import { imagemDoCadastro } from "@/lib/assinatura-cadastro";
 
 const registro = log("api/assinar/[token]");
 
@@ -209,10 +210,9 @@ export async function POST(req, { params }) {
   // "caso o cliente já tenha cadastro ele puxa o carimbo"); para os demais segue valendo o
   // relatório de inspeção, que foi onde a regra nasceu.
   let imagemUrl = conta?.assinaturaUrl || null;
-  if (!imagemUrl && a.envio.tipo === "RELATORIO_INSPECAO" && a.email) {
-    const u = await prisma.user.findFirst({ where: { email: a.email }, select: { assinaturaUrl: true } }).catch(() => null);
-    imagemUrl = u?.assinaturaUrl || null;
-  }
+  // ⚠ convite desviado para outra pessoa (REDIRECIONAR_CONVITE_ASSINATURA): o carimbo é o do titular —
+  // ver lib/assinatura-cadastro.js
+  if (!imagemUrl && a.envio.tipo === "RELATORIO_INSPECAO" && (a.email || a.id)) imagemUrl = await imagemDoCadastro(a);
   const upd = await prisma.assinaturaDocumento.update({ where: { id: a.id }, data: { assinadoEm: new Date(), ip, ...(imagemUrl ? { imagemUrl } : {}) } });
 
   // ── passa a vez: convida o próximo da fila ──

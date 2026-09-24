@@ -8,7 +8,7 @@ import { requireRole } from "@/lib/session";
 import { isBlobUrlSegura } from "@/lib/blob-url";
 import { baixarDocumento, ehUrlSharePoint } from "@/lib/databook-arquivo";
 import { dispArquivo } from "@/lib/arquivo-http";
-import { pdfDoRelatorio, fonteDeInspecao } from "@/lib/relatorio-pdf-fonte";
+import { pdfDoRelatorio, fonteDeInspecao, fonteDeCopiaArquivada } from "@/lib/relatorio-pdf-fonte";
 import { fonteDePit, pdfDoPit } from "@/lib/pit-pdf-fonte";
 
 const registroLog = log("api/qualidade/documentos/download");
@@ -50,7 +50,8 @@ export async function GET(req, { params }) {
     // ⚠ `origem` e `opNumero` são as duas amarrações de `fonteDeInspecao`; `sharepointUrl` é o
     // último recurso de `baixarDocumento` quando o itemId morre. Sem eles no select, o ramo do
     // relatório se recusa a servir e o socorro pelo caminho nunca dispara.
-    select: { arquivoUrl: true, arquivoNome: true, arquivoTipo: true, sharepointItemId: true,
+    // ⚠ `nome` identifica a cópia arquivada de um relatório (`fonteDeCopiaArquivada`)
+    select: { nome: true, arquivoUrl: true, arquivoNome: true, arquivoTipo: true, sharepointItemId: true,
               sharepointUrl: true, origem: true, opNumero: true },
   });
   // ⚠ `sharepointUrl` conta como arquivo: é o campo do último recurso, e sem ele aqui um
@@ -75,8 +76,9 @@ export async function GET(req, { params }) {
   // para o SharePoint em vez de morrer em 400.
   const inline = new URL(req.url).searchParams.get("inline") === "1";
 
-  // O relatório de inspeção não tem binário — ver `servirInspecao`.
-  const insp = fonteDeInspecao(doc);
+  // O relatório de inspeção não tem binário — ver `servirInspecao`. A cópia dele na pasta da obra
+  // foi arquivada antes das assinaturas: vale o do portal (lib/relatorio-pdf-fonte.js).
+  const insp = fonteDeInspecao(doc) || await fonteDeCopiaArquivada(doc);
   if (insp) {
     try {
       return await servirInspecao(doc, insp, inline);

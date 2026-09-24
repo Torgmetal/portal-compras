@@ -11,7 +11,7 @@ vi.mock("@/lib/sharepoint", () => ({
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: { documentoQualidade: { update: vi.fn(async () => ({})) } } }));
 vi.mock("@/lib/projetos-databook", () => ({ resolveServidorDriveId: vi.fn(async () => "drive-servidor") }));
-vi.mock("@/lib/relatorio-pdf-fonte", () => ({ pdfDoRelatorio: vi.fn(), fonteDeInspecao: vi.fn(() => null) }));
+vi.mock("@/lib/relatorio-pdf-fonte", () => ({ pdfDoRelatorio: vi.fn(), fonteDeInspecao: vi.fn(() => null), fonteDeCopiaArquivada: vi.fn(async () => null) }));
 vi.mock("@/lib/pit-pdf-fonte", () => ({ pdfDoPit: vi.fn(), fonteDePit: vi.fn(() => null) }));
 
 import { downloadRhItem, downloadFileById, downloadSharedFile, procurarArquivoPorNome } from "@/lib/sharepoint";

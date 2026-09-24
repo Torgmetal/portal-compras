@@ -25,7 +25,7 @@ export async function GET(_req, { params }) {
   // ⚠ idem à tela interna: imagem que faltava no snapshot vem do cadastro atual
   const assinaturas = await completarImagens(await prisma.assinaturaDocumento.findMany({
     where: { envioId: a.envioId },
-    select: { email: true, nome: true, setor: true, assinadoEm: true, ip: true, imagemUrl: true },
+    select: { id: true, email: true, nome: true, setor: true, assinadoEm: true, ip: true, imagemUrl: true },
     orderBy: { nome: "asc" },
   }));
 

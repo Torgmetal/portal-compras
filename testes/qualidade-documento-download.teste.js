@@ -26,12 +26,12 @@ vi.mock("@/lib/databook-arquivo", () => ({
     } catch { return false; }
   },
 }));
-vi.mock("@/lib/relatorio-pdf-fonte", () => ({ pdfDoRelatorio: vi.fn(), fonteDeInspecao: vi.fn(() => null) }));
+vi.mock("@/lib/relatorio-pdf-fonte", () => ({ pdfDoRelatorio: vi.fn(), fonteDeInspecao: vi.fn(() => null), fonteDeCopiaArquivada: vi.fn(async () => null) }));
 vi.mock("@/lib/pit-pdf-fonte", () => ({ pdfDoPit: vi.fn(), fonteDePit: vi.fn(() => null) }));
 
 import { requireRole } from "@/lib/session";
 import { baixarDocumento } from "@/lib/databook-arquivo";
-import { fonteDeInspecao, pdfDoRelatorio } from "@/lib/relatorio-pdf-fonte";
+import { fonteDeInspecao, fonteDeCopiaArquivada, pdfDoRelatorio } from "@/lib/relatorio-pdf-fonte";
 import { fonteDePit, pdfDoPit } from "@/lib/pit-pdf-fonte";
 import { GET } from "@/app/api/qualidade/documentos/[id]/download/route";
 
@@ -120,6 +120,21 @@ describe("download de documento da Qualidade", () => {
     expect(res.status).toBe(200);
     expect(pdfDoRelatorio).toHaveBeenCalledWith("rel1", { revisao: 0, exigirOp: "106" });
     expect(baixarDocumento).not.toHaveBeenCalled();
+  });
+
+  // ⚠⚠ Vitor (24/09/2026): "Relatório de EVS e LP da OP-102 está puxando os relatórios sem
+  // assinatura". A cópia do relatório na pasta da obra é arquivada na aprovação, antes das
+  // assinaturas: o olho mostra o relatório do portal, como o livro.
+  it("cópia arquivada de um relatório abre o relatório do portal, com as assinaturas de agora", async () => {
+    mockPrisma.documentoQualidade.findUnique.mockResolvedValue({ ...NO_SERVIDOR, origem: "servidor", opNumero: "102", nome: "EVS-102-001 - Inspeção visual de solda" });
+    fonteDeCopiaArquivada.mockResolvedValueOnce({ relatorioId: "rel-evs", revisao: null, exigirOp: "102" });
+    pdfDoRelatorio.mockResolvedValue({ bytes: Buffer.from("%PDF assinado"), nome: "EVS-102-001.pdf" });
+    const res = await chamar("?inline=1");
+    expect(res.status).toBe(200);
+    expect(pdfDoRelatorio).toHaveBeenCalledWith("rel-evs", { revisao: null, exigirOp: "102" });
+    expect(baixarDocumento).not.toHaveBeenCalled();
+    // o nome do documento vai no select: é por ele que a cópia é reconhecida
+    expect(mockPrisma.documentoQualidade.findUnique.mock.calls[0][0].select).toMatchObject({ nome: true, origem: true, opNumero: true });
   });
 
   it("PIT virtual abre como PDF sem passar pelo SharePoint", async () => {

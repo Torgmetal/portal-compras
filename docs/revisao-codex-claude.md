@@ -1948,3 +1948,21 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** (1) a PUT da configuração aceita `cabeceira` 0 = não informada (vale o padrão do código); (2) o
   volume encostado atrás de um que está acima da cabeceira não é marcado — quem segura é a amarração do da frente;
   (3) o nome novo da carreta só aparece se a configuração gravada no banco não tiver outro.
+- **(24/09, tarde) Relatórios de EVS e LP da OP-102 "sem assinatura".** Dois defeitos, medidos em produção.
+  (1) A §12 do data book tinha as CÓPIAS da pasta da obra (arquivadas na aprovação de 21/09, antes de o
+  Alexandre assinar); o vínculo do portal tinha sido removido como duplicata em 22/09. 7 documentos de
+  data book eram cópias (OP-102 ×5, OP-089 ×2). `fonteDeCopiaArquivada` (lib/relatorio-pdf-fonte.js)
+  reconhece a cópia (nome `<código>[ Rnn] - <tipo>`, pasta `/8. Qualidade/`, origem `servidor`) e serve o
+  relatório do portal — código buscado DENTRO da obra do documento, revisão tem de ser a vigente. Ligado
+  em `baixarDocumento` (livro, volumes, portal do cliente) e na rota de download (olho).
+  (2) Os convites do Alexandre foram desviados para o e-mail do Vitor (REDIRECIONAR_CONVITE_ASSINATURA,
+  13:26 UTC) e a imagem era buscada pelo e-mail do convite → quadro sem carimbo. `titularesDesviados`
+  (lib/assinatura-cadastro.js) lê o registro do desvio; `completarImagens` e `imagemDoCadastro` (rota
+  `/api/assinar/[token]`) usam o titular; titular sem imagem NÃO cai para a de quem assinou.
+  Validado contra produção (só leitura): 5/5 cópias da OP-102 mapeadas; o PDF do EVS-102-001 sai com os
+  dois carimbos. Testes: `relatorio-copia-e-carimbo` (10), +1 em `qualidade-documento-download`; mocks de
+  3 testes ganharam as funções novas. **3.922 passando**, `checar` limpo.
+  ⚠ **Para revisar:** (a) servir outro conteúdo que não o arquivo vinculado é deliberado — a cópia é
+  backup do relatório, não documento próprio; conferir se alguma rota de cliente deveria NÃO ver relatório
+  vivo; (b) ler AuditLog no caminho de render/assinatura (única fonte do titular); (c) a pasta continua com
+  a cópia sem assinatura — rearquivar na conclusão do envio fica como sugestão.

@@ -5,7 +5,7 @@ vi.mock('@/lib/session',()=>({requireRole:vi.fn().mockResolvedValue({id:'u'}),ge
 vi.mock('@/lib/email',()=>({sendEmail:vi.fn().mockResolvedValue({ok:true})}));
 vi.mock('@/lib/email-layout',()=>({cabecalhoEmail:()=>''}));
 vi.mock('@/lib/databook-assinaturas',()=>({baseUrlDe:()=> 'http://localhost'}));
-vi.mock('@/lib/assinatura-cadastro',()=>({assinaturaDoEmail:vi.fn().mockResolvedValue(null)}));
+vi.mock('@/lib/assinatura-cadastro',()=>({assinaturaDoEmail:vi.fn().mockResolvedValue(null),imagemDoCadastro:vi.fn().mockResolvedValue(null)}));
 vi.mock('@/lib/relatorio-inspecao',()=>({vincularNoDataBook:vi.fn().mockResolvedValue({}),proximoNumero:vi.fn().mockResolvedValue(1)}));
 vi.mock('@/lib/importar-procedimentos',()=>({procedimentoDoTipo:vi.fn().mockResolvedValue(null)}));
 vi.mock('@/lib/relatorio-dimensional',()=>({procedimentoTolerancia:vi.fn().mockResolvedValue(null)}));
