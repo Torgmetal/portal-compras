@@ -1966,3 +1966,16 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   backup do relatório, não documento próprio; conferir se alguma rota de cliente deveria NÃO ver relatório
   vivo; (b) ler AuditLog no caminho de render/assinatura (única fonte do titular); (c) a pasta continua com
   a cópia sem assinatura — rearquivar na conclusão do envio fica como sugestão.
+- **(24/09, fim da tarde) Rastreio: materiais sem R no data book da OP-102.** Dois defeitos do motor
+  (`lib/rastreio-peca.js`): (1) comparação por HORÁRIO entre recebimento (CMR, meio-dia UTC) e corte
+  (Syneco, meia-noite BRT) — corte no dia da entrega caía em ESTOQUE; agora `diaBRT`; (2) peça sem
+  corte apontado dentro de conjunto já montado ficava AGUARDANDO_CORTE — agora o primeiro apontamento
+  de etapa posterior (da peça ou de conjunto que a leva) é o teto do corte, com `corteInferido: true`
+  (regra do Vitor de 09/09: apontamento à frente dá baixa nas anteriores). OP-102 §02: 117 → 152 de 277
+  com R; 1.879 peças em 17 obras; livro aceito afetado só OP-106 (5 peças, e a rota do PDF remonta o
+  livro a cada download). O resto da OP-102 é lançamento (chapa do pedido 1719 sem entrada; perfis de
+  estoque sem R informado). Testes: `rastreio-corte-dia-e-etapa` (6). **3.932 passando**, `checar` limpo.
+  ⚠ **Para revisar:** (a) a inferência usa o primeiro apontamento de qualquer setor fora de
+  corte/preparação — conferido: o Syneco só tem Corte, Preparação, Montagem, Solda, Acabamento, Jato e
+  Pintura, nenhum antes do corte; (b) livro ACEITO
+  remontado muda de conteúdo (pré-existente a esta mudança, mas agora com 5 peças na OP-106).

@@ -78,3 +78,32 @@ corte · 48% sem material; OP-103 66% (57 por FIFO) · 17% aguardando · 14% sem
 — só 12 peças cortadas até agora, 61% aguardando corte (é a realidade da obra).
 **O gargalo não é o algoritmo, é o lançamento**: perfil sem entrada no CMR daquela OP.
 Ver [[torg_status_compra_cmr]], [[torg_qualidade_import_cmr]] e [[torg_desenho_rastreado]].
+
+## 24/09/2026 — dois furos do motor, achados na OP-102 ("temos mais materiais, sem R no data book")
+
+⚠⚠ **O dia do recebimento conta.** A comparação era por HORÁRIO: o CMR grava o recebimento ao meio-dia
+UTC (4.153 de 4.153 linhas) e a ordem do Syneco começa à meia-noite de Brasília (03:00 UTC, 68.870 de
+68.870). Toda peça cortada NO DIA em que o aço chegou caía em ESTOQUE. Agora `diaBRT` dos dois lados —
+"até o dia do corte" é a regra; a hora nunca foi dado. Cortada no dia ANTERIOR continua ESTOQUE.
+
+⚠⚠ **Corte provado pela etapa seguinte** (regra do Vitor de 09/09, [[torg_baixa_etapa_anterior]]).
+Peça sem data própria de corte (Syneco corte/preparação, `corteConcluidoEm`, `dataProducao`) mas com
+apontamento de montagem em diante — dela ou de um conjunto que a leva (`ConjuntoCroqui`) — foi cortada
+ATÉ o primeiro desses dias. Esse dia vira o teto do FIFO e a linha sai com `corteInferido: true`. Na
+OP-102 eram 25 croquis de ferro redondo FRØ3/4" em conjuntos montados, soldados e jateados, e o data
+book dizia "aguarda corte". ⚠ O PDF da §02 não ganha marca nenhuma (regra de 22/08: frase é declaração
+contra nós); a marca é para as telas internas.
+Medido: 1.879 peças ganham R em 17 obras (OP-067: 1.662, livro EM_MONTAGEM). Livro já ACEITO afetado:
+só a OP-106 (5 peças) — e a rota do PDF remonta o livro a cada download.
+
+**OP-102 depois da correção:** §02 com 152 de 277 posições com R (eram 117). O que falta é LANÇAMENTO:
+- **chapas** (85 croquis cortados, 104 posições): a chapa comprada para a obra (RM T102-002, **pedido
+  1719** da AÇOS MAQ) não tem nota de entrada nem linha no CMR; a fábrica cortou de outra chapa. Na
+  Liberação de material as chapas aparecem "estoque · aguardando entrega" com um R SUGERIDO de outra
+  obra — o certo é o da chapa que foi para o corte, e isso só o Almoxarifado sabe;
+- L6" (a RM diz ATENDIDO_ESTOQUE), HP250X62, TB 8" SCH40, W150X29,8: de estoque, sem R informado;
+- 10 peças W cortadas em 12/08 com o CMR dizendo recebido em 13/08 — ou a data do CMR está um dia
+  atrasada, ou saiu de outro aço.
+⚠ A troca (`TrocaRastreabilidade`) é por PERFIL DA PEÇA, e na chapa o perfil leva a largura
+(CH12.50X113, CH12.50X69…): informar o R da chapa de 12,5 é uma confirmação por largura.
+
