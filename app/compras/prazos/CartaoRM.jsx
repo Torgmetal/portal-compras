@@ -220,11 +220,16 @@ function LinhaPedido({ p, mostrarFD, mostrarFrete, onDecidido }) {
           <ul className="mt-0.5 space-y-0.5">
             {p.etapas.map((e) => (
               <li key={e.id} className="text-[11px] text-torg-gray flex items-start gap-1">
-                {e.etapa === "MATERIAL_RECEBIDO"
-                  ? <PackageCheck size={10} className="mt-[3px] shrink-0 text-emerald-600" />
-                  : <Truck size={10} className="mt-[3px] shrink-0" />}
+                {/* ⚠⚠ PREVISTA NÃO GANHA O ÍCONE DE CAMINHÃO — ganha o de calendário. Data futura é o que
+                    o fornecedor prometeu, e o caminhão diria que já saiu (24/09/2026: 7 dos 10
+                    lançamentos eram "liberado para coleta" com data à frente). */}
+                {e.prevista
+                  ? <CalendarClock size={10} className="mt-[3px] shrink-0 text-sky-600" />
+                  : e.etapa === "MATERIAL_RECEBIDO"
+                    ? <PackageCheck size={10} className="mt-[3px] shrink-0 text-emerald-600" />
+                    : <Truck size={10} className="mt-[3px] shrink-0" />}
                 <span>
-                  {e.titulo} em {fmt(e.data)}
+                  <span className={e.prevista ? "text-sky-700" : undefined}>{e.titulo} {e.prevista ? "para" : "em"} {fmt(e.data)}</span>
                   {e.observacao && <> — <span className="text-torg-dark">“{e.observacao}”</span></>}
                   {e.por && <span className="text-gray-400"> · {e.por}</span>}
                 </span>

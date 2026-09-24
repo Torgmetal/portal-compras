@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { linhaDoTempo, previsaoAtual, ETAPAS_VALIDAS, rotuloEtapa } from "@/lib/acompanhamento-pedido";
 
+// ⚠⚠ O "HOJE" É FIXO NESTA SUÍTE (24/09/2026). Desde que etapa com data futura passou a ser PREVISÃO,
+// `linhaDoTempo` depende do dia — e esta suíte, escrita em 16/09, tinha "material recebido em 25/09"
+// como coisa passada. Virou amanhã, e o teste de atraso quebrou sozinho. Teste que depende do
+// relógio da parede é teste que muda de sentido sem ninguém mexer no código.
+const HOJE = { hoje: "2026-09-30" };
+
 // ⚠⚠ Matheus (16/09/2026) quer controlar, depois que o pedido vai pro Omie, se o material foi
 // recebido / encaminhado para obra / liberado para coleta DENTRO DO PRAZO ESTIMADO. A linha do
 // tempo junta quatro fontes que já viviam separadas — criação, prazo original, remarcações
@@ -41,7 +47,7 @@ describe("linhaDoTempo — a ordem e as fontes", () => {
       prazoHistorico: [{ id: "h1", criadoEm: "2026-09-08T00:00:00.000Z", prazoAnterior: "2026-09-15T00:00:00.000Z", prazoNovo: "2026-09-25T00:00:00.000Z", motivo: "fornecedor atrasou" }],
       acompanhamentos: [{ id: "a1", etapa: "LIBERADO_COLETA", data: "2026-09-24T00:00:00.000Z", observacao: "retirar com a transportadora" }],
     };
-    const { eventos } = linhaDoTempo(p);
+    const { eventos } = linhaDoTempo(p, HOJE);
     expect(eventos.map((e) => e.tipo)).toEqual(["pedido", "prazo", "etapa"]);
     expect(eventos[1].detalhe).toContain("de 2026-09-15 para 2026-09-25 fornecedor atrasou");
     expect(eventos[2].titulo).toBe("Liberado para coleta");
@@ -52,7 +58,7 @@ describe("linhaDoTempo — a ordem e as fontes", () => {
       { id: "a2", etapa: "MATERIAL_RECEBIDO", data: "2026-09-19T00:00:00.000Z" },
       { id: "a1", etapa: "LIBERADO_COLETA", data: "2026-09-19T00:00:00.000Z" },
     ] };
-    expect(linhaDoTempo(p).eventos.filter((e) => e.tipo === "etapa").map((e) => e.etapa))
+    expect(linhaDoTempo(p, HOJE).eventos.filter((e) => e.tipo === "etapa").map((e) => e.etapa))
       .toEqual(["LIBERADO_COLETA", "MATERIAL_RECEBIDO"]);
   });
 
@@ -61,14 +67,14 @@ describe("linhaDoTempo — a ordem e as fontes", () => {
       { id: "a1", etapa: "ENCAMINHADO_OBRA", data: "2026-09-19T00:00:00.000Z", observacao: "metade" },
       { id: "a2", etapa: "ENCAMINHADO_OBRA", data: "2026-09-26T00:00:00.000Z", observacao: "restante" },
     ] };
-    expect(linhaDoTempo(p).eventos.filter((e) => e.etapa === "ENCAMINHADO_OBRA")).toHaveLength(2);
+    expect(linhaDoTempo(p, HOJE).eventos.filter((e) => e.etapa === "ENCAMINHADO_OBRA")).toHaveLength(2);
   });
 });
 
 describe("linhaDoTempo — o recebimento vem de duas origens que não concordam", () => {
   it("o carimbo do Omie entra quando ninguém lançou à mão", () => {
     const p = { ...PEDIDO, statusEntrega: "ENTREGUE", dataEntregaReal: "2026-09-18T00:00:00.000Z" };
-    const recebido = linhaDoTempo(p).eventos.find((e) => e.etapa === "MATERIAL_RECEBIDO");
+    const recebido = linhaDoTempo(p, HOJE).eventos.find((e) => e.etapa === "MATERIAL_RECEBIDO");
     expect(recebido.detalhe).toBe("pela integração do Omie");
     expect(recebido.automatico).toBe(true);
   });
@@ -80,26 +86,26 @@ describe("linhaDoTempo — o recebimento vem de duas origens que não concordam"
       dataEntregaReal: "2026-09-18T00:00:00.000Z",
       acompanhamentos: [{ id: "a1", etapa: "MATERIAL_RECEBIDO", data: "2026-09-19T00:00:00.000Z", registradoPor: { name: "Ana" } }],
     };
-    const recebidos = linhaDoTempo(p).eventos.filter((e) => e.etapa === "MATERIAL_RECEBIDO");
+    const recebidos = linhaDoTempo(p, HOJE).eventos.filter((e) => e.etapa === "MATERIAL_RECEBIDO");
     expect(recebidos).toHaveLength(1);
     expect(recebidos[0].detalhe).toContain("Ana");
   });
 
   it("statusEntrega PARCIAL sem data não inventa chegada", () => {
     const p = { ...PEDIDO, statusEntrega: "PARCIAL", dataEntregaReal: null };
-    expect(linhaDoTempo(p).eventos.some((e) => e.etapa === "MATERIAL_RECEBIDO")).toBe(false);
+    expect(linhaDoTempo(p, HOJE).eventos.some((e) => e.etapa === "MATERIAL_RECEBIDO")).toBe(false);
   });
 });
 
 describe("linhaDoTempo — chegou dentro do prazo estimado?", () => {
   it("chegou 1 dia depois da previsão", () => {
     const p = { ...PEDIDO, acompanhamentos: [{ id: "a1", etapa: "MATERIAL_RECEBIDO", data: "2026-09-21T00:00:00.000Z" }] };
-    expect(linhaDoTempo(p).atrasoDias).toBe(1);
+    expect(linhaDoTempo(p, HOJE).atrasoDias).toBe(1);
   });
 
   it("chegou 2 dias antes — o número é negativo, não zero", () => {
     const p = { ...PEDIDO, acompanhamentos: [{ id: "a1", etapa: "MATERIAL_RECEBIDO", data: "2026-09-18T00:00:00.000Z" }] };
-    expect(linhaDoTempo(p).atrasoDias).toBe(-2);
+    expect(linhaDoTempo(p, HOJE).atrasoDias).toBe(-2);
   });
 
   it("⚠ compara com a previsão REMARCADA, não com a original", () => {
@@ -108,17 +114,17 @@ describe("linhaDoTempo — chegou dentro do prazo estimado?", () => {
       prazoHistorico: [{ id: "h1", criadoEm: "2026-09-08T00:00:00.000Z", prazoNovo: "2026-09-25T00:00:00.000Z" }],
       acompanhamentos: [{ id: "a1", etapa: "MATERIAL_RECEBIDO", data: "2026-09-25T00:00:00.000Z" }],
     };
-    expect(linhaDoTempo(p).atrasoDias).toBe(0);
+    expect(linhaDoTempo(p, HOJE).atrasoDias).toBe(0);
   });
 
   it("⚠⚠ sem chegada não existe atraso — seria um número que cresce sozinho todo dia", () => {
-    expect(linhaDoTempo(PEDIDO).atrasoDias).toBe(null);
-    expect(linhaDoTempo({ ...PEDIDO, acompanhamentos: [{ id: "a1", etapa: "LIBERADO_COLETA", data: "2026-09-19T00:00:00.000Z" }] }).atrasoDias).toBe(null);
+    expect(linhaDoTempo(PEDIDO, HOJE).atrasoDias).toBe(null);
+    expect(linhaDoTempo({ ...PEDIDO, acompanhamentos: [{ id: "a1", etapa: "LIBERADO_COLETA", data: "2026-09-19T00:00:00.000Z" }] }, HOJE).atrasoDias).toBe(null);
   });
 
   it("chegou mas o pedido nunca teve previsão: sem base de comparação, null", () => {
     const p = { createdAt: PEDIDO.createdAt, prazoHistorico: [], acompanhamentos: [{ id: "a1", etapa: "MATERIAL_RECEBIDO", data: "2026-09-21T00:00:00.000Z" }] };
-    expect(linhaDoTempo(p).atrasoDias).toBe(null);
+    expect(linhaDoTempo(p, HOJE).atrasoDias).toBe(null);
   });
 });
 

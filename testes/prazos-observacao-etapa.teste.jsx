@@ -36,21 +36,26 @@ const lancamento = (id, observacao, criadoEm) => ({
 
 afterEach(() => cleanup());
 
+// ⚠ O relógio é FIXO: o caso real (lançado em 24/09, coleta para 15/10) é PREVISÃO hoje e vira
+// acontecimento depois de 15/10. Sem `agora` fixo, o teste mudaria de sentido sozinho.
+const EM_24_09 = new Date("2026-09-24T15:00:00Z");
+const EM_20_10 = new Date("2026-10-20T15:00:00Z");
+
 describe("a observação da etapa aparece nos Prazos das RMs", () => {
   it("mostra o texto que o comprador escreveu", () => {
-    const [linha] = agruparPorRM([pedido([lancamento("a1", "PERFIL 150X50X3,0MM ENTREGA ATÉ TERÇA")])]);
+    const [linha] = agruparPorRM([pedido([lancamento("a1", "PERFIL 150X50X3,0MM ENTREGA ATÉ TERÇA")])], EM_24_09);
     render(<CartaoRM l={linha} onDecidido={() => {}} />);
     expect(screen.getByText(/PERFIL 150X50X3,0MM ENTREGA ATÉ TERÇA/)).toBeTruthy();
   });
 
   it("mostra quem lançou", () => {
-    const [linha] = agruparPorRM([pedido([lancamento("a1", "TUBO 26,90MM ATÉ 02/10")])]);
+    const [linha] = agruparPorRM([pedido([lancamento("a1", "TUBO 26,90MM ATÉ 02/10")])], EM_24_09);
     render(<CartaoRM l={linha} onDecidido={() => {}} />);
     expect(screen.getByText(/Compras/)).toBeTruthy();
   });
 
   it("etapa sem observação continua aparecendo, só com a data", () => {
-    const [linha] = agruparPorRM([pedido([lancamento("a1", null)])]);
+    const [linha] = agruparPorRM([pedido([lancamento("a1", null)])], EM_20_10);
     render(<CartaoRM l={linha} onDecidido={() => {}} />);
     expect(screen.getByText(/Liberado para coleta em 15\/10\/2026/)).toBeTruthy();
   });
@@ -61,10 +66,47 @@ describe("a observação da etapa aparece nos Prazos das RMs", () => {
     const [linha] = agruparPorRM([pedido([
       lancamento("a1", null, new Date("2026-09-24T13:31:00Z")),
       lancamento("a2", "PERFIL 150X50X3,0MM ENTREGA ATÉ TERÇA", new Date("2026-09-24T13:33:00Z")),
-    ])]);
+    ])], EM_24_09);
     const { container } = render(<CartaoRM l={linha} onDecidido={() => {}} />);
-    const itens = [...container.querySelectorAll("li li")].filter((li) => /Liberado para coleta/.test(li.textContent));
+    const itens = [...container.querySelectorAll("li li")].filter((li) => /Coleta prevista/.test(li.textContent));
     expect(itens).toHaveLength(2);
     expect(itens.filter((li) => /ENTREGA ATÉ TERÇA/.test(li.textContent))).toHaveLength(1);
+  });
+});
+
+// ─── DATA FUTURA É PREVISÃO ──────────────────────────────────────────────────
+//
+// ⚠⚠⚠ 24/09/2026: 7 dos 10 lançamentos do banco eram "liberado para coleta" com data à frente, e a
+// tela escrevia "Liberado para coleta em 28/10/2026" — afirmando como feito algo que ainda não
+// aconteceu. Matheus aprovou mostrar como previsão.
+describe("etapa com data futura aparece como previsão", () => {
+  it("antes da data: 'Coleta prevista para 15/10/2026'", () => {
+    const [linha] = agruparPorRM([pedido([lancamento("a1", null)])], EM_24_09);
+    render(<CartaoRM l={linha} onDecidido={() => {}} />);
+    expect(screen.getByText(/Coleta prevista para 15\/10\/2026/)).toBeTruthy();
+    expect(screen.queryByText(/Liberado para coleta/)).toBeNull();
+  });
+
+  it("depois da data: volta a ser 'Liberado para coleta em 15/10/2026'", () => {
+    const [linha] = agruparPorRM([pedido([lancamento("a1", null)])], EM_20_10);
+    render(<CartaoRM l={linha} onDecidido={() => {}} />);
+    expect(screen.getByText(/Liberado para coleta em 15\/10\/2026/)).toBeTruthy();
+  });
+
+  // ⚠ O dia de HOJE já conta como acontecido — "liberado hoje" é fato, não promessa.
+  it("no próprio dia, já é acontecimento", () => {
+    const [linha] = agruparPorRM([pedido([lancamento("a1", null)])], new Date("2026-10-15T20:00:00Z"));
+    render(<CartaoRM l={linha} onDecidido={() => {}} />);
+    expect(screen.getByText(/Liberado para coleta em 15\/10\/2026/)).toBeTruthy();
+  });
+
+  // ⚠⚠⚠ O IRMÃO GRAVE: "material recebido" com data futura NÃO é chegada. Contando, o pedido virava
+  // CHEGOU e saía da COBRANÇA por causa de uma promessa do próprio fornecedor.
+  it("'material recebido' com data futura NÃO faz o pedido chegar — ele continua atrasado", () => {
+    const recebidoFuturo = { ...lancamento("a1", "fornecedor diz que entrega dia 15"), etapa: "MATERIAL_RECEBIDO" };
+    const [antes] = agruparPorRM([pedido([recebidoFuturo])], EM_24_09);
+    expect(antes.pedidos[0].situacao).toBe("ATRASADO");
+    const [depois] = agruparPorRM([pedido([recebidoFuturo])], EM_20_10);
+    expect(depois.pedidos[0].situacao).toBe("CHEGOU");
   });
 });

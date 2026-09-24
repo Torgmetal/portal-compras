@@ -14,7 +14,7 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { CalendarClock, History, Plus, X, Loader2, CheckCircle2, Truck, PackageCheck, AlertTriangle } from "lucide-react";
-import { linhaDoTempo, ETAPAS, ETAPAS_VALIDAS } from "@/lib/acompanhamento-pedido";
+import { linhaDoTempo, ETAPAS, ETAPAS_VALIDAS, hojeEmSP } from "@/lib/acompanhamento-pedido";
 import CampoData from "@/components/CampoData";
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -160,6 +160,18 @@ function FormLancamento({ pedido, aoLancar }) {
           O fornecedor propôs {fmt(pedido.prazoProposto)} e essa proposta ainda está em análise. Remarcar aqui descarta a proposta dele.
         </span>
       )}
+      {/* ⚠⚠ O AVISO NA HORA DE LANÇAR, porque foi aqui que a confusão nasceu (24/09/2026): 7 dos 10
+          lançamentos eram "liberado para coleta" com data futura, e o pedido continuava "atrasado" e
+          na lista de COBRANÇA — a previsão, que é o que decide isso, não tinha mudado. Quem digita
+          uma data futura numa etapa quase sempre quis remarcar a entrega. */}
+      {/* ⚠ `hojeEmSP`, não o `hoje()` deste arquivo (que é UTC): é a MESMA régua de `linhaDoTempo`,
+          senão a dica e a linha do tempo discordariam à noite sobre o que é "futuro". */}
+      {!ehPrevisao && data > hojeEmSP() && (
+        <span className="w-full text-xs text-sky-700">
+          Data futura: vai aparecer como <b className="font-medium">{(ETAPAS[etapa]?.previsto ?? "previsto").toLowerCase()}</b>.
+          {podeRemarcar && <> Se é a nova data de entrega do fornecedor, use <b className="font-medium">Data de entrega (previsão)</b> — é ela que tira o pedido do atraso e da cobrança.</>}
+        </span>
+      )}
       {ehPrevisao && (
         <span className="w-full text-xs text-torg-gray">
           Isto muda a <b className="font-medium text-torg-dark">previsão</b> de entrega do pedido e entra no histórico de prazos — não registra que o material chegou.
@@ -205,7 +217,8 @@ export function AcompanhamentoPedido({ pedido, aoMudar }) {
         ) : (
           <ul className="space-y-1">
             {eventos.map((ev, i) => {
-              const Icone = ICONE[ev.etapa] || (ev.tipo === "prazo" ? CalendarClock : CheckCircle2);
+              // ⚠ Etapa com data futura é previsão: calendário, não caminhão — a mesma regra do cartão de Prazos.
+              const Icone = ev.prevista ? CalendarClock : (ICONE[ev.etapa] || (ev.tipo === "prazo" ? CalendarClock : CheckCircle2));
               return (
                 <li key={ev.id || `${ev.tipo}-${i}`} className="text-[11px] flex items-start gap-1.5">
                   <Icone size={11} className={`mt-0.5 shrink-0 ${ev.etapa === "MATERIAL_RECEBIDO" ? "text-emerald-600" : "text-torg-gray"}`} />
