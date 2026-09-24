@@ -84,3 +84,16 @@ describe("aço nunca direto no assoalho", () => {
     expect(ok.verificacoes.filter((v) => v.tipo === "madeira" || v.tipo === "apoio")).toHaveLength(0);
   });
 });
+
+describe("carga encostada na cabeceira", () => {
+  // Vitor (24/09/2026), vendo o 3D: "esse vão pode ser um problema no transporte? por conta das peças terem um espaço
+  // para correr?" — x cresce da cabine para trás; a carga começa na cabeceira e cada volume encosta no da frente.
+  it("o primeiro volume encosta na cabeceira e o seguinte no da frente — só a folga entre eles", () => {
+    // só a carreta no catálogo: sobra carroceria, e a posição é escolha do motor (numa HR só existe um lugar)
+    const r = simularCarga({ lista: [{ marca: "T118C1", desc: "SUPORTE", qtd: 3, kgUn: 400 }], geometria: { T118C1: geo(3000, 400, 1300) }, perfil: "recomendado", prefixo: "T118", opcoes: { veiculos: { carreta: VEICULOS.carreta } } });
+    const c = r.cargas[0], chao = c.itens.filter((u) => !(u.nivelPilha > 0)).sort((a, b) => a.x - b.x);
+    expect(c.veiculo.chave).toBe("carreta");
+    expect(chao[0].x).toBe(MEDIDAS.FOLGA / 2);
+    for (let i = 1; i < chao.length; i++) expect(chao[i].x - (chao[i - 1].x + chao[i - 1].fx)).toBeLessThanOrEqual(MEDIDAS.FOLGA + MEDIDAS.CEL);
+  });
+});

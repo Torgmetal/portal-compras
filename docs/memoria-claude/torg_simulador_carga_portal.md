@@ -174,3 +174,20 @@ entre as fileiras — quem estava fora do padrão era o motor (feixe com 12 mm d
   15/09, resposta a "caixas sem os devidos apoios"); liberando caixa sobre pacote com caibro conferido no aço, a OP-118
   cai para 4 carretas. (b) Pacote de 1 m de altura (hoje 60 cm, premissa do protótipo): mesmas viagens nas quatro
   obras medidas, e menos peça solta (OP-102 de 28 para 17; OP-118 de 7 para 6) — fica 60 cm até o Vitor decidir.
+
+## Carga encostada na cabeceira — o vão para "correr" (24/09/2026)
+
+Vitor, vendo o 3D: *"esse vão pode ser um problema no transporte? por conta das peças terem um espaço para correr?"*.
+Sim: numa frenagem a carga é empurrada para a frente com até 0,8 g, aço escorrega em caibro, e o vão vira impacto.
+Medido na OP-118 (regras do portal): de 82 volumes, só 3 a até 10 cm de algo à frente na mesma altura; 30 com mais de
+1 m livre.
+
+- ⚠⚠ **O motor mandava a carga para o FIM da carroceria.** O x cresce da cabine para trás (`caminhao-3d.js`, cavalo em
+  x < 0), e o custo tinha `- ix * 2` — preferia x MAIOR. O comentário dizia "depois para o fundo": a intenção era a
+  cabeceira. Agora `+ ix * 2`: cada volume encosta no da frente, a carga vai da cabine para trás.
+- Resultado: OP-118 **5 → 4 carretas**, vãos de 30 cm–1 m 20 → 3, acima de 1 m 30 → 21; OP-102/107/085 mesmas viagens.
+- ⚠ **O que sobra de vão grande é DEGRAU** (13 de 21 na OP-118): a pilha de trás mais alta que a da frente — o volume
+  de cima não tem nada na altura dele até a cabine. Resolver pede carga "em escada" (alta na frente, descendo) ou
+  travamento/amarração marcados por volume — pendente de decisão do Vitor.
+- Teste: `carga-pacotes › carga encostada na cabeceira` (só a carreta no catálogo: numa HR só existe um lugar e o
+  teste passava com o defeito).

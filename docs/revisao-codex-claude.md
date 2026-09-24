@@ -1918,3 +1918,12 @@ Testes novos: `fiscal-anexo-nfe` (16), `fiscal-assistente-multipart` (7), +7 no 
 +3 na idempotência. **3.885 passando**, `checar` limpo, build EXIT=0, tela validada (botão + chip).
 ⚠ **Limite**: a análise ponta a ponta com o modelo não roda aqui — sem a chave local o assistente
 aparece desligado. O caminho inteiro até a chamada está testado.
+- **(24/09, fim da tarde) Simulador: a carga ia para o fim da carroceria — vão para "correr" na frenagem.** Vitor, vendo
+  o 3D: *"esse vão pode ser um problema no transporte? por conta das peças terem um espaço para correr?"*. Medido na
+  OP-118: de 82 volumes, 30 com mais de 1 m livre à frente na mesma altura.
+  **Causa:** o custo da posição tinha `- ix * 2` (prefere x maior), e o x cresce da cabine para trás
+  (`caminhao-3d.js`). O comentário dizia "depois para o fundo" — a intenção era a cabeceira. **Correção:** `+ ix * 2`.
+  **Resultado:** OP-118 5 → 4 carretas; vãos de 30 cm–1 m 20 → 3, acima de 1 m 30 → 21; OP-102/107/085 iguais; zero
+  voando. Teste: `carga-pacotes › carga encostada na cabeceira` (vermelho com o sinal antigo: 1º volume a 3,13 m).
+  ⚠ **Para revisar / decidir:** os vãos grandes que sobram são degraus (pilha de trás mais alta que a da frente) —
+  carga em escada ou travamento/amarração marcados por volume.
