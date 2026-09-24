@@ -130,7 +130,8 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Medir a Engenharia + agente de e-mail](torg_engenharia_medicao.md) — o agente EXISTE e roda (Mail.Read ok); falta classificar. Dossiê "Posição do Cronograma" na aba da OP
 - [Análise Crítica de Projeto (PO-13)](torg_analise_critica_po13.md) — bloco na aba Engenharia da OP; 7 blocos (3 e 4 não estão no PO); FORM 08 Rev.02 sai do registro; PDF em 2.9 Análise Crítica
 - [Portal de Engenharia](torg_portal_engenharia.md) — /engenharia sobre PecaConjunto (Tekla/LPC); Vitor quer o PORTAL antes dos indicadores; roadmap Importar Tekla→Revisões→Reconciliação→Indicadores
-- [Materiais OMIE → Tekla](torg_materiais_tekla.md) — pasta SERVIDOR/Engenharia/Workspace/Materiais OMIE - Tekla; planilha só perfis+parafusos; arquivo NOVO a cada cadastro novo no Omie (cron 6h30/12h30)
+- [Materiais OMIE → Tekla](torg_materiais_tekla.md) — pasta SERVIDOR/Engenharia/Workspace/Materiais OMIE - Tekla; planilha só perfis+parafusos; arquivo NOVO quando código entra, SAI (inativado) ou muda de descrição (cron 6h30/12h30)
+- [Duplicados do cadastro Omie](torg_omie_duplicados.md) — 24/09: 14 códigos a inativar, 4 a decidir, 52 antigos sem uso; INATIVAR (nunca excluir), 0 inativos até hoje; saldo ≠ 0 reativa na busca da RM
 - [Equivalência de material (perfil)](torg_equivalencia_material.md) — Tekla diz CH12, a lista diz CH12,5; `\S\X` do IFC = Ø; nunca casar perfil por string crua
 - [Dado histórico não fecha 100%](torg_dado_historico_incompleto.md) — obra antiga: medir, dizer o tamanho e PARAR; corrigir a regra que erra de novo, não o passado
 - [⚠ Produção é LPC — sempre escolher a lista](torg_producao_e_lpc.md) — `SO_FABRICACAO` em toda consulta de fabricação; registro da LE mente sobre prontidão

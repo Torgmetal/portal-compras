@@ -8,7 +8,7 @@ vi.mock("@/lib/sharepoint", () => ({ listChildrenByPath: vi.fn(), downloadFileBy
 
 import {
   grupoDoProduto, lerPerfil, lerParafuso, linhasDaPlanilha, codigosNovos, nomeDoArquivo,
-  gerarPlanilhaMateriaisTekla, codigosDaPlanilha, PASTA_TEKLA,
+  gerarPlanilhaMateriaisTekla, codigosDaPlanilha, descricoesDaPlanilha, mudancasDoCadastro, PASTA_TEKLA,
 } from "@/lib/materiais-tekla";
 import { publicarMateriaisTekla } from "@/lib/materiais-tekla-publicar";
 import { listarProdutosOmie } from "@/lib/omie-produtos";
@@ -137,14 +137,55 @@ describe("as linhas, o nome do arquivo e o que é novo", () => {
     expect([...(await codigosDaPlanilha(buf))].sort()).toEqual(["0501000049", "120000164"]);
     const ExcelJS = (await import("exceljs")).default;
     const wb = new ExcelJS.Workbook(); await wb.xlsx.load(buf);
-    expect(wb.worksheets.map((w) => w.name)).toEqual(["Perfis", "Parafusos", "Novos", "Leia-me"]);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(["Perfis", "Parafusos", "Mudanças", "Leia-me"]);
     expect(wb.getWorksheet("Perfis").getRow(1).getCell(1).value).toBe("Código Omie"); // tabela começa na linha 1
     expect(wb.getWorksheet("Parafusos").getRow(2).getCell(9).value).toBe("sim");
-    expect(wb.getWorksheet("Novos").getRow(2).getCell(2).value).toBe("120000164");
+    const mud = wb.getWorksheet("Mudanças").getRow(2);
+    expect([mud.getCell(1).value, mud.getCell(2).value, mud.getCell(3).value]).toEqual(["Novo", "Parafuso", "120000164"]);
   });
 });
 
-describe("publicar: planilha nova só quando o Omie ganha perfil ou parafuso", () => {
+// Vitor (24/09/2026): "esses duplicados é possível alterarmos para depois não ocorrer conflitos?". A
+// limpeza é inativar no Omie — e o código inativado tem de SAIR da pasta que o Tekla lê.
+describe("o que mudou desde a última planilha", () => {
+  const antes = new Map([
+    ["501000014", { descricao: "PERFIL W ACO CARBONO LAMINADO A 572 GR.50 DN. W250 X 32,7KG/M", grupo: "Perfil" }],
+    ["501000071", { descricao: "PERFIL H ACO CARBONO LAMINADO A 572 GR.50 DN. W250 X 32,7KG/M", grupo: "Perfil" }],
+    ["101000036", { descricao: "PERFIL QUALQUER 2.65MM", grupo: "Perfil" }],
+  ]);
+
+  it("novo, fora do cadastro e descrição alterada, cada um na sua lista", () => {
+    const r = mudancasDoCadastro([
+      { codigo: "501000014", descricao: "PERFIL W ACO CARBONO LAMINADO A 572 GR.50 DN. W250 X 32,7KG/M" },
+      { codigo: "101000036", descricao: "PERFIL QUALQUER 2,65MM" },
+      { codigo: "501000099", descricao: "PERFIL W NOVO" },
+    ], antes);
+    expect(r.novos).toEqual(["501000099"]);
+    expect(r.sairam).toEqual([{ codigo: "501000071", descricao: "PERFIL H ACO CARBONO LAMINADO A 572 GR.50 DN. W250 X 32,7KG/M", grupo: "Perfil" }]);
+    expect(r.alterados).toEqual([{ codigo: "101000036", descricao: "PERFIL QUALQUER 2,65MM", anterior: "PERFIL QUALQUER 2.65MM" }]);
+  });
+
+  it("espaço a mais não é descrição alterada", () => {
+    const r = mudancasDoCadastro([...antes].map(([codigo, a]) => ({ codigo, descricao: ` ${a.descricao.replace(/ /g, "  ")} ` })), antes);
+    expect(r).toEqual({ novos: [], sairam: [], alterados: [] });
+  });
+
+  it("sem planilha anterior não há mudança a relatar", () => {
+    expect(mudancasDoCadastro([{ codigo: "1", descricao: "x" }], null)).toEqual({ novos: [], sairam: [], alterados: [] });
+  });
+
+  it("a planilha publicada devolve código, descrição e grupo", async () => {
+    const { perfis, parafusos } = linhasDaPlanilha([
+      prod("0501000049", "PERFIL W ACO CARBONO LAMINADO A 572 GR.50 DN. W530 X 85,0KG/M"),
+      prod("120000164", "PARAFUSO SEXT. A325 -  7/8\"X4\" - GF", FX),
+    ]);
+    const lidas = await descricoesDaPlanilha(await gerarPlanilhaMateriaisTekla({ perfis, parafusos }));
+    expect(lidas.get("0501000049")).toEqual({ descricao: "PERFIL W ACO CARBONO LAMINADO A 572 GR.50 DN. W530 X 85,0KG/M", grupo: "Perfil" });
+    expect(lidas.get("120000164")).toEqual({ descricao: "PARAFUSO SEXT. A325 -  7/8\"X4\" - GF", grupo: "Parafuso" });
+  });
+});
+
+describe("publicar: planilha nova só quando o cadastro de perfis e parafusos muda", () => {
   const CATALOGO = [
     prod("501000007", "PERFIL W ACO CARBONO LAMINADO A 572 GR.50 DN. W200 X 31,3KG/M"),
     prod("120000164", "PARAFUSO SEXT. A325 -  7/8\"X4\" - GF", FX),
@@ -198,5 +239,52 @@ describe("publicar: planilha nova só quando o Omie ganha perfil ou parafuso", (
     listChildrenByPath.mockResolvedValue([]);
     await expect(publicarMateriaisTekla({ agora: AGORA })).rejects.toThrow(/nada foi publicado/);
     expect(uploadFileToFolder).not.toHaveBeenCalled();
+  });
+
+  const PASTA = [{ id: "i1", name: "Materiais OMIE - Tekla 2026-09-23 06h30.xlsx", file: {} }];
+  const lerPublicada = async () => {
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook(); await wb.xlsx.load(publicada);
+    return wb;
+  };
+
+  it("código inativado no Omie (a limpeza de um duplicado): arquivo novo SEM ele, e a aba Mudanças diz que saiu", async () => {
+    listChildrenByPath.mockResolvedValue(PASTA);
+    listarProdutosOmie.mockResolvedValue([{ ...CATALOGO[0], inativo: true }, CATALOGO[1]]);
+    const r = await publicarMateriaisTekla({ agora: AGORA });
+    expect(r).toMatchObject({ publicado: true, novos: 0, sairam: 1, alterados: 0, codigosQueSairam: ["501000007"] });
+    expect([...(await codigosDaPlanilha(publicada))]).toEqual(["120000164"]);
+    const mud = (await lerPublicada()).getWorksheet("Mudanças").getRow(2);
+    expect([mud.getCell(1).value, mud.getCell(2).value, mud.getCell(3).value]).toEqual(["Saiu do cadastro", "Perfil", "501000007"]);
+    expect(mud.getCell(5).value).toBe(CATALOGO[0].descricao);
+  });
+
+  it("descrição corrigida no Omie: arquivo novo, com a descrição de antes ao lado", async () => {
+    listChildrenByPath.mockResolvedValue(PASTA);
+    listarProdutosOmie.mockResolvedValue([{ ...CATALOGO[0], descricao: "PERFIL W ACO CARBONO LAMINADO A 572 GR.50 DN. W200 X 31,3 KG/M" }, CATALOGO[1]]);
+    const r = await publicarMateriaisTekla({ agora: AGORA });
+    expect(r).toMatchObject({ publicado: true, novos: 0, sairam: 0, alterados: 1, codigosAlterados: ["501000007"] });
+    const mud = (await lerPublicada()).getWorksheet("Mudanças").getRow(2);
+    expect([mud.getCell(1).value, mud.getCell(4).value, mud.getCell(5).value])
+      .toEqual(["Descrição alterada", "PERFIL W ACO CARBONO LAMINADO A 572 GR.50 DN. W200 X 31,3 KG/M", CATALOGO[0].descricao]);
+  });
+
+  describe("sumiço em massa é leitura ruim, não limpeza", () => {
+    const GRANDE = Array.from({ length: 30 }, (_, i) => prod(`1200001${10 + i}`, `PARAFUSO SEXT. A325 - 1/2"X${10 + i}" - GF`, FX));
+    beforeEach(async () => {
+      listChildrenByPath.mockResolvedValue(PASTA);
+      const { perfis, parafusos } = linhasDaPlanilha(GRANDE);
+      downloadFileById.mockResolvedValue({ buffer: await gerarPlanilhaMateriaisTekla({ perfis, parafusos }) });
+      listarProdutosOmie.mockResolvedValue(GRANDE.slice(0, 5)); // 25 de 30 somem de uma vez
+    });
+
+    it("não publica e lança — o monitor do cron avisa", async () => {
+      await expect(publicarMateriaisTekla({ agora: AGORA })).rejects.toThrow(/25 de 30 .*sumiram/);
+      expect(uploadFileToFolder).not.toHaveBeenCalled();
+    });
+
+    it("com 'forçar' (alguém conferiu o cadastro) publica", async () => {
+      expect(await publicarMateriaisTekla({ agora: AGORA, forcar: true })).toMatchObject({ publicado: true, sairam: 25 });
+    });
   });
 });

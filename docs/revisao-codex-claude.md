@@ -1999,3 +1999,18 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** (a) a pasta é o estado — se alguém renomear/apagar os arquivos, o próximo cron
   publica de novo (comportamento seguro, mas sai arquivo); (b) última planilha ilegível LANÇA em vez de
   publicar; (c) o POST manual escreve no SharePoint — só ADMIN/ENGENHARIA.
+- **(24/09, noite) Planilha do Tekla também muda quando um código SAI ou muda de descrição.** Vitor
+  perguntou como ver os duplicados do cadastro do Omie antes do tradutor Tekla→Omie e se dá para
+  corrigi-los. Medido e entregue em planilha (fora do repositório): 13 produtos em dobro/14 códigos a
+  inativar, 4 casos para decidir, 52 itens sem família sem uso — ver `docs/memoria-claude/torg_omie_duplicados.md`.
+  A limpeza é INATIVAR no Omie, e a 1ª versão da planilha do Tekla só publicava arquivo quando entrava
+  código: o inativado ficaria na pasta até outro cadastro. Agora `mudancasDoCadastro` (código + descrição
+  contra a última planilha: novos, saíram, alterados) decide; aba "Novos" virou "Mudanças" (com a
+  descrição anterior). Trava: sumiço acima de max(20, 15%) dos códigos LANÇA em vez de publicar (leitura
+  ruim ≠ limpeza); `forcar` passa por cima. O xlsx foi para `lib/materiais-tekla-xlsx.js` (arquivo passava
+  do teto de 350 linhas; reexportado). Conferido contra o real: Omie × planilha das 17h02 = 0 mudança.
+  Testes: `materiais-tekla` (79, +8). **4.016 passando**, `checar` limpo, build ok.
+  ⚠ **Para revisar:** (a) descrição comparada com espaço normalizado — outro ruído de formatação geraria
+  arquivo "Descrição alterada" à toa; (b) o limite de sumiço é heurístico; (c) nada mudou no
+  `sincronizarProdutos` (estoque), que marca `ativo:true` em produto com saldo ≠ 0 — a orientação dada é
+  zerar saldo antes de inativar.

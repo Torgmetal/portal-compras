@@ -1,7 +1,8 @@
 // Planilha de perfis e parafusos do Omie para o Tekla (SERVIDOR › Engenharia › Workspace ›
 // Materiais OMIE - Tekla). GET = cron (CRON_SECRET), POST = botão/uso manual.
 // Vitor (24/09/2026): "sempre que um novo tipo de perfil for cadastrado no Omie, cadastrou vc cria
-// uma planilha nova". A regra mora em lib/materiais-tekla-publicar.js.
+// uma planilha nova". Inativar e corrigir descrição também geram arquivo (a limpeza dos duplicados tem
+// de chegar ao Tekla). A regra mora em lib/materiais-tekla-publicar.js.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -15,9 +16,11 @@ export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
 const JOB = "materiais-tekla";
+const mudancas = (r) => [r.novos && `${r.novos} novo(s)`, r.sairam && `${r.sairam} fora do cadastro`, r.alterados && `${r.alterados} com descrição alterada`]
+  .filter(Boolean).join(", ") || "sem mudança";
 const texto = (r) => (r.publicado
-  ? `${r.arquivo} · ${r.perfis} perfis, ${r.parafusos} parafusos${r.anterior ? ` · ${r.novos} novo(s)` : " · primeira planilha"}`
-  : `sem cadastro novo (${r.perfis} perfis, ${r.parafusos} parafusos)`);
+  ? `${r.arquivo} · ${r.perfis} perfis, ${r.parafusos} parafusos · ${r.anterior ? mudancas(r) : "primeira planilha"}`
+  : `cadastro sem mudança (${r.perfis} perfis, ${r.parafusos} parafusos)`);
 
 // ⚠ TRAVA: cron e botão ao mesmo tempo publicariam DOIS arquivos com o mesmo conteúdo
 const publicar = (op) => comTravaDeCron(prisma, JOB, () => publicarMateriaisTekla(op));
