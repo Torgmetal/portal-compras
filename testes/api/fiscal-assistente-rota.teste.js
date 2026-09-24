@@ -142,6 +142,21 @@ describe("POST /api/fiscal/assistente/mensagem", () => {
     expect(devolver).not.toHaveBeenCalled();
   });
 
+  // ⚠⚠⚠ PREPARAÇÃO LENTA ENCURTA O TEMPO DO MODELO — não empurra o fim da rota para depois dos 60 s.
+  // Antes, os 42 s começavam só dentro do orquestrador: 20 s de banco lento + 42 s de modelo = 62 s.
+  it("o prazo do modelo é contado desde a ENTRADA da rota, e não desde o fim da preparação", async () => {
+    abrirExecucao.mockImplementation(async () => {
+      await new Promise((r) => setTimeout(r, 300)); // banco lento na abertura da execução
+      return { conversa: { id: "c1" }, resposta: { id: "m1" } };
+    });
+    const entrada = Date.now();
+    await lerFluxo(await pedir(CORPO));
+    const { ateMs } = responder.mock.calls[0][0];
+    // Contado da entrada: no máximo 50 s depois dela, MESMO com os 300 ms de preparação no meio.
+    expect(ateMs - entrada).toBeLessThanOrEqual(50_000 + 50);
+    expect(ateMs - entrada).toBeGreaterThanOrEqual(50_000 - 50);
+  });
+
   it("falha do modelo marca a execução e avisa, sem derrubar a rota", async () => {
     responder.mockRejectedValue(new Error("Anthropic fora do ar"));
     const texto = await lerFluxo(await pedir(CORPO));

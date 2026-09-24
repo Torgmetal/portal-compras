@@ -1,7 +1,12 @@
 {
-  "build": 3449,
-  "gerado": "2026-09-24T14:54:30.716Z",
+  "build": 3450,
+  "gerado": "2026-09-24T14:54:36.471Z",
   "commits": [
+    {
+      "hash": "6f71adcd86",
+      "data": "24/09/2026",
+      "titulo": "Assistente fiscal: quatro achados do Codex — dinheiro, idempotência, versão e prazo"
+    },
     {
       "hash": "81ecb9eee3",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "92a02cc702",
       "data": "23/09/2026",
       "titulo": "Legislação: três achados do Codex, e a TIPI da contabilidade resolve a vigência"
-    },
-    {
-      "hash": "a61f9e7b9c",
-      "data": "23/09/2026",
-      "titulo": "Fiscal: a base jurídica — 10 normas oficiais coletadas, hasheadas e citáveis"
     }
   ]
 }

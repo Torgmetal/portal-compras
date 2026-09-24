@@ -1862,3 +1862,23 @@ Conferência de Peça já usa em produção.
 
 Testes: `fiscal-assistente-idempotencia` (5), `fiscal-assistente-provedor` (5), +4 na rota, +1 no
 laço. **3.833 passando**, `checar` limpo, build EXIT=0. **Sem push**, como a rodada determina.
+
+## 24/09/2026 — o prazo da rota (pendência da rodada 2/2, decidida por Matheus)
+
+O Codex fechou a rodada 2/2 com `decisao_humana`: *"com lentidão nas operações iniciais de banco, a
+chamada paga ainda pode ultrapassar os 60 segundos da rota"*. Os 42 s do modelo começavam a contar
+DENTRO do orquestrador — depois de autenticação, reserva, abertura da execução (até 15 s de espera
+na trava) e leitura do histórico. 20 s de preparação + 42 s de modelo = 62 s > `maxDuration`.
+Matheus: *"pode subir e ajustar e seguir. Codex: aceito"*.
+
+Corrigido, não só aceito: a rota marca `ateModelo = entrada + 50 s` e passa ao orquestrador; os 10 s
+finais são de gravar e conciliar. O orquestrador confere **antes de cada rodada** se sobram 10 s —
+abaixo disso não inicia chamada paga (com zero rodadas, a mensagem diz que **nada foi cobrado**, e o
+`conciliar` devolve a reserva inteira pelo delta). A espera da trava de idempotência caiu de 15 s
+para 5 s: disputa ali é só reenvio duplicado, que resolve em milissegundos.
+
+Testes: preparação lenta de 300 ms não empurra o prazo (contado da ENTRADA — **conferido vermelho**
+com o cálculo antigo); sem margem, o modelo não é chamado; o prazo é reconferido entre rodadas.
+⚠ Tropeço de teste: `vi.restoreAllMocks()` apagava também o histórico do `rodada` e a asserção lia
+zero chamadas — restauro agora só o espião do relógio.
+**3.837 passando**, `checar` limpo, build EXIT=0.

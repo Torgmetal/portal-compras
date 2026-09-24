@@ -34,7 +34,16 @@ const schema = z.object({
 
 const sse = (evento, dados) => `event: ${evento}\ndata: ${JSON.stringify(dados)}\n\n`;
 
+/**
+ * ⚠⚠ O RELÓGIO COMEÇA NA ENTRADA DA ROTA, NÃO NA CHAMADA AO MODELO (achado do Codex, 24/09/2026).
+ * `maxDuration = 60` é da FUNÇÃO inteira: autenticação, reserva, abertura da execução e leitura do
+ * histórico já gastam parte dele. O modelo recebe o que SOBRA até 50 s — os 10 s finais são de
+ * gravar a resposta e conciliar o custo, e não podem ser disputados por uma chamada lenta.
+ */
+const PRAZO_MODELO_MS = 50_000;
+
 export async function POST(req) {
+  const ateModelo = Date.now() + PRAZO_MODELO_MS;
   let user;
   try {
     user = await requireAcesso({ modulos: ["FISCAL", "FINANCEIRO"] });
@@ -97,6 +106,7 @@ export async function POST(req) {
         const r = await responder({
           historico: anteriores, pergunta: body.pergunta,
           aoProgredir: (p) => env("etapa", p),
+          ateMs: ateModelo,
         });
         // 4. CONCLUSÃO E CONCILIAÇÃO.
         await concluirExecucao(aberta.resposta.id, { ...r, conversaId: aberta.conversa.id });

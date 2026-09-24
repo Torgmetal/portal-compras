@@ -141,6 +141,41 @@ describe("o laço do assistente", () => {
     expect(mockPrisma.fiscalTipiVersao.findFirst).toHaveBeenCalledTimes(1);
   });
 
+  // ⚠⚠⚠ O ÚLTIMO ACHADO DO CODEX (24/09/2026): o prazo começava DENTRO do orquestrador, depois de
+  // a rota já ter gastado tempo preparando. Agora ele vem de fora — e é ele que manda.
+  it("usa o prazo que a ROTA passou, não um relógio próprio", async () => {
+    rodada.mockResolvedValueOnce(semFerramenta("ok"));
+    const ate = Date.now() + 30_000;
+    await responder({ historico: [], pergunta: "x", ateMs: ate });
+    expect(rodada.mock.calls[0][0].ateMs).toBe(ate);
+  });
+
+  it("sem margem para uma chamada, NÃO chama o modelo — e diz que nada foi cobrado", async () => {
+    const r = await responder({ historico: [], pergunta: "x", ateMs: Date.now() + 4_000 });
+    expect(rodada).not.toHaveBeenCalled();
+    expect(r.rodadas).toBe(0);
+    expect(r.custoMicros).toBe(0);
+    expect(r.conteudo).toMatch(/demorou para preparar/);
+  });
+
+  // ⚠ O prazo é conferido antes de CADA rodada, não só da primeira: uma ferramenta lenta no meio
+  // não pode levar a uma segunda chamada paga sem tempo de terminar.
+  it("para antes da rodada seguinte quando a ferramenta comeu o prazo", async () => {
+    const ate = Date.now() + 12_000;
+    let relogio = null;
+    rodada.mockImplementationOnce(async () => {
+      // A primeira rodada "demora" até sobrar menos que o mínimo para chamar de novo.
+      relogio = vi.spyOn(Date, "now").mockReturnValue(ate - 5_000);
+      return comFerramenta("consultar_ncm", { ncm: "84379000" });
+    });
+    const r = await responder({ historico: [], pergunta: "x", ateMs: ate });
+    // ⚠ Restaura SÓ o relógio: `vi.restoreAllMocks()` também apagaria o histórico do `rodada`, e a
+    // asserção abaixo leria zero chamadas — foi exatamente o que aconteceu na primeira versão.
+    relogio?.mockRestore();
+    expect(rodada).toHaveBeenCalledTimes(1);
+    expect(r.rodadas).toBe(1);
+  });
+
   it("resposta vazia do modelo vira mensagem honesta, não string vazia", async () => {
     rodada.mockResolvedValueOnce(semFerramenta(""));
     const r = await responder({ historico: [], pergunta: "x" });
