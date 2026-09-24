@@ -72,7 +72,7 @@ describe("a cópia da pasta da obra é o próprio relatório", () => {
     mockPrisma.relatorioInspecao.findFirst.mockResolvedValue({ id: "r-evs", tipo: "VISUAL_SOLDA", revisao: 0 });
     const bytes = await baixarDocumento(COPIA_EVS, "drive-servidor");
     expect(String(bytes)).toBe("relatorio:r-evs");
-    expect(pdfDoRelatorio).toHaveBeenCalledWith("r-evs", { exigirOp: "102" });
+    expect(pdfDoRelatorio).toHaveBeenCalledWith("r-evs", { exigirOp: "102", exigirLiberado: true });
     expect(downloadFileById).not.toHaveBeenCalled();
   });
 

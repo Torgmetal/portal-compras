@@ -247,6 +247,16 @@ export async function POST(req, { params }) {
     }
   } catch (e) { registro.erro("[assinar] convite do próximo:", e?.message); }
 
+  if (a.envio.tipo === "RELATORIO_INSPECAO") {
+    try {
+      const rel = await prisma.relatorioInspecao.findFirst({ where: { envioAssinaturaId: a.envioId } });
+      if (rel) {
+        const { vincularNoDataBook } = await import("@/lib/relatorio-inspecao");
+        await vincularNoDataBook(rel, null);
+      }
+    } catch (e) { registro.erro("[assinar] vínculo do relatório ao Data Book:", e?.message); }
+  }
+
   // ⚠⚠ APROVOU TUDO → ARQUIVA. Vitor (26/08/2026): "você deve salvar na pasta da qualidade do
   // SharePoint e anexar ao Data Book depois de todos terem aprovado". O gatilho é a última
   // assinatura; esperar alguém lembrar de clicar em "arquivar" é como o Data Book fica sem o plano

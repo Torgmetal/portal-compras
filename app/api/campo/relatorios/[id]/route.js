@@ -279,6 +279,8 @@ export async function PATCH(req, { params }) {
   if (dados.resultadoInspecao === "APROVADO" && rel.resultadoInspecao !== "APROVADO") {
     const { arquivarRelatorioNaObra } = await import("@/lib/relatorio-arquivo");
     arquivo = await arquivarRelatorioNaObra(id).catch(() => null);
+    const { vincularNoDataBook } = await import("@/lib/relatorio-inspecao");
+    await vincularNoDataBook(atualizado, null);
   }
 
   // ── REPROVOU? ABRE A RNC ────────────────────────────────────────────────────────────────────

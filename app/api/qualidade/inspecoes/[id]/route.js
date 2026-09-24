@@ -365,7 +365,7 @@ export async function PATCH(req, { params }) {
   }
 
   // o nome do documento na seção acompanha o título
-  if (dados.titulo !== undefined && atualizado.documentoId) {
+  if (dados.resultadoInspecao === "APROVADO" || (dados.titulo !== undefined && atualizado.documentoId)) {
     await vincularNoDataBook(atualizado, null).catch(() => {});
   }
 

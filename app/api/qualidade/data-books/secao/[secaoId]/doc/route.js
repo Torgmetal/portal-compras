@@ -1,3 +1,4 @@
+import { filtrarRelatoriosLiberados, MOTIVO_RELATORIO_PENDENTE } from '@/lib/databook-relatorios-liberados';
 // POST   /api/qualidade/data-books/secao/[secaoId]/doc  { documentoId }  — vincula
 // DELETE /api/qualidade/data-books/secao/[secaoId]/doc?documentoId=...    — desvincula
 import { NextResponse } from "next/server";
@@ -41,8 +42,10 @@ export async function POST(req, { params }) {
   const secao = await prisma.dataBookSecao.findUnique({ where: { id: params.secaoId }, select: { id: true } });
   if (!secao) return NextResponse.json({ success: false, error: "Seção não encontrada" }, { status: 404 });
 
-  const doc = await prisma.documentoQualidade.findUnique({ where: { id: body.documentoId }, select: { id: true, ativo: true } });
+  const doc = await prisma.documentoQualidade.findUnique({ where: { id: body.documentoId } });
   if (!doc || !doc.ativo) return NextResponse.json({ success: false, error: "Documento não encontrado" }, { status: 404 });
+
+  if (!(await filtrarRelatoriosLiberados([doc])).length) return NextResponse.json({ success: false, error: MOTIVO_RELATORIO_PENDENTE }, { status: 409 });
 
   await prisma.dataBookSecaoDoc.upsert({
     where: { secaoId_documentoId: { secaoId: params.secaoId, documentoId: body.documentoId } },

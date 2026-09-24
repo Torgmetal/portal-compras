@@ -1,3 +1,4 @@
+import { filtrarRelatoriosLiberados } from '@/lib/databook-relatorios-liberados';
 // GET   /api/qualidade/data-books/[id]  — detalhe (seções + docs vinculados + travas)
 // PATCH /api/qualidade/data-books/[id]  — edita cabeçalho / emite (com trava)
 import { NextResponse } from "next/server";
@@ -65,6 +66,8 @@ async function montarDetalhe(id) {
   // classificação por seção — que lê o nome — não tinha como saber se aquilo era aço, tinta,
   // parafuso ou arame: caía no padrão ESTRUTURAL. Resolvendo a ficha do CMR pelo mesmo R, a tela
   // passa a mostrar o material de verdade E a classificação passa a funcionar.
+  const liberados = new Set((await filtrarRelatoriosLiberados([...docsById.values()])).map(d => d.id));
+  for (const id of docsById.keys()) if (!liberados.has(id)) docsById.delete(id);
   const fichas = await fichasPorR([...docsById.values()], book.opNumero);
   for (const [id, d] of docsById) docsById.set(id, comFicha(d, fichas));
 
@@ -78,7 +81,7 @@ async function montarDetalhe(id) {
     const conteudoJson = s.numero === "10"
       ? resolverPitDataBook(s.conteudoJson, op?.pitPadrao, op?.pitRevisao)
       : s.conteudoJson || null;
-    const estado = s.numero === "10" && conteudoJson?.itens?.length ? "ANEXADO" : s.estado;
+    const estado = s.numero === "10" && conteudoJson?.itens?.length ? "ANEXADO" : (s.estado === "ANEXADO" && s.documentos.length > 0 && !docs.length && !conteudoJson ? "PENDENTE" : s.estado);
     return {
       id: s.id, numero: s.numero, titulo: s.titulo, norma: s.norma, fonte: s.fonte,
       estado, observacao: s.observacao, usaModulo1: usaM1,
@@ -88,7 +91,7 @@ async function montarDetalhe(id) {
     };
   });
 
-  const candidatosResolvidos = candidatos.map(resolverDoc);
+  const candidatosResolvidos = candidatos.filter(d => liberados.has(d.id)).map(resolverDoc);
   const naoNA = secoes.filter((s) => s.estado !== "NA");
   const pendentes = naoNA.filter((s) => s.estado !== "ANEXADO");
   const bloqueadas = secoes.filter((s) => s.bloqueada);
