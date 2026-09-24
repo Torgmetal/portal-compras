@@ -73,3 +73,18 @@ que na prática é não ter acesso.
 ⚠ **Nem todo pedido de acesso é mudança de dado.** Eduardo já tinha o módulo ALMOXARIFADO; era só o
 portão. Quando o módulo já existe no usuário, **não precisa deslogar** — a regra de "módulo só vale
 no próximo login" vale para módulo CONCEDIDO, não para rota aberta.
+
+⚠⚠⚠ **E O PORTÃO SOZINHO NÃO ENTREGA ACESSO — ERREI ISSO NO MESMO DIA.** Abri `/compras/prazos` para
+ALMOXARIFADO e pus o link em `components/Sidebar.jsx`, que é a sidebar renderizada **dentro** de
+`/compras/*`. Mas o Almoxarifado **nunca chega lá**: o card "Compras" de `lib/modulos-portal.js`
+exige o módulo COMPRAS. O caminho dele é **Requisições → `components/SidebarRM.jsx`**, e é lá que o
+link tinha de estar — como o Recebimento (CMR) já estava. Matheus voltou com *"ainda está sem
+acesso, não aparece no menu de módulos dele"*, e estava certo.
+
+**São TRÊS camadas, e faltar qualquer uma parece acesso negado:**
+1. `lib/portao-modulos.js` — a rota deixa entrar
+2. `lib/modulos-portal.js` — o card do menu de módulos leva ao módulo onde a tela mora
+3. a sidebar **daquele** módulo — o link existe e o filtro por `modulos` o mostra
+
+`testes/acesso-alcancavel.teste.js` guarda isso: toda rota aberta a um módulo precisa ter link numa
+sidebar que aquele módulo enxerga. ⚠ Conferi que ele fica VERMELHO sem a correção.

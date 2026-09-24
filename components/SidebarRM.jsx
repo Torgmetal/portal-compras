@@ -1,17 +1,30 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, PlusCircle, PackageSearch, PackageCheck } from "lucide-react";
+import { ClipboardList, PlusCircle, PackageSearch, PackageCheck, CalendarClock } from "lucide-react";
 import { useSession } from "next-auth/react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
-const menu = [
+// ⚠ EXPORTADO para `testes/acesso-alcancavel.teste.js` conferir que toda rota aberta a um
+// módulo tem link em alguma sidebar que aquele módulo enxerga. Portão aberto sem link é o mesmo
+// que acesso negado para quem está do outro lado da tela.
+export const menu = [
   { href: "/rm", label: "Minhas RMs", icon: ClipboardList, exact: true },
   { href: "/rm/nova", label: "Nova RM", icon: PlusCircle },
   { href: "/producao/consulta-estoque", label: "Estoque", icon: PackageSearch },
   // Almoxarifado lança os recebimentos de matéria-prima (CMR) — mesma tela do Compras.
   { href: "/compras/recebimento-cmr", label: "Recebimento (CMR)", icon: PackageCheck, modulos: ["ALMOXARIFADO"] },
+  // ⚠⚠⚠ E AQUI, NÃO SÓ NA SIDEBAR DO COMPRAS — foi o erro que eu cometi em 24/09/2026. Abri o
+  // portão da rota e pus o link em `components/Sidebar.jsx`, que é a sidebar renderizada DENTRO de
+  // `/compras/*`. Só que o Almoxarifado **nunca chega lá**: o card "Compras" do menu de módulos
+  // (`lib/modulos-portal.js`) exige o módulo COMPRAS, que ele não tem. O caminho dele é
+  // Requisições → esta sidebar, e o link tinha de estar aqui. Matheus: *"ainda está sem acesso,
+  // não aparece no menu de módulos dele"*.
+  //
+  // ⚠ Permissão concedida que ninguém acha é permissão que não existe. Portão aberto + link
+  // ausente parece exatamente igual a acesso negado para quem está do outro lado da tela.
+  { href: "/compras/prazos", label: "Prazos das RMs", icon: CalendarClock, modulos: ["ALMOXARIFADO"] },
 ];
 
 export default function SidebarRM() {

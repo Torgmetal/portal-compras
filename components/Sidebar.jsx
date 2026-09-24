@@ -10,7 +10,10 @@ import SidebarUserFooter from "@/components/SidebarUserFooter";
 // matchPainel: o detalhe da RM (/compras/rm/[id]) é compartilhado entre os
 // painéis — o link de origem passa ?painel=aluguel|montagem para o menu
 // manter o item certo ativo (sem o parâmetro, vale RMs Materiais).
-const menu = [
+// ⚠ EXPORTADO para `testes/acesso-alcancavel.teste.js` conferir que toda rota aberta a um
+// módulo tem link em alguma sidebar que aquele módulo enxerga. Portão aberto sem link é o mesmo
+// que acesso negado para quem está do outro lado da tela.
+export const menu = [
   // ⚠ O Almoxarifado também vê — acompanha o que foi comprado para cada obra. A tela filtra o
   // que ele enxerga lá dentro (sem verba, sem mapa de cotação, sem finalizar/excluir).
   { href: "/compras/painel-ops", label: "Painel de OPs", icon: FolderKanban, modulos: ["COMPRAS", "ALMOXARIFADO"] },
