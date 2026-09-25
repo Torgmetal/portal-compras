@@ -15,7 +15,7 @@ beforeEach(() => {
   requireRole.mockResolvedValue({ id: "gabriel", name: "Gabriel" });
   mockPrisma.oP.findUnique.mockResolvedValue({ id: "op", numero: "106" });
   mockPrisma.oP.findMany.mockResolvedValue([]);
-  mockPrisma.documentoQualidade.findMany.mockResolvedValue([{ importRef: "261234", nome: "CH 12,5", opNumero: "106" }]);
+  mockPrisma.documentoQualidade.findMany.mockResolvedValue([{ importRef: "261234", nome: "CHAPA ACO CARBONO LAMINADO A-36 ESPESSURA 12,50MM", opNumero: "106" }]);
   mockPrisma.documentoQualidade.count.mockResolvedValue(1);
   mockPrisma.pecaConjunto.findMany.mockResolvedValue([{ perfil: "CH12.5" }]);
   mockPrisma.trocaRastreabilidade.findMany.mockResolvedValue([]);
@@ -53,7 +53,7 @@ it("R inexistente não grava nem notifica", async () => {
   expect(criarNotificacao).not.toHaveBeenCalled();
 });
 it("estoque exige conferência explícita antes de seguir ao PCP", async () => {
-  mockPrisma.documentoQualidade.findMany.mockResolvedValue([{ importRef: "261234", nome: "CH 12,5", opNumero: "84" }]);
+  mockPrisma.documentoQualidade.findMany.mockResolvedValue([{ importRef: "261234", nome: "CHAPA ACO CARBONO LAMINADO A-36 ESPESSURA 12,50MM", opNumero: "84" }]);
   expect((await POST(pedido(body))).status).toBe(400);
   expect(mockPrisma.trocaRastreabilidade.upsert).not.toHaveBeenCalled();
   expect((await POST(pedido({ ...body, estoqueConferido: true })))).toHaveProperty("status", 200);

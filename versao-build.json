@@ -1,7 +1,12 @@
 {
-  "build": 3482,
-  "gerado": "2026-09-25T18:46:07.992Z",
+  "build": 3483,
+  "gerado": "2026-09-25T19:25:09.430Z",
   "commits": [
+    {
+      "hash": "79e86348",
+      "data": "25/09/2026",
+      "titulo": "Chapa de 10 mm é a de 3/8\" (9,5) e a de 12 mm é a de 1/2\" (12,5) — só chapa"
+    },
     {
       "hash": "c17f15b9",
       "data": "25/09/2026",
@@ -146,11 +151,6 @@
       "hash": "51754018",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: travamento por volume (escorar/amarrar) e cinta como fita"
-    },
-    {
-      "hash": "ec93769c",
-      "data": "24/09/2026",
-      "titulo": "Simulador de carga: carga encostada na cabeceira — sem vão para correr na frenagem"
     }
   ]
 }

@@ -34,7 +34,11 @@ checagem, então nem o R da própria obra (261547) passava.
     (corrida 2512076547), o que muda a §02 do livro em montagem. A Qualidade confere;
   - OP-078: a T78B-P498 segue SEM_MATERIAL (não há chapa de 9,5 na obra); agora a janela oferece as de
     outras OPs.
-- Achados que ficaram de fora:
-  - `buscarFardosCompativeis` e o POST de `liberacao-material` não filtram `ativo: true` (a OP-118 tem um
-    duplicado inativo do R 261401);
-  - o POST de `/api/pcp/separacao` não refaz a checagem de compatibilidade, só confere se o R existe.
+- Corrigido no mesmo dia (Vitor: "pode corrigir todos"):
+  - a janela e a gravação da liberação só consideram recebimento ATIVO (a OP-118 tinha um duplicado
+    desativado do R 261401, sobra da confusão com a PORCA);
+  - ⚠ a gravação da SEPARAÇÃO passou a conferir o material, como a da liberação. Ela só conferia se o R
+    existia. ⚠⚠ A conferência vale só para o R NOVO ou TROCADO: "encaminhar ao PCP" reenvia todas as
+    linhas, e 8 das 377 trocas registradas, decididas pelo Vitor, a regra não reconhece (xadrez para
+    CH3,00, barra quadrada, BRØM16 × 5/8", U de "perfil IND", tubo IND, Z com lábio 32, W310 × HP310).
+    A troca já registrada com o mesmo R passa.

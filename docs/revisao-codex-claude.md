@@ -2175,3 +2175,16 @@ aparece desligado. O caminho inteiro até a chamada está testado.
     de um livro em montagem;
   - (b) `buscarFardosCompativeis` e o POST de `liberacao-material` sem `ativo: true`;
   - (c) o POST da separação não confere compatibilidade.
+- **(25/09) R desativado fora da escolha, e a separação conferindo o material.** Os dois achados do item
+  anterior, corrigidos a pedido do Vitor ("pode corrigir todos").
+  - `buscarFardosCompativeis` e o POST de `liberacao-material` filtram `ativo: true`. O POST, com `findFirst`,
+    podia decidir o material pelo duplicado desativado.
+  - O POST de `/api/pcp/separacao` filtra `ativo` e confere `casarPerfilComOmie`, com a mesma mensagem da
+    liberação, **exceto** para a troca já registrada com o mesmo R: "encaminhar ao PCP" reenvia todas as
+    linhas, e 8 de 377 trocas (decisões do Vitor) a regra não reconhece.
+
+  Testes novos: `fardos-compativeis-ativo`, `liberacao-material-ativo` e `separacao-compatibilidade` (6). O
+  `recebimento-planejamento` passou a usar o nome real do CMR, porque "CH 12,5" não casa com nada.
+  **4.156 passando**, `checar` limpo, build ok.
+  ⚠ **Para revisar:** a exceção da "troca já registrada" compara perfil + R; uma troca antiga
+  incompatível segue editável só para outro R compatível.
