@@ -27,8 +27,7 @@ describe("leitura do CMR com retry", () => {
     const fetchMock = vi.fn(async (url) => {
       chamadas.push(String(url));
       const u = String(url);
-      if (u.includes("/root/search")) return resp(200, { value: [{ id: "it1", name: "CMR TORG-2026.xlsx" }] });
-      if (u.includes("/items/it1?")) return resp(200, { id: "it1", name: "CMR TORG-2026.xlsx" });
+      if (u.includes(":/children")) return resp(200, { value: [{ id: "it1", name: "CMR TORG-2026.xlsx", file: {}, lastModifiedDateTime: "2026-09-20" }] });
       if (u.includes("/worksheets?")) return resp(200, { value: [{ name: "2026" }] });
       if (u.includes("usedRange")) {
         // primeira tentativa cai com 504, a segunda vai
@@ -48,8 +47,7 @@ describe("leitura do CMR com retry", () => {
     const fetchMock = vi.fn(async (url) => {
       chamadas.push(String(url));
       const u = String(url);
-      if (u.includes("/root/search")) return resp(200, { value: [{ id: "it1", name: "CMR TORG-2026.xlsx" }] });
-      if (u.includes("/items/it1?")) return resp(200, { id: "it1" });
+      if (u.includes(":/children")) return resp(200, { value: [{ id: "it1", name: "CMR TORG-2026.xlsx", file: {}, lastModifiedDateTime: "2026-09-20" }] });
       if (u.includes("/worksheets?")) return resp(200, { value: [{ name: "2026" }] });
       if (u.includes("usedRange")) return resp(403);
       return resp(404);
@@ -61,8 +59,7 @@ describe("leitura do CMR com retry", () => {
   it("desiste depois das tentativas e propaga o 504", async () => {
     const fetchMock = vi.fn(async (url) => {
       const u = String(url);
-      if (u.includes("/root/search")) return resp(200, { value: [{ id: "it1", name: "CMR TORG-2026.xlsx" }] });
-      if (u.includes("/items/it1?")) return resp(200, { id: "it1" });
+      if (u.includes(":/children")) return resp(200, { value: [{ id: "it1", name: "CMR TORG-2026.xlsx", file: {}, lastModifiedDateTime: "2026-09-20" }] });
       if (u.includes("/worksheets?")) return resp(200, { value: [{ name: "2026" }] });
       if (u.includes("usedRange")) return resp(504);
       return resp(404);

@@ -217,8 +217,8 @@ apagada era a do lançamento manual, sem. Soft delete com `invalidadoMotivo` e `
 cmr-sincronizar, cmr-reconciliar e lqc-sharepoint. No mesmo drive e token, listar pasta por caminho
 seguiu OK (casar-certificados). A busca é índice do SharePoint: quando adoece, nada do nosso lado
 conserta. `lib/cmr-localizar.js` lista `/Almoxarifado/01. Rastreabilidade` (env
-`SHAREPOINT_CMR_FOLDER_PATH`) até 2 níveis, paginado, e **qualquer pasta que falhe derruba a
+`SHAREPOINT_CMR_FOLDER_PATH`) — a árvore INTEIRA, paginada, teto de 600 pastas que estoura como erro —, e **qualquer pasta que falhe derruba a
 listagem** (achado do Codex: `listAllFilesRecursive` engole erro e escolheria cópia velha — e o
-CMR escreve nesse arquivo). A busca virou reserva, e o erro dela traz code/mensagem/request-id.
+CMR escreve nesse arquivo). Falha de listagem PROPAGA; a busca só entra com a árvore listada inteira e sem a planilha, e metadado que falha nela é erro (achados do Codex, rodada 1). O erro traz code/mensagem/request-id.
 ⚠ LQC (`lib/lqc-sharepoint.js`) continua dependendo da busca — espalhada pela árvore de orçamentos.
 ⚠ As credenciais Azure NÃO estão no `.env.local`: não dá para chamar o Graph daqui.

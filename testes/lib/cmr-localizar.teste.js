@@ -93,13 +93,48 @@ describe("localizarCmr", () => {
     expect(r).toMatchObject({ id: "i1", origem: "busca", modificadoEm: "2026-09-20", caminho: "/drive/root:/Outra Pasta" });
   });
 
-  it("⚠ as duas falhando: o erro diz o motivo do Graph dos dois lados", async () => {
+  it("⚠⚠ subpasta em erro + busca com cópia antiga acessível → NENHUM arquivo selecionado", async () => {
     const get = falso([
-      [`root:${RAIZ}:/children`, json({ error: { code: "accessDenied", message: "sem acesso" } }, 403)],
-      ["/search(", json({ error: { code: "generalException", message: "An unexpected error occurred" } }, 500, { "request-id": "abc-123" })],
+      [`root:${RAIZ}/CMR:/children`, json({ error: { code: "generalException", message: "falhou" } }, 500, { "request-id": "abc-123" })],
+      [`root:${RAIZ}:/children`, json({ value: [pasta("CMR")] })],
+      ["/search(", json({ value: [{ id: "velha", name: "CMR TORG-2026.xlsx" }] })],
+      ["/items/velha", json({ id: "velha", name: "CMR TORG-2026.xlsx", lastModifiedDateTime: "2026-01-01", parentReference: { path: "/x/Rastreabilidade" } })],
     ]);
-    await expect(localizarCmr({ ano: 2026, driveId: "d", get })).rejects.toThrow(
-      /SharePoint busca HTTP 500 · generalException · An unexpected error occurred · request-id abc-123 \(e a pasta: .*HTTP 403 · accessDenied/);
+    await expect(localizarCmr({ ano: 2026, driveId: "d", get })).rejects.toThrow(/HTTP 500 · generalException · falhou · request-id abc-123/);
+    expect(get.mock.calls.some(([u]) => u.includes("/search("))).toBe(false);
+  });
+
+  it("⚠⚠ cópia antiga na raiz e a atual no 3º nível → a atual", async () => {
+    const get = falso([
+      [`root:${RAIZ}/A/B/C:/children`, json({ value: [arq("CMR TORG-2026-Almoxarifado01.xlsx", "2026-09-20", { id: "atual" })] })],
+      [`root:${RAIZ}/A/B:/children`, json({ value: [pasta("C")] })],
+      [`root:${RAIZ}/A:/children`, json({ value: [pasta("B")] })],
+      [`root:${RAIZ}:/children`, json({ value: [arq("CMR TORG-2026.xlsx", "2026-03-01", { id: "velha" }), pasta("A")] })],
+    ]);
+    expect((await localizarCmr({ ano: 2026, driveId: "d", get })).id).toBe("atual");
+  });
+
+  it("⚠ teto de pastas estourado é erro, não escolha pelo que deu para ver", async () => {
+    const get = falso([[`:/children`, json({ value: [pasta("x"), arq("CMR TORG-2026.xlsx", "2026-01-01")] })]]);
+    await expect(listarPlanilhas(get, "d", "/r", 5)).rejects.toThrow(/mais de 5 pastas/);
+  });
+
+  it("⚠ na busca, metadado que falha é erro — a que faltou pode ser a atual", async () => {
+    const get = falso([
+      [`root:${RAIZ}:/children`, json({ value: [] })],
+      ["/search(", json({ value: [{ id: "i1", name: "CMR TORG-2026.xlsx" }, { id: "i2", name: "CMR TORG-2026-B.xlsx" }] })],
+      ["/items/i1", json({ id: "i1", name: "CMR TORG-2026.xlsx", lastModifiedDateTime: "2026-01-01" })],
+      ["/items/i2", json({ error: { code: "accessDenied", message: "sem acesso" } }, 403)],
+    ]);
+    await expect(localizarCmr({ ano: 2026, driveId: "d", get })).rejects.toThrow(/item "CMR TORG-2026-B.xlsx": HTTP 403 · accessDenied/);
+  });
+
+  it("a busca em 500 (com a pasta listada inteira e vazia) diz o motivo do Graph", async () => {
+    const get = falso([
+      [`root:${RAIZ}:/children`, json({ value: [] })],
+      ["/search(", json({ error: { code: "generalException", message: "An unexpected error occurred" } }, 500, { "request-id": "r-1" })],
+    ]);
+    await expect(localizarCmr({ ano: 2026, driveId: "d", get })).rejects.toThrow(/SharePoint busca HTTP 500 · generalException · An unexpected error occurred · request-id r-1/);
   });
 
   it("a pasta pode ser trocada por env", async () => {
