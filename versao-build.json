@@ -1,7 +1,12 @@
 {
-  "build": 3467,
-  "gerado": "2026-09-25T10:57:19.298Z",
+  "build": 3468,
+  "gerado": "2026-09-25T12:04:51.155Z",
   "commits": [
+    {
+      "hash": "7d79b377",
+      "data": "25/09/2026",
+      "titulo": "Memória: saldo dos duplicados em TODOS os locais do Omie"
+    },
     {
       "hash": "b37d3d85",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5c56fc98",
       "data": "23/09/2026",
       "titulo": "Prazos: a data de entrega faltava no seletor, e ela não é uma etapa"
-    },
-    {
-      "hash": "390aa8b9",
-      "data": "23/09/2026",
-      "titulo": "Assistente Fiscal: a IA orquestra, a ferramenta é que determina"
     }
   ]
 }

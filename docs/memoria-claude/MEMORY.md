@@ -32,6 +32,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 ### Segurança & libs
 - [Segurança — decisões e pendências](torg_seguranca_pendencias.md) — limitador POR CONTA (nunca por IP); `audit fix --force` PROIBIDO (quebra exceljs); não regenerar token de fornecedor
 - [Backups](torg_backup_banco.md) — banco: dump semanal no SharePoint (Workspace/Backup - Portal); código: GitHub; docs: Blob + SharePoint
+- [Neon: só 6 h de histórico, sem snapshot](torg_neon_historico.md) — apagou há mais de 6 h, só o backup semanal (domingo); caso RIP-112-001 (25/09); acesso ao console via Vercel "Open in Neon"
 - [Libs compartilhadas](torg_libs_compartilhadas.md) — data-br, html (escapeHtml), blob-url (anti-SSRF), token (gerarTokenForte), **numero-br** (`numeroBR`), `fmtOP` única; usar em código novo
 - [Fuso: servidor roda em UTC](torg_fuso_servidor.md) — `toLocaleString("pt-BR")` não define fuso; usar `dataHoraBR()`/`dataBR()` no que o SERVIDOR escreve (não em `@db.Date`)
 - [Upload trava em 4,5MB](torg_upload_4mb.md) — rota serverless trava ~4,5MB; "não anexa" costuma ser TAMANHO; fix = client-token (`*/upload-token` + `@vercel/blob/client`)
