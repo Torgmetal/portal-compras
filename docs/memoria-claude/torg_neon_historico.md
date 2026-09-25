@@ -21,6 +21,11 @@ que ele criou na seção 14 do data book, e a auditoria guarda só código e tip
 não havia de onde: 6 h de histórico, sem snapshot, backup de 20/09, ramos anteriores. Sorte: as duas
 gravações dela tinham **0 medições** (`MEDIR_RELATORIO_CAMPO` → `"medidas":0`) — perdeu-se só a lista de
 peças.
+**Recriado em 25/09/2026 09:13** a pedido do Vitor ("precisava voltar para o 001 e trazer essas peças
+informadas"): mesmo número, mesmo id e data de criação originais, pelas mesmas funções da rota de criação
+(`valoresIniciaisInspecao`, `resultadosComPecas`, `vincularNoDataBook`) — voltou à seção 14 do data book.
+Auditoria `RESTAURAR_RELATORIO_INSPECAO` (usuário Vitor). Os 4 equipamentos não foram registrados na
+exclusão: a inspetora escolhe de novo ao medir.
 
 **Como se chega ao console:** Vercel (logado) → Storage → neon-cyclamen-candle → "Open in Neon" (SSO
 `/api/marketplace/sso?...`; no navegador do app o link tenta nova aba e é bloqueado — navegar direto no
