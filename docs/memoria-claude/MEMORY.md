@@ -136,7 +136,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Portal de Engenharia](torg_portal_engenharia.md) — /engenharia sobre PecaConjunto (Tekla/LPC); Vitor quer o PORTAL antes dos indicadores; roadmap Importar Tekla→Revisões→Reconciliação→Indicadores
 - [Materiais OMIE → Tekla](torg_materiais_tekla.md) — pasta SERVIDOR/Engenharia/Workspace/Materiais OMIE - Tekla; planilha só perfis+parafusos; arquivo NOVO quando código entra, SAI (inativado) ou muda de descrição (cron 6h30/12h30)
 - [Duplicados do cadastro Omie](torg_omie_duplicados.md) — API do Omie NÃO inativa (só a tela); "em uso" = também ENTRADA DE NOTA (CMR) e pedido aberto no Omie; 4 seguros, 9 em uso; cache ProdutoOmie velho
-- [Equivalência de material (perfil)](torg_equivalencia_material.md) — Tekla diz CH12, a lista diz CH12,5; `\S\X` do IFC = Ø; nunca casar perfil por string crua
+- [Equivalência de material (perfil)](torg_equivalencia_material.md) — Tekla diz CH12, a lista diz CH12,5; `\S\X` do IFC = Ø; nunca casar perfil por string crua; chapa 10 = 9,5 e 12 = 12,5 (`MESMA_CHAPA`, só chapa, Vitor 25/09)
 - [Dado histórico não fecha 100%](torg_dado_historico_incompleto.md) — obra antiga: medir, dizer o tamanho e PARAR; corrigir a regra que erra de novo, não o passado
 - [⚠ Produção é LPC — sempre escolher a lista](torg_producao_e_lpc.md) — `SO_FABRICACAO` em toda consulta de fabricação; registro da LE mente sobre prontidão
 - [LPC: chave numérica duplica marcas](torg_lpc_chave_duplicada.md) — arquivo com várias fases entra sob o número da obra e duplica; import avisa e o Planejamento exclui a linha errada

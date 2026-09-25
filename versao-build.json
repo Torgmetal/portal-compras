@@ -1,7 +1,12 @@
 {
-  "build": 3481,
-  "gerado": "2026-09-25T18:40:04.633Z",
+  "build": 3482,
+  "gerado": "2026-09-25T18:46:07.992Z",
   "commits": [
+    {
+      "hash": "c17f15b9",
+      "data": "25/09/2026",
+      "titulo": "Relatório de ultrassom: todo o cabeçalho editável, no computador e no celular"
+    },
     {
       "hash": "3d84e169",
       "data": "25/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ec93769c",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: carga encostada na cabeceira — sem vão para correr na frenagem"
-    },
-    {
-      "hash": "17977e85",
-      "data": "24/09/2026",
-      "titulo": "Assistente fiscal: XML de NF-e no chat — e o código da nota não é recomendação"
     }
   ]
 }

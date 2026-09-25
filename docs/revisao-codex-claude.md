@@ -2158,3 +2158,20 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (b) o celular passa a carregar e devolver `procedimento`, `norma`, `criterio` e `tag` em todos os tipos
     de relatório (sem mudar o valor, se ninguém mexer);
   - (c) datalist no iOS aparece como sugestão acima do teclado, não como lista suspensa.
+- **(25/09) Chapa 10 = 9,5 e 12 = 12,5 (decisão do Vitor), só para chapa.** OP-118 (Gabriel): a janela
+  "Selecionar R" da CH10.00X120 dava "0 de 0 compatíveis". A regra era 3% ou o par de `MESMA_BITOLA`, onde
+  só havia 4,75 = 5,00; a busca filtra só o que veio, e o POST refaz a checagem. Investigação feita por
+  subagente em modo só leitura.
+  - `MESMA_CHAPA` [9.50, 10.00] e [12.00, 12.50] é lida só no ramo CHAPA de `pontua`.
+  - Não entrou em `MESMA_BITOLA`: `perto()` serve todos os perfis.
+  - Teste `chapa-mesma-bitola` (6): os dois sentidos, a chapa sem "ESPESSURA", o par nomeado (10 ≠ 9,0 e
+    ≠ 10,5), a barra chata que continua diferente e o 4,75 = 5,00 mantido.
+  - A janela passa a oferecer 78 recebimentos para a CH10 (incluindo o R 261547 da própria OP) e 69 para a
+    CH12 (incluindo o R 261548).
+
+  **4.148 passando**, `checar` limpo, build ok.
+  ⚠ **Para revisar:**
+  - (a) OP-067 T67BT340 ganhou R automático (única chapa de 9,5 da obra na data do corte), o que muda a §02
+    de um livro em montagem;
+  - (b) `buscarFardosCompativeis` e o POST de `liberacao-material` sem `ativo: true`;
+  - (c) o POST da separação não confere compatibilidade.
