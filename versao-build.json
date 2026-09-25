@@ -1,7 +1,12 @@
 {
-  "build": 3471,
-  "gerado": "2026-09-25T13:17:38.788Z",
+  "build": 3472,
+  "gerado": "2026-09-25T13:54:04.853Z",
   "commits": [
+    {
+      "hash": "ec19ab43",
+      "data": "25/09/2026",
+      "titulo": "Importação da LPC em lote: a T118B estourava os 300 s (HTTP 504)"
+    },
     {
       "hash": "d3ec58b9",
       "data": "25/09/2026",
@@ -146,11 +151,6 @@
       "hash": "07a529f0",
       "data": "24/09/2026",
       "titulo": "Backups: o dump do banco longe do teto, e cópia do que só existia no Blob"
-    },
-    {
-      "hash": "74fa9db4",
-      "data": "24/09/2026",
-      "titulo": "Memória: o estado dos backups medido em 24/09 — tempo do dump perto do teto, anexos do data book e fotos sem cópia"
     }
   ]
 }

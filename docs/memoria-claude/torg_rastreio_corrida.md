@@ -118,3 +118,18 @@ entrada da Torg. Pedido, data e OP continuam como aviso; certificado e corrida c
 As outras NF obrigatórias (botão Receber do pedido; "já foi entregue" no link do fornecedor) ele NÃO
 pediu para tirar.
 
+
+**25/09/2026 — "importamos os certificados faltantes, mas ainda falta puxar" (Geraldo, OP-102).**
+O CMR ficou SEM sincronizar de 23/09 a 25/09 (busca do Graph em 500; Matheus trocou a localização da
+planilha pela pasta — `lib/cmr-localizar.js`). A rodada de 25/09 10:40 trouxe as 23 linhas com material
+(11 da OP-102, R 261646–261656) e o casar-certificados das 10:50 ligou os 11 PDFs.
+- ⚠ O PDF do certificado da planilha fica em `sharepointUrl`/`sharepointItemId`; `arquivoUrl` é de upload
+  pelo portal. Conferir só `arquivoUrl` diz "sem PDF" para certificado que está ligado.
+- ⚠ "Fora do portal" não é "faltando": R reservado sem descrição (casca) não vira registro, de propósito.
+  Em 25/09 eram 172 cascas e 0 linhas com material pendentes.
+- ⚠ A rodada que importou foi cortada no teto de 60 s DEPOIS de gravar — o `CronHeartbeat` seguiu dizendo
+  "falha" com o trabalho feito. Conferir o banco antes de concluir que não rodou.
+- OP-102 ficou com 266 de 277 posições com R. As 10 peças sem R (W150×18 ×5, W150×22,5 ×2, W200×35,9 ×3)
+  foram cortadas em 12/08 e o material da obra (pedido 1721) entrou no CMR em 13/08: pela regra, veio de
+  estoque. Saída: informar o R usado (troca) OU corrigir a data de recebimento no CMR se o material chegou
+  mesmo em 12/08. Decisão do Almoxarifado/Qualidade.
