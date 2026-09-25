@@ -1,7 +1,12 @@
 {
-  "build": 3473,
-  "gerado": "2026-09-25T14:25:08.030Z",
+  "build": 3474,
+  "gerado": "2026-09-25T14:25:08.293Z",
   "commits": [
+    {
+      "hash": "0c43bbcd6e",
+      "data": "25/09/2026",
+      "titulo": "CMR: localizador percorre a árvore inteira e não cai na busca quando a listagem falha"
+    },
     {
       "hash": "022bdf37e3",
       "data": "25/09/2026",
@@ -146,11 +151,6 @@
       "hash": "12562caa27",
       "data": "24/09/2026",
       "titulo": "Memória: recuperar backup local numa pasta separada, nunca com switch na pasta principal"
-    },
-    {
-      "hash": "1424d1553e",
-      "data": "24/09/2026",
-      "titulo": "Memória: o código que só existia no Mac foi para refs/backup no GitHub — por que não branch, e como recuperar"
     }
   ]
 }
