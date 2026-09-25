@@ -1,9 +1,99 @@
 {
-  "build": 3470,
-  "gerado": "2026-09-25T10:46:23.356Z",
+  "build": 3488,
+  "gerado": "2026-09-25T21:24:19.751Z",
   "commits": [
     {
-      "hash": "4b035e5b",
+      "hash": "a9a14d76",
+      "data": "25/09/2026",
+      "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
+    },
+    {
+      "hash": "7a2d9ecd",
+      "data": "25/09/2026",
+      "titulo": "R desativado fora da escolha; a separação passa a conferir o material"
+    },
+    {
+      "hash": "79e86348",
+      "data": "25/09/2026",
+      "titulo": "Chapa de 10 mm é a de 3/8\" (9,5) e a de 12 mm é a de 1/2\" (12,5) — só chapa"
+    },
+    {
+      "hash": "c17f15b9",
+      "data": "25/09/2026",
+      "titulo": "Relatório de ultrassom: todo o cabeçalho editável, no computador e no celular"
+    },
+    {
+      "hash": "3d84e169",
+      "data": "25/09/2026",
+      "titulo": "Data book: só relatório de inspeção assinado por todos entra"
+    },
+    {
+      "hash": "bb849b93",
+      "data": "25/09/2026",
+      "titulo": "Relatório de ultrassom: a peça ensaiada aparece na tabela"
+    },
+    {
+      "hash": "9acba6c0",
+      "data": "25/09/2026",
+      "titulo": "RNC: anexar mensagem de e-mail (.eml e .msg do Outlook)"
+    },
+    {
+      "hash": "c79184ab",
+      "data": "25/09/2026",
+      "titulo": "Memória: primeira rodada real do vínculo automático de certificados (76 em 7 livros)"
+    },
+    {
+      "hash": "5cdeb4e1",
+      "data": "25/09/2026",
+      "titulo": "Data book: certificado que chega depois entra sozinho na seção já montada"
+    },
+    {
+      "hash": "696eb72d",
+      "data": "25/09/2026",
+      "titulo": "Memória: data book da OP-102 fechado — 10 peças por troca SEM_R e 11 certificados na §04"
+    },
+    {
+      "hash": "9f3f4d3b",
+      "data": "25/09/2026",
+      "titulo": "RM: sobrar só item cotado é \"pronta pra pedido\", não \"aberta\"; a OP só recalcula RM que teve pedido"
+    },
+    {
+      "hash": "0c43bbcd",
+      "data": "25/09/2026",
+      "titulo": "CMR: localizador percorre a árvore inteira e não cai na busca quando a listagem falha"
+    },
+    {
+      "hash": "022bdf37",
+      "data": "25/09/2026",
+      "titulo": "Memória: CMR parado de 23 a 25/09, certificados da OP-102 e as 10 peças cortadas antes do material"
+    },
+    {
+      "hash": "ec19ab43",
+      "data": "25/09/2026",
+      "titulo": "Importação da LPC em lote: a T118B estourava os 300 s (HTTP 504)"
+    },
+    {
+      "hash": "d3ec58b9",
+      "data": "25/09/2026",
+      "titulo": "Memória: RIP-112-001 recriado com número, id e data originais"
+    },
+    {
+      "hash": "1e60d6d0",
+      "data": "25/09/2026",
+      "titulo": "CMR: a planilha é achada pela pasta da rastreabilidade — a busca do Graph está em 500"
+    },
+    {
+      "hash": "6ee5dca4",
+      "data": "25/09/2026",
+      "titulo": "Memória: o Neon guarda só 6 h de histórico e não tem snapshot"
+    },
+    {
+      "hash": "7d79b377",
+      "data": "25/09/2026",
+      "titulo": "Memória: saldo dos duplicados em TODOS os locais do Omie"
+    },
+    {
+      "hash": "6140d6cb",
       "data": "25/09/2026",
       "titulo": "Memória e revisão: posição de estoque por local no Omie"
     },
@@ -61,96 +151,6 @@
       "hash": "b39e3ab1",
       "data": "24/09/2026",
       "titulo": "Rastreio: corte no dia do recebimento conta; corte provado pela etapa seguinte"
-    },
-    {
-      "hash": "08fc4cde",
-      "data": "24/09/2026",
-      "titulo": "Prazos das RMs: data futura é previsão — e \"recebido\" futuro não é chegada"
-    },
-    {
-      "hash": "842c3700",
-      "data": "24/09/2026",
-      "titulo": "Relatórios de inspeção: data book puxava a cópia sem assinatura; carimbo de convite desviado"
-    },
-    {
-      "hash": "c6ca7a1f",
-      "data": "24/09/2026",
-      "titulo": "Prazos das RMs: a observação do comprador aparecia só na RM, não aqui"
-    },
-    {
-      "hash": "8c92271d",
-      "data": "24/09/2026",
-      "titulo": "Simulador de carga: a cabeceira tem altura (Resolução CONTRAN 945/2022, art. 8º)"
-    },
-    {
-      "hash": "51754018",
-      "data": "24/09/2026",
-      "titulo": "Simulador de carga: travamento por volume (escorar/amarrar) e cinta como fita"
-    },
-    {
-      "hash": "ec93769c",
-      "data": "24/09/2026",
-      "titulo": "Simulador de carga: carga encostada na cabeceira — sem vão para correr na frenagem"
-    },
-    {
-      "hash": "17977e85",
-      "data": "24/09/2026",
-      "titulo": "Assistente fiscal: XML de NF-e no chat — e o código da nota não é recomendação"
-    },
-    {
-      "hash": "b79fbe23",
-      "data": "24/09/2026",
-      "titulo": "Assistente fiscal: o prazo do modelo conta desde a entrada da rota"
-    },
-    {
-      "hash": "6f71adcd",
-      "data": "24/09/2026",
-      "titulo": "Assistente fiscal: quatro achados do Codex — dinheiro, idempotência, versão e prazo"
-    },
-    {
-      "hash": "81ecb9ee",
-      "data": "24/09/2026",
-      "titulo": "Simulador de carga: pacotes de até 1,14 m com madeira entre as camadas; aço sempre sobre caibro"
-    },
-    {
-      "hash": "0271778a",
-      "data": "24/09/2026",
-      "titulo": "Prazos das RMs: o link estava na sidebar que o almoxarifado nunca abre"
-    },
-    {
-      "hash": "e883f93b",
-      "data": "24/09/2026",
-      "titulo": "Simulador de carga: empilha pelo aço real — caibro sobre aço, calço até 15 cm"
-    },
-    {
-      "hash": "70bc11fd",
-      "data": "24/09/2026",
-      "titulo": "Prazos das RMs: o almoxarifado vê a lista — a caneta continua no Compras"
-    },
-    {
-      "hash": "12562caa",
-      "data": "24/09/2026",
-      "titulo": "Memória: recuperar backup local numa pasta separada, nunca com switch na pasta principal"
-    },
-    {
-      "hash": "1424d155",
-      "data": "24/09/2026",
-      "titulo": "Memória: o código que só existia no Mac foi para refs/backup no GitHub — por que não branch, e como recuperar"
-    },
-    {
-      "hash": "07a529f0",
-      "data": "24/09/2026",
-      "titulo": "Backups: o dump do banco longe do teto, e cópia do que só existia no Blob"
-    },
-    {
-      "hash": "74fa9db4",
-      "data": "24/09/2026",
-      "titulo": "Memória: o estado dos backups medido em 24/09 — tempo do dump perto do teto, anexos do data book e fotos sem cópia"
-    },
-    {
-      "hash": "9e3d2b82",
-      "data": "23/09/2026",
-      "titulo": "PDF do relatório: o botão grava o que está pendente antes de abrir"
     }
   ]
 }

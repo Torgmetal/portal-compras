@@ -51,3 +51,15 @@ Feedback do Vitor: a IA estava **transcrevendo** a RNC do cliente (o `descricao`
 - **Resposta ao cliente em PDF** (2b-parte-2): a IA já tem a análise; falta gerar a carta de resposta ao cliente (PDF Torg) com as evidências (treinamentos/melhorias) + envio. Vitor ainda não repriorizou isso.
 - **Erros de Projeto como %**: quando a liberação de GRDs entrar, usar como denominador.
 - Fase 3 dos indicadores: CSAT, IQF de fornecedores, Plano de Calibração.
+
+### Anexo de e-mail (.eml/.msg) — 25/09/2026
+Vitor: *"nos relatórios de não conformidade, preciso que dê permissão para anexar EMS, EML mensagens"*.
+Entendido "EMS" como o **.msg do Outlook**. O seletor de anexos da RNC (interna e de cliente) aceita
+`.eml` e `.msg`; o card mostra ícone de e-mail e o PDF da RNC lista a mensagem pelo nome, em ANEXOS.
+Regras em `lib/anexo-email.js`.
+- ⚠⚠ **O tipo sai da EXTENSÃO, não do navegador.** O `.msg` chega com tipo vazio no Mac, e o upload
+  vai direto ao Blob, que só aceita os tipos do token. O e-mail sobe com `contentType` explícito
+  (`message/rfc822` / `application/vnd.ms-outlook`); os demais arquivos sobem como sempre.
+- ⚠ **Só nos anexos da RNC.** `/api/qualidade/documentos/upload-token` serve 8 telas da Qualidade;
+  o e-mail só é liberado quando o caminho começa com `qualidade/rnc/anexos/`.
+- A IA de extração continua lendo só PDF/imagem; o e-mail é evidência, não fonte de preenchimento.

@@ -16,6 +16,12 @@ beforeEach(() => {
   mockPrisma.dataBookSecao.findFirst.mockResolvedValue({ id: "s14", titulo: "Tratamento de superfície e pintura", estado: "ANEXADO" });
   mockPrisma.documentoQualidade.update.mockResolvedValue({});
   mockPrisma.dataBookSecaoDoc.createMany.mockResolvedValue({ count: 0 });
+  // desde 25/09 o vínculo confere as assinaturas e as rodadas encerradas antes de pôr no livro —
+  // ver testes/lib/databook-relatorio-assinado.teste.js
+  mockPrisma.documentoQualidade.findMany.mockResolvedValue([]);
+  mockPrisma.assinaturaDocumento.findMany.mockResolvedValue([]);
+  mockPrisma.dataBookSecaoDoc.deleteMany.mockResolvedValue({ count: 0 });
+  mockPrisma.dataBookSecaoDoc.count.mockResolvedValue(1);
 });
 
 it("atualizar só o nome mantém o arquivo que já está vinculado", async () => {

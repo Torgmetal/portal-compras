@@ -51,10 +51,20 @@ describe("as condições do ensaio no portal de campo", () => {
   });
 
   it("não carrega o que nenhuma tela do campo edita — voltaria na gravação, cortado em 120", () => {
-    const cond = condicoesDoRelatorio({ desenho: "T1, T2, T3", desenhoCliente: "SE-001", procedimento: "PO-15" });
-    expect(cond).not.toHaveProperty("desenho");
+    const cond = condicoesDoRelatorio({ desenhoCliente: "SE-001", revisaoCliente: "R2" });
     expect(cond).not.toHaveProperty("desenhoCliente");
-    expect(cond).not.toHaveProperty("procedimento");
+    expect(cond).not.toHaveProperty("revisaoCliente");
+  });
+
+  // ⚠ Desde 25/09/2026 o ultrassom edita TODO o cabeçalho no celular — desenho e procedimento
+  // inclusive (Vitor: "todos os campos precisamos deixar para ser possível ajustar"). O desenho
+  // aceita até 500 caracteres nas duas rotas, então a lista não volta cortada.
+  it("o ultrassom recarrega todo o cabeçalho ao reabrir", async () => {
+    const { CAMPOS_CABECALHO_US } = await import("@/lib/us-campos");
+    const gravado = Object.fromEntries(CAMPOS_CABECALHO_US.map((c) => [c.k, `v-${c.k}`]));
+    const cond = condicoesDoRelatorio(gravado);
+    const perdidos = CAMPOS_CABECALHO_US.map((c) => c.k).filter((k) => cond[k] !== `v-${k}`);
+    expect(perdidos).toEqual([]);
   });
 
   it("o especificado do PLP vai à parte, para conferência", () => {

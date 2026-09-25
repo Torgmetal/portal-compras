@@ -4,13 +4,14 @@ import CampoData from "@/components/CampoData";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown, Plus, Upload, X, FileText, Sparkles } from "lucide-react";
+import { ArrowLeft, Loader2, Trash2, CheckCircle2, AlertCircle, ListChecks, FileDown, Plus, Upload, X, FileText, Sparkles, Mail } from "lucide-react";
 import { numRNC, TIPOS_RNC, ORIGEM_NC, NECESSITA_ACAO, STATUS_RNC, statusRncLabel } from "@/lib/nao-conformidade";
 import { SETORES_AUDITORIA } from "@/lib/auditoria-interna";
 import { SETORES_RETRABALHO } from "@/lib/retrabalho";
 import SeletorPecasLE from "./SeletorPecasLE";
 import Apontamentos from "./Apontamentos";
 import { apontamentosDaRnc, procedenciaDaRnc, contagemProcedencia } from "@/lib/rnc-apontamentos";
+import { ACEITA_EMAIL, comTipoDeEmail, tipoDoArquivo, ehEmail } from "@/lib/anexo-email";
 
 const dISO = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 
@@ -97,8 +98,10 @@ export default function RncDetalheClient({ id }) {
       const novos = [];
       for (const file of files) {
         const safe = (file.name || "anexo").replace(/[^\w.-]+/g, "-");
-        const blob = await upload(`qualidade/rnc/anexos/${Date.now()}-${safe}`, file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
-        novos.push({ url: blob.url, nome: file.name || "anexo", tipo: file.type || "" });
+        // e-mail (.eml/.msg) vai com o tipo explícito: o navegador nem sempre sabe — ver lib/anexo-email.js
+        const opcoes = comTipoDeEmail(file, { access: "public", handleUploadUrl: "/api/qualidade/documentos/upload-token" });
+        const blob = await upload(`qualidade/rnc/anexos/${Date.now()}-${safe}`, file, opcoes);
+        novos.push({ url: blob.url, nome: file.name || "anexo", tipo: tipoDoArquivo(file) });
       }
       const anexos = [...(d.anexos || []), ...novos];
       setD((p) => ({ ...p, anexos }));
@@ -180,7 +183,7 @@ export default function RncDetalheClient({ id }) {
   const nProc = contagemProcedencia(apts);
   const improcedente = procedencia === "IMPROCEDENTE";
   const mostrarAnalise = !improcedente;                   // tratamento, causa raiz, plano, acompanhamento
-  const aceita = cliente ? ".pdf,image/png,image/jpeg,image/webp" : "image/png,image/jpeg,image/webp,.pdf,.doc,.docx,.xls,.xlsx";
+  const aceita = `${cliente ? ".pdf,image/png,image/jpeg,image/webp" : "image/png,image/jpeg,image/webp,.pdf,.doc,.docx,.xls,.xlsx"},${ACEITA_EMAIL}`;
   const anexoIA = cliente ? ((d.anexos || []).find((x) => x.tipo === "application/pdf") || (d.anexos || []).find((x) => String(x.tipo || "").startsWith("image/"))) : null;
 
   return (
@@ -289,7 +292,7 @@ export default function RncDetalheClient({ id }) {
           <input type="file" accept={aceita} multiple disabled={subindo} className="hidden" onChange={(e) => { anexar(e.target.files); e.target.value = ""; }} />
         </label>
       }>
-        <p className="text-[12px] text-torg-gray -mt-1">{cliente ? "Anexe o PDF e as imagens que o cliente enviou — a IA já preenche cliente, nº da RNC, data, descrição e as causas apontadas." : "Anexe imagens e documentos (PDF, Word, Excel) para compor o relatório."}</p>
+        <p className="text-[12px] text-torg-gray -mt-1">{cliente ? "Anexe o PDF e as imagens que o cliente enviou — a IA já preenche cliente, nº da RNC, data, descrição e as causas apontadas. O e-mail do cliente (.eml, .msg) também pode ser anexado." : "Anexe imagens, documentos (PDF, Word, Excel) e e-mails (.eml, .msg) para compor o relatório."}</p>
         {anexoIA && (
           <button onClick={() => extrairDoAnexo(anexoIA)} disabled={extraindo || subindo} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-torg-blue-50 text-torg-blue text-[12px] font-medium hover:bg-torg-blue-100 disabled:opacity-50">
             {extraindo ? <><Loader2 size={13} className="animate-spin" /> lendo o documento…</> : <><Sparkles size={13} /> Preencher com IA a partir do anexo</>}
@@ -438,6 +441,7 @@ export default function RncDetalheClient({ id }) {
 
 function AnexoCard({ a, onRemover }) {
   const img = String(a.tipo || "").startsWith("image/");
+  const Icone = ehEmail(a) ? Mail : FileText;
   return (
     <div className="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
       <a href={a.url} target="_blank" rel="noopener noreferrer" className="block" title={a.nome}>
@@ -445,7 +449,7 @@ function AnexoCard({ a, onRemover }) {
           <img src={a.url} alt={a.nome} className="w-full h-24 object-cover" />
         ) : (
           <div className="h-24 flex flex-col items-center justify-center gap-1 text-torg-gray p-2">
-            <FileText size={22} /><span className="text-[10px] text-center leading-tight line-clamp-2 break-all">{a.nome}</span>
+            <Icone size={22} /><span className="text-[10px] text-center leading-tight line-clamp-2 break-all">{a.nome}</span>
           </div>
         )}
       </a>

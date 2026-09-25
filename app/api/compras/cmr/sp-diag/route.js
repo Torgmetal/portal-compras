@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { getAccessToken } from "@/lib/sharepoint";
+import { localizarCmr } from "@/lib/cmr-localizar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,20 +26,15 @@ export async function GET(req) {
     const token = await getAccessToken();
     const H = { Authorization: `Bearer ${token}` };
 
-    // 1) achar o arquivo CMR do ano (mesma lógica do baixarCmrAtual)
-    const s = await fetch(`${GRAPH}/drives/${driveId}/root/search(q='${encodeURIComponent(`CMR TORG-${ano}`)}')?$select=id,name&$top=20`, { headers: H });
-    const achados = ((await s.json()).value || []).filter((x) => /\.xlsx?$/i.test(x.name) && x.name.toUpperCase().includes(`CMR TORG-${ano}`));
-    out.etapas.arquivosEncontrados = achados.map((a) => a.name);
-    const det = [];
-    for (const a of achados) {
-      const r = await fetch(`${GRAPH}/drives/${driveId}/items/${a.id}?$select=id,name,size,lastModifiedDateTime,parentReference,webUrl`, { headers: H });
-      if (r.ok) det.push(await r.json());
-    }
-    const naPasta = det.filter((d) => /rastreabilidade/i.test(decodeURIComponent(d.parentReference?.path || "")));
-    const lista = (naPasta.length ? naPasta : det).sort((a, b) => new Date(b.lastModifiedDateTime) - new Date(a.lastModifiedDateTime));
-    const alvo = lista[0];
-    if (!alvo) { out.etapas.erro = "Nenhum arquivo CMR do ano encontrado."; return NextResponse.json(out); }
-    out.arquivo = { nome: alvo.name, sizeMB: +(alvo.size / 1048576).toFixed(2), modificadoEm: alvo.lastModifiedDateTime, pasta: decodeURIComponent(alvo.parentReference?.path || "").split("root:")[1] || null, webUrl: alvo.webUrl };
+    // 1) achar o arquivo CMR do ano (o MESMO localizador do baixarCmrAtual — pasta primeiro)
+    let alvo;
+    try {
+      alvo = await localizarCmr({ ano, driveId, get: (url) => fetch(url, { headers: H }) });
+    } catch (e) { out.etapas.erro = e.message; return NextResponse.json(out); }
+    out.etapas.origem = alvo.origem;
+    const r = await fetch(`${GRAPH}/drives/${driveId}/items/${alvo.id}?$select=id,name,size,lastModifiedDateTime,parentReference,webUrl`, { headers: H });
+    const meta = r.ok ? await r.json() : {};
+    out.arquivo = { nome: alvo.name, sizeMB: meta.size ? +(meta.size / 1048576).toFixed(2) : null, modificadoEm: alvo.modificadoEm, pasta: alvo.caminho, webUrl: meta.webUrl || null };
     const itemId = alvo.id;
 
     // 2) a API de Excel do Graph abre esse workbook? (aqui bate o limite de tamanho)

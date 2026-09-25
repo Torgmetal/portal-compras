@@ -111,8 +111,10 @@ export async function POST(req) {
 
   // ⚠ o R informado pode ser de OUTRA obra — é exatamente o caso do material de estoque. Não se
   // valida contra o CMR da OP, senão a resposta correta seria recusada.
+  // ⚠ ATIVO: o duplicado desativado de um R (OP-118, R 261401 — era também uma PORCA) não decide
+  // o material; sem o filtro o `findFirst` podia pegá-lo e recusar o R certo.
   const existe = await prisma.documentoQualidade.findFirst({
-    where: { categoria: "MATERIAL", importRef: d.rUsado.trim() },
+    where: { categoria: "MATERIAL", ativo: true, importRef: d.rUsado.trim() },
     select: { id: true, importRef: true, nome: true, opNumero: true, pesoKg: true, numeroCorrida: true },
   });
   if (!existe) return NextResponse.json({ error: `O R ${d.rUsado} não existe no CMR.` }, { status: 400 });

@@ -29,18 +29,28 @@ describe("a identidade do cabeçote", () => {
   });
 });
 
+// ⚠ Desde 25/09/2026 fabricante e modelo do cabeçote são CAMPOS PRÓPRIOS, os dois ajustáveis (Vitor:
+// "todos os campos precisamos deixar para ser possível ajustar"). A marca não é mais descoberta pelo
+// rótulo — que era exatamente o que trocava Doppler por Mitech —, é escolhida ou digitada.
 it("escolher o Doppler no celular grava Doppler, não Mitech", () => {
   let cond = {};
   const setCond = (fn) => { cond = typeof fn === "function" ? fn(cond) : fn; };
-  render(<FormularioUSCampo rel={{ marcas: ["T113A1"], resultados: {} }} cond={cond} setCond={setCond} />);
+  const { rerender } = render(<FormularioUSCampo rel={{ marcas: ["T113A1"], resultados: {} }} cond={cond} setCond={setCond} />);
 
-  const select = screen.getByLabelText(/Modelo, ângulo e frequência/);
-  const doppler = [...select.querySelectorAll("optgroup")].find((g) => g.label === "Doppler");
-  const opcao = [...doppler.querySelectorAll("option")].find((o) => o.textContent === "angular 20x22 · 45 · 2 MHz");
-  fireEvent.change(select, { target: { value: opcao.value } });
+  fireEvent.change(screen.getByLabelText(/^Cabeçote — fabricante/), { target: { value: "Doppler" } });
+  rerender(<FormularioUSCampo rel={{ marcas: ["T113A1"], resultados: {} }} cond={cond} setCond={setCond} />);
+  fireEvent.change(screen.getByLabelText(/^Cabeçote — modelo/), { target: { value: "angular 20x22 · 45 · 2 MHz" } });
 
   expect(cond.cbFabricante).toBe("Doppler");
   expect(cond.cbModelo).toBe("angular 20x22 · 45 · 2 MHz");
+});
+
+it("a lista de modelos oferece cada rótulo uma vez — a marca é outro campo", () => {
+  render(<FormularioUSCampo rel={{ marcas: ["T113A1"], resultados: {} }} cond={{}} setCond={() => {}} />);
+  const lista = document.getElementById(screen.getByLabelText(/^Cabeçote — modelo/).getAttribute("list"));
+  const valores = [...lista.querySelectorAll("option")].map((o) => o.value);
+  expect(new Set(valores).size).toBe(valores.length);
+  expect(valores).toContain("angular 20x22 · 45 · 2 MHz");
 });
 
 it("o PATCH do Campo grava o fabricante do cabeçote — ele estava fora da lista fechada", async () => {

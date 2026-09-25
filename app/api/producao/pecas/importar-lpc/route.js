@@ -8,12 +8,13 @@ import { parseLPC } from "@/lib/parse-lpc";
 import { chaveParaOParser, chaveAjustadaPeloBanco, ehSoNumero } from "@/lib/lpc-chave";
 import { classificarMaquina } from "@/lib/maquina-corte";
 import { chaveDaPeca } from "@/lib/liberacao-pecas";
+import { gravarPecasLpc, gravarRelacoesLpc, emParalelo, PARALELO } from "@/lib/lpc-gravar";
 import { log } from "@/lib/log";
 
 const registro = log("api/producao/pecas/importar-lpc");
 
 export const runtime = "nodejs";
-export const maxDuration = 300; // LPC grande faz upsert peça a peça; 60s estourava (timeout → HTML → "token JSON")
+export const maxDuration = 300; // a gravação é em lote (lib/lpc-gravar.js); peça a peça, a T118B estourava até os 300 s
 
 export async function POST(req) {
   let user;
@@ -210,206 +211,14 @@ export async function POST(req) {
     });
   }
 
-  const pieceIds = new Map(); // marca -> id
-  let criados = 0;
-  let atualizados = 0;
-  let ignorados = 0;
-
-  // --- Upsert conjuntos ---
-  for (const c of parsed.conjuntos) {
-    try {
-      const existing = await prisma.pecaConjunto.findUnique({
-        where: { opNumero_marca: { opNumero, marca: c.marca } },
-      });
-      if (existing) {
-        await prisma.pecaConjunto.update({
-          where: { id: existing.id },
-          data: {
-            descricao: c.descricao,
-            qte: c.qte,
-            pesoUnitKg: c.pesoUnitKg,
-            pesoTotalKg: c.pesoTotalKg,
-            tipoPeca: "CONJUNTO",
-            areaPinturaM2: c.areaPinturaM2,
-            observacao: c.observacao ?? undefined, // undefined = não mexe (preserva no update; null no create)
-            naLPC: true, fonte: "LPC_IMPORT", // ⚠ pertencimento — ver o bloco naLE/naLPC no schema
-          },
-        });
-        pieceIds.set(c.marca, existing.id);
-        atualizados++;
-      } else {
-        const created = await prisma.pecaConjunto.create({
-          data: {
-            opId: op?.id || null,
-            opNumero,
-            marca: c.marca,
-            descricao: c.descricao,
-            qte: c.qte,
-            pesoUnitKg: c.pesoUnitKg,
-            pesoTotalKg: c.pesoTotalKg,
-            tipoPeca: "CONJUNTO",
-            areaPinturaM2: c.areaPinturaM2,
-            observacao: c.observacao ?? undefined, // undefined = não mexe (preserva no update; null no create)
-            status: "PENDENTE",
-            fonte: "LPC_IMPORT",
-            naLPC: true,
-          },
-        });
-        pieceIds.set(c.marca, created.id);
-        criados++;
-      }
-    } catch {
-      ignorados++;
-    }
-  }
-
-  // --- Upsert croquis (ja deduplicados pelo parser) ---
-  for (const cr of parsed.croquis) {
-    try {
-      const maq = classificarMaquina(cr.descricao, cr.pesoUnitKg, cr.comprimentoMm);
-      const existing = await prisma.pecaConjunto.findUnique({
-        where: { opNumero_marca: { opNumero, marca: cr.marca } },
-      });
-      if (existing) {
-        await prisma.pecaConjunto.update({
-          where: { id: existing.id },
-          data: {
-            descricao: cr.descricao,
-            material: cr.material,
-            perfil: cr.perfil,
-            qte: cr.qte,
-            comprimentoMm: cr.comprimentoMm,
-            pesoUnitKg: cr.pesoUnitKg,
-            pesoTotalKg: cr.pesoTotalKg,
-            tipoPeca: "CROQUI",
-            areaPinturaM2: cr.areaPinturaM2,
-            observacao: cr.observacao ?? undefined,
-            statusPrep: existing.statusPrep || "PENDENTE",
-            maquina: maq || existing.maquina,
-            naLPC: true, fonte: "LPC_IMPORT",
-          },
-        });
-        pieceIds.set(cr.marca, existing.id);
-        atualizados++;
-      } else {
-        const created = await prisma.pecaConjunto.create({
-          data: {
-            opId: op?.id || null,
-            opNumero,
-            marca: cr.marca,
-            descricao: cr.descricao,
-            material: cr.material,
-            perfil: cr.perfil,
-            qte: cr.qte,
-            comprimentoMm: cr.comprimentoMm,
-            pesoUnitKg: cr.pesoUnitKg,
-            pesoTotalKg: cr.pesoTotalKg,
-            tipoPeca: "CROQUI",
-            areaPinturaM2: cr.areaPinturaM2,
-            observacao: cr.observacao ?? undefined,
-            statusPrep: "PENDENTE",
-            status: "PENDENTE",
-            fonte: "LPC_IMPORT",
-            naLPC: true,
-            maquina: maq,
-          },
-        });
-        pieceIds.set(cr.marca, created.id);
-        criados++;
-      }
-    } catch {
-      ignorados++;
-    }
-  }
-
-  // --- Upsert avulsas ---
-  for (const a of parsed.avulsas) {
-    try {
-      const maq = classificarMaquina(a.descricao, a.pesoUnitKg, a.comprimentoMm);
-      const existing = await prisma.pecaConjunto.findUnique({
-        where: { opNumero_marca: { opNumero, marca: a.marca } },
-      });
-      if (existing) {
-        await prisma.pecaConjunto.update({
-          where: { id: existing.id },
-          data: {
-            descricao: a.descricao,
-            material: a.material,
-            perfil: a.perfil,
-            qte: a.qte,
-            comprimentoMm: a.comprimentoMm,
-            pesoUnitKg: a.pesoUnitKg,
-            pesoTotalKg: a.pesoTotalKg,
-            areaPinturaM2: a.areaPinturaM2,
-            observacao: a.observacao ?? undefined,
-            maquina: maq || existing.maquina,
-            // ⚠ A LINHA PASSA A PERTENCER À LPC. Sem isto, a marca que a LE criou primeiro
-            // continuava carimbada LE e sumia da lista de produção — o caso da OP-113.
-            // O `fonte` acompanha porque, para o fluxo de fábrica, a LPC é a lista que manda:
-            // peça que está na LPC é peça que se fabrica, tenha vindo por onde tiver vindo.
-            naLPC: true,
-            fonte: "LPC_IMPORT",
-          },
-        });
-        pieceIds.set(a.marca, existing.id);
-        atualizados++;
-      } else {
-        const created = await prisma.pecaConjunto.create({
-          data: {
-            opId: op?.id || null,
-            opNumero,
-            marca: a.marca,
-            descricao: a.descricao,
-            material: a.material,
-            perfil: a.perfil,
-            qte: a.qte,
-            comprimentoMm: a.comprimentoMm,
-            pesoUnitKg: a.pesoUnitKg,
-            pesoTotalKg: a.pesoTotalKg,
-            areaPinturaM2: a.areaPinturaM2,
-            observacao: a.observacao ?? undefined,
-            status: "PENDENTE",
-            fonte: "LPC_IMPORT",
-            naLPC: true,
-            maquina: maq,
-          },
-        });
-        pieceIds.set(a.marca, created.id);
-        criados++;
-      }
-    } catch {
-      ignorados++;
-    }
-  }
-
-  // --- Criar relacoes ConjuntoCroqui ---
-  // Limpar juncoes existentes dos conjuntos importados
-  const conjuntoIds = parsed.conjuntos.map((c) => pieceIds.get(c.marca)).filter(Boolean);
-  if (conjuntoIds.length > 0) {
-    await prisma.conjuntoCroqui.deleteMany({
-      where: { conjuntoId: { in: conjuntoIds } },
-    });
-  }
-
-  let relacoesCriadas = 0;
-  for (const rel of parsed.relacoes) {
-    const conjuntoId = pieceIds.get(rel.conjuntoMarca);
-    const croquiId = pieceIds.get(rel.croquiMarca);
-    if (conjuntoId && croquiId) {
-      try {
-        await prisma.conjuntoCroqui.create({
-          data: {
-            conjuntoId,
-            croquiId,
-            qtdNoConjunto: rel.qtdNoConjunto,
-          },
-        });
-        relacoesCriadas++;
-      } catch {
-        // unique constraint — nao deveria acontecer apos deleteMany
-      }
-    }
-  }
+  // ⚠⚠ EM LOTE. Peça a peça — uma busca e uma gravação cada, ~120 ms por ida e volta até o banco em
+  // São Paulo — a LPC da T118B (1.240 peças) esgotou os 300 s antes das ligações (25/09/2026). Os
+  // campos gravados são os mesmos de antes; ver lib/lpc-gravar.js.
+  const { pieceIds, criados, atualizados, ignorados } = await gravarPecasLpc(prisma, {
+    opId: op?.id || null, opNumero, parsed,
+    maquinaDe: (x) => classificarMaquina(x.descricao, x.pesoUnitKg, x.comprimentoMm),
+  });
+  const relacoesCriadas = await gravarRelacoesLpc(prisma, { parsed, pieceIds });
 
   // ⚠⚠ A PROGRAMAÇÃO SEGUE A MARCA, NÃO O ID. Traduz cada liberação viva desta OP: id apagado →
   // marca → id recriado. A marca que saiu da lista de verdade (não veio no arquivo novo) não tem
@@ -428,12 +237,12 @@ export async function POST(req) {
      branco. O que a lista nova traz (peso, perfil, qte) não está nesta lista e continua intacto. */
   let restauradas = 0;
   if (sobrescrever && producaoAntes.size) {
-    for (const [marca, dados] of producaoAntes) {
+    await emParalelo([...producaoAntes], PARALELO, async ([marca, dados]) => {
       const id = pieceIds.get(marca);
-      if (!id) continue;                       // marca saiu da lista: nada a restaurar
+      if (!id) return;                         // marca saiu da lista: nada a restaurar
       try { await prisma.pecaConjunto.update({ where: { id }, data: dados }); restauradas++; }
       catch (e) { registro.erro("[importar-lpc] restaurar produção falhou:", marca, e?.message); }
-    }
+    });
   }
 
   const novasMarcas = [...pieceIds.keys()].filter((m) => !marcasAntes.has(m));

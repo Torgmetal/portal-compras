@@ -13,8 +13,10 @@ vi.mock("next-auth/react", () => ({ useSession: () => sessao }));
 const { AcompanhamentoPedido } = await import("@/app/compras/rm/[id]/_componentes/AcompanhamentoPedido");
 
 const PEDIDO = {
+  // ⚠ Prazo num ano que nunca é "hoje": com 25/09/2026 aqui, o teste que exige "não é hoje" quebrou
+  // exatamente em 25/09/2026.
   id: "p1", fornecedorNome: "A2 METAIS", numeroPedido: "2069", createdAt: "2026-09-01T00:00:00.000Z",
-  prazoEntregaPrevisto: "2026-09-25T00:00:00.000Z", prazoOriginal: null,
+  prazoEntregaPrevisto: "2099-03-17T00:00:00.000Z", prazoOriginal: null,
   prazoHistorico: [], acompanhamentos: [], cotacao: null,
   prazoProposto: null, prazoPropostoEm: null, prazoPropostoId: null,
 };
@@ -67,7 +69,7 @@ describe("a opção Data de entrega no lançamento do pedido", () => {
     const [url, opcoes] = global.fetch.mock.calls[0];
     expect(url).toBe("/api/compras/entregas/prazo");
     expect(opcoes.method).toBe("PATCH");
-    expect(JSON.parse(opcoes.body)).toMatchObject({ pedidoId: "p1", novoPrazo: "2026-09-25" });
+    expect(JSON.parse(opcoes.body)).toMatchObject({ pedidoId: "p1", novoPrazo: "2099-03-17" });
   });
 
   it("uma etapa comum continua indo para a rota de acompanhamento", async () => {
@@ -86,7 +88,7 @@ describe("a opção Data de entrega no lançamento do pedido", () => {
     fireEvent.click(screen.getByRole("button", { name: /Lançar/i }));
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     const enviado = JSON.parse(global.fetch.mock.calls[0][1].body).novoPrazo;
-    expect(enviado).toBe("2026-09-25");
+    expect(enviado).toBe("2099-03-17");
     expect(enviado).not.toBe(new Date().toISOString().slice(0, 10));
   });
 

@@ -7,9 +7,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { estaFechado, erroPrecisaRevisao } from "@/lib/databook-revisao";
-import { classificarMaterial, gruposDaSecao } from "@/lib/databook-secoes";
-import { enriquecerComFicha } from "@/lib/databook-ficha-r";
+import { gruposDaSecao } from "@/lib/databook-secoes";
 import { consumiveisDaOP, abrasivosDaOP } from "@/lib/consumivel-solda";
+import { certificadosDaOp, doGrupo } from "@/lib/databook-certificados-novos";
 
 export const runtime = "nodejs";
 
@@ -46,38 +46,17 @@ export async function POST(req, { params }) {
 
   // Certificados de material da OP (rastreabilidade importada do CMR), filtrados pelo
   // grupo da seção: seção 04 aço estrutural, seção 05 fixadores, seção 15 tintas. Outras seções: todos.
+  //
+  // ⚠ O AÇO QUE ENTROU POR OUTRA OBRA também vem (R declarado na Conferência de Rastreabilidade —
+  // Vitor, 05/09/2026, fechando a OP-085). A seleção mora em `certificadosDaOp` porque o cron do
+  // data book usa a MESMA para vincular sozinho o que chega depois: o automático nunca pode trazer
+  // outra coisa além do que este botão traria.
   const grupos = gruposDaSecao(secao.numero);
-  const daOp = await prisma.documentoQualidade.findMany({
-    where: { ativo: true, categoria: "MATERIAL", opNumero },
-    select: { id: true, nome: true },
-  });
 
-  // ── O AÇO QUE ENTROU POR OUTRA OBRA ─────────────────────────────────────────────────────────
-  //
-  // Vitor (05/09/2026), fechando a OP-085: "possa ser que eu comprei material em nome de outro
-  // cliente e o recebimento não fica sabendo". Quando alguém declara na Conferência de
-  // Rastreabilidade que aquele perfil veio do R tal — um R lançado sob OUTRA obra — a §02 passa a
-  // carimbar esse R na peça. Só que esta rota buscava certificado por `opNumero`, então o
-  // certificado DESSE R nunca entrava na seção: o livro citaria um R cujo certificado não está nele.
-  //
-  // Puxar o R declarado é a mesma regra já usada na §06 (arame) e na granalha da §15: o que entra é
-  // o lote que o motor de rastreio efetivamente aponta para esta obra, não o que a coluna OBRA diz.
-  const rsDeclarados = [...new Set(
-    (await prisma.trocaRastreabilidade.findMany({ where: { opNumero }, select: { rUsado: true } }))
-      .map((t) => t.rUsado).filter(Boolean)
-  )];
-  const declarados = rsDeclarados.length
-    ? await prisma.documentoQualidade.findMany({
-        where: { ativo: true, categoria: "MATERIAL", importRef: { in: rsDeclarados } },
-        select: { id: true, nome: true },
-      })
-    : [];
-  const idsDaOp = new Set(daOp.map((d) => d.id));
-  const todos = [...daOp, ...declarados.filter((d) => !idsDaOp.has(d.id))];
   // ── seção 06 NÃO SE RESOLVE POR OP ───────────────────────────────────────────────────────────────
   //
-  // O arame entra no CMR SEM OP (é estoque geral, não é comprado por obra). A busca acima, que
-  // filtra por `opNumero`, volta vazia — era por isso que a seção 06 nunca trazia nada. E puxar as 17
+  // O arame entra no CMR SEM OP (é estoque geral, não é comprado por obra). A busca por
+  // `opNumero` (`certificadosDaOp`) volta vazia — era por isso que a seção 06 nunca trazia nada. E puxar as 17
   // entradas do CMR colocaria no livro lotes que nunca encostaram nesta obra.
   //
   // Vitor (20/08/2026): "precisamos ter certeza desses certificados de acordo com o que está
@@ -100,8 +79,7 @@ export async function POST(req, { params }) {
     // ⚠ classifica pela FICHA DO CMR, não pelo nome do vínculo. Certificado anexado se chama só
     // "R 260527" — sem o material, `classificarMaterial` cai no padrão ESTRUTURAL e a tinta vai
     // parar na seção 04. Ver lib/databook-ficha-r.js.
-    const enriquecidos = await enriquecerComFicha(todos, opNumero);
-    docs = grupos.length ? enriquecidos.filter((d) => grupos.includes(classificarMaterial(d.nome))) : enriquecidos;
+    docs = doGrupo(await certificadosDaOp(prisma, opNumero), grupos);
 
     // ⚠⚠ A GRANALHA ENTRA NA §15 JUNTO DAS TINTAS (Vitor, 28/08/2026), e ela NÃO se resolve por OP:
     // como o arame, é comprada para estoque e entra no CMR sem obra. O que vale aqui é o lote

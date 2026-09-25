@@ -58,8 +58,9 @@ it("reabrir o ultrassom traz de volta processo, metal de adição, junta, chanfr
   expect(screen.getByLabelText(/Metal de adição/).value).toBe("E71T-1");
   expect(screen.getByLabelText(/Tipo de junta/).value).toBe("Topo");
   expect(screen.getByLabelText("Tipo de chanfro").value).toBe("X");
-  // o seletor só reconhece a opção com a MARCA junto — sem ela, abria em "Selecione…"
-  expect(screen.getByLabelText(/Modelo, ângulo e frequência/).value).toBe("Doppler|angular 20x22 · 45 · 2 MHz");
+  // o cabeçote volta nos DOIS campos — fabricante e modelo são próprios desde 25/09/2026
+  expect(screen.getByLabelText(/^Cabeçote — fabricante/).value).toBe("Doppler");
+  expect(screen.getByLabelText(/^Cabeçote — modelo/).value).toBe("angular 20x22 · 45 · 2 MHz");
 });
 
 it("apagar a primeira junta não escreve os dados da segunda por cima dela", async () => {
