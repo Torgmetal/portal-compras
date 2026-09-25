@@ -2093,3 +2093,19 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** (a) o upload real para o Blob com esses tipos não foi feito, porque criaria anexo
   numa RNC de produção; o primeiro e-mail anexado de verdade é a prova final; (b) a URL do Blob é
   pública (sufixo aleatório), como a dos outros anexos da RNC, e o e-mail pode ter dados de terceiros.
+- **(25/09) Relatório de ultrassom: a tabela saía vazia e a peça não aparecia (RUS-113-001).** Três causas
+  no caminho tela → PDF, reunidas em `linhasTabelaUS` (`lib/us-relatorio.js`):
+  - a tela e o Campo gravam a peça em `marca`, e o PDF lia `peca`;
+  - "Compr. reprovado" é gravado em `comprimento`, e o PDF o imprimia sob "Compr. Inspec."; a coluna agora
+    lê `inspecionado`, sem fonte, em branco;
+  - peça aprovada não tem linha pelo 15.1 do PI-QUA-003, então passa a sair numa linha própria (peça, "—",
+    ângulo do cabeçote, laudo A e "Sem indicação reprovável"). O "A" só aparece com `resultadoInspecao`
+    lançado.
+
+  A célula encolhe até 5,4 pt antes da reticência. Aviso nas duas telas. Era o único relatório de US do
+  portal e ninguém tinha assinado (Alexandre e Geraldo pendentes). O PDF real, gerado do banco, foi
+  conferido na folha. Testes `us-tabela` (7, incluindo o texto do PDF). **4.107 passando**, `checar`
+  limpo, build ok.
+  ⚠ **Para revisar:** (a) "A" para peça sem linha em relatório REPROVADO: o registro só da reprovada
+  implica aceite, mas é inferência sobre o que o inspetor deixou de lançar; (b) a folga de 3% no corpo
+  da letra; (c) as linhas aprovadas vão para o fim, depois das indicações, e não agrupadas por peça.

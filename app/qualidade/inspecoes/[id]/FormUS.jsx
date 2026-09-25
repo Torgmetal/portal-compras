@@ -162,7 +162,7 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
         {/* ⚠ só o reprovado entra — item 15.1 do PI-QUA-003 */}
         <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mb-2 inline-flex items-start gap-1.5">
           <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-          Registre apenas as descontinuidades <strong>reprovadas</strong> (item 15.1). Em solda crítica à fratura, também as até 6 dB abaixo do nível de rejeição.
+          Registre apenas as descontinuidades <strong>reprovadas</strong> (item 15.1). Em solda crítica à fratura, também as até 6 dB abaixo do nível de rejeição. A peça sem indicação sai no relatório numa linha própria, com laudo A.
         </p>
 
         {!linhas.length && <p className="text-[12px] text-torg-gray">Nenhuma indicação lançada.</p>}

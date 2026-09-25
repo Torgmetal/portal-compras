@@ -1,7 +1,12 @@
 {
-  "build": 3478,
-  "gerado": "2026-09-25T16:44:25.540Z",
+  "build": 3479,
+  "gerado": "2026-09-25T17:12:44.678Z",
   "commits": [
+    {
+      "hash": "9acba6c0",
+      "data": "25/09/2026",
+      "titulo": "RNC: anexar mensagem de e-mail (.eml e .msg do Outlook)"
+    },
     {
       "hash": "c79184ab",
       "data": "25/09/2026",
@@ -146,11 +151,6 @@
       "hash": "6f71adcd",
       "data": "24/09/2026",
       "titulo": "Assistente fiscal: quatro achados do Codex — dinheiro, idempotência, versão e prazo"
-    },
-    {
-      "hash": "81ecb9ee",
-      "data": "24/09/2026",
-      "titulo": "Simulador de carga: pacotes de até 1,14 m com madeira entre as camadas; aço sempre sobre caibro"
     }
   ]
 }
