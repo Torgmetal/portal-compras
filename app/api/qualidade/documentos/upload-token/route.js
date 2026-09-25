@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { handleUpload } from "@vercel/blob/client";
 import { requireRole } from "@/lib/session";
+import { TIPOS_EMAIL, aceitaEmailNoCaminho } from "@/lib/anexo-email";
 
 export const runtime = "nodejs";
 
@@ -30,10 +31,11 @@ export async function POST(req) {
     const json = await handleUpload({
       request: req,
       body,
-      onBeforeGenerateToken: async () => {
+      onBeforeGenerateToken: async (pathname) => {
         await requireRole(["ADMIN", "QUALIDADE"]);
         return {
-          allowedContentTypes: TIPOS_PERMITIDOS,
+          // e-mail (.eml/.msg) só nos anexos da RNC — ver lib/anexo-email.js
+          allowedContentTypes: aceitaEmailNoCaminho(pathname) ? [...TIPOS_PERMITIDOS, ...TIPOS_EMAIL] : TIPOS_PERMITIDOS,
           addRandomSuffix: true,
           maximumSizeInBytes: 50 * 1024 * 1024,
           tokenPayload: null,

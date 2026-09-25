@@ -2080,3 +2080,16 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   simulação = 0. Cobertura "R citado na §02 está no livro": 10 de 12 livros completos. OP-105 e OP-107
   têm §04 PENDENTE, por desenho. A OP-112 tem 3 R da própria OP criados antes da montagem e alterados
   em 22/09, o que confirma o limite (b) acima com dado real; ficam para o botão.
+- **(25/09) RNC aceita mensagem de e-mail como anexo (.eml e .msg).** Pedido do Vitor ("anexar EMS, EML
+  mensagens"; "EMS" lido como .msg do Outlook). `lib/anexo-email.js` (tipo pela extensão, `ehEmail`,
+  `comTipoDeEmail`, `aceitaEmailNoCaminho`); o seletor da RNC ganha `.eml,.msg` nos dois tipos; o e-mail
+  sobe com `contentType` explícito, e o resto sobe exatamente como antes (há teste). O token de
+  `/api/qualidade/documentos/upload-token` só libera `message/rfc822` e `application/vnd.ms-outlook`
+  quando o caminho é `qualidade/rnc/anexos/` (as outras 7 telas seguem iguais, também com teste). O card
+  usa o ícone de e-mail. Testes: `anexo-email` (8), `upload-token-email` (2), `rnc-anexo-email` (4, a tela
+  renderizada em jsdom: o seletor, o `.msg` com tipo vazio subindo como Outlook, o PDF sem tipo
+  forçado e o ícone). **4.100 passando**, `checar` limpo, build ok. `anexar` caiu de complexidade 16
+  para 15.
+  ⚠ **Para revisar:** (a) o upload real para o Blob com esses tipos não foi feito, porque criaria anexo
+  numa RNC de produção; o primeiro e-mail anexado de verdade é a prova final; (b) a URL do Blob é
+  pública (sufixo aleatório), como a dos outros anexos da RNC, e o e-mail pode ter dados de terceiros.

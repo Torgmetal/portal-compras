@@ -1,7 +1,12 @@
 {
-  "build": 3477,
-  "gerado": "2026-09-25T16:17:30.129Z",
+  "build": 3478,
+  "gerado": "2026-09-25T16:44:25.540Z",
   "commits": [
+    {
+      "hash": "c79184ab",
+      "data": "25/09/2026",
+      "titulo": "Memória: primeira rodada real do vínculo automático de certificados (76 em 7 livros)"
+    },
     {
       "hash": "5cdeb4e1",
       "data": "25/09/2026",
@@ -146,11 +151,6 @@
       "hash": "81ecb9ee",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: pacotes de até 1,14 m com madeira entre as camadas; aço sempre sobre caibro"
-    },
-    {
-      "hash": "0271778a",
-      "data": "24/09/2026",
-      "titulo": "Prazos das RMs: o link estava na sidebar que o almoxarifado nunca abre"
     }
   ]
 }
