@@ -1,7 +1,12 @@
 {
-  "build": 3467,
-  "gerado": "2026-09-25T10:43:58.800Z",
+  "build": 3468,
+  "gerado": "2026-09-25T10:44:08.726Z",
   "commits": [
+    {
+      "hash": "06ff92a5",
+      "data": "25/09/2026",
+      "titulo": "Estoque: saldo de todos os locais do Omie, e a falha da sincronização aparece"
+    },
     {
       "hash": "b37d3d85",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5c56fc98",
       "data": "23/09/2026",
       "titulo": "Prazos: a data de entrega faltava no seletor, e ela não é uma etapa"
-    },
-    {
-      "hash": "390aa8b9",
-      "data": "23/09/2026",
-      "titulo": "Assistente Fiscal: a IA orquestra, a ferramenta é que determina"
     }
   ]
 }

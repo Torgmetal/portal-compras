@@ -11,7 +11,37 @@ const fmtQtd = (v, unidade = "") =>
 const fmtDataHora = (d) =>
   d ? new Date(d).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
 
-export default function EstoqueClient({ itensIniciais, configInicial }) {
+// ⚠ Os locais do Omie se chamam "ESTOQUE ALMOXARIFADO", "ESTOQUE FABRICA", "ESTOQUE TERCEIRO": a
+// primeira palavra, sozinha, dava três botões "ESTOQUE".
+const rotuloLocal = (nome) => String(nome || "").replace(/^ESTOQUE\s+/i, "").split(" ")[0];
+
+/** "Soma de ESTOQUE ALMOXARIFADO + ESTOQUE FABRICA" — ou nada, antes de a sincronização gravar os locais. */
+function tituloQtd(locaisOmie) {
+  const daQtd = locaisOmie.filter((l) => l.naQtd);
+  return daQtd.length > 0 ? `Soma de ${daQtd.map((l) => l.nome).join(" + ")}` : undefined;
+}
+
+/** O saldo de um local na linha do produto. Negativo em vermelho; fora da Qtd, tracejado e avisado. */
+function ChipLocal({ local, qtd, unidade, onFiltrar }) {
+  const fora = local.naQtd === false;
+  const cor = fora
+    ? "border border-dashed border-gray-300 text-gray-500 hover:bg-gray-100"
+    : qtd < 0
+      ? "bg-red-50 text-red-600 hover:bg-red-600 hover:text-white"
+      : "bg-torg-blue-50 text-torg-blue hover:bg-torg-blue hover:text-white";
+  return (
+    <button
+      onClick={onFiltrar}
+      title={`${local.nome}: ${fmtQtd(qtd, unidade)}${fora ? " — fora da Qtd" : ""}`}
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-colors ${cor}`}
+    >
+      <Warehouse size={9} />
+      {rotuloLocal(local.nome)} {fmtQtd(qtd)}
+    </button>
+  );
+}
+
+export default function EstoqueClient({ itensIniciais, configInicial, agendaCron }) {
   const router = useRouter();
   const [itens, setItens] = useState(itensIniciais || []);
   const [config, setConfig] = useState(configInicial);
@@ -37,6 +67,8 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
 
   // Locais de estoque disponíveis (da config, populados após sync)
   const locaisOmie = useMemo(() => Array.isArray(config?.locaisOmie) ? config.locaisOmie : [], [config]);
+  // Quais somam a Qtd (`naQtd`, decidido em lib/omie-estoque-posicao.js); os outros só no detalhe.
+  const tituloDaQtd = tituloQtd(locaisOmie);
 
   // Famílias únicas presentes nos itens
   const familias = useMemo(() => {
@@ -394,8 +426,11 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                     Família
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
-                    {filtroLocal ? locaisOmie.find(l => String(l.cod) === filtroLocal)?.nome?.split(" ")[0] || "Qtd" : "Qtd total"}
+                  <th
+                    className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                    title={filtroLocal ? undefined : tituloDaQtd}
+                  >
+                    {filtroLocal ? rotuloLocal(locaisOmie.find(l => String(l.cod) === filtroLocal)?.nome) || "Qtd" : "Qtd"}
                   </th>
                   {locaisOmie.length > 0 && !filtroLocal && (
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
@@ -419,7 +454,10 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
                   const semEstoque = !(qtd > 0);
                   const valorLinha = (Number(i.cmc) || 0) * (Number(i.qtdAtual) || 0);
                   const locQtd = i.locaisQtd || {};
-                  const locaisComQtd = locaisOmie.filter(l => (locQtd[String(l.cod)] || 0) > 0);
+                  // ⚠⚠ DIFERENTE DE ZERO, não "maior que zero": o negativo é o que explica a Qtd (a chapa
+                  // 3,00 mm tem −6.480 no Almoxarifado e +8.159 na Fábrica — Qtd 1.679). Escondido, a
+                  // conta da linha não fecha com o que se vê.
+                  const locaisComQtd = locaisOmie.filter(l => Number(locQtd[String(l.cod)] || 0) !== 0);
                   return (
                     <tr key={i.id} className={`hover:bg-gray-50 transition-colors ${semEstoque ? "opacity-60" : ""}`}>
                       {/* Código */}
@@ -456,15 +494,13 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1">
                             {locaisComQtd.map(l => (
-                              <button
+                              <ChipLocal
                                 key={l.cod}
-                                onClick={() => setFiltroLocal(String(l.cod))}
-                                title={`${l.nome}: ${fmtQtd(locQtd[String(l.cod)], i.unidade)}`}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-torg-blue-50 text-torg-blue hover:bg-torg-blue hover:text-white transition-colors"
-                              >
-                                <Warehouse size={9} />
-                                {l.nome.split(" ")[0]}
-                              </button>
+                                local={l}
+                                qtd={Number(locQtd[String(l.cod)])}
+                                unidade={i.unidade}
+                                onFiltrar={() => setFiltroLocal(String(l.cod))}
+                              />
                             ))}
                           </div>
                         </td>
@@ -490,15 +526,32 @@ export default function EstoqueClient({ itensIniciais, configInicial }) {
         </div>
       )}
 
-      {/* Rodapé */}
-      <div className="text-xs text-torg-gray flex items-center gap-4 flex-wrap">
-        <span>Última sync produtos: <strong>{fmtDataHora(config?.ultimaSincProd)}</strong></span>
-        <span>Última sync movimentações: <strong>{fmtDataHora(config?.ultimaSincMov)}</strong></span>
-        {locaisOmie.length > 0 && (
-          <span className="text-torg-blue">{locaisOmie.length} locais: {locaisOmie.map(l => l.nome).join(", ")}</span>
-        )}
-        <span className="text-[10px] text-gray-400">Cron automático: diariamente às 06:00 (produtos) e 06:30 (movimentações)</span>
-      </div>
+      <RodapeCatalogo config={config} locaisOmie={locaisOmie} agendaCron={agendaCron} />
+    </div>
+  );
+}
+
+// ── Rodapé ─────────────────────────────────────────────────────────────────────
+function RodapeCatalogo({ config, locaisOmie, agendaCron }) {
+  const daQtd = locaisOmie.filter((l) => l.naQtd);
+  const foraDaQtd = locaisOmie.filter((l) => l.naQtd === false);
+  return (
+    <div className="text-xs text-torg-gray flex items-center gap-4 flex-wrap">
+      <span>Última sync produtos: <strong>{fmtDataHora(config?.ultimaSincProd)}</strong></span>
+      <span>Última sync movimentações: <strong>{fmtDataHora(config?.ultimaSincMov)}</strong></span>
+      {daQtd.length > 0 && (
+        <span className="text-torg-blue">
+          Qtd = {daQtd.map(l => l.nome).join(" + ")}
+          {foraDaQtd.length > 0 && ` · só no detalhe: ${foraDaQtd.map(l => l.nome).join(", ")}`}
+        </span>
+      )}
+      {/* ⚠ A agenda vem do vercel.json (lib/cron-agenda.js). O texto fixo que havia aqui dizia
+          "diariamente às 06:00" com o cron rodando de hora em hora, das 3h às 17h de Brasília. */}
+      {agendaCron?.produtos && (
+        <span className="text-[10px] text-gray-400">
+          Cron automático: produtos {agendaCron.produtos}{agendaCron.movimentacoes ? `; movimentações ${agendaCron.movimentacoes}` : ""}
+        </span>
+      )}
     </div>
   );
 }
