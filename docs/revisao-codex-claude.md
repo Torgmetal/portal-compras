@@ -2042,3 +2042,18 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** (a) ordem das atualizações deixou de ser sequencial (não havia dependência entre
   peças distintas); (b) `createManyAndReturn` (Prisma ≥ 5.14) no lugar de `create`; (c) mudar a região
   das funções para gru1 fica como decisão do Vitor.
+- **(25/09) Data book da OP-102: as 10 peças sem R e os 11 certificados fora da §04 — só dados, sem código.**
+  Geraldo: "importamos os certificados faltantes, mas ainda falta puxar". Eram duas coisas. (1) 10 peças
+  cortadas em 12/08, um dia antes da entrega do pedido 1721 (13/08), ficaram ESTOQUE. Vitor decidiu usar os
+  certificados da própria OP: `TrocaRastreabilidade` `SEM_R` para W150X18 → 261147, W150X22.5 → 261148 e
+  W200X35.9 → 261153, em nome do Vitor e com o motivo, e `AuditLog` `TROCAR_RASTREABILIDADE`. É a mesma
+  gravação de `POST /api/pcp/separacao` (tela "Peça sem certificado"). Simulado antes de gravar.
+  (2) A §04 tinha 35 vinculados. O "puxar" das 09h46–09h51 rodou 5× com 0 novos porque os 11 R
+  (261646–261656) ainda não existiam no portal, com o CMR parado. Vinculados com a mesma lógica de
+  `popular-material`: 11 novos, 46 no total, as 8 tintas seguem na §15. Conferido: `rastreioDaOp` deu
+  235/235 peças definidas, 10 por troca. `montarSecaoLpc` deu 277/277 posições com R, 0 sem certificado,
+  e os 38 R citados na §02 estão todos na §04. Todas as seções não-NA estão ANEXADO, 0 vencidos. O livro
+  segue EM_MONTAGEM (não emiti nada).
+  ⚠ **Para revisar:** (a) W150×22,5: 304 kg de peças sobre um R de 270 kg; (b) a §04 é retrato do clique,
+  e certificado que chega depois não entra sozinho no livro em montagem, o que é candidato a automação;
+  (c) a tinta R 261393 está fora da §15 e aguarda decisão da Qualidade.

@@ -133,3 +133,19 @@ planilha pela pasta — `lib/cmr-localizar.js`). A rodada de 25/09 10:40 trouxe 
   foram cortadas em 12/08 e o material da obra (pedido 1721) entrou no CMR em 13/08: pela regra, veio de
   estoque. Saída: informar o R usado (troca) OU corrigir a data de recebimento no CMR se o material chegou
   mesmo em 12/08. Decisão do Almoxarifado/Qualidade.
+
+**Resolvido (25/09, Vitor: *"pode usar esses mesmo resolva pelo amor de Deus esse data book"*).** Troca
+`SEM_R` por perfil, com os certificados da PRÓPRIA OP (pedido 1721, NF 44914): W150X18 → R 261147,
+W150X22.5 → R 261148, W200X35.9 → R 261153. Gravada em nome do Vitor, com o motivo, e `AuditLog`
+`TROCAR_RASTREABILIDADE` — a mesma gravação da tela "Peça sem certificado". `SEM_R` só preenche a peça que
+ficou sem R; as 9 peças desses perfis que o FIFO já tinha resolvido ficaram como estavam. Resultado:
+**277/277 posições com R, 0 sem certificado.**
+- ⚠ W150×22,5: as 7 peças somam 304 kg e o R 261148 recebeu 270 kg — no papel, o R cobre 34 kg a mais do
+  que entrou. (W150×18: 130 de 216 kg; W200×35,9: 609 de 646 kg, dois R da mesma corrida.)
+- ⚠⚠ **"Puxar certificados" da §04 é um RETRATO do clique.** Em 25/09, das 09h46 às 09h51, o botão rodou
+  5× com "0 novos": os 11 certificados ainda não existiam no portal (CMR parado). Quando o CMR voltou,
+  ninguém clicou de novo, e a §02 passou a citar 11 R cujos PDFs não estavam na §04. O PDF monta a §02
+  AO VIVO (rastreio), mas a §04 só leva o que está VINCULADO. Conferir sempre: os R citados na §02 têm de
+  estar todos na §04. Vinculados os 11 (mesma gravação do botão, `POPULAR_SECAO_MATERIAL_DATABOOK`).
+- A tinta R 261393 (W-POLI HPD 451 cinza N6,5, OP 102, criada em 12/09) não está na §15: nunca foi
+  vinculada nem removida. Cabe à Qualidade dizer se ela foi usada na 102.
