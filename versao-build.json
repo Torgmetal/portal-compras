@@ -1,7 +1,12 @@
 {
-  "build": 3475,
-  "gerado": "2026-09-25T15:18:30.438Z",
+  "build": 3476,
+  "gerado": "2026-09-25T16:09:02.574Z",
   "commits": [
+    {
+      "hash": "696eb72d",
+      "data": "25/09/2026",
+      "titulo": "Memória: data book da OP-102 fechado — 10 peças por troca SEM_R e 11 certificados na §04"
+    },
     {
       "hash": "9f3f4d3b",
       "data": "25/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e883f93b",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: empilha pelo aço real — caibro sobre aço, calço até 15 cm"
-    },
-    {
-      "hash": "70bc11fd",
-      "data": "24/09/2026",
-      "titulo": "Prazos das RMs: o almoxarifado vê a lista — a caneta continua no Compras"
     }
   ]
 }

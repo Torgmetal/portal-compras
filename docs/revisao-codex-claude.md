@@ -2057,3 +2057,22 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** (a) W150×22,5: 304 kg de peças sobre um R de 270 kg; (b) a §04 é retrato do clique,
   e certificado que chega depois não entra sozinho no livro em montagem, o que é candidato a automação;
   (c) a tinta R 261393 está fora da §15 e aguarda decisão da Qualidade.
+- **(25/09) Certificado que chega depois entra sozinho no data book em montagem.** Vitor aprovou ("sim pode
+  vincular") depois do caso da OP-102. `lib/databook-certificados-novos.js` roda no começo do cron
+  `/api/cron/data-book` (sem cron novo), com a MESMA seleção do botão "Puxar certificados", que passou a
+  usar `certificadosDaOp` + `doGrupo` (teste de caracterização da rota antes da troca). As 4 travas: só
+  seção ANEXADO com documento; só o que chegou depois do último vínculo da seção (para R declarado, conta
+  a data da declaração); nunca o que foi tirado (audit `REMOVER_DOC_SECAO_DATABOOK`, por id e por R);
+  nunca R duplicado no livro. Grava em transação com `SELECT … FOR UPDATE` na linha do livro e reconfere
+  `estaFechado`. Auditoria `VINCULAR_CERTIFICADOS_AUTO_DATABOOK`. §06 e a granalha da §15 ficam fora (lote
+  vigente, previsto até a produção). No cron, `aquecerBanco` foi para dentro do `try` (mesmo defeito do
+  achado de 17/09) e falha no vínculo vai ao monitor (`ok:false`) sem segurar as gerações. Testes
+  novos: `databook-certificados-novos` (12; cada trava desligada derruba o teste dela), a
+  caracterização `databook-popular-material` (2) e `cron-data-book` (3; o aquecimento falhava antes da
+  correção). **4.086 passando**, `checar` limpo, build ok. Simulação contra produção (só leitura, 2 s):
+  76 vínculos em 7 livros, sendo 23 R declarados depois da montagem.
+  ⚠ **Para revisar:** (a) "chegou depois" usa o `createdAt` do vínculo mais recente da seção; um vínculo
+  manual entre a chegada e a rodada seguinte (até 1 h) faz o certificado ficar para o botão; (b)
+  `createdAt` do documento não muda quando o CMR corrige a OP depois, e esse caso também fica para o
+  botão; (c) R declarado com `SEM_R` entra mesmo se o FIFO não deixou peça para ele, como o botão já
+  fazia; (d) o `$queryRaw … FOR UPDATE` dentro da transação interativa, via pooler.
