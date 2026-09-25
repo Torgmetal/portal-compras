@@ -1,7 +1,12 @@
 {
-  "build": 3466,
-  "gerado": "2026-09-24T23:42:36.057Z",
+  "build": 3467,
+  "gerado": "2026-09-25T10:57:19.298Z",
   "commits": [
+    {
+      "hash": "b37d3d85",
+      "data": "24/09/2026",
+      "titulo": "Memória: o piloto no PRD00005 não deixou rastro nenhum no Omie"
+    },
     {
       "hash": "6b908b7b",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "390aa8b9",
       "data": "23/09/2026",
       "titulo": "Assistente Fiscal: a IA orquestra, a ferramenta é que determina"
-    },
-    {
-      "hash": "a1840903",
-      "data": "23/09/2026",
-      "titulo": "Fiscal: a validação das regras — e por que elas não viraram tabela"
     }
   ]
 }

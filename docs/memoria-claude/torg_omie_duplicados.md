@@ -56,15 +56,20 @@ cuidado para não inativar o que estamos usando hoje"*.
   vivo. Medido: 101000050 (chapa 12,70) 5 entradas desde maio/26, última 20/08; 101000038 (6,35) última
   19/06; 501000064 (PERFIL H W150) última 16/03; 101000037 (4.75) 15/01; 501000070 (H W200x71) 12/2025;
   201000008 (tubo 42,40 CC) 10/2025. Também olhar: pedido de compra EM ABERTO NO OMIE (`PesquisarPedCompra`
-  pendentes/parciais — o portal só conhece os pedidos que ele criou; eram 96), saldo ≠ 0
-  (`ListarPosEstoque`), data de cadastro (`info.dInc`).
+  pendentes/parciais — o portal só conhece os pedidos que ele criou; eram 96), saldo ≠ 0 EM TODOS OS
+  LOCAIS (`ListarPosEstoque` com `lista_local_estoque:"TODOS"` — ⚠⚠ sem isso vem SÓ o Almoxarifado, e o
+  aço entra na Fábrica; ver [[torg_omie_posicao_estoque]]), data de cadastro (`info.dInc`).
 - ⚠ **O cache `ProdutoOmie` é semanal e estava velho:** PRD00016, 2010000049 e 201000196 já tinham sido
   APAGADOS no Omie. Antes de agir, ler o cadastro ao vivo.
 - ⚠ 01.03.20668 (U 8") e 01.03.16796 (L 4"x5/16") foram CRIADOS em 18/09/2026 (usuário P000414907, o
   mesmo que criou o 101000050): código com cara de fornecedor, provavelmente criado na entrada de nota.
 - **Resultado:** seguros para inativar (nenhum uso em lugar nenhum, sem ambiguidade) = PRD00005, PRD00015,
-  101000036, 501000082 → passados ao Vitor para a tela. Em uso = 501000071 (pedido 1721 aberto) + os 6 do
-  recebimento + os 2 de 18/09. Ambíguos (tubo sem "com costura"/com DIN 2440) = 201000050, 201000098.
+  101000036, 501000082 → passados ao Vitor para a tela (reconferidos 25/09 em TODOS os locais: sem saldo).
+  Em uso = 501000071 (pedido 1721 aberto) + os 6 do recebimento + os 2 de 18/09 + ⚠ 201000050: dado como
+  "sem uso, ambíguo" em 24/09 pela leitura só do Almoxarifado, tem saldo na Fábrica (197,68) e no Terceiro
+  (886). Ambíguo e sem saldo em nenhum local = só 201000098 (tubo DIN 2440).
+  ⚠ A planilha de 24/09 ("Duplicados cadastro Omie") tem a coluna de saldo e o passo 3 do resumo errados
+  pelo mesmo motivo (só Almoxarifado). Os "31 negativos" também eram isso, não problema de estoque.
   Para o tradutor, os duplicados em uso se resolvem por REGRA de equivalência (ex.: 1/2" → 101000007, o
   código em que Compras compra), não por inativação.
 - **Portal:** a busca da RM (`/api/omie/buscar-produto`) devolvia o produto INATIVO quando se digitava o
