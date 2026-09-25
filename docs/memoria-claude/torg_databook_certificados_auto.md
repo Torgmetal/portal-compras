@@ -33,13 +33,21 @@ certificados da OP e os R de outra obra declarados na Conferência de Rastreabil
 antes disso o botão traz o de hoje como previsto; automático, entraria lote que a obra talvez nunca use.
 ⚠ Sem aviso no sino: `NotificacaoTipo` é enum do banco, e valor novo exige ALTER TYPE no build.
 
-**Primeira rodada (simulada em 25/09):** 76 vínculos em 7 livros:
+**Primeira rodada (simulada e depois REAL, cron das 16:15 UTC de 25/09 — bateu com a simulação):** 76 vínculos em 7 livros:
 - OP-112: +22 na §04 (12 deles R declarados em 01 e 08/09);
 - OP-084: +15;
 - OP-067: +12 (11 tintas na §15 e o tubo TB 1.1/4" declarado em 23/08);
 - OP-085: +11 (R declarados em 20/09);
 - OP-089 e OP-060: +6 e +5;
 - OP-083: +5.
+
+Conferido depois da rodada: nova simulação = 0; em 10 dos 12 livros com §02, todo R citado está no livro.
+Sobraram, de propósito:
+- OP-105 e OP-107: §04 nunca montada (17 e 16 R citados). O primeiro "Puxar" é da Qualidade.
+- ⚠ OP-112: 3 R citados fora do livro (261316, 261319, 261320). São da própria OP e têm PDF, mas foram
+  criados em 26/08, antes da montagem de 28/08, e alterados em 22/09: provavelmente só viraram
+  candidatos depois. É o limite da regra do `createdAt` — ela não distingue isso de "tirado antes de
+  15/09". Fica para o botão, que traz também os outros 16 antigos daquela §04.
 
 De quebra, o `aquecerBanco` do cron foi para dentro do `try` (mesmo achado do Codex de 17/09 em
 [[torg_crons]]): fora dele, Neon dormindo derrubava o cron sem registrar falha no monitor.

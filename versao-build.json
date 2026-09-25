@@ -1,7 +1,12 @@
 {
-  "build": 3476,
-  "gerado": "2026-09-25T16:09:02.574Z",
+  "build": 3477,
+  "gerado": "2026-09-25T16:17:30.129Z",
   "commits": [
+    {
+      "hash": "5cdeb4e1",
+      "data": "25/09/2026",
+      "titulo": "Data book: certificado que chega depois entra sozinho na seção já montada"
+    },
     {
       "hash": "696eb72d",
       "data": "25/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0271778a",
       "data": "24/09/2026",
       "titulo": "Prazos das RMs: o link estava na sidebar que o almoxarifado nunca abre"
-    },
-    {
-      "hash": "e883f93b",
-      "data": "24/09/2026",
-      "titulo": "Simulador de carga: empilha pelo aço real — caibro sobre aço, calço até 15 cm"
     }
   ]
 }

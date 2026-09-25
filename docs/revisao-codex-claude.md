@@ -2076,3 +2076,7 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   `createdAt` do documento não muda quando o CMR corrige a OP depois, e esse caso também fica para o
   botão; (c) R declarado com `SEM_R` entra mesmo se o FIFO não deixou peça para ele, como o botão já
   fazia; (d) o `$queryRaw … FOR UPDATE` dentro da transação interativa, via pooler.
+  **Rodada real (cron 16:15 UTC, 25/09):** 76 vínculos em 7 livros, iguais à simulação; heartbeat ok. Nova
+  simulação = 0. Cobertura "R citado na §02 está no livro": 10 de 12 livros completos. OP-105 e OP-107
+  têm §04 PENDENTE, por desenho. A OP-112 tem 3 R da própria OP criados antes da montagem e alterados
+  em 22/09, o que confirma o limite (b) acima com dado real; ficam para o botão.
