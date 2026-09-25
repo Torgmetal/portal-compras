@@ -35,3 +35,21 @@ mesma linha fariam a etapa dizer "prevista" ao lado de um chip que já a trata c
   `[Fornecedor]`). A feita por dentro ficava no `PrazoHistorico` e sumia da tela — a data mudava sem
   rastro nem observação. Agora `historicoDaPrevisao` (`lib/historico-previsao.js`) lista todas, uma
   por linha, com de/para, quem e observação; a do fornecedor segue em âmbar.
+
+## O "hoje" do formulário era UTC — corrigido (25/09/2026)
+
+- ⚠⚠ **O padrão da data de uma ETAPA era o dia em UTC** (`toISOString().slice(0, 10)` em
+  `AcompanhamentoPedido.jsx`), enquanto o resto do módulo usa `hojeEmSP`. Medido com o relógio fixado:
+  às **22h de Brasília** de 25/09 o campo vinha com **26/09** e a dica "Data futura" acendia no
+  formulário intocado; às 10h vinha 25/09. Entre 21h e meia-noite, "Material recebido" lançado sem
+  conferir a data gravava o dia seguinte: previsto até a meia-noite, depois chegada UM DIA DEPOIS
+  (`atrasoDias` +1 — "chegou no prazo" virava "1 dia de atraso").
+- **Agora** o estado inicial e a volta da previsão para uma etapa usam `hojeEmSP()`. ⚠ O padrão da
+  PREVISÃO segue em UTC, e está certo: prazo é `@db.Date`. ⚠ A rota POST de acompanhamento não tem
+  "hoje" nenhum — grava o dia digitado à meia-noite UTC, que é o que `etapaPrevista` lê.
+- ⚠ **Teste de componente com relógio: fixe só o `Date`** — `vi.useFakeTimers({ toFake: ["Date"] })`
+  + `vi.setSystemTime(...)`, com `vi.useRealTimers()` no `finally`. Com todos os timers falsos o
+  `waitFor` do Testing Library não anda. ⚠ Para testar a volta da previsão, o prazo do fixture tem de
+  ser diferente dos dois "hojes" (UTC e SP): senão "a volta não refez a data" passa por acaso.
+- Este defeito chegou a ser anotado como PENDENTE no `71a2cbbe` (branch `claude/jolly-liskov-e9e146`),
+  que nunca entrou na main e ficou superado — ver `docs/revisao-codex-claude.md`, 25/09.

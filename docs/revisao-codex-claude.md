@@ -2188,3 +2188,27 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   **4.156 passando**, `checar` limpo, build ok.
   ⚠ **Para revisar:** a exceção da "troca já registrada" compara perfil + R; uma troca antiga
   incompatível segue editável só para outro R compatível.
+- **(25/09) Acompanhamento do pedido: o padrão da data de uma etapa era o dia em UTC (Claude).** Medido
+  com o relógio fixado: às 22h de Brasília (2026-09-26T01:00Z) o formulário do cartão do pedido, na RM,
+  vinha com 26/09 e a dica "Data futura" acendia sem ninguém mexer; às 10h vinha 25/09. Entre 21h e
+  meia-noite, "Material recebido" lançado sem conferir a data gravava o dia seguinte: previsto até a
+  meia-noite, depois chegada um dia depois (`atrasoDias` +1).
+  - `AcompanhamentoPedido.jsx`: o estado inicial e a volta da previsão para uma etapa usam `hojeEmSP()`,
+    e o `hoje()` em UTC saiu do arquivo. A previsão segue em UTC (prazo é `@db.Date`).
+  - A rota POST `/api/pedido-omie/[id]/acompanhamento` não tem padrão nem validação de "hoje": grava o
+    dia digitado à meia-noite UTC. Nada mudou lá.
+  - Testes novos em `acompanhamento-data-entrega` (2), com o relógio fixado só no `Date` às 22h de
+    Brasília: a etapa padrão sai com 25/09 e sem a dica; voltar da previsão para "Material recebido"
+    também dá 25/09 (prazo do fixture em 15/10, para a volta sem refazer a data não passar por acaso).
+    Com o defeito devolvido os dois falham (recebem 26/09); três mutações conferidas (estado inicial em
+    UTC, volta em UTC, volta sem refazer a data), cada uma pega pelo seu caso.
+  - O `71a2cbbe` (branch `claude/jolly-liskov-e9e146`, fora da main) anotava este defeito como PENDENTE
+    e consertava o teste "trocar para previsão… não para hoje" fixando o relógio. A main consertou o
+    mesmo teste por outro caminho (`1e60d6d0`, prazo do fixture em 2099) e este item corrige o defeito:
+    ele ficou superado, e trazê-lo agora conflitaria nesse teste.
+
+  **4.158 passando**, `checar` limpo; build não rodado.
+  ⚠ **Para revisar:**
+  - (a) validação da tela no `npm run dev` pendente: ela exige login, e a sessão não digita senha;
+  - (b) `FormLancamento` segue com complexidade 17 (teto 12), como já era antes da mudança;
+  - (c) sem parecer do Codex: `scripts/revisao-codex/` não está neste clone.

@@ -115,3 +115,46 @@ describe("a opção Data de entrega no lançamento do pedido", () => {
     expect(screen.getByText(/não registra que o material chegou/i)).toBeTruthy();
   });
 });
+
+// ⚠⚠ O "HOJE" DE UMA ETAPA É O DIA DE SÃO PAULO, NÃO O DE UTC. Às 22h de Brasília já é amanhã em
+// UTC: o campo vinha com o dia seguinte, a dica "Data futura" acendia num formulário que ninguém
+// tocou, e um "Material recebido" lançado à noite sem conferir a data gravava a chegada UM DIA
+// DEPOIS — "chegou no prazo" virava "1 dia de atraso" (medido em 25/09/2026).
+//
+// ⚠ Só o `Date` é falsificado: com todos os timers falsos, o `waitFor` do Testing Library não anda.
+describe("a data padrão de uma etapa", () => {
+  const AS_22H_DE_BRASILIA = "2026-09-26T01:00:00.000Z"; // 25/09/2026, 22h em São Paulo
+
+  const comRelogioEm = async (instante, corpo) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(instante));
+    try {
+      await corpo();
+    } finally {
+      vi.useRealTimers();
+    }
+  };
+
+  it("às 22h de Brasília é o dia de São Paulo, sem a dica de data futura", () =>
+    comRelogioEm(AS_22H_DE_BRASILIA, async () => {
+      abrir();
+      fireEvent.click(screen.getByRole("button", { name: /Lançar/i }));
+      await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+      const [url, opcoes] = global.fetch.mock.calls[0];
+      expect(url).toBe("/api/pedido-omie/p1/acompanhamento");
+      expect(JSON.parse(opcoes.body).data).toBe("2026-09-25");
+      expect(screen.queryByText(/Data futura/i)).toBeNull();
+    }));
+
+  // ⚠ O prazo fica em 15/10, longe dos dois "hojes": se a volta para a etapa não refizesse a data,
+  // o prazo continuaria no campo — e com o prazo em 25/09 o teste passaria por acaso.
+  it("voltar da previsão para uma etapa às 22h de Brasília também devolve o dia de São Paulo", () =>
+    comRelogioEm(AS_22H_DE_BRASILIA, async () => {
+      abrir({ ...PEDIDO, prazoEntregaPrevisto: "2026-10-15T00:00:00.000Z" });
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "__PREVISAO__" } });
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "MATERIAL_RECEBIDO" } });
+      fireEvent.click(screen.getByRole("button", { name: /Lançar/i }));
+      await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+      expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({ etapa: "MATERIAL_RECEBIDO", data: "2026-09-25" });
+    }));
+});

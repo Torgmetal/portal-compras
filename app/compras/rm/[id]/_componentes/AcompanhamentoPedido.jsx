@@ -18,7 +18,6 @@ import { linhaDoTempo, ETAPAS, ETAPAS_VALIDAS, hojeEmSP } from "@/lib/acompanham
 import CampoData from "@/components/CampoData";
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
-const hoje = () => new Date().toISOString().slice(0, 10);
 
 const ICONE = {
   LIBERADO_COLETA: Truck,
@@ -73,7 +72,12 @@ function FormLancamento({ pedido, aoLancar }) {
   const podeRemarcar = u?.tipo === "ADMIN" || (u?.modulos ?? []).includes("COMPRAS");
 
   const [etapa, setEtapa] = useState(ETAPAS_VALIDAS[0]);
-  const [data, setData] = useState(hoje());
+  // ⚠⚠ O PADRÃO DE UMA ETAPA É O DIA DE SÃO PAULO (`hojeEmSP`), NÃO `toISOString()`. Às 22h de
+  // Brasília já é amanhã em UTC: o campo vinha com o dia seguinte, e um "Material recebido" lançado
+  // à noite sem conferir a data gravava a chegada um dia depois — "chegou no prazo" virava "1 dia
+  // de atraso" (medido em 25/09/2026). ⚠ A PREVISÃO, em `trocarTipo`, segue em UTC de propósito:
+  // prazo é `@db.Date` e se formata em UTC.
+  const [data, setData] = useState(hojeEmSP());
   const [observacao, setObservacao] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -88,7 +92,7 @@ function FormLancamento({ pedido, aoLancar }) {
   const trocarTipo = (novo) => {
     setEtapa(novo);
     if (novo === PREVISAO) setData(pedido.prazoEntregaPrevisto ? new Date(pedido.prazoEntregaPrevisto).toISOString().slice(0, 10) : "");
-    else if (ehPrevisao) setData(hoje());
+    else if (ehPrevisao) setData(hojeEmSP());
   };
 
   const enviar = async (e) => {
@@ -165,8 +169,8 @@ function FormLancamento({ pedido, aoLancar }) {
           lançamentos eram "liberado para coleta" com data futura, e o pedido continuava "atrasado" e
           na lista de COBRANÇA — a previsão, que é o que decide isso, não tinha mudado. Quem digita
           uma data futura numa etapa quase sempre quis remarcar a entrega. */}
-      {/* ⚠ `hojeEmSP`, não o `hoje()` deste arquivo (que é UTC): é a MESMA régua de `linhaDoTempo`,
-          senão a dica e a linha do tempo discordariam à noite sobre o que é "futuro". */}
+      {/* ⚠ `hojeEmSP`, a MESMA régua de `linhaDoTempo` e do padrão do campo: com o UTC, a dica e a
+          linha do tempo discordariam à noite sobre o que é "futuro". */}
       {!ehPrevisao && data > hojeEmSP() && (
         <span className="w-full text-xs text-sky-700">
           Data futura: vai aparecer como <b className="font-medium">{(ETAPAS[etapa]?.previsto ?? "previsto").toLowerCase()}</b>.
