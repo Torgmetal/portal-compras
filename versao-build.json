@@ -1,7 +1,12 @@
 {
-  "build": 3480,
-  "gerado": "2026-09-25T17:40:15.761Z",
+  "build": 3481,
+  "gerado": "2026-09-25T18:40:04.633Z",
   "commits": [
+    {
+      "hash": "3d84e169",
+      "data": "25/09/2026",
+      "titulo": "Data book: só relatório de inspeção assinado por todos entra"
+    },
     {
       "hash": "bb849b93",
       "data": "25/09/2026",
@@ -146,11 +151,6 @@
       "hash": "17977e85",
       "data": "24/09/2026",
       "titulo": "Assistente fiscal: XML de NF-e no chat — e o código da nota não é recomendação"
-    },
-    {
-      "hash": "b79fbe23",
-      "data": "24/09/2026",
-      "titulo": "Assistente fiscal: o prazo do modelo conta desde a entrada da rota"
     }
   ]
 }

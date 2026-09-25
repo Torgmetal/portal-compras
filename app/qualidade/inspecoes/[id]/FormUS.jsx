@@ -3,12 +3,11 @@ import { useEffect, useState } from "react";
 import { useComponenteEstavel } from "@/lib/react-estavel";
 import { Plus, Trash2, AlertTriangle } from "lucide-react";
 import {
-  APARELHOS, ANGULOS, ACOPLANTES, BLOCOS_PADRAO, FACES, MATERIAL_PADRAO,
-  TIPOS_CARREGAMENTO, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL, cabecotesPorFabricante,
-  chaveCabecote, cabecoteDaChave,
-  ESPESSURAS_CHAPA, rotuloEspessura, valorEspessura, PROCESSOS_SOLDA, CHANFROS,
-  JUNTA_PADRAO, TECNICA_PADRAO,
+  ANGULOS, FACES, MATERIAL_PADRAO,
+  TIPOS_CARREGAMENTO, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL,
+  JUNTA_PADRAO, TECNICA_PADRAO, CAMPOS_CABECALHO_US, GRUPOS_CABECALHO_US,
 } from "@/lib/us-campos";
+import { camposCabecalhoUS } from "@/lib/us-relatorio";
 import { LAUDOS } from "@/lib/evs-campos";
 
 /**
@@ -35,19 +34,8 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
 
   const set = (i, campo, v) => setLinhas(linhas.map((l, k) => (k === i ? { ...l, [campo]: v } : l)));
 
-  const grupos = cabecotesPorFabricante();
-  /**
-   * Escolher o cabeçote grava também a MARCA — o rótulo não a carrega mais.
-   *
-   * ⚠⚠ E A MARCA VEM DA CHAVE DA OPÇÃO, não de procurar pelo rótulo (achado do Codex, 22/09/2026):
-   * Mitech e Doppler têm "angular 20x22" nos mesmos três ângulos, e o `find` pelo texto achava
-   * Mitech primeiro — o Doppler escolhido virava Mitech no documento do cliente.
-   */
-  const escolherCabecote = (chave) => {
-    const { fabricante, rotulo } = cabecoteDaChave(chave);
-    setResultado("cbModelo", rotulo);
-    setResultado("cbFabricante", fabricante);
-  };
+  // o que o PDF imprime quando o campo fica vazio — aparece apagado na caixa (ver CAMPOS_CABECALHO_US)
+  const efetivo = camposCabecalhoUS({ ...rel, resultados: res });
 
   // ⚠ O metal base nasce preenchido (Vitor, 22/09/2026: "deixe ela pré-setado em aço carbono") —
   // inclusive nos relatórios abertos antes desta versão, que vieram com o campo vazio.
@@ -60,38 +48,33 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
   }, [travado]);
   const addLinha = () => setLinhas([...linhas, { marca: marcas[0] || "", indicacao: String(linhas.length + 1), laudo: "R" }]);
 
-  const Campo = useComponenteEstavel(({ rot, k, opcoes = null, rotulos = null, grupos = null, aoMudar = null, chaveAtual = null, tipo = "text", destaque = false }) => {
-    const valores = grupos ? grupos.flatMap((g) => g.itens.map((i) => i.rotulo)) : (opcoes || []);
-    // ⚠ com `grupos`, o valor do <select> é a CHAVE da opção (marca + rótulo) — o que fica gravado
-    // continua sendo o rótulo, em `res[k]`.
-    const atual = chaveAtual != null ? chaveAtual : (res[k] || "");
-    return (
+  /**
+   * Um campo do cabeçalho. Com `opcoes`, lista FECHADA (só o tipo de estrutura, que tem dois valores
+   * pela norma); com `sugestoes`, a lista da casa é SUGESTÃO e se digita outro valor (Vitor,
+   * 25/09/2026: "todos os campos precisamos deixar para ser possível ajustar").
+   */
+  const Campo = useComponenteEstavel(({ rot, k, opcoes = null, sugestoes = null, rotulos = null, padrao = "", tipo = "text", destaque = false }) => (
     <label className="block">
       <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">{rot}</span>
-      {opcoes || grupos ? (
-        <select value={atual} disabled={travado} onChange={(e) => (aoMudar ? aoMudar(e.target.value) : setResultado(k, e.target.value))}
+      {opcoes ? (
+        <select value={res[k] || ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
           className={`w-full text-[12px] border rounded-lg px-2 py-1.5 disabled:bg-gray-50 ${
             destaque && !res[k] ? "border-amber-400 bg-amber-50" : "border-gray-200 focus:border-torg-blue"}`}>
           <option value="">—</option>
-          {/* ⚠⚠ VALOR FORA DA LISTA CONTINUA À VISTA. Relatório antigo tem o cabeçote gravado com a
-              marca ("Mitech angular 20x22 · 70° · 2 MHz"), que não existe mais entre as opções —
-              sem esta linha o seletor abriria VAZIO e a primeira gravação apagaria o que estava lá. */}
-          {res[k] && !valores.includes(res[k]) && <option value={atual}>{res[k]} (registrado antes)</option>}
-          {grupos
-            ? grupos.map((g) => (
-              <optgroup key={g.fabricante} label={g.fabricante}>
-                {g.itens.map((i) => <option key={i.valor} value={i.valor}>{i.rotulo}</option>)}
-              </optgroup>
-            ))
-            : opcoes.map((o) => <option key={o} value={o}>{rotulos?.[o] || o}</option>)}
+          {/* ⚠ valor fora da lista continua à vista — senão a primeira gravação o apagaria */}
+          {res[k] && !opcoes.includes(res[k]) && <option value={res[k]}>{res[k]} (registrado antes)</option>}
+          {opcoes.map((o) => <option key={o} value={o}>{rotulos?.[o] || o}</option>)}
         </select>
       ) : (
-        <input type={tipo} value={res[k] ?? ""} disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
-          className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
+        <>
+          <input type={tipo} list={sugestoes ? `us-pc-${k}` : undefined} value={res[k] ?? ""} placeholder={padrao || ""}
+            disabled={travado} onChange={(e) => setResultado(k, e.target.value)}
+            className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50 placeholder:text-gray-400" />
+          {sugestoes && <datalist id={`us-pc-${k}`}>{sugestoes.map((o) => <option key={o} value={o}>{rotulos?.[o] || null}</option>)}</datalist>}
+        </>
       )}
     </label>
-  );
-  });
+  ));
 
   const N = useComponenteEstavel(({ l, i, k, rot }) => (
     <label className="block">
@@ -103,48 +86,27 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
 
   return (
     <div className="space-y-3">
-      {/* ── o ensaio ─────────────────────────────────────────────────────────────────── */}
+      {/* ── o cabeçalho do relatório ─────────────────────────────────────────────────── */}
+      {/* ⚠⚠ TODO CAMPO QUE O PDF IMPRIME, TODOS AJUSTÁVEIS (Vitor, 25/09/2026). A lista da casa é
+          sugestão; vazio, o campo mostra apagado o que vai sair no documento (o TAG vem da peça, a
+          norma é a AWS D1.1…). A lista dos campos mora em CAMPOS_CABECALHO_US, a mesma do celular. */}
       <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
-        <p className="text-[12px] font-bold text-torg-dark mb-2">Condições do ensaio</p>
-        <div className="grid sm:grid-cols-4 gap-2.5">
-          {/* ⚠ obrigatório pelo item 18.1 do PI-QUA-003, e o critério muda com ele (15.6 × 15.7) */}
-          <Campo rot="Tipo de estrutura" k="carregamento" opcoes={TIPOS_CARREGAMENTO.map((t) => t.nome)} destaque />
-          <Campo rot="Local de ensaio" k="local" />
-          <Campo rot="Acoplante" k="acoplante" opcoes={ACOPLANTES} />
-          <Campo rot="Bloco padrão" k="blocoPadrao" opcoes={BLOCOS_PADRAO} />
-          <Campo rot="Aparelho" k="apModelo" opcoes={APARELHOS} />
-          <Campo rot="Nº de série do aparelho" k="apSerie" />
-          {/* ⚠ Vitor (22/09/2026): "tirar esse Mitech, pois já informamos a marca dele antes". A
-              opção mostra só "angular 20x22 · 70 · 2 MHz"; a MARCA é o título do grupo e vai
-              gravada em `cbFabricante` — Mitech e Doppler têm o mesmo 20x22 nos três ângulos. */}
-          <Campo rot="Cabeçote" k="cbModelo" grupos={grupos} aoMudar={escolherCabecote} chaveAtual={chaveCabecote(res.cbFabricante, res.cbModelo)} />
-          <Campo rot="Nº de série do cabeçote" k="cbSerie" />
-          <Campo rot="Ângulo real (graus)" k="cbAngulo" tipo="number" />
-          <Campo rot="Ganho de varredura (dB)" k="ganhoVarredura" tipo="number" />
-          <Campo rot="Material" k="material" />
-          {/* Vitor (22/09/2026): "coloque o seletor de espessura de chapas de 8 até 3 polegadas" */}
-          <Campo rot="Espessura" k="espessura" opcoes={ESPESSURAS_CHAPA.map(valorEspessura)}
-            rotulos={Object.fromEntries(ESPESSURAS_CHAPA.map((e) => [valorEspessura(e), rotuloEspessura(e)]))} />
-        </div>
-        {/* ⚠⚠ O PDF JÁ IMPRIMIA ESTES CAMPOS — e não havia onde preenchê-los. Vitor (22/09/2026):
-            "não tenho campo para informar o processo de soldagem". O cabeçalho do RUS tem
-            PROC. DE SOLDAGEM, METAL DE ADIÇÃO, TIPO DE JUNTA, TIPO DE CHANFRO e TÉCNICA DE ENSAIO;
-            sem entrada, o documento saía com as cinco caixas em branco na frente do cliente. */}
-        <p className="text-[11px] font-bold text-torg-dark mt-3 mb-1.5">A junta ensaiada</p>
-        <div className="grid sm:grid-cols-4 gap-2.5">
-          <Campo rot="Processo de soldagem" k="processoSolda" opcoes={PROCESSOS_SOLDA} />
-          <Campo rot="Metal de adição" k="metalAdicao" />
-          {/* ⚠ `tipoJunta` é a chave que o EVS e o LP já usam — duas chaves para a mesma coisa
-              fariam o mesmo dado aparecer num relatório e sumir no outro. O PDF do US lê as duas. */}
-          <Campo rot="Tipo de junta" k="tipoJunta" />
-          <Campo rot="Tipo de chanfro" k="chanfro" opcoes={CHANFROS} />
-          <Campo rot="Técnica de ensaio" k="tecnica" />
-          <Campo rot="Desenho de referência" k="desenho" />
-        </div>
-        <p className="text-[10px] text-torg-gray mt-2">
-          Procedimento: <strong className="text-torg-dark">{res.procedimento || "—"}</strong>
-          {" · "}Critério: <strong className="text-torg-dark">{res.criterio || "—"}</strong>
-        </p>
+        {GRUPOS_CABECALHO_US.map((g, gi) => (
+          <div key={g.id} className={gi ? "mt-3" : ""}>
+            <p className="text-[12px] font-bold text-torg-dark mb-2">{g.titulo}</p>
+            <div className="grid sm:grid-cols-4 gap-2.5">
+              {g.id === "ensaio" && <>
+                {/* ⚠ obrigatório pelo item 18.1 do PI-QUA-003, e o critério muda com ele (15.6 × 15.7) */}
+                <Campo rot="Tipo de estrutura" k="carregamento" opcoes={TIPOS_CARREGAMENTO.map((t) => t.nome)} destaque />
+                <Campo rot="Ganho de varredura (dB)" k="ganhoVarredura" tipo="number" />
+              </>}
+              {CAMPOS_CABECALHO_US.filter((c) => c.grupo === g.id).map((c) => (
+                <Campo key={c.k} rot={c.rotulo} k={c.k} sugestoes={c.sugestoes} rotulos={c.rotulos}
+                  padrao={res[c.k] ? "" : efetivo[c.k]} tipo={c.k === "cbAngulo" ? "number" : "text"} />
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* ── indicações ───────────────────────────────────────────────────────────────── */}

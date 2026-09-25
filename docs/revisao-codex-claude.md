@@ -2137,3 +2137,24 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (b) quatro seções voltaram a PENDENTE, o que trava a emissão desses livros até as assinaturas;
   - (c) `aoConcluirAssinaturas` roda dentro do `try` do convite do próximo assinante; se o convite
     lançar antes, o vínculo fica para a próxima sincronização.
+- **(25/09) Relatório de ultrassom: todo o cabeçalho editável, no computador e no celular.** Vitor: "desenho e
+  metal de adição não está sendo possível preencher (…) tipo de chanfro tbm, todos os campos precisamos
+  deixar para ser possível ajustar". O computador já preenchia desenho e metal. O celular não tinha desenho,
+  material nem espessura (a rota descartava material e espessura). Chanfro e processo eram listas fechadas.
+  - `CAMPOS_CABECALHO_US` (24 campos, grupos e sugestões) alimenta as duas telas, as duas rotas e o
+    `campo-condicoes`.
+  - As listas viram `<datalist>`, e o campo vazio mostra em placeholder o que sai no PDF.
+  - Fabricante e modelo do cabeçote são campos próprios.
+  - O desenho aceita 500 caracteres (`limiteDoCampo`).
+  - `camposCabecalhoUS` decompõe sempre o rótulo com "·".
+
+  Testes novos: `us-cabecalho-campos` (4, inclusive "o que se preenche sai no PDF", campo a campo),
+  `campo-us-cabecalho` (2) e `us-cabecalho-telas` (7, as duas telas em jsdom). Três testes antigos foram
+  ajustados à tela nova sem perder o que protegem: reabrir traz o cabeçote, Doppler continua Doppler, e o
+  gravado aparece. **4.142 passando**, `checar` limpo, build ok.
+  ⚠ **Para revisar:**
+  - (a) `cabecotesPorFabricante`, `chaveCabecote` e `cabecoteDaChave` ficaram sem uso nas telas (só os
+    testes as usam);
+  - (b) o celular passa a carregar e devolver `procedimento`, `norma`, `criterio` e `tag` em todos os tipos
+    de relatório (sem mudar o valor, se ninguém mexer);
+  - (c) datalist no iOS aparece como sugestão acima do teclado, não como lista suspensa.

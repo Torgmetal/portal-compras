@@ -8,6 +8,8 @@ import { pecasInformadasSchema, textoPeca, quantidadesPorMarca } from "@/lib/ins
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { CAMPOS_CABECALHO_US } from "@/lib/us-campos";
+import { limiteDoCampo } from "@/lib/campo-condicoes";
 import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
 import { garantirDesenhos } from "@/lib/relatorio-dimensional";
 import { usaCotas } from "@/lib/qualidade-campo";
@@ -263,9 +265,11 @@ export async function PATCH(req, { params }) {
       // ensaio por ultrassom (PI-QUA-003)
       "carregamento", "ganhoVarredura", "acoplante", "blocoPadrao", "local",
       "apModelo", "apSerie", "cbModelo", "cbSerie", "cbAngulo",
+      // ⚠ e TODO o cabeçalho do US, da mesma lista que as telas usam (25/09/2026)
+      ...CAMPOS_CABECALHO_US.map((x) => x.k),
     ];
     for (const k of TEXTO_LIVRE) {
-      if (r[k] !== undefined) dados.resultados[k] = r[k] == null ? null : String(r[k]).slice(0, 120);
+      if (r[k] !== undefined) dados.resultados[k] = r[k] == null ? null : String(r[k]).slice(0, limiteDoCampo(k));
     }
     // ⚠ as demãos e as leituras de espessura são ESTRUTURA, não texto: guardadas como estão, com
     // teto de tamanho. Sem isto o relatório de pintura salvaria vazio.

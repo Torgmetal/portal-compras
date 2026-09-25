@@ -10,6 +10,8 @@ import {usaQuantidadeInspecao, pecasInformadasSchema, resultadosComPecas, quanti
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { CAMPOS_CABECALHO_US } from "@/lib/us-campos";
+import { limiteDoCampo } from "@/lib/campo-condicoes";
 import { PERFIS_CAMPO, TIPO_LABEL } from "@/lib/qualidade-campo";
 import { RESULTADOS, proximaRevisao, rotuloRevisao } from "@/lib/revisao-inspecao";
 import { numeroBR } from "@/lib/numero-br";
@@ -217,8 +219,10 @@ export async function PATCH(req, { params }) {
                      "desenhoCliente", "revisaoCliente", "revisaoDesenho", "metalAdicao",
                      "processoSolda", "eps", "rqs", "tipoJunta",
                      // ultrassom: a junta ensaiada, que o PDF já imprimia sem ter onde preencher
-                     "chanfro", "desenho"]) {
-      if (c[k] !== undefined) dados.resultados[k] = c[k] == null || c[k] === "" ? null : String(c[k]).slice(0, 120);
+                     "chanfro", "desenho",
+                     // ⚠ e TODO o cabeçalho do US (25/09/2026) — material e espessura eram descartados aqui
+                     ...CAMPOS_CABECALHO_US.map((x) => x.k)]) {
+      if (c[k] !== undefined) dados.resultados[k] = c[k] == null || c[k] === "" ? null : String(c[k]).slice(0, limiteDoCampo(k));
     }
 
     // ⚠ ESTRUTURA NÃO PASSA POR String(). As leituras e as demãos são listas e objetos; o laço

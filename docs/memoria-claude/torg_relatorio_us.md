@@ -31,3 +31,23 @@ O link de assinatura regera o PDF do banco a cada abertura — a correção vale
 reemitir. O arquivo final vai para o SharePoint quando é arquivado.
 
 Relacionados: [[torg_qualidade]], [[torg_nao_declarar_furo]]
+
+**O cabeçalho inteiro editável (25/09/2026)** — Vitor: *"no campo de desenho e metal de adição não está
+sendo possível preencher (…) tipo de chanfro tbm, todos os campos precisamos deixar para ser possível
+ajustar"*. No computador desenho e metal já se preenchiam. O buraco era o CELULAR, onde o inspetor
+trabalha: sem desenho, material e espessura (a rota do celular nem gravava os dois últimos), e com
+chanfro e processo presos a listas fechadas.
+- `CAMPOS_CABECALHO_US` (`lib/us-campos.js`): os 24 campos que o PDF imprime, com grupo e `sugestoes`.
+  As duas telas, as duas rotas e o `campo-condicoes` leem daqui. O teste `us-cabecalho-campos` cobra que
+  cada um tenha entrada e saia no PDF.
+- ⚠ A lista da casa virou SUGESTÃO (`<datalist>`): escolhe-se ou digita-se ("1/2 V", "K", "SMAW"). Só o
+  tipo de estrutura segue lista fechada, porque tem dois valores pela norma.
+- Campo vazio mostra, APAGADO (placeholder), o que vai sair no PDF: o TAG da peça, a AWS D1.1, a marca
+  e as medidas decompostas do cabeçote.
+- Fabricante e modelo do cabeçote viraram campos próprios, sem a lista agrupada. O Doppler × Mitech
+  de 22/09 deixa de existir: a marca não é mais adivinhada pelo rótulo.
+- ⚠ O desenho aceita até 500 caracteres nas duas rotas (`limiteDoCampo`); o resto segue 120. Por isso o
+  celular pode carregar e devolver `desenho` e `procedimento` sem cortar. Hoje o maior desenho gravado
+  tem 34 caracteres.
+- `camposCabecalhoUS` decompõe o rótulo da lista ("angular 20x22 · 70 · 2 MHz") mesmo com dimensão ou
+  frequência ajustadas à mão; senão o MODELO sairia com o rótulo inteiro.

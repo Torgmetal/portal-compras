@@ -1,41 +1,45 @@
 "use client";
 import { CheckCircle2, AlertCircle } from "lucide-react";
-import { APARELHOS, ACOPLANTES, BLOCOS_PADRAO, TIPOS_CARREGAMENTO, cabecotesPorFabricante, chaveCabecote, cabecoteDaChave, PROCESSOS_SOLDA, CHANFROS } from "@/lib/us-campos";
-
-const gruposCabecote = cabecotesPorFabricante();
-import { camposCabecalhoUS, detalhesCabecoteUS, progressoPreenchimentoUS } from "@/lib/us-relatorio";
+import { TIPOS_CARREGAMENTO, CAMPOS_CABECALHO_US, GRUPOS_CABECALHO_US } from "@/lib/us-campos";
+import { camposCabecalhoUS, progressoPreenchimentoUS, ehObrigatorioUS } from "@/lib/us-relatorio";
 
 const obrigatorio = <span className="text-red-600" aria-label="obrigatório"> *</span>;
 
-function Select({ rotulo, valor, opcoes = null, grupos = null, mudar, fora = null }) {
+function Select({ rotulo, valor, opcoes, mudar }) {
   return <label className="block"><span className="block text-[12px] font-semibold text-torg-dark mb-1">{rotulo}{obrigatorio}</span>
     <select value={valor || ""} onChange={e => mudar(e.target.value)} className={`w-full text-base border-2 rounded-xl px-3 py-3 outline-none ${valor ? "border-gray-200 focus:border-torg-blue" : "border-amber-300 bg-amber-50"}`}>
-      {/* ⚠ `grupos`: a MARCA é o título do grupo, não prefixo de cada opção (Vitor, 22/09/2026) — e
-          o VALOR de cada opção leva a marca junto (`chaveCabecote`), senão Mitech e Doppler ficam
-          indistinguíveis e a gravação escolhe pelo primeiro que casar com o texto.
-          ⚠ `fora`: o que está gravado e não existe mais na lista continua à vista, senão o seletor
-          abre vazio e a primeira gravação apaga o cabeçote do relatório antigo. */}
       <option value="">Selecione…</option>
-      {fora && <option value={valor}>{fora} (registrado antes)</option>}
-      {grupos
-        ? grupos.map(g => <optgroup key={g.fabricante} label={g.fabricante}>{g.itens.map(i => <option key={i.valor} value={i.valor}>{i.rotulo}</option>)}</optgroup>)
-        : opcoes.map(o => <option key={o} value={o}>{o}</option>)}
+      {opcoes.map(o => <option key={o} value={o}>{o}</option>)}
     </select></label>;
 }
 
-/** Igual ao Select, sem a estrela de obrigatório — para o que a norma não exige. */
-function SelectOpcional({ rotulo, valor, opcoes, mudar }) {
-  return <label className="block"><span className="block text-[12px] font-semibold text-torg-dark mb-1">{rotulo}</span>
-    <select value={valor || ""} onChange={e => mudar(e.target.value)} className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-torg-blue">
-      <option value="">—</option>{opcoes.map(o => <option key={o} value={o}>{o}</option>)}
-    </select></label>;
+/**
+ * Campo de texto com a lista da casa como SUGESTÃO (Vitor, 25/09/2026: "todos os campos precisamos
+ * deixar para ser possível ajustar"). Escolhe-se da lista ou digita-se outro valor — chanfro "K",
+ * processo "SMAW". Vazio, mostra apagado o que vai sair no PDF (`padrao`).
+ */
+// o campo exigido e vazio fica âmbar, como os outros obrigatórios do celular
+const bordaDoCampo = (exigido, valor) => (!exigido || (valor !== "" && valor != null) ? "border-gray-200 focus:border-torg-blue" : "border-amber-300 bg-amber-50");
+
+function Sugestoes({ id, sugestoes, rotulos }) {
+  if (!sugestoes) return null;
+  return <datalist id={id}>{sugestoes.map(s => <option key={s} value={s}>{rotulos?.[s] || null}</option>)}</datalist>;
 }
 
-function Texto({ rotulo, valor, mudar, numero = false, sufixo = "", opcional = false }) {
-  return <label className="block"><span className="block text-[12px] font-semibold text-torg-dark mb-1">{rotulo}{opcional ? null : obrigatorio}</span>
-    <div className="relative"><input type={numero ? "number" : "text"} inputMode={numero ? "decimal" : undefined} value={valor ?? ""} onChange={e => mudar(e.target.value)}
-      className={`w-full text-base border-2 rounded-xl px-3 py-3 outline-none ${sufixo ? "pr-14" : ""} ${opcional || (valor !== "" && valor != null) ? "border-gray-200 focus:border-torg-blue" : "border-amber-300 bg-amber-50"}`} />
-      {sufixo && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-torg-gray">{sufixo}</span>}</div></label>;
+// campo com unidade (graus, dB) é numérico, e a unidade fica dentro da caixa
+const tipoDoCampo = (sufixo) => (sufixo ? { type: "number", inputMode: "decimal" } : { type: "text" });
+function Unidade({ sufixo }) {
+  return sufixo ? <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-torg-gray">{sufixo}</span> : null;
+}
+
+function Livre({ id, rotulo, valor, mudar, sugestoes = null, rotulos = null, padrao = "", sufixo = "", exigido = false }) {
+  return <label className="block"><span className="block text-[12px] font-semibold text-torg-dark mb-1">{rotulo}{exigido && obrigatorio}</span>
+    <div className="relative"><input {...tipoDoCampo(sufixo)} list={sugestoes && id}
+      value={valor ?? ""} placeholder={padrao} onChange={e => mudar(e.target.value)}
+      className={`w-full text-base border-2 rounded-xl px-3 py-3 outline-none placeholder:text-gray-400 ${sufixo && "pr-14"} ${bordaDoCampo(exigido, valor)}`} />
+      <Unidade sufixo={sufixo} /></div>
+    <Sugestoes id={id} sugestoes={sugestoes} rotulos={rotulos} />
+  </label>;
 }
 
 function Secao({ numero, titulo, ajuda, children }) {
@@ -46,9 +50,23 @@ function Secao({ numero, titulo, ajuda, children }) {
   </section>;
 }
 
+const AJUDA = {
+  identificacao: "Vazio, sai o que aparece apagado no campo.",
+  aparelho: "Identifique o aparelho de ultrassom utilizado.",
+  cabecote: "Escolha da lista ou digite; dimensão e frequência saem do modelo quando ficam vazias.",
+  ensaio: "Registre como o ensaio foi executado.",
+  junta: "Sai no cabeçalho do relatório.",
+};
+
+/**
+ * O CABEÇALHO DO ULTRASSOM NO CELULAR — todo campo que o PDF imprime (`CAMPOS_CABECALHO_US`).
+ *
+ * ⚠⚠ Vitor (25/09/2026): "no campo de desenho e metal de adição não está sendo possível preencher
+ * (…) tipo de chanfro tbm, todos os campos precisamos deixar para ser possível ajustar". O celular
+ * não tinha desenho, material nem espessura, e o chanfro e o processo eram listas fechadas.
+ */
 export default function FormularioUSCampo({ rel, cond, setCond }) {
-  const cabecalho = camposCabecalhoUS(rel);
-  const cabecote = detalhesCabecoteUS(cond.cbModelo);
+  const efetivo = camposCabecalhoUS({ ...rel, resultados: { ...(rel?.resultados || {}), ...cond } });
   const progresso = progressoPreenchimentoUS(cond);
   const mudar = (campo) => (valor) => setCond(c => ({ ...c, [campo]: valor }));
   return <div className="mt-3 space-y-3">
@@ -59,50 +77,19 @@ export default function FormularioUSCampo({ rel, cond, setCond }) {
       {progresso.faltando.length > 0 && <p className="text-[11px] text-amber-800 mt-1">Falta: {progresso.faltando.join(" · ")}</p>}
     </div>
 
-    <Secao numero="1" titulo="Identificação e documentos" ajuda="Confira antes de iniciar o ensaio.">
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-lg bg-gray-50 p-2"><p className="text-[10px] text-torg-gray">PEÇA / TAG</p><p className="text-[13px] font-bold font-mono text-torg-dark">{cabecalho.tag || "—"}</p></div>
-        <div className="rounded-lg bg-gray-50 p-2"><p className="text-[10px] text-torg-gray">NORMA</p><p className="text-[13px] font-bold text-torg-dark">{cabecalho.norma}</p></div>
-      </div>
-      <div className="rounded-lg bg-torg-blue/5 border border-torg-blue/20 p-2"><p className="text-[10px] text-torg-gray">PROCEDIMENTO</p><p className="text-[13px] font-semibold text-torg-dark">{cabecalho.procedimento}</p><p className="text-[10px] text-torg-gray mt-0.5">Critério: {cabecalho.criterio}</p></div>
-    </Secao>
-
-    <Secao numero="2" titulo="Aparelho" ajuda="Identifique o aparelho de ultrassom utilizado.">
-      <Select rotulo="Modelo do aparelho" valor={cond.apModelo} opcoes={APARELHOS} mudar={mudar("apModelo")} />
-      <Texto rotulo="Número de série do aparelho" valor={cond.apSerie} mudar={mudar("apSerie")} />
-    </Secao>
-
-    <Secao numero="3" titulo="Cabeçote" ajuda="Escolha o conjunto completo; dimensão e frequência aparecem abaixo.">
-      <Select rotulo="Modelo, ângulo e frequência" grupos={gruposCabecote}
-        valor={chaveCabecote(cond.cbFabricante, cond.cbModelo)}
-        fora={cond.cbModelo && !gruposCabecote.some(g => g.itens.some(i => i.rotulo === cond.cbModelo)) ? cond.cbModelo : null}
-        mudar={(v) => { const { fabricante, rotulo } = cabecoteDaChave(v); setCond(c => ({ ...c, cbModelo: rotulo, cbFabricante: fabricante })); }} />
-      {cond.cbModelo && <div className="grid grid-cols-3 gap-1.5 text-center">
-        <div className="rounded-lg bg-gray-50 p-2"><p className="text-[9px] text-torg-gray">MODELO</p><p className="text-[11px] font-bold">{cabecote.modelo || "—"}</p></div>
-        <div className="rounded-lg bg-gray-50 p-2"><p className="text-[9px] text-torg-gray">DIMENSÃO</p><p className="text-[11px] font-bold">{cabecote.dimensoes || "—"}</p></div>
-        <div className="rounded-lg bg-gray-50 p-2"><p className="text-[9px] text-torg-gray">FREQUÊNCIA</p><p className="text-[11px] font-bold">{cabecote.frequencia || "—"}</p></div>
-      </div>}
-      <Texto rotulo="Número de série do cabeçote" valor={cond.cbSerie} mudar={mudar("cbSerie")} />
-      <Texto rotulo="Ângulo real medido" valor={cond.cbAngulo} mudar={mudar("cbAngulo")} numero sufixo="graus" />
-    </Secao>
-
-    <Secao numero="4" titulo="Condições do ensaio" ajuda="Registre como o ensaio foi executado.">
-      <Select rotulo="Tipo de estrutura" valor={cond.carregamento} opcoes={TIPOS_CARREGAMENTO.map(t => t.nome)} mudar={mudar("carregamento")} />
-      <Texto rotulo="Local do ensaio" valor={cond.local} mudar={mudar("local")} />
-      <Select rotulo="Acoplante" valor={cond.acoplante} opcoes={ACOPLANTES} mudar={mudar("acoplante")} />
-      <Select rotulo="Bloco padrão" valor={cond.blocoPadrao} opcoes={BLOCOS_PADRAO} mudar={mudar("blocoPadrao")} />
-      <Texto rotulo="Ganho de varredura" valor={cond.ganhoVarredura} mudar={mudar("ganhoVarredura")} numero sufixo="dB" />
-    </Secao>
-
-    {/* ⚠ Campos que o PDF do RUS já imprimia sem ter onde preencher (Vitor, 22/09/2026: "não tenho
-        campo para informar o processo de soldagem"). Opcionais: nem todo ensaio é de junta soldada,
-        e o progresso acima continua contando só o que o PI-QUA-003 exige. */}
-    <Secao numero="5" titulo="A junta ensaiada" ajuda="Opcional — sai no cabeçalho do relatório.">
-      <SelectOpcional rotulo="Processo de soldagem" valor={cond.processoSolda} opcoes={PROCESSOS_SOLDA} mudar={mudar("processoSolda")} />
-      <Texto rotulo="Metal de adição" valor={cond.metalAdicao} mudar={mudar("metalAdicao")} opcional />
-      <Texto rotulo="Tipo de junta" valor={cond.tipoJunta} mudar={mudar("tipoJunta")} opcional />
-      <SelectOpcional rotulo="Tipo de chanfro" valor={cond.chanfro} opcoes={CHANFROS} mudar={mudar("chanfro")} />
-      <Texto rotulo="Técnica de ensaio" valor={cond.tecnica} mudar={mudar("tecnica")} opcional />
-    </Secao>
+    {GRUPOS_CABECALHO_US.map((g, i) => (
+      <Secao key={g.id} numero={String(i + 1)} titulo={g.titulo} ajuda={AJUDA[g.id]}>
+        {g.id === "ensaio" && <>
+          {/* ⚠ obrigatório pelo item 18.1 do PI-QUA-003, e o critério muda com ele (15.6 × 15.7) */}
+          <Select rotulo="Tipo de estrutura" valor={cond.carregamento} opcoes={TIPOS_CARREGAMENTO.map(t => t.nome)} mudar={mudar("carregamento")} />
+          <Livre id="us-campo-ganho" rotulo="Ganho de varredura" valor={cond.ganhoVarredura} mudar={mudar("ganhoVarredura")} sufixo="dB" exigido />
+        </>}
+        {CAMPOS_CABECALHO_US.filter(c => c.grupo === g.id).map(c => (
+          <Livre key={c.k} id={`us-campo-${c.k}`} rotulo={c.rotulo} valor={cond[c.k]} mudar={mudar(c.k)}
+            sugestoes={c.sugestoes} rotulos={c.rotulos} padrao={cond[c.k] ? "" : efetivo[c.k] || ""}
+            sufixo={c.k === "cbAngulo" ? "graus" : ""} exigido={ehObrigatorioUS(c.k)} />
+        ))}
+      </Secao>
+    ))}
   </div>;
 }
