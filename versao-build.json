@@ -1,7 +1,12 @@
 {
-  "build": 3470,
-  "gerado": "2026-09-25T12:14:23.689Z",
+  "build": 3471,
+  "gerado": "2026-09-25T13:17:38.788Z",
   "commits": [
+    {
+      "hash": "d3ec58b9",
+      "data": "25/09/2026",
+      "titulo": "Memória: RIP-112-001 recriado com número, id e data originais"
+    },
     {
       "hash": "1e60d6d0",
       "data": "25/09/2026",
@@ -146,11 +151,6 @@
       "hash": "74fa9db4",
       "data": "24/09/2026",
       "titulo": "Memória: o estado dos backups medido em 24/09 — tempo do dump perto do teto, anexos do data book e fotos sem cópia"
-    },
-    {
-      "hash": "9e3d2b82",
-      "data": "23/09/2026",
-      "titulo": "PDF do relatório: o botão grava o que está pendente antes de abrir"
     }
   ]
 }

@@ -2029,3 +2029,16 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** (a) a chamada de piloto não deixou rastro no PRD00005 — nem a data de "última
   alteração" mudou (reconferido 1 h depois: segue 13/10/2025); (b) produto sem o campo `inativo` na
   resposta conta como ativo.
+- **(25/09) Importação da LPC em lote — a T118B dava HTTP 504.** Mike (Engenharia) subindo a LPC da
+  T118B (OP-118): 504. Medido: as funções rodam em Washington (`x-vercel-id: gru1::iad1`) e o Neon em São
+  Paulo (~120 ms por ida e volta); a rota fazia busca + gravação POR PEÇA e 1.240 peças esgotaram os 300 s
+  no passo das ligações (22 de centenas gravadas; sem `IMPORTAR_LPC` na auditoria — lista pela metade).
+  Correção: `lib/lpc-gravar.js` (`gravarPecasLpc`: uma leitura das existentes, `createManyAndReturn` em
+  lotes de 500 com recaída uma a uma se o lote for recusado, `update` em paralelo com teto 12; marca
+  repetida entre as listas continua "nasce na 1ª, a 2ª atualiza"; `gravarRelacoesLpc`: `deleteMany` +
+  `createMany` sem repetição). A devolução da programação (`sobrescrever`) também em paralelo. Os campos de
+  cada gravação são os mesmos da rota antiga. Rota 567 → 377 linhas. Testes `lpc-gravar` (8) e
+  `importar-lpc-lote` (1, falha na rota antiga). **4.056 passando**, `checar` limpo, build ok.
+  ⚠ **Para revisar:** (a) ordem das atualizações deixou de ser sequencial (não havia dependência entre
+  peças distintas); (b) `createManyAndReturn` (Prisma ≥ 5.14) no lugar de `create`; (c) mudar a região
+  das funções para gru1 fica como decisão do Vitor.
