@@ -80,14 +80,25 @@ describe("a opção Data de entrega no lançamento do pedido", () => {
   // ⚠⚠⚠ HOJE É O PALPITE CERTO PARA UM FATO DO PASSADO E O ERRADO PARA UMA PREVISÃO: deixado ali,
   // grava sem querer um prazo para hoje, que joga o pedido em "vence hoje" e dispara cobrança em
   // cima de um fornecedor que não combinou nada disso.
+  //
+  // ⚠⚠ O RELÓGIO É FIXADO NUM DIA QUE NÃO É O PRAZO DO PEDIDO. Com o relógio de verdade o teste
+  // falhou em 25/09/2026 sem defeito nenhum na tela: nesse dia o prazo e hoje são a mesma data, e o
+  // "não é hoje" não tinha como passar. Meio-dia UTC para ser 20/09 também em São Paulo; só o `Date`
+  // é falsificado, e o `waitFor` segue com os timers de verdade.
   it("trocar para previsão troca a data padrão para o prazo atual, não para hoje", async () => {
-    abrir();
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "__PREVISAO__" } });
-    fireEvent.click(screen.getByRole("button", { name: /Lançar/i }));
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    const enviado = JSON.parse(global.fetch.mock.calls[0][1].body).novoPrazo;
-    expect(enviado).toBe("2026-09-25");
-    expect(enviado).not.toBe(new Date().toISOString().slice(0, 10));
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-20T12:00:00.000Z"));
+    try {
+      abrir();
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "__PREVISAO__" } });
+      fireEvent.click(screen.getByRole("button", { name: /Lançar/i }));
+      await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+      const enviado = JSON.parse(global.fetch.mock.calls[0][1].body).novoPrazo;
+      expect(enviado).toBe("2026-09-25");
+      expect(enviado).not.toBe(new Date().toISOString().slice(0, 10));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("a observação vira o MOTIVO da remarcação", async () => {

@@ -35,3 +35,20 @@ mesma linha fariam a etapa dizer "prevista" ao lado de um chip que já a trata c
   `[Fornecedor]`). A feita por dentro ficava no `PrazoHistorico` e sumia da tela — a data mudava sem
   rastro nem observação. Agora `historicoDaPrevisao` (`lib/historico-previsao.js`) lista todas, uma
   por linha, com de/para, quem e observação; a do fornecedor segue em âmbar.
+
+## O mesmo 25/09 derrubou um teste de COMPONENTE — e o "hoje" do formulário é UTC (25/09/2026)
+
+- ⚠⚠ **`testes/acompanhamento-data-entrega.teste.jsx` apodreceu igual à suíte de 16/09.** O caso
+  "trocar para previsão… não para hoje" (escrito em 23/09) tinha o prazo do pedido em **25/09** e
+  conferia `not.toBe(<hoje de verdade>)`: no dia 25 as duas datas coincidiram e ele falhou sem defeito
+  na tela. Componente não recebe `hoje` por parâmetro, então o equivalente é fixar o relógio:
+  `vi.useFakeTimers({ toFake: ["Date"] })` + `vi.setSystemTime(new Date("…T12:00:00.000Z"))`, com
+  `vi.useRealTimers()` no `finally`. ⚠ **Só o `Date`**: com todos os timers falsos o `waitFor` do
+  Testing Library fica sem os timers que usa. ⚠ **Meio-dia UTC**: é o mesmo dia em UTC e em São
+  Paulo, e o componente usa os dois relógios.
+- ⚠⚠ **PENDENTE — o padrão da ETAPA no formulário é `hoje()` em UTC** (`AcompanhamentoPedido.jsx`),
+  não `hojeEmSP`. Medido com o relógio fixado: às **22h de Brasília** de 25/09 o campo já vem com
+  **26/09** e a dica "Data futura" aparece no formulário intocado; às 10h vem 25/09. Entre 21h e
+  meia-noite, quem lança "Material recebido" sem conferir a data grava o dia seguinte: até a
+  meia-noite conta como previsto, e depois como chegada UM DIA DEPOIS (`atrasoDias` +1 — "chegou no
+  prazo" vira "1 dia de atraso"). ⚠ O padrão da PREVISÃO está certo: prazo é `@db.Date` e formata em UTC.

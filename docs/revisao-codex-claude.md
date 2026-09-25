@@ -2029,3 +2029,22 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** (a) a chamada de piloto não deixou rastro no PRD00005 — nem a data de "última
   alteração" mudou (reconferido 1 h depois: segue 13/10/2025); (b) produto sem o campo `inativo` na
   resposta conta como ativo.
+
+## 25/09/2026 — Teste da data de entrega dependia do calendário (Claude)
+
+- **Feito:** `testes/acompanhamento-data-entrega.teste.jsx`, caso "trocar para previsão troca a data
+  padrão para o prazo atual, não para hoje", falhava hoje com `expected '2026-09-25' not to be
+  '2026-09-25'`: o prazo do fixture é 25/09 e a segunda asserção compara com o `new Date()` real — no
+  dia do prazo as duas coincidem. O caso agora fixa o relógio em 20/09 ao meio-dia UTC
+  (`vi.useFakeTimers({ toFake: ["Date"] })` + `vi.setSystemTime`, `vi.useRealTimers()` no `finally`).
+  As duas asserções ficaram como estavam. **Nenhum código de produção mudou**: o componente lê o prazo
+  certo (`prazoEntregaPrevisto` formatado em UTC, a regra de PRAZO).
+- **Provas:** relógio fixado em 25/09 → falha igual à original (RED determinístico); fixado em 20/09 →
+  passa, rodado no próprio dia 25; mutação temporária (previsão caindo em `hoje()`) → o teste corrigido
+  pega (`expected '2026-09-20' to be '2026-09-25'`), revertida. `npm run checar` limpo; suíte inteira
+  **4.036 passando** (427 arquivos).
+- **Achado fora do escopo, NÃO corrigido (para revisar — `testing`):** o padrão da ETAPA no mesmo
+  formulário é `hoje()` em UTC, não `hojeEmSP`. Medido com o relógio fixado: às 22h de Brasília o campo
+  vem com o dia seguinte e a dica "Data futura" aparece no formulário intocado; um "Material recebido"
+  lançado assim à noite grava a chegada um dia depois (`atrasoDias` +1). Registrado em
+  `docs/memoria-claude/torg_etapa_data_futura.md`.
