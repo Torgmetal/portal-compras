@@ -1,7 +1,17 @@
 {
-  "build": 3468,
-  "gerado": "2026-09-25T10:44:08.726Z",
+  "build": 3470,
+  "gerado": "2026-09-25T10:46:23.356Z",
   "commits": [
+    {
+      "hash": "4b035e5b",
+      "data": "25/09/2026",
+      "titulo": "Memória e revisão: posição de estoque por local no Omie"
+    },
+    {
+      "hash": "a4764072",
+      "data": "25/09/2026",
+      "titulo": "Compras › Estoque: a tela carregava 1.000 de 2.500 produtos; detalhe por local e agenda real"
+    },
     {
       "hash": "06ff92a5",
       "data": "25/09/2026",
@@ -141,16 +151,6 @@
       "hash": "9e3d2b82",
       "data": "23/09/2026",
       "titulo": "PDF do relatório: o botão grava o que está pendente antes de abrir"
-    },
-    {
-      "hash": "1411cd4e",
-      "data": "23/09/2026",
-      "titulo": "Relatórios de LP e EVS: a junta soldada sai da EPS escolhida"
-    },
-    {
-      "hash": "5c56fc98",
-      "data": "23/09/2026",
-      "titulo": "Prazos: a data de entrega faltava no seletor, e ela não é uma etapa"
     }
   ]
 }

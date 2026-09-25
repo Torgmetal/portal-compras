@@ -2029,3 +2029,49 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** (a) a chamada de piloto não deixou rastro no PRD00005 — nem a data de "última
   alteração" mudou (reconferido 1 h depois: segue 13/10/2025); (b) produto sem o campo `inativo` na
   resposta conta como ativo.
+- **(25/09, madrugada) Estoque: a Qtd do portal era só o Almoxarifado — e a tela cortava em 1.000.** As suspeitas
+  (e)/(f) que a sessão das movimentações deixou registradas (24/09, noite; aquele trabalho ainda está sem commit na
+  worktree `silly-golick`). **Medido ao vivo, só leitura** (Omie + banco): `ListarPosEstoque` SEM
+  `lista_local_estoque` devolve só o local PADRÃO (258 linhas, byte a byte = filtro pelo Almoxarifado); com "TODOS",
+  810 linhas de 657 produtos, uma por (produto, local). `qtdAtual` batia 657/657 com a posição sem filtro: 399
+  produtos fora da tela, 31 negativos (chapa 3,00 mm −6.480 com +8.159 na Fábrica). Os locais vinham de
+  `estoque/localestoque/` (doc 404; estourou os 3 s ou voltou `{error}` SEM `faultstring`); o certo é `estoque/local/`
+  (`locaisEncontrados`, 6 locais). `nCodLocal` o Omie RECUSA ("Tag [NCODLOCAL] não faz parte da estrutura"). Tudo em
+  `catch { break; }`: `locaisOmie` null e 0 de 2.500 itens com `locaisQtd`. De carona, também confirmados: a posição
+  não tem `cUnidade` e o update gravava "UN" (258/258 da posição; 120 são KG/LATA/PC no cadastro); CMC é POR LOCAL
+  (o do Almoxarifado, 0 ou 1 R$/kg no aço, alimentava `custo-material`/`match-omie`); o Omie devolve no máximo 100
+  linhas por página, com picos de 25–29 s; e a página `/compras/estoque` fazia `take: 1000` com filtro no navegador —
+  419 dos 657 com posição (todos os 196 PERFIL e 52 TUBO) nunca apareciam, nem buscando.
+  **Feito:** `lib/omie-estoque-posicao.js` (novo: `listarLocais` — LANÇA se um local da Qtd sumir do cadastro,
+  porque os códigos são fixos —, `listarPosicao` "TODOS" inteira-ou-exceção — erro, página sem
+  `produtos`/`nTotPaginas` e total ≠ `nTotRegistros` LANÇAM —, `consolidarPosicao`);
+  `sincronizarProdutos` usa o módulo, não grava saldo antes da posição inteira, não grava `unidade`, zera também
+  negativo e detalhe velho, aceita `ateMs` (cron: 40 s contados do início da rota); data da posição em Brasília;
+  `lib/estoque-catalogo.js` (a página sem `take`, `select` enxuto); `descreverAgenda` em `lib/cron-agenda.js` (rodapé
+  lido do `vercel.json`); tela com o detalhe por local (negativo em vermelho, fora da Qtd tracejado, nome sem
+  "ESTOQUE"). Testes novos: `omie-estoque-posicao` (18), `omie-estoque-sincronizar` (7 — **7 vermelhos no código
+  antigo**, ex. *"expected 1392.6 to be close to 1679.29"*), `api/cron-estoque-produtos` (3 — com a lib antiga o
+  cron dava **200/`ok:true`** com a página do Omie falhando), `cron-agenda-descrever` (6), `compras-estoque-pagina`
+  (4), `estoque-catalogo-tela` (5). Commits `06ff92a5` (sincronização) e `a4764072` (tela), na branch
+  `claude/funny-lederberg-012e97`, sem push. Suíte final **4.078 passando**, 1 falha (a de data, item (g) abaixo);
+  build do Next EXIT=0 com o banco apontando para lugar nenhum. `checar` limpo; módulos novos sem aviso de ESLint; `sincronizarProdutos` caiu de
+  complexidade 78 → 45 e o `EstoqueClient` de 39 → 36. Simulação da regra nova sobre a posição medida: 478 produtos
+  com Qtd positiva (eram 227), 26 negativos, 153 só com saldo fora da Qtd (visíveis no detalhe).
+  ⚠⚠ **Decisão pendente (Vitor): o que soma a Qtd.** Ficou `LOCAIS_NA_QTD` = Almoxarifado + Fábrica (os dois em uso:
+  47 e 34 pedidos desde 28/08). O "ESTOQUE TERCEIRO" (273 itens, 1,43 mi, códigos de cliente TMSA/Vale/Jotun, 86
+  movimentos todos "24 Retorno de Remessa" jan–fev/2025 e nada depois) e os de patrimônio ficam só no detalhe.
+  Perguntei; a pergunta ficou sem resposta. Trocar é uma linha — mas 8 produtos (ex. W610×174: Fábrica −5.112,6,
+  Terceiro +126.606,4) ficam negativos sem o Terceiro.
+  ⚠ **Não rodei a sincronização contra a produção** (sem autorização): nada foi gravado. **Não validei a tela no
+  `npm run dev`**: exige login e não tenho credencial; a porta 3000 é de outro checkout. A tela está coberta por teste
+  em jsdom, e o build do Next foi conferido com o banco apontando para lugar nenhum.
+  ⚠ **Para revisar:** (a) o CMC muda para ~422 produtos — preço de fallback do `custo-material` e do orçamento por IA
+  mudam junto (correção: aço deixa de valer 0/1 R$/kg); (b) `ativo:true` passa a valer para os 657 da posição (eram
+  258), inclusive item só no Terceiro; (c) a zeragem lê os 2.500 itens por rodada, e são ~650 `updateMany` por hora
+  (eram 258) — padrão de antes, só maior; (d) a tela passa a carregar os 2.500 itens (~750 KB); (e) mesma causa, NÃO
+  corrigido: fallback ao vivo de `app/api/omie/buscar-produto` (só local padrão, lê `cUnidade`), `app/api/omie/
+  preco-medio` (manda `cCodigo`, fora da doc do `ListarPosEstoque`) e o cache de `lib/omie-pedido-compra.js`; (f) ao
+  juntar com a worktree das movimentações haverá conflito trivial no topo de `lib/omie-estoque.js` (as duas removem
+  constantes vizinhas) e no fim deste arquivo; (g) `acompanhamento-data-entrega` falha HOJE por calendário: supõe que
+  o prazo do fixture (25/09/2026) ≠ hoje — sugerida como tarefa à parte (relógio fixo no teste). Rodadas da suíte
+  sob carga tiveram falhas que mudam a cada vez (cotação, carga, cobrança) e passam sozinhas.
