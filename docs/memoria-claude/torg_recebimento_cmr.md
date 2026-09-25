@@ -210,3 +210,15 @@ mantendo a de rastreabilidade mais completa — em `261401` a que ficou é a que
 apagada era a do lançamento manual, sem. Soft delete com `invalidadoMotivo` e `AuditLog`
 (`CMR_DESATIVAR_DUPLICATA`). **1.586 ativos, 1.586 índices distintos, zero duplicados.**
 
+
+## A busca do Graph caiu; a planilha é achada pela PASTA (25/09/2026)
+
+⚠⚠ `drives/{id}/root/search(q=...)` passou a devolver **HTTP 500** entre 22 e 23/09/2026 e parou
+cmr-sincronizar, cmr-reconciliar e lqc-sharepoint. No mesmo drive e token, listar pasta por caminho
+seguiu OK (casar-certificados). A busca é índice do SharePoint: quando adoece, nada do nosso lado
+conserta. `lib/cmr-localizar.js` lista `/Almoxarifado/01. Rastreabilidade` (env
+`SHAREPOINT_CMR_FOLDER_PATH`) até 2 níveis, paginado, e **qualquer pasta que falhe derruba a
+listagem** (achado do Codex: `listAllFilesRecursive` engole erro e escolheria cópia velha — e o
+CMR escreve nesse arquivo). A busca virou reserva, e o erro dela traz code/mensagem/request-id.
+⚠ LQC (`lib/lqc-sharepoint.js`) continua dependendo da busca — espalhada pela árvore de orçamentos.
+⚠ As credenciais Azure NÃO estão no `.env.local`: não dá para chamar o Graph daqui.

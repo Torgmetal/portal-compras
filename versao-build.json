@@ -1,156 +1,156 @@
 {
-  "build": 3468,
-  "gerado": "2026-09-25T12:04:51.155Z",
+  "build": 3469,
+  "gerado": "2026-09-25T12:10:04.892Z",
   "commits": [
     {
-      "hash": "7d79b377",
+      "hash": "6ee5dca41d",
+      "data": "25/09/2026",
+      "titulo": "Memória: o Neon guarda só 6 h de histórico e não tem snapshot"
+    },
+    {
+      "hash": "7d79b377d3",
       "data": "25/09/2026",
       "titulo": "Memória: saldo dos duplicados em TODOS os locais do Omie"
     },
     {
-      "hash": "b37d3d85",
+      "hash": "b37d3d8582",
       "data": "24/09/2026",
       "titulo": "Memória: o piloto no PRD00005 não deixou rastro nenhum no Omie"
     },
     {
-      "hash": "6b908b7b",
+      "hash": "6b908b7b4e",
       "data": "24/09/2026",
       "titulo": "Prazos das RMs: data anterior da remarcação em destaque"
     },
     {
-      "hash": "6460d54a",
+      "hash": "6460d54aa1",
       "data": "24/09/2026",
       "titulo": "Assistente fiscal: reenvio depois de queda repete a tentativa inteira, não só a chave"
     },
     {
-      "hash": "3b01fcb8",
+      "hash": "3b01fcb84b",
       "data": "24/09/2026",
       "titulo": "Prazos das RMs: remarcação interna aparece com observação; nova etapa \"Entrega\""
     },
     {
-      "hash": "1ad14826",
+      "hash": "1ad14826ea",
       "data": "24/09/2026",
       "titulo": "Busca da RM não devolve mais produto inativo no Omie"
     },
     {
-      "hash": "7f5778d4",
+      "hash": "7f5778d4d2",
       "data": "24/09/2026",
       "titulo": "Tekla: planilha nova também quando um código sai ou muda de descrição"
     },
     {
-      "hash": "244a50f4",
+      "hash": "244a50f4f7",
       "data": "24/09/2026",
       "titulo": "Engenharia: planilha de perfis e parafusos do Omie para o Tekla"
     },
     {
-      "hash": "30b6e233",
+      "hash": "30b6e2331c",
       "data": "24/09/2026",
       "titulo": "Rastreabilidade: a NF deixa de ser cobrada"
     },
     {
-      "hash": "b39e3ab1",
+      "hash": "b39e3ab18e",
       "data": "24/09/2026",
       "titulo": "Rastreio: corte no dia do recebimento conta; corte provado pela etapa seguinte"
     },
     {
-      "hash": "08fc4cde",
+      "hash": "08fc4cde1d",
       "data": "24/09/2026",
       "titulo": "Prazos das RMs: data futura é previsão — e \"recebido\" futuro não é chegada"
     },
     {
-      "hash": "842c3700",
+      "hash": "842c37003b",
       "data": "24/09/2026",
       "titulo": "Relatórios de inspeção: data book puxava a cópia sem assinatura; carimbo de convite desviado"
     },
     {
-      "hash": "c6ca7a1f",
+      "hash": "c6ca7a1f2e",
       "data": "24/09/2026",
       "titulo": "Prazos das RMs: a observação do comprador aparecia só na RM, não aqui"
     },
     {
-      "hash": "8c92271d",
+      "hash": "8c92271d65",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: a cabeceira tem altura (Resolução CONTRAN 945/2022, art. 8º)"
     },
     {
-      "hash": "51754018",
+      "hash": "51754018e7",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: travamento por volume (escorar/amarrar) e cinta como fita"
     },
     {
-      "hash": "ec93769c",
+      "hash": "ec93769cef",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: carga encostada na cabeceira — sem vão para correr na frenagem"
     },
     {
-      "hash": "17977e85",
+      "hash": "17977e8564",
       "data": "24/09/2026",
       "titulo": "Assistente fiscal: XML de NF-e no chat — e o código da nota não é recomendação"
     },
     {
-      "hash": "b79fbe23",
+      "hash": "b79fbe234d",
       "data": "24/09/2026",
       "titulo": "Assistente fiscal: o prazo do modelo conta desde a entrada da rota"
     },
     {
-      "hash": "6f71adcd",
+      "hash": "6f71adcd86",
       "data": "24/09/2026",
       "titulo": "Assistente fiscal: quatro achados do Codex — dinheiro, idempotência, versão e prazo"
     },
     {
-      "hash": "81ecb9ee",
+      "hash": "81ecb9eee3",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: pacotes de até 1,14 m com madeira entre as camadas; aço sempre sobre caibro"
     },
     {
-      "hash": "0271778a",
+      "hash": "0271778aae",
       "data": "24/09/2026",
       "titulo": "Prazos das RMs: o link estava na sidebar que o almoxarifado nunca abre"
     },
     {
-      "hash": "e883f93b",
+      "hash": "e883f93bbb",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: empilha pelo aço real — caibro sobre aço, calço até 15 cm"
     },
     {
-      "hash": "70bc11fd",
+      "hash": "70bc11fd23",
       "data": "24/09/2026",
       "titulo": "Prazos das RMs: o almoxarifado vê a lista — a caneta continua no Compras"
     },
     {
-      "hash": "12562caa",
+      "hash": "12562caa27",
       "data": "24/09/2026",
       "titulo": "Memória: recuperar backup local numa pasta separada, nunca com switch na pasta principal"
     },
     {
-      "hash": "1424d155",
+      "hash": "1424d1553e",
       "data": "24/09/2026",
       "titulo": "Memória: o código que só existia no Mac foi para refs/backup no GitHub — por que não branch, e como recuperar"
     },
     {
-      "hash": "07a529f0",
+      "hash": "07a529f0cf",
       "data": "24/09/2026",
       "titulo": "Backups: o dump do banco longe do teto, e cópia do que só existia no Blob"
     },
     {
-      "hash": "74fa9db4",
+      "hash": "74fa9db450",
       "data": "24/09/2026",
       "titulo": "Memória: o estado dos backups medido em 24/09 — tempo do dump perto do teto, anexos do data book e fotos sem cópia"
     },
     {
-      "hash": "9e3d2b82",
+      "hash": "9e3d2b8226",
       "data": "23/09/2026",
       "titulo": "PDF do relatório: o botão grava o que está pendente antes de abrir"
     },
     {
-      "hash": "1411cd4e",
+      "hash": "1411cd4e96",
       "data": "23/09/2026",
       "titulo": "Relatórios de LP e EVS: a junta soldada sai da EPS escolhida"
-    },
-    {
-      "hash": "5c56fc98",
-      "data": "23/09/2026",
-      "titulo": "Prazos: a data de entrega faltava no seletor, e ela não é uma etapa"
     }
   ]
 }
