@@ -2109,3 +2109,31 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** (a) "A" para peça sem linha em relatório REPROVADO: o registro só da reprovada
   implica aceite, mas é inferência sobre o que o inspetor deixou de lançar; (b) a folga de 3% no corpo
   da letra; (c) as linhas aprovadas vão para o fim, depois das indicações, e não agrupadas por peça.
+- **(25/09) Data book: só relatório de inspeção assinado por todos entra.** Vitor, no livro da OP-112:
+  "ainda está puxando relatórios em rascunho e falamos de puxar apenas os que estiverem assinados".
+  - **O defeito:** `vincularNoDataBook` rodava na criação, na edição e no envio, e punha o relatório no livro
+    sem olhar assinatura nem livro fechado.
+  - **A função agora sincroniza:** o relatório assinado por todos entra; o que não está sai, e a seção
+    vazia volta a PENDENTE. Livro fechado não é tocado.
+  - **Quem põe no livro é a última assinatura:** `aoConcluirAssinaturas` na rota `/api/assinar/[token]`.
+  - **Abrir revisão e reinspecionar** tiram o relatório do livro.
+  - **Rodadas encerradas:** a reprovada/REC (retrabalho, 21/08) e a assinada acompanham; a intermediária
+    não (`revisaoEntraNoLivro`).
+  - **Anexar à mão:** documento de relatório não assinado dá 409.
+  - **Aviso da tela** sem ⚠ quando só aguarda assinatura.
+
+  Testes novos: `databook-relatorio-assinado` (12), `assinar-relatorio-databook` (3; falhar ao vincular
+  não derruba a assinatura), `databook-anexar-relatorio` (2) e `relatorio-vinculo-texto` (3). O teste
+  antigo `databook-vinculo-arquivo` ganhou os mocks das consultas novas, e a proteção do `arquivoUrl`
+  segue igual. **4.127 passando**, `checar` limpo, build ok.
+
+  Dados: 13 vínculos retirados de livros abertos (5 rascunhos, 4 com assinatura incompleta e 4 rodadas
+  intermediárias), com auditoria `DESVINCULAR_RELATORIO_NAO_ASSINADO_DATABOOK`. Nenhum relatório
+  assinado ficou fora de livro aberto.
+
+  ⚠ **Para revisar:**
+  - (a) a conciliação das rodadas (reprovada entra, intermediária não) foi decisão minha entre duas regras
+    do Vitor;
+  - (b) quatro seções voltaram a PENDENTE, o que trava a emissão desses livros até as assinaturas;
+  - (c) `aoConcluirAssinaturas` roda dentro do `try` do convite do próximo assinante; se o convite
+    lançar antes, o vínculo fica para a próxima sincronização.

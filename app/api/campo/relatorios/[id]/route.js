@@ -106,9 +106,11 @@ export async function PATCH(req, { params }) {
     // vigente: é o que evidencia o retrabalho. Falhar aqui não pode impedir a reinspeção — o
     // vínculo se refaz depois, a medição no chão de fábrica não.
     const fechada = dados.revisoes[dados.revisoes.length - 1];
-    const { anexarRevisaoNoDataBook } = await import("@/lib/relatorio-inspecao");
+    const { anexarRevisaoNoDataBook, vincularNoDataBook } = await import("@/lib/relatorio-inspecao");
     const vinculo = await anexarRevisaoNoDataBook(rel, fechada)
       .catch((e) => ({ vinculado: false, motivo: e.message }));
+    // ⚠ em reinspeção o relatório é rascunho: sai do data book até ser assinado por todos
+    await vincularNoDataBook(atualizado, null).catch(() => {});
     await prisma.auditLog.create({
       data: {
         userId: user.id, action: "REINSPECIONAR_RELATORIO", entity: "RelatorioInspecao", entityId: id,

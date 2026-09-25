@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { bloqueioRelatorioNaoAssinado } from "@/lib/relatorio-inspecao";
 
 import { estaFechado, erroPrecisaRevisao } from "@/lib/databook-revisao";
 export const runtime = "nodejs";
@@ -43,6 +44,10 @@ export async function POST(req, { params }) {
 
   const doc = await prisma.documentoQualidade.findUnique({ where: { id: body.documentoId }, select: { id: true, ativo: true } });
   if (!doc || !doc.ativo) return NextResponse.json({ success: false, error: "Documento não encontrado" }, { status: 404 });
+
+  // ⚠ só relatório ASSINADO por todos entra no livro — à mão também (Vitor, 25/09/2026)
+  const bloqueio = await bloqueioRelatorioNaoAssinado(prisma, doc.id);
+  if (bloqueio) return NextResponse.json({ success: false, error: bloqueio }, { status: 409 });
 
   await prisma.dataBookSecaoDoc.upsert({
     where: { secaoId_documentoId: { secaoId: params.secaoId, documentoId: body.documentoId } },

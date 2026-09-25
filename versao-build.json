@@ -1,7 +1,12 @@
 {
-  "build": 3479,
-  "gerado": "2026-09-25T17:12:44.678Z",
+  "build": 3480,
+  "gerado": "2026-09-25T17:40:15.761Z",
   "commits": [
+    {
+      "hash": "bb849b93",
+      "data": "25/09/2026",
+      "titulo": "Relatório de ultrassom: a peça ensaiada aparece na tabela"
+    },
     {
       "hash": "9acba6c0",
       "data": "25/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b79fbe23",
       "data": "24/09/2026",
       "titulo": "Assistente fiscal: o prazo do modelo conta desde a entrada da rota"
-    },
-    {
-      "hash": "6f71adcd",
-      "data": "24/09/2026",
-      "titulo": "Assistente fiscal: quatro achados do Codex — dinheiro, idempotência, versão e prazo"
     }
   ]
 }
