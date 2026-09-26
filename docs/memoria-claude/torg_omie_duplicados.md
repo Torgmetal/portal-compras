@@ -116,3 +116,13 @@ de contas não precisa inativar"*.
   201000098, 101000048, 101000049 — todos com saldo zero, nenhum ajuste de estoque. Caminho na tela: Compras, Estoque
   e Produção › Produtos › Exibir todos › filtro na coluna Código › selecionar a linha › painel à direita › "Inativar"
   (⚠ "Excluir" fica logo abaixo — clicar pelo elemento, nunca por coordenada).
+- **Vitor (26/09/2026, 16h30): "1 zera" (sem transferir) e "2 pode transferir" (itens do pedido 1721 → 501000014).**
+  ✅ 201000008: zerado nos 2 locais (002 Fábrica 3.890 kg, 003 Terceiro 9.002 kg) e INATIVADO. Caminho na tela:
+  Consultar Estoque › Produto › Local › "Novo Movimento" › tipo **"Ajustar o saldo de estoque do dia"**, quantidade 0,
+  motivo "Ajuste por Inventário", observação com a decisão › Confirmar (o tipo às vezes volta para "entrada" —
+  reler antes de confirmar).
+  ⏳ **Travados pelo modo automático do Claude Code** ("Modify Shared Resources") e deixados para o Vitor/permissão:
+  zerar 501000064 (715 kg, Terceiro), 101000037 (2.298 Fábrica + 112 Terceiro), 101000038 (2.013), 101000050
+  (9.798); trocar os itens 7 e 8 do pedido 1721 (392,4 e 196,2 kg, nada recebido) de 501000071 para 501000014
+  (Compra de Produto › Exibir todos › 1721 › Editar › Editar Item › Produto) e depois inativar o 501000071. ⚠ No
+  portal, a RM T102-001-R00 continua com o código 501000071 nos 2 itens.
