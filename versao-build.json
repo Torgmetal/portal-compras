@@ -1,7 +1,12 @@
 {
-  "build": 3508,
-  "gerado": "2026-09-26T15:41:07.540Z",
+  "build": 3509,
+  "gerado": "2026-09-26T15:41:07.770Z",
   "commits": [
+    {
+      "hash": "71fc548412",
+      "data": "26/09/2026",
+      "titulo": "Fiscal: Inteligência com 4 abas do dia a dia; o resto em Administração (só ADMIN)"
+    },
     {
       "hash": "c120743162",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "5cdeb4e1a8",
       "data": "25/09/2026",
       "titulo": "Data book: certificado que chega depois entra sozinho na seção já montada"
-    },
-    {
-      "hash": "696eb72d86",
-      "data": "25/09/2026",
-      "titulo": "Memória: data book da OP-102 fechado — 10 peças por troca SEM_R e 11 certificados na §04"
     }
   ]
 }

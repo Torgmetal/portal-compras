@@ -28,6 +28,14 @@ describe("ParcelaMedicao", () => {
     expect(screen.getByRole("button", { name: /Auditar parcela/ }).disabled).toBe(true);
   });
 
+  it("⚠ quantidade com decimal vem cheia e VÁLIDA (1803.7 não pode virar 18037)", () => {
+    const onAuditar = vi.fn();
+    render(<ParcelaMedicao itens={[{ item: 2, descricao: "Pilaretes", ncm: "94069020", cfop: "5101", quantidade: 1803.7, valor: 18037 }]} onAuditar={onAuditar} />);
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Auditar parcela/ }));
+    expect(onAuditar).toHaveBeenCalledWith([{ item: 2, quantidade: 1803.7 }]);
+  });
+
   it("nenhum item marcado trava o botão", () => {
     render(<ParcelaMedicao itens={ITENS} onAuditar={vi.fn()} />);
     fireEvent.click(screen.getByLabelText("Incluir item 1"));

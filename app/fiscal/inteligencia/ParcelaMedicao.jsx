@@ -19,7 +19,9 @@ const numero = (s) => Number(String(s ?? "").replace(/\./g, "").replace(",", "."
 export default function ParcelaMedicao({ itens, carregando, onAuditar, esperados, totais }) {
   const [sel, setSel] = useState({});
   useEffect(() => {
-    setSel(Object.fromEntries((itens ?? []).map((i) => [i.item, { marcado: true, qtd: String(i.quantidade ?? "") }])));
+    // ⚠ A quantidade padrão sai no formato BRASILEIRO: "1803.7" lido por `numero` (que tira o ponto de
+    // milhar) virava 18037 — acima do pedido — e o item inteiro era recusado ao ser marcado.
+    setSel(Object.fromEntries((itens ?? []).map((i) => [i.item, { marcado: true, qtd: i.quantidade == null ? "" : String(i.quantidade).replace(".", ",") }])));
   }, [itens]);
 
   const linhas = useMemo(() => (itens ?? []).map((i) => {
