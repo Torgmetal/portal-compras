@@ -1,7 +1,12 @@
 {
-  "build": 3516,
-  "gerado": "2026-09-26T17:16:56.178Z",
+  "build": 3517,
+  "gerado": "2026-09-26T17:20:50.550Z",
   "commits": [
+    {
+      "hash": "fe64938f",
+      "data": "26/09/2026",
+      "titulo": "Assistente Fiscal: contrato das ferramentas descrito e cabeçalho beta de cache removido"
+    },
     {
       "hash": "cf3f61fe",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e4074373",
       "data": "25/09/2026",
       "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
-    },
-    {
-      "hash": "7a2d9ecd",
-      "data": "25/09/2026",
-      "titulo": "R desativado fora da escolha; a separação passa a conferir o material"
     }
   ]
 }
