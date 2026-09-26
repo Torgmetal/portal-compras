@@ -1,5 +1,5 @@
 // Desenhos (projetos) da peça no SharePoint da Engenharia + controle de liberação (GRD).
-// GET  ?opNumero=&marca= — busca os PDFs da marca em {OP}/2. Engenharia/2.5 Projetos/2.5.2 Fabricação
+// GET  ?opNumero=&marca= — os PDFs da marca em {OP}/2. Engenharia/2.5 Projetos/2.5.2 Fabricação
 //        (conjunto em .../2.5.2.3 Conjunto/{frente}/{A1..A4}/{marca}.pdf → formato = pasta-mãe;
 //         croqui em .../2.5.2.2 Croqui/{frente}/{marca} - CROQUI.pdf → A4) + as liberações GRD já
 //        registradas da marca. Ignora OBSOLETOS.
@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { casaMarca } from "@/lib/pasta-engenharia";
+import { arquivosDaFabricacao, desenhosDaMarca } from "@/lib/desenhos-fabricacao";
 import { requireRole } from "@/lib/session";
 import { getAccessToken, acharPastaOp, uploadFileToFolder } from "@/lib/sharepoint";
 import { rastreioDoConjunto } from "@/lib/rastreio-peca";
@@ -26,7 +26,7 @@ import { formatoDoPdf } from "@/lib/formato-folha";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60; // baixar A1 do SharePoint + carimbar + subir
+export const maxDuration = 120; // varrer a pasta de fabricação (GET) ou baixar A1 + carimbar + subir (POST)
 
 const ROLES = ["ADMIN", "PLANEJAMENTO", "PCP", "PRODUCAO", "COMERCIAL"];
 const GRAPH = "https://graph.microsoft.com/v1.0";
@@ -57,45 +57,11 @@ export async function GET(req) {
   try {
     const base = await acharPastaOp(opNumero);
     if (!base) throw new Error("Pasta da OP não encontrada no SharePoint.");
-    const fab = `${base}/2. Engenharia/2.5 Projetos/2.5.2 Fabricação`;
-    const token = await getAccessToken();
-    const driveId = process.env.SHAREPOINT_DRIVE_ID;
-    const url = `${GRAPH}/drives/${driveId}/root:${encodeURI(fab)}:/search(q='${encodeURIComponent(marca)}')?$select=id,name,size,file,parentReference&$top=200`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) throw new Error(`SharePoint HTTP ${res.status}`);
-    const data = await res.json();
-    // ⚠⚠ O CARIMBADO NÃO É DESENHO PARA IMPRIMIR — é o RESULTADO de uma impressão. Vitor
-    // (26/08/2026) viu "105A-P34 - RASTREADO 26-08 17-38.pdf" listado com botão de imprimir do
-    // lado do croqui: imprimir aquilo criaria uma GRD de um arquivo que já É uma GRD, e a segunda
-    // via nasceria como liberação nova em vez de somar na existente. O emitido se abre pelo "ver
-    // emitido" da própria GRD, que é onde ele significa alguma coisa.
-    const ehCarimbado = (n) => /\bRASTREADO\b/i.test(n) || /^LOTE\s/i.test(n);
-    const pdfs = (data.value || []).filter((x) => x.file && /\.pdf$/i.test(x.name) && casaMarca(x.name, marca)
-      && !/obsolet/i.test(x.name) && !ehCarimbado(x.name));
-
-    // formato = nome da pasta-mãe (A1..A4); croqui identifica pelo nome. Resolve o pai por id
-    // (o search não devolve o path) e descarta o que estiver em OBSOLETOS.
-    // Os PDFs de uma marca quase sempre dividem a MESMA pasta — resolver por arquivo era uma ida
-    // ao Graph por item e deixava o modal lento. Resolve uma vez por pasta. (Vitor 19/08.)
-    const nomePasta = new Map();
-    const resolvePasta = async (id) => {
-      if (!id) return "";
-      if (nomePasta.has(id)) return nomePasta.get(id);
-      let nome = "";
-      try {
-        const rp = await fetch(`${GRAPH}/drives/${driveId}/items/${id}?$select=name`, { headers: { Authorization: `Bearer ${token}` } });
-        if (rp.ok) nome = (await rp.json()).name || "";
-      } catch {}
-      nomePasta.set(id, nome);
-      return nome;
-    };
-    await Promise.all([...new Set(pdfs.map((x) => x.parentReference?.id).filter(Boolean))].map(resolvePasta));
-    arquivos = (await Promise.all(pdfs.map(async (x) => {
-      const pastaMae = await resolvePasta(x.parentReference?.id);
-      if (/obsolet/i.test(pastaMae)) return null;
-      const formato = /^A[1-4]$/i.test(pastaMae) ? pastaMae.toUpperCase() : (/croqui/i.test(x.name) ? "A4 (croqui)" : null);
-      return { itemId: x.id, nome: x.name, formato, sizeKb: Math.round((x.size || 0) / 1024) };
-    }))).filter(Boolean).sort((a, b) => String(a.nome).localeCompare(String(b.nome)));
+    // ⚠⚠ ERA UMA BUSCA, E A BUSCA DO GRAPH DEVOLVE 500 NESTE DRIVE DESDE 22–23/09/2026 — o modal
+    // ficou vazio em 7 telas de PCP/produção sem avisar ninguém, porque as liberações de GRD já
+    // gravadas continuavam aparecendo. Agora a pasta é varrida por caminho, com cache por OP.
+    // Ver `lib/desenhos-fabricacao.js` e `docs/memoria-claude/torg_graph_busca_500.md`.
+    arquivos = desenhosDaMarca(await arquivosDaFabricacao(base), marca);
   } catch (e) {
     erroSp = e?.message || "Falha ao consultar o SharePoint.";
   }

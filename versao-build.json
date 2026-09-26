@@ -1,7 +1,12 @@
 {
-  "build": 3490,
-  "gerado": "2026-09-26T14:31:19.026Z",
+  "build": 3495,
+  "gerado": "2026-09-26T14:44:16.703Z",
   "commits": [
+    {
+      "hash": "24663567",
+      "data": "26/09/2026",
+      "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
+    },
     {
       "hash": "13b279d4",
       "data": "26/09/2026",
@@ -11,6 +16,26 @@
       "hash": "72310a4e",
       "data": "26/09/2026",
       "titulo": "Estoque: o Terceiro soma na Qtd — é material da Torg e pode ser usado"
+    },
+    {
+      "hash": "b9bd0339",
+      "data": "26/09/2026",
+      "titulo": "docs: o search do Graph devolve 500 e derrubou 6 pontos — o que foi medido"
+    },
+    {
+      "hash": "676c23d5",
+      "data": "26/09/2026",
+      "titulo": "Remove o cron sync-sharepoint do PCP — abandonado, e ninguém olhava"
+    },
+    {
+      "hash": "9b2368a8",
+      "data": "26/09/2026",
+      "titulo": "CMR: reconciliação morria por tempo sem registrar — 300 s e varredura das pastas em paralelo"
+    },
+    {
+      "hash": "0ab3c374",
+      "data": "26/09/2026",
+      "titulo": "SharePoint: a pasta da Engenharia é lida inteira, não só a 1ª página"
     },
     {
       "hash": "e4074373",
@@ -126,31 +151,6 @@
       "hash": "6b908b7b",
       "data": "24/09/2026",
       "titulo": "Prazos das RMs: data anterior da remarcação em destaque"
-    },
-    {
-      "hash": "6460d54a",
-      "data": "24/09/2026",
-      "titulo": "Assistente fiscal: reenvio depois de queda repete a tentativa inteira, não só a chave"
-    },
-    {
-      "hash": "3b01fcb8",
-      "data": "24/09/2026",
-      "titulo": "Prazos das RMs: remarcação interna aparece com observação; nova etapa \"Entrega\""
-    },
-    {
-      "hash": "1ad14826",
-      "data": "24/09/2026",
-      "titulo": "Busca da RM não devolve mais produto inativo no Omie"
-    },
-    {
-      "hash": "7f5778d4",
-      "data": "24/09/2026",
-      "titulo": "Tekla: planilha nova também quando um código sai ou muda de descrição"
-    },
-    {
-      "hash": "244a50f4",
-      "data": "24/09/2026",
-      "titulo": "Engenharia: planilha de perfis e parafusos do Omie para o Tekla"
     }
   ]
 }
