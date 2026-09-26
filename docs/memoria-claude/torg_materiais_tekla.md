@@ -43,3 +43,20 @@ deixar ela somente com perfis e parafusos"*.
   designação lida: 2 perfis (descrição truncada; "2,25M"). Sem medida: 1 parafuso.
 - **Conferido contra o real (24/09 noite):** Omie ao vivo × planilha das 17h02 = 1.087 × 1.087 códigos,
   0 mudança — a regra nova não gera arquivo à toa.
+
+**As normas do Tekla e o "Omie automático" (26/09/2026).** Na sessão do Tekla (PC Windows) foram criados os
+materiais TORG: **A36, A572-GR.50, MULTINORMA, CIVIL 300**. O "Omie automático" (DLL no Tekla) escolhe o código pelo
+perfil e, entre os códigos do mesmo perfil, pelo material da peça; **sem código na norma da peça, fica o A36** (nunca
+multinormas). Ele lê a norma da DESCRIÇÃO (via esta planilha: `materialDe` + descrição).
+- ⚠⚠ **A NORMA MORA NA DESCRIÇÃO DO OMIE, no padrão da família** ("A-36", "A 572 GR.50", "MULTINORMAS COMERCIAL",
+  "USI CIVIL 300"). Vitor perguntou se a descrição se mantém: sim — só se corrige grafia que impede o casamento.
+- ⚠⚠ **"SEM CÓDIGO NO OMIE" QUASE SEMPRE É GRAFIA, NÃO FALTA.** Medido nos 12 meses de listas: a L152X12.7 da RM da
+  OP-124 existe (401000058 "1/2 X 6POL", de 23/07 — o Tekla não converte cantoneira em mm para polegada; a peça veio
+  do NC1 do cliente com nome métrico); a W200X86 existe (501000103, escrita "WH200"); a U3"X7.44 existe (601000002,
+  escrita "7,40", o catálogo diz 7,44). Criar teria gerado duplicado. **Conferir a grafia antes de cadastrar.**
+- ⚠ **Chapa: o Tekla escolhe pela espessura e ignora a norma** (só xadrez/inox mudam o tipo), e lê os códigos de chapa
+  da tabela dele (Omie.dat), não desta planilha (que não tem chapa). Chapa CIVIL 300 só sai sozinha depois de ajuste
+  no programa do Tekla.
+- **Decisão do Vitor (26/09):** CIVIL 300 é o padrão; a USI CIVIL 350 (101000048/49, criadas em 29/04, nunca
+  compradas) não será comprada. Faltavam de verdade só a cantoneira 4" x 7/16" (T64T, sem compra) e as chapas CIVIL 300
+  (T92/T60B: 3; 4,75; 6,30; 9,50; 12,50; 16; 19; 31,50; 44,50 mm). Ver [[torg_omie_cadastro_fiscal]].

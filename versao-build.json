@@ -1,7 +1,12 @@
 {
-  "build": 3520,
-  "gerado": "2026-09-26T17:40:12.458Z",
+  "build": 3521,
+  "gerado": "2026-09-26T18:36:25.875Z",
   "commits": [
+    {
+      "hash": "cb671756",
+      "data": "26/09/2026",
+      "titulo": "docs: duplicados do Omie revalidados em 26/09 — 3 chapas inativadas com saldo"
+    },
     {
       "hash": "3e38aa95",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b9bd0339",
       "data": "26/09/2026",
       "titulo": "docs: o search do Graph devolve 500 e derrubou 6 pontos — o que foi medido"
-    },
-    {
-      "hash": "676c23d5",
-      "data": "26/09/2026",
-      "titulo": "Remove o cron sync-sharepoint do PCP — abandonado, e ninguém olhava"
     }
   ]
 }

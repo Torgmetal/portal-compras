@@ -96,3 +96,18 @@ decisão de custo (Contabilidade), feita no Omie; nenhuma reserva de OP nas 3.
   pedido 1721 aberto). Duplicados ativos hoje: 8 grupos (5 perfis, 3 tubos); cadastro com 2.493 produtos, 4 inativos.
 - Script da revalidação (scratchpad): `omie-validar.mjs` (cadastro ao vivo + pedidos abertos + saldo em TODOS os
   locais + RM + entrada de nota + duplicados).
+
+**Decisões do Vitor (26/09/2026, noite).** *"todos que estiverem como PRD está errado deve inativar e se encontrar
+algum escrito Cópia antes da descrição pode inativar também"*, *"pode zerar o estoque de todos os itens que vc
+inativar"* e, sobre os PRD em uso: *"faça apenas para materiais e itens de materiais auxiliares, serviços ou esses tipos
+de contas não precisa inativar"*.
+- ⚠⚠ **PRD = código automático do Omie (produto criado sem código), mas NEM TODO PRD É LIXO.** PRD00001 ENERGIA ELETRICA
+  é o produto da conta de luz (nota todo mês); PRD00012/PRD00017 ARMAÇÃO… estão em notas de VENDA de set/26 (saldo
+  negativo). Esses, as máquinas (PRD00008/10) e o manômetro sem família (PRD00007) FICAM.
+- **A inativar (todos com saldo zero em todos os locais):** PRD00004, PRD00005, PRD00009, PRD00011, PRD00015;
+  duplicados 501000008 (W200x71 sem uso — fica o 501000070, que tem 15 t), 501000082, 201000040, 201000098; CIVIL 350
+  101000048/49. Na hora de escolher QUAL do par sai, sai o sem saldo/sem uso.
+- ⚠ **Pendentes (26/09):** 201000008 (tubo 42,40×2,65, 12,9 t — fica o 201000048, que tem os pedidos) e 501000064
+  (715 kg — fica o 501000003) têm aço de verdade: zerar sem dar entrada no código que fica tira o estoque contábil;
+  perguntado ao Vitor se transfere. 501000071 está no pedido 1721 aberto. Inativar é só pela tela, e o Omie do Chrome
+  pede login.
