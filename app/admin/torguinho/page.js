@@ -18,16 +18,23 @@ const MODULOS = [
 
 const MODELOS = [
   {
-    value: "claude-haiku-4-5",
-    label: "Haiku (Rápido e econômico)",
-    descricao: "Ideal para chat. Respostas em ~2s. Custo estimado: < R$20/mês para uso normal.",
+    value: "auto",
+    label: "Automático",
+    descricao: "Haiku nas perguntas simples; Sonnet nas complexas, com anexo ou que pedem várias consultas.",
     badge: "Recomendado",
     badgeCor: "bg-green-100 text-green-700",
   },
   {
-    value: "claude-sonnet-4-5",
+    value: "claude-haiku-4-5",
+    label: "Haiku (Rápido e econômico)",
+    descricao: "Sempre o Haiku. Respostas em ~2s. Custo estimado: < R$20/mês para uso normal.",
+    badge: "Econômico",
+    badgeCor: "bg-gray-100 text-gray-700",
+  },
+  {
+    value: "claude-sonnet-4-6",
     label: "Sonnet (Mais inteligente)",
-    descricao: "Raciocínio mais profundo, melhor para consultas complexas. ~4× mais caro que Haiku.",
+    descricao: "Sempre o Sonnet. Raciocínio mais profundo, melhor para consultas complexas. ~3× mais caro que Haiku.",
     badge: "Premium",
     badgeCor: "bg-blue-100 text-blue-700",
   },

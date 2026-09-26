@@ -1,7 +1,12 @@
 {
-  "build": 3514,
-  "gerado": "2026-09-26T17:10:50.183Z",
+  "build": 3515,
+  "gerado": "2026-09-26T17:12:48.626Z",
   "commits": [
+    {
+      "hash": "344ed047",
+      "data": "26/09/2026",
+      "titulo": "IA: respostas no formato estruturado da API em vez de \"responda SOMENTE com JSON\""
+    },
     {
       "hash": "18e2078d",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "79e86348",
       "data": "25/09/2026",
       "titulo": "Chapa de 10 mm é a de 3/8\" (9,5) e a de 12 mm é a de 1/2\" (12,5) — só chapa"
-    },
-    {
-      "hash": "c17f15b9",
-      "data": "25/09/2026",
-      "titulo": "Relatório de ultrassom: todo o cabeçalho editável, no computador e no celular"
     }
   ]
 }

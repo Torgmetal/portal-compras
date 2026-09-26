@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getToolsParaUser } from "@/lib/assistente/tools";
 import { executarTool } from "@/lib/assistente/executar-tools";
 import { buildSystemPrompt } from "@/lib/assistente/system-prompt";
+import { modeloForcadoDe } from "@/lib/assistente/modelo";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 import { log } from "@/lib/log";
 
@@ -82,9 +83,9 @@ export async function POST(req) {
     configDb = await prisma.configAssistente.findFirst();
   } catch { /* usa defaults se banco indisponível */ }
 
-  // Modelo: respeita override explícito do admin; senão escolhe pela pergunta.
+  // Modelo: respeita o modelo fixado pelo admin; com "auto", escolhe pela pergunta.
   const ultimaPergunta = [...historico].reverse().find((m) => m.role === "user")?.content || "";
-  const modeloForcado = configDb?.modelo || null;
+  const modeloForcado = modeloForcadoDe(configDb);
   // Anexos (ler/transformar arquivos, visão) exigem o modelo mais capaz.
   let modelo = modeloForcado || ((perguntaComplexa(ultimaPergunta) || anexos.length) ? MODELO_COMPLEXO : MODELO_SIMPLES);
 
