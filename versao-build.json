@@ -1,7 +1,12 @@
 {
-  "build": 3486,
-  "gerado": "2026-09-26T13:56:45.552Z",
+  "build": 3487,
+  "gerado": "2026-09-26T14:23:08.235Z",
   "commits": [
+    {
+      "hash": "676c23d5",
+      "data": "26/09/2026",
+      "titulo": "Remove o cron sync-sharepoint do PCP — abandonado, e ninguém olhava"
+    },
     {
       "hash": "9b2368a8",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "08fc4cde",
       "data": "24/09/2026",
       "titulo": "Prazos das RMs: data futura é previsão — e \"recebido\" futuro não é chegada"
-    },
-    {
-      "hash": "842c3700",
-      "data": "24/09/2026",
-      "titulo": "Relatórios de inspeção: data book puxava a cópia sem assinatura; carimbo de convite desviado"
     }
   ]
 }
