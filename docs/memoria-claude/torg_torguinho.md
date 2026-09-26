@@ -14,6 +14,9 @@ desde 12/06 (Sonnet na pergunta complexa, com anexo ou depois da 3ª rodada), nu
 26/09/2026 o valor `"auto"` deixa a rota escolher (`lib/assistente/modelo.js`, opção "Automático" em
 Admin › Torguinho). Enquanto ninguém escolher "Automático" lá, continua tudo no Haiku.
 
+**Decisão do Vitor (26/09/2026): o Torguinho fica no Haiku** — "deixa como está o Torguinho". A opção
+"Automático" existe na tela, mas não foi escolhida; não propor a troca de novo sem ele pedir.
+
 ⚠⚠ **PESO PRODUZIDO DE UMA OP = kg DO SETOR MAIS AVANÇADO COM APONTAMENTO, nunca a soma dos setores:** a peça é
 apontada em cada setor por onde passa. A ferramenta `consultar_mes_producao` devolvia `totalKg` somado (o
 número que o próprio prompt proibia usar). Medido em 26/09: para a OP-97 o Haiku respondeu **59.660 kg**; com
