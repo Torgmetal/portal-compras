@@ -2340,3 +2340,14 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   certificado CP-01 sai com a data de calibração/emissão quando o campo está vazio, e na RNC da Dan Power a IA
   costuma pôr o cliente final (COMBIO) como emitente; (d) produtividade: mover a faixa de kg/m e a soma para o
   código depende de decidir o método (média da peça × perfil a perfil).
+- **(26/09, noite) Cadastro de produtos do Omie no portal (`ProdutoOmie`) passa a atualizar todo dia.** Vitor:
+  *"pode ser desde que vc não diga que será um problema para o nosso banco de dados"*. `vercel.json`:
+  `/api/compras/produtos-omie/sincronizar` de `0 5 * * 1` para `0 5 * * *` (02:00 em Brasília). Carga: o
+  `sincronizarProdutosOmie` grava ~2.500 linhas em 5 statements UNNEST constantes pelo `prismaDirect` (o padrão
+  anti-OOM do CLAUDE.md) e 5 `ListarProdutos` no Omie — o cron de estoque (`0 6-20 * * *`) já grava o mesmo cadastro
+  no `EstoqueItem` 15 vezes por dia. A tolerância do monitor cai sozinha de 252 h para 36 h (`lib/cron-agenda.js`).
+  Comentários que diziam "semanal/às segundas" corrigidos (rota, `omie-produtos`, `materiais-tekla-publicar`,
+  `omie-estoque-movimentos` e o nome de um teste). Suíte 4.343/4.343, `checar` limpo. Sem tela afetada.
+  ⚠ **Para revisar:** (a) a compute do Neon já acorda de hora em hora pelo `pasta-engenharia` (`10 * * * *`), então
+  02:00 não é um despertar a mais; (b) os 10 produtos criados desde segunda (entre eles as 9 chapas CIVIL 300 de
+  26/09) só entram no cache na próxima madrugada — o botão "Atualizar produtos" faz na hora.

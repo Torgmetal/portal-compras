@@ -223,9 +223,9 @@ describe("sincronizarMovimentacoes — os campos lidos", () => {
 });
 
 describe("sincronizarMovimentacoes — o produto (idProd numérico → código do portal)", () => {
-  // ⚠ Produto novo nasce na entrada da nota e o cache `ProdutoOmie` é SEMANAL: sem a consulta, o
-  // movimento dele cairia fora da janela de 2 dias antes de o cache saber que ele existe.
-  it("produto fora do cache semanal é consultado no Omie pelo codigo_produto", async () => {
+  // ⚠ Produto novo nasce na entrada da nota e o cache `ProdutoOmie` só é atualizado de madrugada: sem
+  // a consulta, o movimento dele esperaria o dia seguinte (ou sairia da janela se o sync falhasse).
+  it("produto fora do cache é consultado no Omie pelo codigo_produto", async () => {
     omieResponde({
       paginas: [pagina([movimento({ idProd: 7828050860 })])],
       consultar: async (p) => ({ codigo_produto: p.codigo_produto, codigo: "301000010" }),

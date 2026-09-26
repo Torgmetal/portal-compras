@@ -1,7 +1,10 @@
 // Sincroniza o CADASTRO DE PRODUTOS do Omie pro cache local (ProdutoOmie).
-// POST = botão "Atualizar produtos"; GET = cron semanal (CRON_SECRET).
+// POST = botão "Atualizar produtos"; GET = cron diário, 05:00 UTC (CRON_SECRET).
 // O portal só conhecia os itens que já passaram por uma RM (~190 de 2.4k) — perfis existentes no
 // Omie apareciam "sem código" no romaneio de terceiro. (Vitor 18/08.)
+// ⚠ Era SEMANAL (segunda) até 26/09/2026: produto cadastrado na terça só chegava ao portal na
+// segunda seguinte. Diário custa 5 statements UNNEST de 500 linhas por dia — o cron de estoque já
+// grava o mesmo cadastro no `EstoqueItem` 15 vezes por dia.
 import { NextResponse } from "next/server";
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { prisma } from "@/lib/prisma";

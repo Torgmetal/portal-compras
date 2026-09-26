@@ -1,7 +1,12 @@
 {
-  "build": 3527,
-  "gerado": "2026-09-26T22:45:47.303Z",
+  "build": 3528,
+  "gerado": "2026-09-26T23:41:35.778Z",
   "commits": [
+    {
+      "hash": "9fef5953",
+      "data": "26/09/2026",
+      "titulo": "docs: famílias de 134 produtos no Omie e três armadilhas da API de produto (26/09)"
+    },
     {
       "hash": "cc0a79f4",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f2050d99",
       "data": "26/09/2026",
       "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
-    },
-    {
-      "hash": "ddcef2ed",
-      "data": "26/09/2026",
-      "titulo": "Estoque: o cron de produtos tinha 60 s e morria gravando — agora 300 s"
     }
   ]
 }
