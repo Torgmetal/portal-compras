@@ -1,6 +1,6 @@
 ---
 name: torg_graph_busca_500
-description: O search do Graph neste drive devolve HTTP 500 desde 22–23/09/2026 e derrubou SEIS pontos, só UM com alarme; corrigidos os DOIS maiores (modal de desenhos e cron do LQC) listando por caminho — delta e varredura cega NÃO servem (medido)
+description: O search do Graph neste drive devolve HTTP 500 desde 22–23/09/2026 e derrubou SEIS pontos, só UM com alarme; os SEIS foram corrigidos listando por caminho — delta e varredura cega NÃO servem (medido), e o modelo em branco da LQC vinha sendo escolhido por data, o que já era bug
 metadata:
   type: project
 ---
@@ -23,10 +23,10 @@ e tela que falha não manda e-mail para ninguém:
 |---|---|---|
 | ✅ `lib/lqc-sharepoint.js` (`listarLqcs`) | cron `lqc-sharepoint` | **sim** — 65 h sem sucesso |
 | ✅ `app/api/producao/desenhos/route.js` | **modal de desenhos, em 7 telas de PCP/produção** | não |
-| `lib/lqc-planilha.js` (`baixarModeloLqc`) | criar LQC no portal (modelo em branco) | não |
-| `lib/lqc-op-servidor.js` (`lerFonteLqc`) | gerar OP a partir da LQC | não |
-| `lib/databook-arquivo.js` (`procurarArquivoPorNome`) | 4º degrau que resgata certificado movido | não |
-| `lib/sharepoint-lpc.js` (`buscarLpcDaOp`) | importar revisão de LPC | não |
+| ✅ `lib/lqc-planilha.js` (`baixarModeloLqc`) | criar LQC no portal (modelo em branco) | não |
+| ✅ `lib/lqc-op-servidor.js` (`lerFonteLqc`) | gerar OP a partir da LQC | não |
+| ✅ `lib/databook-arquivo.js` (`procurarArquivoPorNome`) | 4º degrau que resgata certificado movido | não |
+| ✅ `lib/sharepoint-lpc.js` (`buscarLpcDaOp`) | importar revisão de LPC | não |
 
 ⚠ O modal de desenhos degrada **quieto**: as liberações de GRD já gravadas continuam aparecendo
 (vêm do banco), só a lista de PDFs disponíveis fica vazia. Marca que já tem GRD parece normal.
@@ -99,6 +99,46 @@ segura a cota. Medido contra a produção: **46,5 s, 659 pastas, 90 LQC de 2026 
 idêntico ao levantamento independente. ⚠ **De-dup pelo `id` do drive**: a mesma LQC aparece em duas
 pastas quando a obra sai de "Solicitados" para "Concluidos" e a cópia velha fica.
 
-⚠ **Sobraram quatro pontos, todos sem alarme** — criar LQC (`baixarModeloLqc`), gerar OP pela LQC
-(`lerFonteLqc`), o 4º degrau do Data Book (`procurarArquivoPorNome`) e o import de revisão de LPC
-(`buscarLpcDaOp`). Todos têm a pasta conhecida e resolvem com o mesmo `lib/sharepoint-arvore.js`.
+## Os outros quatro, fechados no mesmo dia
+
+Medido contra a produção depois de cada troca:
+
+| ponto | custo agora |
+|---|---|
+| `baixarModeloLqc` | **1,9 s** (varre só a pasta `000-…`; a varredura inteira ficou de reserva) |
+| `procurarArquivoPorNome` | **3,3 s**, e reencontrou o `R 261163.pdf` em "Certificados 2026/Certificados Digitalizados" |
+| `buscarLpcDaOp` | 10–16 s por OP (OP-102 2 obras, OP-103 1, OP-105 3) |
+| `lerFonteLqc` | **45 s** — ver abaixo |
+
+⚠ **`procurarArquivoPorNome` MUDOU DE ARQUIVO**, de `lib/sharepoint.js` para
+`lib/sharepoint-arvore.js`. Ela era uma busca; agora é varredura. Quem procurar por ela no lugar
+antigo acha um comentário apontando o novo.
+
+⚠ **O cabeçalho de `lib/sharepoint-lpc.js` dizia "NÃO faz crawl recursivo (a árvore de cada OP é
+enorme)".** Não é: medido, ~130 pastas e 8–9 s. Aquilo foi escrito quando a varredura era
+sequencial. Documentação que envelhece vira decisão errada — por isso a medida ficou no lugar.
+
+⚠⚠ **`lerFonteLqc` LEVA 45 s E EU NÃO ESTREITEI, DE PROPÓSITO.** Dava para olhar só a pasta
+numerada do orçamento (~3 s), mas a garantia desta função é *"existe UMA cópia desta planilha no
+servidor"* — e a LQC-295-26-R01 está em DUAS pastas (`2. Concluidos/295-26-DANPOWER-ENC0337` e
+`1. Solicitados/24_09 - DANPOWER-REVISÃO - VITOR`). Estreitando, ela escolheria uma em silêncio.
+Gerar OP com a planilha errada é pior que esperar. `maxDuration` das duas rotas: 60 → **300 s**.
+
+## Dois achados de DADO que apareceram na prova (não são defeito de código)
+
+⚠ **Estudo 295** recusa com "há mais de uma cópia": são duas mesmo, a cópia velha ficou para trás
+quando a obra saiu de "Solicitados". Alguém precisa apagar uma.
+⚠ **Estudo 316** aponta para `LQC-316-26-TMSA-ETC-MB-0141-TORG-R00.xlsx`, e o que existe é
+`LQC-316-26-QWS-REVAMP-4-TORG-R000.xlsx`. A origem do estudo está desatualizada.
+
+## ⚠⚠ E um bug que a correção revelou: o modelo em branco era escolhido pela DATA
+
+`baixarModeloLqc` ficava com a cópia **mais recente** do `LQC-000-00-CLIENTE-OBRA-TORG-R00.xlsx`, e
+existem **quatro** no servidor — três dentro da pasta de uma obra de verdade (`117-26-TAKRAF`,
+`235-26-MEGASTEAM`, `291-26-TESTE`). Bastava alguém mexer numa delas para o portal passar a exportar
+o estudo em cima da planilha da TAKRAF. Agora vence a que está na pasta do modelo (número
+todo-zero); sem nenhuma lá, volta a mais recente **com aviso na tela**, porque exportar com uma
+cópia é ruim e não exportar é pior.
+
+⚠ Só dá para distinguir porque a varredura por pasta traz o **caminho** — a busca do Graph não
+trazia. O defeito existia desde sempre e ninguém tinha como vê-lo.
