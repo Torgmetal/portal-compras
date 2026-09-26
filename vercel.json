@@ -138,6 +138,10 @@
       "schedule": "30 4 * * *"
     },
     {
+      "path": "/api/cron/fiscal-ibs-cbs",
+      "schedule": "50 4 * * *"
+    },
+    {
       "path": "/api/cron/fiscal-legislacao",
       "schedule": "40 4 * * 1"
     }

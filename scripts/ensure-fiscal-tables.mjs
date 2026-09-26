@@ -305,6 +305,20 @@ const sql = [
   `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalUsoIa_userId_dia_key" ON "FiscalUsoIa"("userId","dia")`,
   `CREATE INDEX IF NOT EXISTS "FiscalUsoIa_dia_idx" ON "FiscalUsoIa"("dia")`,
 
+  // ⚠ Regras de IBS/CBS aprendidas das NF-e de saída (lib/fiscal/coleta-ibs-cbs.js). O ÚNICO por
+  // alíquotas é o que faz divergência virar duas linhas — e o `ON CONFLICT` da gravação depende dele.
+  `CREATE TABLE IF NOT EXISTS "FiscalRegraIbsCbs" (
+     "id" TEXT PRIMARY KEY,
+     "ncm" TEXT NOT NULL,
+     "cfop" TEXT NOT NULL,
+     "pCbs" DOUBLE PRECISION NOT NULL,
+     "pIbsUf" DOUBLE PRECISION NOT NULL,
+     "qtdNotas" INTEGER NOT NULL DEFAULT 0,
+     "primeiraNf" TEXT, "primeiraEm" TEXT, "ultimaNf" TEXT, "ultimaEm" TEXT,
+     "atualizadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "FiscalRegraIbsCbs_ncm_cfop_pCbs_pIbsUf_key" ON "FiscalRegraIbsCbs"("ncm","cfop","pCbs","pIbsUf")`,
+  `CREATE INDEX IF NOT EXISTS "FiscalRegraIbsCbs_ncm_cfop_idx" ON "FiscalRegraIbsCbs"("ncm","cfop")`,
+
   // ⚠ A identidade do conteúdo da tentativa (pergunta + conversa + anexo). Coluna NOVA em tabela que
   // já existe: `ADD COLUMN IF NOT EXISTS` é idempotente e não reescreve a tabela (nullable, sem default).
   `ALTER TABLE "FiscalMensagem" ADD COLUMN IF NOT EXISTS "tentativaHash" TEXT`,

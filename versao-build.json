@@ -1,7 +1,12 @@
 {
-  "build": 3504,
-  "gerado": "2026-09-26T15:41:06.556Z",
+  "build": 3505,
+  "gerado": "2026-09-26T15:41:06.802Z",
   "commits": [
+    {
+      "hash": "042ddcf4cc",
+      "data": "26/09/2026",
+      "titulo": "Fiscal: regras de IBS/CBS extraídas das NFs do Omie (puro)"
+    },
     {
       "hash": "8c7fde322e",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "022bdf37e3",
       "data": "25/09/2026",
       "titulo": "Memória: CMR parado de 23 a 25/09, certificados da OP-102 e as 10 peças cortadas antes do material"
-    },
-    {
-      "hash": "ec19ab4353",
-      "data": "25/09/2026",
-      "titulo": "Importação da LPC em lote: a T118B estourava os 300 s (HTTP 504)"
     }
   ]
 }

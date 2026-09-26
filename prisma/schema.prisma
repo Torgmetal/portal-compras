@@ -6997,6 +6997,26 @@ model FiscalMensagem {
 /// teto` faz o Postgres decidir, não a aplicação.
 /// ⚠ `dia` é texto "AAAA-MM-DD" em America/Sao_Paulo — o teto diário é do dia de quem trabalha,
 /// não do UTC.
+/// Alíquotas de IBS/CBS que as NOSSAS NF-e de saída usaram, por NCM × CFOP — aprendidas do `ListarNF`
+/// (lib/fiscal/coleta-ibs-cbs.js). ⚠ Uma linha por combinação de ALÍQUOTAS: divergência vira duas
+/// linhas, nunca sobrescrita. ⚠ Tabela criada por scripts/ensure-fiscal-tables.mjs (nunca db push).
+model FiscalRegraIbsCbs {
+  id           String   @id @default(cuid())
+  ncm          String
+  cfop         String
+  pCbs         Float
+  pIbsUf       Float
+  qtdNotas     Int      @default(0)
+  primeiraNf   String?
+  primeiraEm   String?
+  ultimaNf     String?
+  ultimaEm     String?
+  atualizadoEm DateTime @default(now()) @updatedAt
+
+  @@unique([ncm, cfop, pCbs, pIbsUf])
+  @@index([ncm, cfop])
+}
+
 model FiscalUsoIa {
   id            String   @id @default(cuid())
   userId        String
