@@ -14,6 +14,7 @@ vi.mock("@/lib/omie-call", () => ({ omieCall: mocks.omieCall, ORCAMENTO_ESGOTADO
 vi.mock("@/lib/db-retry", () => ({ aquecerBanco: mocks.aquecer, ehErroConexao: () => true }));
 vi.mock("@/lib/cron-monitor", () => ({ registrarExecucao: mocks.registrar }));
 vi.mock("@/lib/cron-auth", () => ({ temCronSecret: () => true }));
+vi.mock("@/lib/session", () => ({ requireRole: vi.fn().mockResolvedValue({ role: "ADMIN" }) }));
 
 import { GET, maxDuration } from "@/app/api/cron/estoque-produtos/route";
 
@@ -93,7 +94,43 @@ describe("cron estoque-produtos — o prazo cabe no maxDuration", () => {
 
     const [, , , opcoes] = mocks.omieCall.mock.calls.find(([, call]) => call === "ListarPosEstoque");
     expect(opcoes.ateMs).toBeGreaterThan(t0);
-    // 15 s de folga para gravar os ~650 itens e bater o ponto do monitor
     expect(opcoes.ateMs).toBeLessThanOrEqual(t0 + (maxDuration - 15) * 1000);
+  });
+
+  // ⚠⚠ 26/09/2026, 12h — A PRIMEIRA RODADA DO CÓDIGO NOVO FOI MORTA PELOS 60 s DA VERCEL no meio da
+  // gravação: 508 dos 657 itens gravados, sem ponto no monitor e sem os locais na configuração. A leitura
+  // do Omie foi até 39 s (o prazo era 40) e as ~650 gravações pedem ~27 s (508 levaram 21 s). E já vinha
+  // de antes: a rodada das 8h (código antigo) levou 59,8 s, e as de 9h, 10h e 11h não deixaram registro.
+  // Quebra que pega: um `maxDuration` em que o prazo de leitura não deixa tempo para gravar.
+  it("⚠⚠ depois do prazo de leitura sobra pelo menos 1 min para gravar e bater o ponto", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const t0 = new Date("2026-09-26T15:00:00Z").getTime();
+    vi.setSystemTime(t0);
+    omie([paginaPosicao(LINHAS.barra)]);
+
+    await GET(req());
+
+    const [, , , opcoes] = mocks.omieCall.mock.calls.find(([, call]) => call === "ListarPosEstoque");
+    expect(maxDuration * 1000 - (opcoes.ateMs - t0)).toBeGreaterThanOrEqual(60_000);
+    // e a leitura não pode ser tão justa quanto os 40 s que a das 12h quase estourou
+    expect(opcoes.ateMs - t0).toBeGreaterThanOrEqual(90_000);
+  });
+});
+
+describe("botão \"Sincronizar agora\" — a mesma conta", () => {
+  // A rota manual roda o mesmo `sincronizarProdutos` (com o prazo padrão) e ainda as movimentações.
+  it("⚠⚠ depois do prazo de leitura sobra pelo menos 1 min para gravar", async () => {
+    const { POST, maxDuration: maxManual } = await import("@/app/api/estoque/sync/route");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const t0 = new Date("2026-09-26T15:00:00Z").getTime();
+    vi.setSystemTime(t0);
+    omie([paginaPosicao(LINHAS.barra)]);
+
+    await POST(new Request("http://localhost/api/estoque/sync", {
+      method: "POST", body: JSON.stringify({ produtos: true, movimentacoes: false }),
+    }));
+
+    const [, , , opcoes] = mocks.omieCall.mock.calls.find(([, call]) => call === "ListarPosEstoque");
+    expect(maxManual * 1000 - (opcoes.ateMs - t0)).toBeGreaterThanOrEqual(60_000);
   });
 });

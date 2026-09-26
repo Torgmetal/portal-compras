@@ -2246,3 +2246,13 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** outras 12 listagens seguem na 1ª página (L.E. $top=100, prontuário e
   sharepoint-lista $top=200, rotas de romaneio, SGQ e orçamento). Pastas pequenas hoje; ficam anotadas em
   `torg_portao_desenho`.
+- **(26/09, 12h) Estoque: a 1ª rodada do código novo foi morta pelos 60 s da Vercel.** Deploy às 11h38; o cron das
+  12h leu o Omie até 39 s (prazo de 40) e morreu gravando: 508 dos 657 itens com o saldo novo, sem ponto no monitor,
+  `locaisOmie` ainda null (medido no banco, só leitura). O problema vinha de antes: o código antigo levou 59,8 s às
+  8h e as rodadas de 9h, 10h e 11h não deixaram registro — o cron já morria em silêncio, e 657 gravações no lugar
+  de 258 pioraram. Corrigido: `maxDuration` 300 s no cron e em `/api/estoque/sync` (o botão), prazo de leitura
+  180 s contado do início da rota. Teste `api/cron-estoque-produtos` (+2, **vermelhos com os valores antigos**:
+  *"expected 20000 to be greater than or equal to 60000"*).
+  ⚠ **Para revisar:** (a) gravar em lote (UNNEST, padrão do CLAUDE.md) em vez de ~650 `updateMany` sequenciais;
+  (b) o catálogo (`sincronizarCatalogo`) ainda usa 3 s por página sem retentativa — às 12h ele não gravou nada, e
+  falha dele segue só como aviso no log; (c) até a próxima rodada completa, 149 itens seguem com o saldo antigo.

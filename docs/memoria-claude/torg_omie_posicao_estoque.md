@@ -57,7 +57,12 @@ sobre `sincronizarProdutos` levantadas na correção das movimentações ([[torg
 - CMC = média dos locais da Qtd ponderada pelo saldo positivo → senão a de onde houver positivo → senão o
   CMC que o Omie informar (igual ao de antes para produto de um local só) → senão 0.
 - Zera quem saiu da posição: inclusive negativo e quem só tinha detalhe fora da Qtd (antes, só `> 0`).
-- Data da posição no dia de Brasília ([[torg_fuso_servidor]]); prazo de 40 s contado do início da rota.
+- Data da posição no dia de Brasília ([[torg_fuso_servidor]]).
+- ⚠⚠ **60 s NÃO CABE (26/09/2026, 12h).** A 1ª rodada do código novo foi MORTA pela Vercel no meio da
+  gravação: 508 dos 657 itens gravados, sem ponto no monitor, `locaisOmie` ainda null. Leitura até 39 s,
+  ~650 `updateMany` ≈ 27 s. E vinha de antes: o código antigo levou 59,8 s às 8h, e 9h/10h/11h morreram sem
+  registro. Agora `maxDuration` 300 s (cron e botão) e prazo de leitura de 180 s do início da rota.
+  Próximo passo natural: gravar em lote (UNNEST, padrão anti-OOM do CLAUDE.md) em vez de 650 `updateMany`.
 
 **Achados de passagem, NÃO corrigidos (mesma causa):** `app/api/omie/buscar-produto` (fallback ao vivo da
 RM: só local padrão, lê `cUnidade`), `app/api/omie/preco-medio` (manda `cCodigo`, que não está na doc do

@@ -6,7 +6,8 @@ import { requireRole } from "@/lib/session";
 import { sincronizarProdutos, sincronizarMovimentacoes } from "@/lib/omie-estoque";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// ⚠ 300 s: os produtos sozinhos passam de 60 s (ver app/api/cron/estoque-produtos/route.js, 26/09/2026).
+export const maxDuration = 300;
 
 export async function POST(req) {
   try {
