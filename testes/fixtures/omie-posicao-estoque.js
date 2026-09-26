@@ -8,6 +8,7 @@
 export const ALMOXARIFADO = 7315778267;
 export const FABRICA = 7320665233;
 export const TERCEIRO = 7572486140;
+export const EDIFICACOES = 7756631522; // local de patrimônio
 
 /** `ListarLocaisEstoque` em estoque/local/ — os seis locais cadastrados. */
 export const RESPOSTA_LOCAIS = {
@@ -61,6 +62,8 @@ export const LINHAS = {
   diluente: [linha(...DILUENTE, ALMOXARIFADO, 38, 458.078892), linha(...DILUENTE, FABRICA, 2, 365.775)],
   // só negativo, mas o Omie ainda informa o custo médio
   escova: [linha("901000026", 7318302991, "ESCOVA ACO CIRCULAR - 4.1/2&quot;", ALMOXARIFADO, -2, 13.381429)],
+  // o único saldo num local de patrimônio
+  luva: [linha("181000031", 7318304897, "LUVA DE RASPA 20CM", EDIFICACOES, 11, 0)],
 };
 
 /** Monta a página `n` de uma posição, com os totais que o Omie manda (100 linhas por página, no máximo). */

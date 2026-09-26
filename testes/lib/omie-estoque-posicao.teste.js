@@ -4,7 +4,7 @@
 // nunca chegavam à tela, e 31 apareciam NEGATIVOS (a chapa 3,00 mm dizia −6.480 com 8.159 na Fábrica).
 // A leitura por local nunca rodou: a lista de locais vinha de um serviço que não existe.
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { RESPOSTA_LOCAIS, LINHAS, paginaPosicao, ALMOXARIFADO, FABRICA, TERCEIRO } from "@/testes/fixtures/omie-posicao-estoque";
+import { RESPOSTA_LOCAIS, LINHAS, paginaPosicao, ALMOXARIFADO, FABRICA, TERCEIRO, EDIFICACOES } from "@/testes/fixtures/omie-posicao-estoque";
 
 const mocks = vi.hoisted(() => ({ omieCall: vi.fn() }));
 vi.mock("@/lib/omie-call", () => ({ omieCall: mocks.omieCall, ORCAMENTO_ESGOTADO: "Orçamento de tempo esgotado" }));
@@ -16,11 +16,11 @@ beforeEach(() => vi.clearAllMocks());
 const produto = (mapa, cod) => mapa.get(cod);
 
 describe("consolidarPosicao — uma linha por (produto, local) vira o saldo do produto", () => {
-  // Quebra que pega: somar TODOS os locais (3.071,89), ficar com a última linha (1.392,6) ou
+  // Quebra que pega: deixar o Terceiro fora (1.679,29), ficar com a última linha (1.392,6) ou
   // descartar o local negativo do detalhe.
-  it("⚠⚠ a Qtd soma Almoxarifado + Fábrica; o detalhe guarda CADA local, negativo inclusive", () => {
+  it("⚠⚠ a Qtd soma Almoxarifado + Fábrica + Terceiro; o detalhe guarda CADA local, negativo inclusive", () => {
     const p = produto(consolidarPosicao(LINHAS.chapa3), "101000002");
-    expect(p.qtdAtual).toBeCloseTo(1679.29, 6); // −6.480 + 8.159,29 — o Terceiro fica fora
+    expect(p.qtdAtual).toBeCloseTo(3071.89, 6); // −6.480 + 8.159,29 + 1.392,6
     expect(p.locaisQtd).toEqual({
       [ALMOXARIFADO]: -6480,
       [FABRICA]: 8159.29,
@@ -29,12 +29,20 @@ describe("consolidarPosicao — uma linha por (produto, local) vira o saldo do p
     expect(p.descricao).toBe("CHAPA ACO CARBONO LAMINADO A-36 ESPESSURA 3,00MM");
   });
 
-  // Quebra que pega: produto sem linha nos locais da Qtd sumir da posição (e depois ser zerado
-  // sem o detalhe), ou o Terceiro entrar na Qtd.
-  it("produto com saldo positivo só no Terceiro entra na posição, com a Qtd só dos locais dela", () => {
+  // ⚠ Vitor (26/09/2026): "o material de terceiro sim é da Torg e pode ser usado". O W610 entrou no
+  // Terceiro e foi baixado na Fábrica — sem o Terceiro na conta, sairia NEGATIVO.
+  it("⚠ o Terceiro entra na Qtd: o consumo baixado na Fábrica desconta da entrada no Terceiro", () => {
     const p = produto(consolidarPosicao(LINHAS.w610), "501000055");
-    expect(p.qtdAtual).toBeCloseTo(-5112.6, 6);
+    expect(p.qtdAtual).toBeCloseTo(121493.8, 6); // −5.112,6 + 126.606,4
     expect(p.locaisQtd).toEqual({ [FABRICA]: -5112.6, [TERCEIRO]: 126606.4 });
+  });
+
+  // Quebra que pega: patrimônio (máquinas, ferramentas, edificações) somando como material de uso,
+  // ou o produto sumindo da posição por não ter linha nos locais da Qtd.
+  it("local de patrimônio fica fora da Qtd, mas o produto e o local aparecem no detalhe", () => {
+    const p = produto(consolidarPosicao(LINHAS.luva), "181000031");
+    expect(p.qtdAtual).toBe(0);
+    expect(p.locaisQtd).toEqual({ [EDIFICACOES]: 11 });
   });
 
   it("consumível só no Almoxarifado continua como sempre foi", () => {
@@ -53,12 +61,15 @@ describe("consolidarPosicao — uma linha por (produto, local) vira o saldo do p
     expect(p.cmc).toBeCloseTo(453.4636974, 5); // (38 × 458,078892 + 2 × 365,775) ÷ 40
   });
 
-  it("o Almoxarifado negativo não pesa no CMC: fica o da Fábrica, onde o aço está", () => {
-    expect(produto(consolidarPosicao(LINHAS.chapa3), "101000002").cmc).toBeCloseTo(6.962834, 6);
+  it("o Almoxarifado negativo não pesa no CMC: fica a média de Fábrica e Terceiro, onde o aço está", () => {
+    // (8.159,29 × 6,962834 + 1.392,6 × 5,740038) ÷ 9.551,89
+    expect(produto(consolidarPosicao(LINHAS.chapa3), "101000002").cmc).toBeCloseTo(6.784558736, 5);
   });
 
+  // O degrau do meio da escada, com os dados do W610 e uma Qtd só da Fábrica (negativa).
   it("sem saldo positivo nos locais da Qtd, o CMC vem de onde houver saldo positivo", () => {
-    expect(produto(consolidarPosicao(LINHAS.w610), "501000055").cmc).toBeCloseTo(7.036942, 6);
+    const p = produto(consolidarPosicao(LINHAS.w610, new Set([String(FABRICA)])), "501000055");
+    expect(p.cmc).toBeCloseTo(7.036942, 6);
   });
 
   // Quebra que pega: zerar o CMC de quem só tem saldo negativo — o custo de material usa este
@@ -94,12 +105,13 @@ describe("listarLocais — o cadastro de locais do Omie", () => {
     expect(param).toMatchObject({ nPagina: 1 });
     expect(param.nRegPorPagina).toBeGreaterThanOrEqual(6);
     expect(locais).toHaveLength(6);
-    expect(locais.slice(0, 3)).toEqual([
+    expect(locais.slice(0, 4)).toEqual([
       { cod: ALMOXARIFADO, nome: "ESTOQUE ALMOXARIFADO", padrao: true, naQtd: true },
       { cod: FABRICA, nome: "ESTOQUE FABRICA", padrao: false, naQtd: true },
-      { cod: TERCEIRO, nome: "ESTOQUE TERCEIRO", padrao: false, naQtd: false },
+      { cod: TERCEIRO, nome: "ESTOQUE TERCEIRO", padrao: false, naQtd: true },
+      { cod: 7756631248, nome: "MAQUINAS E EQUIPAMENTOS", padrao: false, naQtd: false },
     ]);
-    expect(locais.filter((l) => l.naQtd).map((l) => l.cod)).toEqual([ALMOXARIFADO, FABRICA]);
+    expect(locais.filter((l) => l.naQtd).map((l) => l.cod)).toEqual([ALMOXARIFADO, FABRICA, TERCEIRO]);
   });
 
   // ⚠⚠ ERA ASSIM QUE A FALHA SUMIA: HTTP 200, JSON sem `faultstring` — o `omieCall` devolve como

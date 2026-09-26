@@ -8,7 +8,7 @@
 //   · uma página que falhasse virava `break` — e o passo seguinte ZERAVA quem não tinha sido lido.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockPrisma } from "@/testes/apoio/prisma";
-import { RESPOSTA_LOCAIS, LINHAS, paginaPosicao, ALMOXARIFADO, FABRICA, TERCEIRO } from "@/testes/fixtures/omie-posicao-estoque";
+import { RESPOSTA_LOCAIS, LINHAS, paginaPosicao, ALMOXARIFADO, FABRICA, TERCEIRO, EDIFICACOES } from "@/testes/fixtures/omie-posicao-estoque";
 
 const mocks = vi.hoisted(() => ({ omieCall: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma, prismaDirect: mockPrisma }));
@@ -77,16 +77,16 @@ beforeEach(() => {
 });
 
 describe("sincronizarProdutos — a Qtd e o detalhe por local", () => {
-  it("⚠⚠ grava a Qtd de Almoxarifado + Fábrica, o detalhe de CADA local e o CMC de onde o aço está", async () => {
+  it("⚠⚠ grava a Qtd de Almoxarifado + Fábrica + Terceiro, o detalhe de CADA local e o CMC de onde o aço está", async () => {
     noBanco(item("101000002", -6480, {}), item("301000045", 320, {}));
     omie({ paginas: umaPagina([...LINHAS.chapa3, ...LINHAS.barra]) });
 
     await sincronizarProdutos();
 
     const chapa = gravacaoDe("101000002").data;
-    expect(chapa.qtdAtual).toBeCloseTo(1679.29, 6); // era −6.480
+    expect(chapa.qtdAtual).toBeCloseTo(3071.89, 6); // era −6.480
     expect(chapa.locaisQtd).toEqual({ [ALMOXARIFADO]: -6480, [FABRICA]: 8159.29, [TERCEIRO]: 1392.6 });
-    expect(chapa.cmc).toBeCloseTo(6.962834, 6);     // era 0 (o do Almoxarifado)
+    expect(chapa.cmc).toBeCloseTo(6.784558736, 5); // era 0 (o do Almoxarifado)
     expect(gravacaoDe("301000045").data.qtdAtual).toBe(320);
   });
 
@@ -110,7 +110,7 @@ describe("sincronizarProdutos — a Qtd e o detalhe por local", () => {
     const { data } = mockPrisma.configEstoque.update.mock.calls.at(-1)[0];
     expect(data.ultimaSincProd).toBeInstanceOf(Date);
     expect(data.locaisOmie).toHaveLength(6);
-    expect(data.locaisOmie.filter((l) => l.naQtd).map((l) => l.nome)).toEqual(["ESTOQUE ALMOXARIFADO", "ESTOQUE FABRICA"]);
+    expect(data.locaisOmie.filter((l) => l.naQtd).map((l) => l.nome)).toEqual(["ESTOQUE ALMOXARIFADO", "ESTOQUE FABRICA", "ESTOQUE TERCEIRO"]);
   });
 
   // ⚠⚠ Quebra que pega: o filtro antigo (`qtdAtual > 0`) deixava o NEGATIVO de pé, e o produto que
@@ -120,7 +120,7 @@ describe("sincronizarProdutos — a Qtd e o detalhe por local", () => {
     noBanco(
       item("301000045", 320, { [ALMOXARIFADO]: 320 }),   // continua na posição
       item("NEGATIVO", -5, { [ALMOXARIFADO]: -5 }),        // saiu: negativo
-      item("SO-TERCEIRO", 0, { [TERCEIRO]: 10 }),          // saiu: Qtd 0, detalhe velho
+      item("SO-PATRIMONIO", 0, { [EDIFICACOES]: 11 }),     // saiu: Qtd 0, detalhe velho
       item("JA-ZERADO", 0, null),                          // nada a fazer
       item("JA-VAZIO", 0, {}),                             // nada a fazer
     );
@@ -130,7 +130,7 @@ describe("sincronizarProdutos — a Qtd e o detalhe por local", () => {
 
     const zeragem = mockPrisma.estoqueItem.updateMany.mock.calls.map(([a]) => a)
       .find((a) => Array.isArray(a.where?.codigoOmie?.in));
-    expect(zeragem.where.codigoOmie.in.sort()).toEqual(["NEGATIVO", "SO-TERCEIRO"]);
+    expect(zeragem.where.codigoOmie.in.sort()).toEqual(["NEGATIVO", "SO-PATRIMONIO"]);
     expect(zeragem.data).toEqual({ qtdAtual: 0, locaisQtd: {} });
   });
 });
@@ -139,7 +139,7 @@ describe("sincronizarProdutos — falha do Omie aparece, e não apaga saldo", ()
   // ⚠⚠ O DEFEITO MAIS CARO. Antes: a página 2 caía no `catch { break; }`, a posição ficava com a
   // página 1, e todo produto das outras páginas era ZERADO — em silêncio, com o cron verde.
   it("⚠⚠ página da posição que falha: LANÇA e não grava saldo de ninguém", async () => {
-    noBanco(item("101000002", 1679.29, {}), item("501000055", -5112.6, {}));
+    noBanco(item("101000002", 3071.89, {}), item("501000055", 121493.8, {}));
     omie({ paginas: duasPaginas(LINHAS.chapa3, LINHAS.w610).map((p, i) => (i === 1 ? new Error("The operation was aborted due to timeout") : p)) });
 
     await expect(sincronizarProdutos()).rejects.toThrow(/timeout/);
