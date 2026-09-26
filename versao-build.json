@@ -1,7 +1,12 @@
 {
-  "build": 3503,
-  "gerado": "2026-09-26T15:41:06.315Z",
+  "build": 3504,
+  "gerado": "2026-09-26T15:41:06.556Z",
   "commits": [
+    {
+      "hash": "8c7fde322e",
+      "data": "26/09/2026",
+      "titulo": "Plano: Inteligência Fiscal mais simples (6 tarefas) + spec ajustada (chave NCM×CFOP)"
+    },
     {
       "hash": "6a4f37aae7",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ec19ab4353",
       "data": "25/09/2026",
       "titulo": "Importação da LPC em lote: a T118B estourava os 300 s (HTTP 504)"
-    },
-    {
-      "hash": "d3ec58b915",
-      "data": "25/09/2026",
-      "titulo": "Memória: RIP-112-001 recriado com número, id e data originais"
     }
   ]
 }
