@@ -48,3 +48,20 @@ arame tubular 8311.20.00, autobrocante 7318.14.00…, origem 39, tipo 99→01 em
 ⚠⚠ **O MODO AUTOMÁTICO DO CLAUDE CODE BLOQUEIA ESCRITA NO OMIE** ("Modify Shared Resources") mesmo com a autorização
 no chat — até a criação do script foi barrada. Para gravar: regra de permissão para o script, ou a sessão no modo
 que pede aprovação a cada comando. Ver [[torg_omie_duplicados]] e [[torg_materiais_tekla]].
+
+**Famílias (26/09/2026, noite — Vitor: "notei alguns produtos sem família definida, consegue ajustar isso também").**
+✅ 134 dos 171 sem família gravados pela API e conferidos campo a campo: Matéria Prima 43, Fixadores 29, Tinta e
+Solvente 13, Material Auxiliar 12, Manutenção e Conservação do Imóvel 8, Máquinas e Equipamentos 5, Serviço 5,
+Manutenção de Equipamentos 4, EPI 3, Gas e Equipamento 3, Material Escritório 3, Marketing 2, e 1 cada em
+Ferramentas, Material Auxiliar de Pintura, Material para embalagem e Telhas. Regra: a família que a maioria dos
+produtos com o MESMO NCM já tem (≥ 3 e ≥ 70%), senão a descrição; cilindro de gás → Gas e Equipamento; módulo/placa
+de tomada → Imóvel. ⏳ Ficaram 38 para o Vitor decidir: peças de cliente com desenho (T…/TP… "- PP", chapas UHMW,
+etiquetas), ENERGIA ELETRICA, FORNECIMENTO DE ALIMENTOS, MATERIAIS DIVERSOS (193 notas), MARQUISE e ESTRUTURA METALICA.
+⚠⚠ **TRÊS ARMADILHAS DA API DE PRODUTO (medidas nessa rodada):**
+1. `AlterarProduto` com só o campo que muda responde "Produto alterado com sucesso!" e **não grava** — é preciso mandar
+   junto `codigo`, `descricao`, `unidade`, `ncm`, `valor_unitario` (e `tipoItem`).
+2. O `ConsultarProduto` logo depois devolve o dado **antigo** por alguns segundos: conferir numa segunda passada, não na
+   hora (a 1ª rodada "falhou" por isso, e tinha gravado).
+3. ⚠⚠ O `ConsultarProduto`/`ListarProdutos` devolve o texto com **entidade HTML** (`"` vem `&quot;`). Reenviar assim
+   grava o `&quot;` como TEXTO — 17 descrições e 1 código (`CTTOR-750-2000-1"`) ficaram com `&amp;quot;` e foram
+   restaurados na hora. **Decodificar (`&quot;`→`"`, `&amp;`→`&`…) antes de mandar de volta.**

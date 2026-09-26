@@ -1,7 +1,12 @@
 {
-  "build": 3526,
-  "gerado": "2026-09-26T22:20:46.945Z",
+  "build": 3527,
+  "gerado": "2026-09-26T22:45:47.303Z",
   "commits": [
+    {
+      "hash": "cc0a79f4",
+      "data": "26/09/2026",
+      "titulo": "docs: RM T102-001-R00 atualizada para o código que ficou (26/09)"
+    },
     {
       "hash": "ddccd6aa",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ddcef2ed",
       "data": "26/09/2026",
       "titulo": "Estoque: o cron de produtos tinha 60 s e morria gravando — agora 300 s"
-    },
-    {
-      "hash": "f1c06c4a",
-      "data": "26/09/2026",
-      "titulo": "Spec: Inteligência Fiscal mais simples — simulador pela obra, IBS/CBS das NFs, auditoria por parcela"
     }
   ]
 }
