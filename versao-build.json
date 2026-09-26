@@ -1,7 +1,12 @@
 {
-  "build": 3515,
-  "gerado": "2026-09-26T17:12:48.626Z",
+  "build": 3516,
+  "gerado": "2026-09-26T17:16:56.178Z",
   "commits": [
+    {
+      "hash": "cf3f61fe",
+      "data": "26/09/2026",
+      "titulo": "Torguinho: contrato das ferramentas corrigido e prompt sem instruções de modelos antigos"
+    },
     {
       "hash": "344ed047",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7a2d9ecd",
       "data": "25/09/2026",
       "titulo": "R desativado fora da escolha; a separação passa a conferir o material"
-    },
-    {
-      "hash": "79e86348",
-      "data": "25/09/2026",
-      "titulo": "Chapa de 10 mm é a de 3/8\" (9,5) e a de 12 mm é a de 1/2\" (12,5) — só chapa"
     }
   ]
 }
