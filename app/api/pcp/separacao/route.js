@@ -279,7 +279,7 @@ export async function POST(req) {
 
   // Verifica a existência dos lotes antes de gravar qualquer vínculo.
   const lotes = await prisma.documentoQualidade.findMany({
-    where: { categoria: "MATERIAL", importRef: { in: body.trocas.map((t) => t.rUsado.trim()) } },
+    where: { categoria: "MATERIAL", ativo: true, importRef: { in: body.trocas.map((t) => t.rUsado.trim()) } },
     select: { importRef: true, nome: true, opNumero: true },
   });
   const porR = new Map(lotes.map((l) => [l.importRef, l]));
@@ -295,6 +295,25 @@ export async function POST(req) {
     }
   }
   const anteriores = await prisma.trocaRastreabilidade.findMany({ where: { opNumero: op.numero, perfil: { in: body.trocas.map((t) => t.perfil.trim()) } } });
+  // ⚠⚠ O R TEM DE SER DO MESMO MATERIAL — a mesma regra da liberação de material (Vitor, 25/08/2026:
+  // "vamos criar uma maneira de burlarmos e informar um material que não era destinado a essa obra").
+  // Esta rota só conferia se o R existia: dava para gravar o R de uma chapa num perfil W, e o
+  // certificado do Data Book apontaria para um aço que a peça não é (achado de 25/09/2026).
+  //
+  // ⚠ Só o R NOVO ou TROCADO. "Encaminhar ao PCP" reenvia todas as linhas, e 8 trocas antigas — decididas
+  // pelo Vitor (xadrez, barra quadrada, W310 × HP310…) — a regra não reconhece; reenviá-las não pode
+  // travar o encaminhamento. A decisão já está registrada e auditada.
+  const jaRegistrada = (t) => anteriores.some((a) => a.perfil === t.perfil.trim() && a.rUsado === t.rUsado.trim());
+  const doMaterial = (t) => jaRegistrada(t) || lotes.some((l) => l.importRef === t.rUsado.trim() && casarPerfilComOmie(t.perfil, [{ codigo: null, descricao: l.nome }]));
+  const errada = body.trocas.find((t) => !doMaterial(t));
+  if (errada) {
+    const lote = porR.get(errada.rUsado.trim());
+    return NextResponse.json({
+      error: `O R ${lote.importRef} é "${lote.nome}" — não é o material do perfil ${errada.perfil}. ` +
+             "Informe o R do material certo; se estiver certo e o portal não reconheceu, avise para ajustarmos o cadastro.",
+      naoCasa: true, perfil: errada.perfil, descricaoDoR: lote.nome,
+    }, { status: 400 });
+  }
   let salvas;
   try { salvas = await prisma.$transaction(async (tx) => {
     const resultados = [];

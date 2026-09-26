@@ -774,7 +774,8 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       {ehUS && (
         <p className="text-[12px] text-torg-gray mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
           Registre apenas as descontinuidades <strong>reprovadas</strong> (PI-QUA-003, item 15.1).
-          Em solda crítica à fratura, também as até 6 dB abaixo do nível de rejeição.
+          Em solda crítica à fratura, também as até 6 dB abaixo do nível de rejeição. A peça sem
+          indicação sai no relatório numa linha própria, com laudo A.
         </p>
       )}
 

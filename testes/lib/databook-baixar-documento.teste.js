@@ -7,14 +7,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/sharepoint", () => ({
-  downloadRhItem: vi.fn(), downloadFileById: vi.fn(), downloadSharedFile: vi.fn(), procurarArquivoPorNome: vi.fn(),
+  downloadRhItem: vi.fn(), downloadFileById: vi.fn(), downloadSharedFile: vi.fn(),
 }));
+// ⚠ `procurarArquivoPorNome` mudou de casa em 26/09/2026: era uma BUSCA do Graph (HTTP 500 neste
+// drive desde 22–23/09) e virou varredura por caminho em `lib/sharepoint-arvore.js`.
+vi.mock("@/lib/sharepoint-arvore", () => ({ procurarArquivoPorNome: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ prisma: { documentoQualidade: { update: vi.fn(async () => ({})) } } }));
 vi.mock("@/lib/projetos-databook", () => ({ resolveServidorDriveId: vi.fn(async () => "drive-servidor") }));
 vi.mock("@/lib/relatorio-pdf-fonte", () => ({ pdfDoRelatorio: vi.fn(), fonteDeInspecao: vi.fn(() => null), fonteDeCopiaArquivada: vi.fn(async () => null) }));
 vi.mock("@/lib/pit-pdf-fonte", () => ({ pdfDoPit: vi.fn(), fonteDePit: vi.fn(() => null) }));
 
-import { downloadRhItem, downloadFileById, downloadSharedFile, procurarArquivoPorNome } from "@/lib/sharepoint";
+import { downloadRhItem, downloadFileById, downloadSharedFile } from "@/lib/sharepoint";
+import { procurarArquivoPorNome } from "@/lib/sharepoint-arvore";
 import { prisma } from "@/lib/prisma";
 import { fonteDeInspecao, pdfDoRelatorio } from "@/lib/relatorio-pdf-fonte";
 import { fonteDePit, pdfDoPit } from "@/lib/pit-pdf-fonte";

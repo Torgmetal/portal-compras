@@ -107,6 +107,7 @@ export async function POST(req, { params }) {
 
   // Agrupa: { [cotacaoId × isFD]: { cotacao, isFD, linhas[], rmIdsEnvolvidas } }
   const grupos = new Map();
+  const rmIdsGravadas = new Set(); // RMs com item que virou PEDIDO_GERADO nesta chamada
 
   for (const cot of cotacoesRecebidas) {
     // Filtro: gera so as cotacoes selecionadas (modo 1-a-1)
@@ -333,6 +334,12 @@ export async function POST(req, { params }) {
         });
         return pedido;
       });
+      // ⚠ Só as RMs cujos itens foram GRAVADOS como pedido aqui entram no recálculo (achado do
+      // Codex): a transação acima já confirmou; linha que falhou no Omie não chega até aqui.
+      for (const l of linhas) {
+        const rmDaLinha = itemPorId.get(l.rmItem.id)?.rm?.id;
+        if (rmDaLinha) rmIdsGravadas.add(rmDaLinha);
+      }
     } else {
       // Erro: registra no audit pra rastreabilidade, sem criar PedidoOmie
       await prisma.auditLog.create({
@@ -418,9 +425,10 @@ export async function POST(req, { params }) {
     await new Promise((r) => setTimeout(r, 1500));
   }
 
-  // Atualiza status das RMs envolvidas — ver lib/rm-status: sobrando item, a RM VOLTA para ABERTA
-  const rmIdsAfetadas = [...new Set(op.rms.map((r) => r.id))];
-  for (const rmId of rmIdsAfetadas) await reavaliarStatusRM(rmId);
+  // Atualiza status das RMs que TIVERAM pedido gravado — ver lib/rm-status.
+  // ⚠⚠ ERA `op.rms` INTEIRO (25/09/2026): gerar o pedido da T105-010 recalculou a T105-009, que não
+  // tinha pedido nenhum, e a tirou de "pronta pra pedido". RM que esta chamada não tocou não muda.
+  for (const rmId of rmIdsGravadas) await reavaliarStatusRM(rmId);
 
   await prisma.auditLog.create({
     data: {

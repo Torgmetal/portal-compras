@@ -1,33 +1,37 @@
 ---
 name: torg_sync_sharepoint_pcp
-description: Cron sync-sharepoint (PCP) — o nome do arquivo mensal ganha o mês no fim, e a aba EAP de OUTRO mês é recusada em vez de gravar calada; CMR no Graph agora retenta 504
+description: O cron sync-sharepoint (planilha de gestão do PCP) foi REMOVIDO em 26/09/2026 — ninguém olhava a tela; fica aqui por que ele existia, o que morreu junto e o que NÃO morreu (a tela PMP e o retry do Graph no CMR)
 metadata:
   type: project
 ---
 
-**O cron `sync-sharepoint` ficou 17 dias fora do ar e ninguém soube** (achado em 17/09/2026, ao
-verificar o diagnóstico do Matheus sobre o Neon). Último sucesso em 31/08. Duas causas empilhadas:
+**Removido em 26/09/2026.** Vitor: *"esse que está abandonado que seria a produção semanal pode
+finalizar, não estamos nem olhando para essa parte mais"*.
 
-1. **O nome do arquivo ganhou o mês no fim.** O PCP passou a chamar a planilha de
-   `1. Planilha de Gestão Setembro.xlsx` (agosto foi renomeado junto) e o código procurava o nome
-   exato `1. Planilha de Gestão.xlsx`. Agora, se os caminhos exatos falham, `downloadPlanilhaProducao`
-   lista a pasta do mês e usa `escolherPlanilhaDaPasta` (pura, testada): casa por **prefixo**
-   normalizado, então mês no fim, `REV00` ou espaço a mais deixam de quebrar. Empate fica com o
-   `lastModifiedDateTime` mais novo.
-2. **⚠⚠ A ABA EAP ESTÁ CONGELADA EM JUNHO, E O PARSER ACEITAVA CALADO.** A planilha de setembro tem
-   uma única aba EAP: **"EAP JUNHO"**, com realizado zerado. `findEapSheetName` caía na primeira aba
-   `EAP*` quando não achava a do mês — então consertar só o item 1 faria o cron gravar junho todo
-   dia, para sempre. Agora aba que anuncia OUTRO mês é **recusada**, com o erro nomeando as que
-   existem. Aba genérica (só "EAP", sem mês) continua servindo para qualquer mês.
-   **Pendência do PCP: criar/renomear a aba EAP do mês vigente** — enquanto não fizerem, o cron
-   falha de propósito, e a mensagem no heartbeat diz exatamente isso.
-   O resumo do cron passou a dizer **qual aba foi lida**, com "⚠ NÃO é a do mês" quando for o caso.
+O cron `0 8 * * *` → `/api/producao/sync-sharepoint` lia a planilha de gestão mensal do PCP no
+SharePoint, extraía a aba EAP e gravava `ProducaoSemanal` com `fonte: "SHAREPOINT"`. Saiu inteiro:
+a rota (e a `/historico`), `lib/parse-pcp-eap.js`, a entrada no `vercel.json`, o job no
+`lib/cron-monitor.js`, o caminho na allowlist do `middleware.js` e os ajudantes que só ele usava em
+`lib/sharepoint.js` (`downloadPlanilhaProducao`, `getPlanilhaProducaoCandidates`,
+`escolherPlanilhaDaPasta`, `getMesAtualFolder`, `getMesNomePt`).
 
-**`cmr-reconciliar`: um 504 do Graph derrubava tudo.** O job ficou 60 h sem sucesso com
-`usedRange HTTP 504` — a sessão de workbook na planilha CMR do ano (~16 MB) estoura o gateway de vez
-em quando. Era `fetch` cru, sem retry. `graphGet` (`lib/cmr-sharepoint.js`) retenta 408/429/500/502/
-503/504 com backoff e respeita `Retry-After`. ⚠ **Só LEITURA é retentada**: um 504 num POST/PATCH
-pode ter gravado do outro lado, e repetir duplicaria a linha no Excel.
+⚠⚠ **`/producao/planejamento-semanal` NÃO é esta tela, e continua no ar.** O nome engana: ela
+renderiza o `PmpClient` (o PMP, que vem do banco do portal). Cheguei a incluí-la na remoção antes
+de abrir o arquivo. Nenhuma tela chamava `/api/producao/semanal` — as 308 linhas de
+`ProducaoSemanal` com `fonte: "SHAREPOINT"` ficaram no banco, inertes, e a tabela segue de pé.
 
-⚠ **A lição das duas é a mesma**: falha que não se anuncia custa semanas. Ver
-[[torg_crons]] (heartbeat/monitor) e [[torg_nao_declarar_furo]].
+⚠ **O que morreu junto e vale saber, se um dia isto voltar** — as duas armadilhas medidas em
+17/09/2026, que custaram 17 dias de cron parado em silêncio:
+1. **O nome do arquivo ganha o mês no fim** (`1. Planilha de Gestão Setembro.xlsx`). A saída era
+   casar por PREFIXO normalizado dentro da pasta do mês, não cravar o nome.
+2. **A aba EAP estava congelada em "EAP JUNHO"**, com realizado zerado, e o parser caía calado na
+   primeira aba `EAP*`. Consertar só o item 1 faria o cron gravar junho todo dia, para sempre. A
+   correção foi **recusar** aba que anuncia outro mês. O PCP nunca criou a aba do mês vigente — em
+   26/09 o dado estava 87 dias velho, que é o que tornou a remoção óbvia.
+
+⚠ **O retry do Graph NÃO saiu.** `graphGet` em `lib/cmr-sharepoint.js` (retenta 408/429/500/502/
+503/504 com backoff, respeitando `Retry-After`) é do CMR e continua valendo. ⚠ **Só LEITURA é
+retentada**: um 504 num POST/PATCH pode ter gravado do outro lado, e repetir duplicaria a linha.
+
+⚠ **A lição que fica**: falha que não se anuncia custa semanas — mas cron que ninguém lê custa
+manutenção para sempre. Ver [[torg_crons]] (heartbeat/monitor) e [[torg_nao_declarar_furo]].

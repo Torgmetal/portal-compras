@@ -1,7 +1,12 @@
 {
-  "build": 3463,
-  "gerado": "2026-09-26T15:26:00.449Z",
+  "build": 3499,
+  "gerado": "2026-09-26T15:30:29.943Z",
   "commits": [
+    {
+      "hash": "c6917010",
+      "data": "26/09/2026",
+      "titulo": "Estoque: movimentações do Omie pelo método que existe, e a falha da sincronização aparece"
+    },
     {
       "hash": "1ad14826",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d869b972",
       "data": "23/09/2026",
       "titulo": "Portão por módulo: /fiscal nunca esteve na tabela, e por isso quebrava"
-    },
-    {
-      "hash": "99f932cc",
-      "data": "23/09/2026",
-      "titulo": "Fiscal: a cadeia de documentos de uma obra — e ela nunca diz \"falta uma nota\""
     }
   ]
 }

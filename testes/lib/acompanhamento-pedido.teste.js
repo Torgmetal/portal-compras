@@ -129,8 +129,10 @@ describe("linhaDoTempo — chegou dentro do prazo estimado?", () => {
 });
 
 describe("as etapas", () => {
-  it("são as três que o Matheus pediu", () => {
-    expect(ETAPAS_VALIDAS).toEqual(["LIBERADO_COLETA", "ENCAMINHADO_OBRA", "MATERIAL_RECEBIDO"]);
+  // ⚠ Eram três; "ENTREGA" entrou em 24/09/2026, a pedido do Matheus (entrega combinada/parcial
+  // com observação — ver testes/acompanhamento-etapa-entrega.teste.jsx).
+  it("são as que o Matheus pediu, na ordem do processo", () => {
+    expect(ETAPAS_VALIDAS).toEqual(["LIBERADO_COLETA", "ENCAMINHADO_OBRA", "ENTREGA", "MATERIAL_RECEBIDO"]);
     expect(rotuloEtapa("ENCAMINHADO_OBRA")).toBe("Encaminhado para obra");
   });
 

@@ -2026,8 +2026,9 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   Teste novo `testes/api/buscar-produto-inativo.teste.js` (3; o 1º falha sem a correção). **4.019
   passando**, `checar` limpo, build ok. Achado separado (tarefa aberta): `sincronizarMovimentacoes` chama
   `ListarMovEstoque`, que não existe no Omie — `EstoqueMovimentacao` tem 0 linhas.
-  ⚠ **Para revisar:** (a) a chamada de piloto marcou "alterado em 24/09" no PRD00005 (sem mudar campo);
-  (b) produto sem o campo `inativo` na resposta conta como ativo.
+  ⚠ **Para revisar:** (a) a chamada de piloto não deixou rastro no PRD00005 — nem a data de "última
+  alteração" mudou (reconferido 1 h depois: segue 13/10/2025); (b) produto sem o campo `inativo` na
+  resposta conta como ativo.
 - **(24/09, noite) Movimentações de estoque: o método não existia e o erro virava "0 com sucesso".** A tarefa aberta no
   item anterior. `sincronizarMovimentacoes` chamava `ListarMovEstoque` em `estoque/movestoque/` — lá só existem
   `ConsultarPrevisao` e `ListarMovimentos` (agregado por dia, sem id nem CMC) — e o `catch { break; }` com
@@ -2060,6 +2061,233 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   `sincronizarProdutos` passa `nCodLocal`, que não está na doc — o saldo por local (e talvez o do aço) pode estar
   incompleto; não conferido, fora do escopo; (f) o rodapé da tela diz "diariamente às 06:00/06:30", mas a agenda é de
   hora em hora (06–20 UTC).
+- **(25/09, madrugada) Estoque: a Qtd do portal era só o Almoxarifado — e a tela cortava em 1.000.** As suspeitas
+  (e)/(f) que a sessão das movimentações deixou registradas (24/09, noite; aquele trabalho ainda está sem commit na
+  worktree `silly-golick`). **Medido ao vivo, só leitura** (Omie + banco): `ListarPosEstoque` SEM
+  `lista_local_estoque` devolve só o local PADRÃO (258 linhas, byte a byte = filtro pelo Almoxarifado); com "TODOS",
+  810 linhas de 657 produtos, uma por (produto, local). `qtdAtual` batia 657/657 com a posição sem filtro: 399
+  produtos fora da tela, 31 negativos (chapa 3,00 mm −6.480 com +8.159 na Fábrica). Os locais vinham de
+  `estoque/localestoque/` (doc 404; estourou os 3 s ou voltou `{error}` SEM `faultstring`); o certo é `estoque/local/`
+  (`locaisEncontrados`, 6 locais). `nCodLocal` o Omie RECUSA ("Tag [NCODLOCAL] não faz parte da estrutura"). Tudo em
+  `catch { break; }`: `locaisOmie` null e 0 de 2.500 itens com `locaisQtd`. De carona, também confirmados: a posição
+  não tem `cUnidade` e o update gravava "UN" (258/258 da posição; 120 são KG/LATA/PC no cadastro); CMC é POR LOCAL
+  (o do Almoxarifado, 0 ou 1 R$/kg no aço, alimentava `custo-material`/`match-omie`); o Omie devolve no máximo 100
+  linhas por página, com picos de 25–29 s; e a página `/compras/estoque` fazia `take: 1000` com filtro no navegador —
+  419 dos 657 com posição (todos os 196 PERFIL e 52 TUBO) nunca apareciam, nem buscando.
+  **Feito:** `lib/omie-estoque-posicao.js` (novo: `listarLocais` — LANÇA se um local da Qtd sumir do cadastro,
+  porque os códigos são fixos —, `listarPosicao` "TODOS" inteira-ou-exceção — erro, página sem
+  `produtos`/`nTotPaginas` e total ≠ `nTotRegistros` LANÇAM —, `consolidarPosicao`);
+  `sincronizarProdutos` usa o módulo, não grava saldo antes da posição inteira, não grava `unidade`, zera também
+  negativo e detalhe velho, aceita `ateMs` (cron: 40 s contados do início da rota); data da posição em Brasília;
+  `lib/estoque-catalogo.js` (a página sem `take`, `select` enxuto); `descreverAgenda` em `lib/cron-agenda.js` (rodapé
+  lido do `vercel.json`); tela com o detalhe por local (negativo em vermelho, fora da Qtd tracejado, nome sem
+  "ESTOQUE"). Testes novos: `omie-estoque-posicao` (18), `omie-estoque-sincronizar` (7 — **7 vermelhos no código
+  antigo**, ex. *"expected 1392.6 to be close to 1679.29"*), `api/cron-estoque-produtos` (3 — com a lib antiga o
+  cron dava **200/`ok:true`** com a página do Omie falhando), `cron-agenda-descrever` (6), `compras-estoque-pagina`
+  (4), `estoque-catalogo-tela` (5). Commits `06ff92a5` (sincronização), `a4764072` (tela) e `72310a4e` (o
+  Terceiro na Qtd). Suíte completa, já com a `main` de 25/09 junta: **4.199 passando**; build do Next EXIT=0 com o
+  banco apontando para lugar nenhum. `checar` limpo; módulos novos sem aviso de ESLint; `sincronizarProdutos` caiu de
+  complexidade 78 → 45 e o `EstoqueClient` de 39 → 36. Simulação da regra final sobre a posição medida: 638 dos 657
+  produtos com Qtd positiva (eram 227) e 19 negativos.
+  ⚠⚠ **Decisão do Vitor (26/09): o Terceiro soma na Qtd** — *"o material de terceiro sim é da Torg e pode ser
+  usado"*. `LOCAIS_NA_QTD` = Almoxarifado + Fábrica + Terceiro; os de patrimônio (máquinas, ferramentas,
+  edificações) ficam só no detalhe. Com o Terceiro fecham os 8 produtos que entraram nele e foram baixados na
+  Fábrica (W610×174: −5.112,6 + 126.606,4). Subida autorizada por ele (*"pode subir"*).
+  ⚠ **Não rodei a sincronização à mão**: a primeira gravação é a do cron, depois do deploy. **Não validei a tela no
+  `npm run dev`**: exige login e não tenho credencial; a porta 3000 é de outro checkout. A tela está coberta por teste
+  em jsdom, e o build do Next foi conferido com o banco apontando para lugar nenhum.
+  ⚠ **Para revisar:** (a) o CMC muda para ~422 produtos — preço de fallback do `custo-material` e do orçamento por IA
+  mudam junto (correção: aço deixa de valer 0/1 R$/kg); (b) `ativo:true` passa a valer para os 657 da posição (eram
+  258), inclusive item só no Terceiro; (c) a zeragem lê os 2.500 itens por rodada, e são ~650 `updateMany` por hora
+  (eram 258) — padrão de antes, só maior; (d) a tela passa a carregar os 2.500 itens (~750 KB); (e) mesma causa, NÃO
+  corrigido: fallback ao vivo de `app/api/omie/buscar-produto` (só local padrão, lê `cUnidade`), `app/api/omie/
+  preco-medio` (manda `cCodigo`, fora da doc do `ListarPosEstoque`) e o cache de `lib/omie-pedido-compra.js`; (f) ao
+  juntar com a worktree das movimentações haverá conflito trivial no topo de `lib/omie-estoque.js` (as duas removem
+  constantes vizinhas) e no fim deste arquivo; (g) `acompanhamento-data-entrega` falha HOJE por calendário: supõe que
+  o prazo do fixture (25/09/2026) ≠ hoje — sugerida como tarefa à parte (relógio fixo no teste). Rodadas da suíte
+  sob carga tiveram falhas que mudam a cada vez (cotação, carga, cobrança) e passam sozinhas.
+- **(25/09) Importação da LPC em lote — a T118B dava HTTP 504.** Mike (Engenharia) subindo a LPC da
+  T118B (OP-118): 504. Medido: as funções rodam em Washington (`x-vercel-id: gru1::iad1`) e o Neon em São
+  Paulo (~120 ms por ida e volta); a rota fazia busca + gravação POR PEÇA e 1.240 peças esgotaram os 300 s
+  no passo das ligações (22 de centenas gravadas; sem `IMPORTAR_LPC` na auditoria — lista pela metade).
+  Correção: `lib/lpc-gravar.js` (`gravarPecasLpc`: uma leitura das existentes, `createManyAndReturn` em
+  lotes de 500 com recaída uma a uma se o lote for recusado, `update` em paralelo com teto 12; marca
+  repetida entre as listas continua "nasce na 1ª, a 2ª atualiza"; `gravarRelacoesLpc`: `deleteMany` +
+  `createMany` sem repetição). A devolução da programação (`sobrescrever`) também em paralelo. Os campos de
+  cada gravação são os mesmos da rota antiga. Rota 567 → 377 linhas. Testes `lpc-gravar` (8) e
+  `importar-lpc-lote` (1, falha na rota antiga). **4.056 passando**, `checar` limpo, build ok.
+  ⚠ **Para revisar:** (a) ordem das atualizações deixou de ser sequencial (não havia dependência entre
+  peças distintas); (b) `createManyAndReturn` (Prisma ≥ 5.14) no lugar de `create`; (c) mudar a região
+  das funções para gru1 fica como decisão do Vitor.
+- **(25/09) Data book da OP-102: as 10 peças sem R e os 11 certificados fora da §04 — só dados, sem código.**
+  Geraldo: "importamos os certificados faltantes, mas ainda falta puxar". Eram duas coisas. (1) 10 peças
+  cortadas em 12/08, um dia antes da entrega do pedido 1721 (13/08), ficaram ESTOQUE. Vitor decidiu usar os
+  certificados da própria OP: `TrocaRastreabilidade` `SEM_R` para W150X18 → 261147, W150X22.5 → 261148 e
+  W200X35.9 → 261153, em nome do Vitor e com o motivo, e `AuditLog` `TROCAR_RASTREABILIDADE`. É a mesma
+  gravação de `POST /api/pcp/separacao` (tela "Peça sem certificado"). Simulado antes de gravar.
+  (2) A §04 tinha 35 vinculados. O "puxar" das 09h46–09h51 rodou 5× com 0 novos porque os 11 R
+  (261646–261656) ainda não existiam no portal, com o CMR parado. Vinculados com a mesma lógica de
+  `popular-material`: 11 novos, 46 no total, as 8 tintas seguem na §15. Conferido: `rastreioDaOp` deu
+  235/235 peças definidas, 10 por troca. `montarSecaoLpc` deu 277/277 posições com R, 0 sem certificado,
+  e os 38 R citados na §02 estão todos na §04. Todas as seções não-NA estão ANEXADO, 0 vencidos. O livro
+  segue EM_MONTAGEM (não emiti nada).
+  ⚠ **Para revisar:** (a) W150×22,5: 304 kg de peças sobre um R de 270 kg; (b) a §04 é retrato do clique,
+  e certificado que chega depois não entra sozinho no livro em montagem, o que é candidato a automação;
+  (c) a tinta R 261393 está fora da §15 e aguarda decisão da Qualidade.
+- **(25/09) Certificado que chega depois entra sozinho no data book em montagem.** Vitor aprovou ("sim pode
+  vincular") depois do caso da OP-102. `lib/databook-certificados-novos.js` roda no começo do cron
+  `/api/cron/data-book` (sem cron novo), com a MESMA seleção do botão "Puxar certificados", que passou a
+  usar `certificadosDaOp` + `doGrupo` (teste de caracterização da rota antes da troca). As 4 travas: só
+  seção ANEXADO com documento; só o que chegou depois do último vínculo da seção (para R declarado, conta
+  a data da declaração); nunca o que foi tirado (audit `REMOVER_DOC_SECAO_DATABOOK`, por id e por R);
+  nunca R duplicado no livro. Grava em transação com `SELECT … FOR UPDATE` na linha do livro e reconfere
+  `estaFechado`. Auditoria `VINCULAR_CERTIFICADOS_AUTO_DATABOOK`. §06 e a granalha da §15 ficam fora (lote
+  vigente, previsto até a produção). No cron, `aquecerBanco` foi para dentro do `try` (mesmo defeito do
+  achado de 17/09) e falha no vínculo vai ao monitor (`ok:false`) sem segurar as gerações. Testes
+  novos: `databook-certificados-novos` (12; cada trava desligada derruba o teste dela), a
+  caracterização `databook-popular-material` (2) e `cron-data-book` (3; o aquecimento falhava antes da
+  correção). **4.086 passando**, `checar` limpo, build ok. Simulação contra produção (só leitura, 2 s):
+  76 vínculos em 7 livros, sendo 23 R declarados depois da montagem.
+  ⚠ **Para revisar:** (a) "chegou depois" usa o `createdAt` do vínculo mais recente da seção; um vínculo
+  manual entre a chegada e a rodada seguinte (até 1 h) faz o certificado ficar para o botão; (b)
+  `createdAt` do documento não muda quando o CMR corrige a OP depois, e esse caso também fica para o
+  botão; (c) R declarado com `SEM_R` entra mesmo se o FIFO não deixou peça para ele, como o botão já
+  fazia; (d) o `$queryRaw … FOR UPDATE` dentro da transação interativa, via pooler.
+  **Rodada real (cron 16:15 UTC, 25/09):** 76 vínculos em 7 livros, iguais à simulação; heartbeat ok. Nova
+  simulação = 0. Cobertura "R citado na §02 está no livro": 10 de 12 livros completos. OP-105 e OP-107
+  têm §04 PENDENTE, por desenho. A OP-112 tem 3 R da própria OP criados antes da montagem e alterados
+  em 22/09, o que confirma o limite (b) acima com dado real; ficam para o botão.
+- **(25/09) RNC aceita mensagem de e-mail como anexo (.eml e .msg).** Pedido do Vitor ("anexar EMS, EML
+  mensagens"; "EMS" lido como .msg do Outlook). `lib/anexo-email.js` (tipo pela extensão, `ehEmail`,
+  `comTipoDeEmail`, `aceitaEmailNoCaminho`); o seletor da RNC ganha `.eml,.msg` nos dois tipos; o e-mail
+  sobe com `contentType` explícito, e o resto sobe exatamente como antes (há teste). O token de
+  `/api/qualidade/documentos/upload-token` só libera `message/rfc822` e `application/vnd.ms-outlook`
+  quando o caminho é `qualidade/rnc/anexos/` (as outras 7 telas seguem iguais, também com teste). O card
+  usa o ícone de e-mail. Testes: `anexo-email` (8), `upload-token-email` (2), `rnc-anexo-email` (4, a tela
+  renderizada em jsdom: o seletor, o `.msg` com tipo vazio subindo como Outlook, o PDF sem tipo
+  forçado e o ícone). **4.100 passando**, `checar` limpo, build ok. `anexar` caiu de complexidade 16
+  para 15.
+  ⚠ **Para revisar:** (a) o upload real para o Blob com esses tipos não foi feito, porque criaria anexo
+  numa RNC de produção; o primeiro e-mail anexado de verdade é a prova final; (b) a URL do Blob é
+  pública (sufixo aleatório), como a dos outros anexos da RNC, e o e-mail pode ter dados de terceiros.
+- **(25/09) Relatório de ultrassom: a tabela saía vazia e a peça não aparecia (RUS-113-001).** Três causas
+  no caminho tela → PDF, reunidas em `linhasTabelaUS` (`lib/us-relatorio.js`):
+  - a tela e o Campo gravam a peça em `marca`, e o PDF lia `peca`;
+  - "Compr. reprovado" é gravado em `comprimento`, e o PDF o imprimia sob "Compr. Inspec."; a coluna agora
+    lê `inspecionado`, sem fonte, em branco;
+  - peça aprovada não tem linha pelo 15.1 do PI-QUA-003, então passa a sair numa linha própria (peça, "—",
+    ângulo do cabeçote, laudo A e "Sem indicação reprovável"). O "A" só aparece com `resultadoInspecao`
+    lançado.
+
+  A célula encolhe até 5,4 pt antes da reticência. Aviso nas duas telas. Era o único relatório de US do
+  portal e ninguém tinha assinado (Alexandre e Geraldo pendentes). O PDF real, gerado do banco, foi
+  conferido na folha. Testes `us-tabela` (7, incluindo o texto do PDF). **4.107 passando**, `checar`
+  limpo, build ok.
+  ⚠ **Para revisar:** (a) "A" para peça sem linha em relatório REPROVADO: o registro só da reprovada
+  implica aceite, mas é inferência sobre o que o inspetor deixou de lançar; (b) a folga de 3% no corpo
+  da letra; (c) as linhas aprovadas vão para o fim, depois das indicações, e não agrupadas por peça.
+- **(25/09) Data book: só relatório de inspeção assinado por todos entra.** Vitor, no livro da OP-112:
+  "ainda está puxando relatórios em rascunho e falamos de puxar apenas os que estiverem assinados".
+  - **O defeito:** `vincularNoDataBook` rodava na criação, na edição e no envio, e punha o relatório no livro
+    sem olhar assinatura nem livro fechado.
+  - **A função agora sincroniza:** o relatório assinado por todos entra; o que não está sai, e a seção
+    vazia volta a PENDENTE. Livro fechado não é tocado.
+  - **Quem põe no livro é a última assinatura:** `aoConcluirAssinaturas` na rota `/api/assinar/[token]`.
+  - **Abrir revisão e reinspecionar** tiram o relatório do livro.
+  - **Rodadas encerradas:** a reprovada/REC (retrabalho, 21/08) e a assinada acompanham; a intermediária
+    não (`revisaoEntraNoLivro`).
+  - **Anexar à mão:** documento de relatório não assinado dá 409.
+  - **Aviso da tela** sem ⚠ quando só aguarda assinatura.
+
+  Testes novos: `databook-relatorio-assinado` (12), `assinar-relatorio-databook` (3; falhar ao vincular
+  não derruba a assinatura), `databook-anexar-relatorio` (2) e `relatorio-vinculo-texto` (3). O teste
+  antigo `databook-vinculo-arquivo` ganhou os mocks das consultas novas, e a proteção do `arquivoUrl`
+  segue igual. **4.127 passando**, `checar` limpo, build ok.
+
+  Dados: 13 vínculos retirados de livros abertos (5 rascunhos, 4 com assinatura incompleta e 4 rodadas
+  intermediárias), com auditoria `DESVINCULAR_RELATORIO_NAO_ASSINADO_DATABOOK`. Nenhum relatório
+  assinado ficou fora de livro aberto.
+
+  ⚠ **Para revisar:**
+  - (a) a conciliação das rodadas (reprovada entra, intermediária não) foi decisão minha entre duas regras
+    do Vitor;
+  - (b) quatro seções voltaram a PENDENTE, o que trava a emissão desses livros até as assinaturas;
+  - (c) `aoConcluirAssinaturas` roda dentro do `try` do convite do próximo assinante; se o convite
+    lançar antes, o vínculo fica para a próxima sincronização.
+- **(25/09) Relatório de ultrassom: todo o cabeçalho editável, no computador e no celular.** Vitor: "desenho e
+  metal de adição não está sendo possível preencher (…) tipo de chanfro tbm, todos os campos precisamos
+  deixar para ser possível ajustar". O computador já preenchia desenho e metal. O celular não tinha desenho,
+  material nem espessura (a rota descartava material e espessura). Chanfro e processo eram listas fechadas.
+  - `CAMPOS_CABECALHO_US` (24 campos, grupos e sugestões) alimenta as duas telas, as duas rotas e o
+    `campo-condicoes`.
+  - As listas viram `<datalist>`, e o campo vazio mostra em placeholder o que sai no PDF.
+  - Fabricante e modelo do cabeçote são campos próprios.
+  - O desenho aceita 500 caracteres (`limiteDoCampo`).
+  - `camposCabecalhoUS` decompõe sempre o rótulo com "·".
+
+  Testes novos: `us-cabecalho-campos` (4, inclusive "o que se preenche sai no PDF", campo a campo),
+  `campo-us-cabecalho` (2) e `us-cabecalho-telas` (7, as duas telas em jsdom). Três testes antigos foram
+  ajustados à tela nova sem perder o que protegem: reabrir traz o cabeçote, Doppler continua Doppler, e o
+  gravado aparece. **4.142 passando**, `checar` limpo, build ok.
+  ⚠ **Para revisar:**
+  - (a) `cabecotesPorFabricante`, `chaveCabecote` e `cabecoteDaChave` ficaram sem uso nas telas (só os
+    testes as usam);
+  - (b) o celular passa a carregar e devolver `procedimento`, `norma`, `criterio` e `tag` em todos os tipos
+    de relatório (sem mudar o valor, se ninguém mexer);
+  - (c) datalist no iOS aparece como sugestão acima do teclado, não como lista suspensa.
+- **(25/09) Chapa 10 = 9,5 e 12 = 12,5 (decisão do Vitor), só para chapa.** OP-118 (Gabriel): a janela
+  "Selecionar R" da CH10.00X120 dava "0 de 0 compatíveis". A regra era 3% ou o par de `MESMA_BITOLA`, onde
+  só havia 4,75 = 5,00; a busca filtra só o que veio, e o POST refaz a checagem. Investigação feita por
+  subagente em modo só leitura.
+  - `MESMA_CHAPA` [9.50, 10.00] e [12.00, 12.50] é lida só no ramo CHAPA de `pontua`.
+  - Não entrou em `MESMA_BITOLA`: `perto()` serve todos os perfis.
+  - Teste `chapa-mesma-bitola` (6): os dois sentidos, a chapa sem "ESPESSURA", o par nomeado (10 ≠ 9,0 e
+    ≠ 10,5), a barra chata que continua diferente e o 4,75 = 5,00 mantido.
+  - A janela passa a oferecer 78 recebimentos para a CH10 (incluindo o R 261547 da própria OP) e 69 para a
+    CH12 (incluindo o R 261548).
+
+  **4.148 passando**, `checar` limpo, build ok.
+  ⚠ **Para revisar:**
+  - (a) OP-067 T67BT340 ganhou R automático (única chapa de 9,5 da obra na data do corte), o que muda a §02
+    de um livro em montagem;
+  - (b) `buscarFardosCompativeis` e o POST de `liberacao-material` sem `ativo: true`;
+  - (c) o POST da separação não confere compatibilidade.
+- **(25/09) R desativado fora da escolha, e a separação conferindo o material.** Os dois achados do item
+  anterior, corrigidos a pedido do Vitor ("pode corrigir todos").
+  - `buscarFardosCompativeis` e o POST de `liberacao-material` filtram `ativo: true`. O POST, com `findFirst`,
+    podia decidir o material pelo duplicado desativado.
+  - O POST de `/api/pcp/separacao` filtra `ativo` e confere `casarPerfilComOmie`, com a mesma mensagem da
+    liberação, **exceto** para a troca já registrada com o mesmo R: "encaminhar ao PCP" reenvia todas as
+    linhas, e 8 de 377 trocas (decisões do Vitor) a regra não reconhece.
+
+  Testes novos: `fardos-compativeis-ativo`, `liberacao-material-ativo` e `separacao-compatibilidade` (6). O
+  `recebimento-planejamento` passou a usar o nome real do CMR, porque "CH 12,5" não casa com nada.
+  **4.156 passando**, `checar` limpo, build ok.
+  ⚠ **Para revisar:** a exceção da "troca já registrada" compara perfil + R; uma troca antiga
+  incompatível segue editável só para outro R compatível.
+- **(26/09) A pasta do SharePoint era lida só na 1ª página.** OP-118 (Gabriel): P470, P382 e P383 "sem
+  desenho" com o PDF na pasta. Medido no Graph: a "2.5.2.2 Croqui/B" tem 1.762 arquivos em 2 páginas; as três
+  estão na 2ª, e a P295 e a P315 (que passavam) na 1ª.
+  - A conferência (`pasta-engenharia.js`), a impressão em lote (`desenhos-lote.js`) e a pasta do dia
+    (`pastas-liberacao.js`) liam uma página só.
+  - Agora usam `todasAsPaginas` (`lib/graph-paginas.js`); falha em qualquer página = `ok: false`.
+  - `varrerDesenhosDaOp` e `listarNaLiberacao` foram exportadas para o teste.
+
+  Testes: `graph-paginas` (2) e `pasta-engenharia-paginas` (3, com a árvore da OP-118 e a Croqui/B em duas
+  páginas). **4.161 passando**, `checar` limpo, build ok.
+  ⚠ **Para revisar:** outras 12 listagens seguem na 1ª página (L.E. $top=100, prontuário e
+  sharepoint-lista $top=200, rotas de romaneio, SGQ e orçamento). Pastas pequenas hoje; ficam anotadas em
+  `torg_portao_desenho`.
+- **(26/09, 12h) Estoque: a 1ª rodada do código novo foi morta pelos 60 s da Vercel.** Deploy às 11h38; o cron das
+  12h leu o Omie até 39 s (prazo de 40) e morreu gravando: 508 dos 657 itens com o saldo novo, sem ponto no monitor,
+  `locaisOmie` ainda null (medido no banco, só leitura). O problema vinha de antes: o código antigo levou 59,8 s às
+  8h e as rodadas de 9h, 10h e 11h não deixaram registro — o cron já morria em silêncio, e 657 gravações no lugar
+  de 258 pioraram. Corrigido: `maxDuration` 300 s no cron e em `/api/estoque/sync` (o botão), prazo de leitura
+  180 s contado do início da rota. Teste `api/cron-estoque-produtos` (+2, **vermelhos com os valores antigos**:
+  *"expected 20000 to be greater than or equal to 60000"*).
+  ⚠ **Para revisar:** (a) gravar em lote (UNNEST, padrão do CLAUDE.md) em vez de ~650 `updateMany` sequenciais;
+  (b) o catálogo (`sincronizarCatalogo`) ainda usa 3 s por página sem retentativa — às 12h ele não gravou nada, e
+  falha dele segue só como aviso no log; (c) até a próxima rodada completa, 149 itens seguem com o saldo antigo.
 - **(26/09) Movimentações de estoque: decisão antes do deploy — as saídas NÃO abatem reserva de OP.** Perguntado,
   Vitor escolheu subir gravando entradas e saídas sem a alocação FIFO nas `EstoqueReserva` até definir quais saídas
   são consumo. `sincronizarMovimentacoes` ganhou `abaterReservas` (padrão `false`; nem o cron nem a rota manual passam);

@@ -65,7 +65,7 @@ describe("middleware — o cron chega ao handler", () => {
   // `/api/cron/` sem liberar o caminho vê este teste falhar — em vez de descobrir meses depois,
   // por um 307 que ninguém olha.
   const fonte = readFileSync(new URL("../middleware.js", import.meta.url), "utf8");
-  const PREFIXOS_LIBERADOS = ["/api/cron/", "/api/producao/sync-sharepoint"];
+  const PREFIXOS_LIBERADOS = ["/api/cron/"];
 
   it.each([...AGENDA.keys()])("%s passa pelo middleware", (path) => {
     const porPrefixo = PREFIXOS_LIBERADOS.some((p) => path.startsWith(p));

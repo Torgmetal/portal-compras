@@ -15,6 +15,7 @@ import { baseUrlDe } from "@/lib/databook-assinaturas";
 import { ehTipoDePlano, docDoTipo, tudoAprovado, arquivarPlano, DOCS } from "@/lib/planos-aceite";
 import { log } from "@/lib/log";
 import { imagemDoCadastro } from "@/lib/assinatura-cadastro";
+import { aoConcluirAssinaturas } from "@/lib/relatorio-inspecao";
 
 const registro = log("api/assinar/[token]");
 
@@ -243,7 +244,12 @@ export async function POST(req, { params }) {
       // Relatórios podem ter assinantes em paralelo, sem ordem. Não haver próximo
       // na fila sequencial não significa que todos já assinaram.
       const pendentes = await prisma.assinaturaDocumento.count({where:{envioId:a.envioId,assinadoEm:null}});
-      if (!pendentes) await prisma.envioAssinatura.update({ where: { id: a.envioId }, data: { status: "CONCLUIDO" } }).catch(() => {});
+      if (!pendentes) {
+        await prisma.envioAssinatura.update({ where: { id: a.envioId }, data: { status: "CONCLUIDO" } }).catch(() => {});
+        // ⚠⚠ SÓ AGORA o relatório de inspeção entra no data book (Vitor, 25/09/2026: "puxar apenas os
+        // que estiverem assinados"). Falhar aqui não desfaz a assinatura de quem acabou de assinar.
+        await aoConcluirAssinaturas(a.envio).catch((e) => registro.erro("[assinar] data book:", e?.message));
+      }
     }
   } catch (e) { registro.erro("[assinar] convite do próximo:", e?.message); }
 

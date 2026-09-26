@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // rodada tinha centenas de linhas para acertar de uma vez — a sincronização morreu no meio, com 68
 // gravadas e nenhuma conclusão. O teto por rodada (`TETO_POR_RODADA`) é a trava real; isto é a
 // folga para ela caber. Mesmo número da sincronização de prazos, pelo mesmo motivo.
-export const maxDuration = 180;
+export const maxDuration = 300; // mesma planilha de ~17 MB da sincronização — ver lib/cmr-localizar
 const ROLES = ["ADMIN", "ALMOXARIFADO", "COMPRAS", "PCP", "PLANEJAMENTO", "QUALIDADE"];
 
 const schema = z.object({ ano: z.number().int().optional() });

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Loader2, FileText, Check, Send, AlertCircle, ChevronRight, ExternalLink, Plus, X, ShieldCheck, Trash2, Link2, Search, MoreHorizontal } from "lucide-react";
 import { TIPO_LABEL, TIPOS_RELATORIO, usaCotas, pendenciasParaAssinatura, faltamAssinar, rotuloAssinante } from "@/lib/qualidade-campo";
+import { textoDoVinculo } from "@/lib/relatorio-vinculo-texto";
 import { rotuloFase } from "@/lib/fase-peca";
 import FiltroFase from "@/components/qualidade/FiltroFase";
 
@@ -330,9 +331,7 @@ function Montar({ grupo, onFechar, onPronto }) {
       // é melhor que deixar a pessoa achar que apareceu na estruturação quando não apareceu
       alert(
         `Relatório ${j.relatorio.codigo} criado.\n\n` +
-        (j.vinculo?.vinculado
-          ? `Entrou na seção ${j.vinculo.secao} do data book (${j.vinculo.secaoTitulo}).`
-          : `⚠ Não entrou no data book: ${j.vinculo?.motivo || "seção não encontrada"}.`)
+        textoDoVinculo(j.vinculo)
       );
       onPronto();
     } catch (e) { alert(e.message); } finally { setSalvando(false); }
@@ -541,7 +540,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
       if (!r.ok) throw new Error(j.error || "Erro");
       alert(
         `Relatório ${j.relatorio.codigo} criado.\n\n` +
-        (j.vinculo?.vinculado ? `Entrou na seção ${j.vinculo.secao} do data book.\n\n` : `⚠ Não entrou no data book: ${j.vinculo?.motivo || "seção não encontrada"}.\n\n`) +
+        `${textoDoVinculo(j.vinculo)}\n\n` +
         "Abra o relatório para marcar as cotas A, B e C sobre o desenho."
       );
       onPronto();

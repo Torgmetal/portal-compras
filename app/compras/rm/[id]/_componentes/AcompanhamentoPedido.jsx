@@ -23,6 +23,7 @@ const hoje = () => new Date().toISOString().slice(0, 10);
 const ICONE = {
   LIBERADO_COLETA: Truck,
   ENCAMINHADO_OBRA: Truck,
+  ENTREGA: Truck,
   MATERIAL_RECEBIDO: PackageCheck,
 };
 

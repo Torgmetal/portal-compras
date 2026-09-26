@@ -25,3 +25,13 @@ mesma linha fariam a etapa dizer "prevista" ao lado de um chip que já a trata c
 
 ⚠ **Teste que usa data "de verdade" muda de sentido sozinho.** A suíte de 16/09 tinha "recebido em
 25/09" como passado; virou amanhã e quebrou. As suítes agora fixam `hoje`/`agora`.
+
+## Etapa "Entrega" e o histórico de remarcação no cartão (24/09/2026)
+
+- **`ENTREGA`** ("Entrega" / "Entrega prevista") entrou em `ETAPAS` para anotar entrega combinada,
+  muitas vezes parcial ("um item 29/09, o restante 15/10"). ⚠ Não marca "Chegou" (só
+  `MATERIAL_RECEBIDO` marca) e não muda a previsão: remarcar continua sendo "Data de entrega (previsão)".
+- ⚠⚠ **O cartão dos Prazos só mostrava a remarcação do FORNECEDOR** (`origemDaPrevisao`, prefixo
+  `[Fornecedor]`). A feita por dentro ficava no `PrazoHistorico` e sumia da tela — a data mudava sem
+  rastro nem observação. Agora `historicoDaPrevisao` (`lib/historico-previsao.js`) lista todas, uma
+  por linha, com de/para, quem e observação; a do fornecedor segue em âmbar.
