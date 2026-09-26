@@ -1,7 +1,12 @@
 {
-  "build": 3517,
-  "gerado": "2026-09-26T17:20:50.550Z",
+  "build": 3518,
+  "gerado": "2026-09-26T17:25:42.680Z",
   "commits": [
+    {
+      "hash": "38af6f13",
+      "data": "26/09/2026",
+      "titulo": "CLAUDE.md: fatos atualizados e regras de módulo carregadas sob demanda"
+    },
     {
       "hash": "fe64938f",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0ab3c374",
       "data": "26/09/2026",
       "titulo": "SharePoint: a pasta da Engenharia é lida inteira, não só a 1ª página"
-    },
-    {
-      "hash": "e4074373",
-      "data": "25/09/2026",
-      "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
     }
   ]
 }

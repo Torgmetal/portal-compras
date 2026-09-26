@@ -2298,3 +2298,45 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   o caminho FIFO segue testado atrás da opção, e o estorno continua fora dele mesmo ligado. Testes: +1 no
   `omie-estoque-movimentos` (26; o padrão ficou vermelho antes da mudança) e o do cron trava que a rota não liga a
   alocação. ⚠ **Para revisar:** ligar depois não aloca as saídas já gravadas (a rodada as vê como existentes).
+- **(26/09) Auditoria dos prompts de IA (`/claude-api prompt-audit`) — liberado o que não toca cotação/RM.** Vitor:
+  *"a parte de cotação e RM nos deixa um pouco com medo, do resto poderíamos soltar"*. Subiu em 5 commits (deploy
+  granular), cada um esperando Ready na Vercel:
+  - `18e2078d` **Estudo: parafusos e acessórios chamavam `claude-sonnet-4-20250514`, aposentado (404 na API de
+    modelos).** Os dois botões falhavam desde 15/06. Passam a `claude-sonnet-4-6`. `analisar-pintura` (mesmo modelo,
+    nenhuma tela chama) foi removida.
+  - `344ed047` **Formato estruturado da API (`output_config.format`) no lugar de "responda SOMENTE com JSON"**:
+    extratores de `lib/` (tarefas, ata, atividades, doc. qualidade, RNC do cliente, e-mails, boletim, calibração,
+    PLP, auditoria), rotas do estudo (peso, produtividade, parafusos, acessórios), Kick Off e retorno de terceiros.
+    `pedirJson`/`Esquema` em `lib/ia-json.js`; schemas das rotas em `lib/ia-esquemas.js`. Estudo (peso): a IA não
+    faz mais a conta do peso. `qualidade/documentos/extrair` passa a usar `lib/extrair-doc-qualidade` (o prompt
+    tinha duas cópias divergentes). Auditoria: `max_tokens` 1500 → 6000 e a rota `sugerir-docs` 60 → 180 s
+    (a lista de um pedido amplo cortava e virava erro de JSON; medido: 46 sugestões em 55 s).
+  - `cf3f61fe` **Torguinho:** `consultar_mes_producao` devolvia `totalKg` somado entre setores (o número que a
+    "REGRA CRÍTICA" do prompt proibia) — agora `pesoProduzidoKg` do setor mais avançado; `consultar_ops` oferecia
+    status inexistentes (`EM_ANDAMENTO`, `CONCLUIDA`); o exemplo de `consultar_dados` filtrava um `status` que
+    `CronogramaTarefa` não tem; o prompt citava `consultar_produtos_omie`, que 9 de 14 módulos não recebem; saem
+    "Pense passo a passo", o roteiro de 4 passos e a lista de conhecimentos gerais. `ConfigAssistente.modelo` com
+    `"auto"` (opção "Automático" na tela) liga a escolha por pergunta, que nunca rodava.
+  - `fe64938f` **Assistente Fiscal:** parâmetros das ferramentas descritos; sai o cabeçalho beta
+    `prompt-caching-2024-07-31`.
+  - `38af6f13` **CLAUDE.md** de 1.231 para 385 linhas: as seções de módulo foram, sem mudar texto, para
+    `.claude/rules/*.md` com `paths`; fatos corrigidos (testes, crons, roles, módulos Omie, integração Codex).
+
+  **Testado antes de subir** (cópia da main com os pacotes): suíte 4.343/4.343, `checar` limpo, eslint 35 → 32
+  avisos (0 erros), `next build` completo. Comportamento com documentos reais, código de antes × depois: Kick Off
+  (3 propostas), boletins Jotun, calibrações (42 e 12 pontos), peso do estudo, tarefas/ata/e-mails, retorno de
+  terceiro — iguais; parafusos/acessórios: 404 → funcionam. Torguinho (Haiku, só ferramentas de leitura):
+  "peso produzido da OP 97" 59.660 kg (soma) → 13.865 kg (Acabamento); "OPs em execução" com 2 erros de status →
+  certo de primeira. Produtividade e nota de retorno variam entre rodadas **nas duas versões** (4 rodadas cada).
+  Os 17 schemas compilam na API.
+
+  **Fica de fora por decisão do Vitor:** `app/api/parse-cotacao-ai` (a proposta pronta corrige os "avisos" de
+  imposto que a rota descarta e a regra do prompt que zera o preço que `lib/cotacao-itens-ia.js` corrige) e a
+  lista de status de `consultar_rms` (inclui `ATENDIDA`, que não existe).
+
+  ⚠ **Para revisar:** (a) o texto vazio como ausente em boletim, calibração, PLP e Kick Off (teto de 16 campos
+  "ou null" por schema); (b) o Torguinho só usa o Sonnet depois de alguém escolher "Automático" em
+  Admin › Torguinho (custo ~3× nas perguntas complexas); (c) defeitos que já existiam e seguem: a validade do
+  certificado CP-01 sai com a data de calibração/emissão quando o campo está vazio, e na RNC da Dan Power a IA
+  costuma pôr o cliente final (COMBIO) como emitente; (d) produtividade: mover a faixa de kg/m e a soma para o
+  código depende de decidir o método (média da peça × perfil a perfil).

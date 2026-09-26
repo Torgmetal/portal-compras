@@ -37,7 +37,8 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Libs compartilhadas](torg_libs_compartilhadas.md) — data-br, html (escapeHtml), blob-url (anti-SSRF), token (gerarTokenForte), **numero-br** (`numeroBR`), `fmtOP` única; usar em código novo
 - [Fuso: servidor roda em UTC](torg_fuso_servidor.md) — `toLocaleString("pt-BR")` não define fuso; usar `dataHoraBR()`/`dataBR()` no que o SERVIDOR escreve (não em `@db.Date`)
 - [Upload trava em 4,5MB](torg_upload_4mb.md) — rota serverless trava ~4,5MB; "não anexa" costuma ser TAMANHO; fix = client-token (`*/upload-token` + `@vercel/blob/client`)
-- [Integração de IA (Claude)](torg_ia_integracao.md) — portal usa @anthropic-ai/sdk, model `claude-sonnet-4-6`, ANTHROPIC_API_KEY; extração em lib/extrair-*.js
+- [Integração de IA (Claude)](torg_ia_integracao.md) — portal usa @anthropic-ai/sdk, `claude-sonnet-4-6`; resposta em formato estruturado (`pedirJson`/`Esquema`, teto de 16 campos "ou null"); cotação do fornecedor ainda no jeito antigo por decisão do Vitor; modelo aposentado = 404
+- [Torguinho](torg_torguinho.md) — só usa Sonnet com "Automático" em Admin › Torguinho; peso produzido = setor mais avançado (nunca soma); status das ferramentas = enum do banco
 - [Omie recebimento/NF/pedido](torg_omie_recebimento.md) — etapa 15, tolerância de peso, chave nIdPedido, codigo_local_estoque por item
 - [Movimentações de estoque (Omie)](torg_omie_movimentos_estoque.md) — `ListarMovimentoEstoque` em estoque/consulta (`ListarMovEstoque` NÃO existe: 0 linhas até 24/09); `idProd` numérico → `ProdutoOmie.codigoOmie`; 2 locais ("TODOS"); falha agora LANÇA; saídas NÃO abatem reserva de OP (decisão 26/09, `abaterReservas`)
 - [Pedido — rescale de preço](torg_pedido_rescale.md) — escala preço pro totalProposta só se cobre a proposta INTEIRA; split inflava; corrigido ffa4b13 (guard + ≤15%)
