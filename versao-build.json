@@ -1,156 +1,156 @@
 {
-  "build": 3502,
-  "gerado": "2026-09-26T15:36:26.963Z",
+  "build": 3503,
+  "gerado": "2026-09-26T15:41:06.315Z",
   "commits": [
     {
-      "hash": "ad69d555",
+      "hash": "6a4f37aae7",
+      "data": "26/09/2026",
+      "titulo": "Memória: a cópia duplicada da LQC 295 era a da pasta da obra, não a outra"
+    },
+    {
+      "hash": "ad69d55524",
       "data": "26/09/2026",
       "titulo": "Merge remote-tracking branch 'origin/main' into claude/silly-golick-65af65"
     },
     {
-      "hash": "c6917010",
+      "hash": "c6917010ab",
       "data": "26/09/2026",
       "titulo": "Estoque: movimentações do Omie pelo método que existe, e a falha da sincronização aparece"
     },
     {
-      "hash": "080eaa77",
+      "hash": "080eaa772e",
       "data": "26/09/2026",
       "titulo": "Fecha os 4 pontos que ainda dependiam da busca do Graph"
     },
     {
-      "hash": "f2050d99",
+      "hash": "f2050d99bd",
       "data": "26/09/2026",
       "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
     },
     {
-      "hash": "ddcef2ed",
+      "hash": "ddcef2eda4",
       "data": "26/09/2026",
       "titulo": "Estoque: o cron de produtos tinha 60 s e morria gravando — agora 300 s"
     },
     {
-      "hash": "f1c06c4a",
+      "hash": "f1c06c4a28",
       "data": "26/09/2026",
       "titulo": "Spec: Inteligência Fiscal mais simples — simulador pela obra, IBS/CBS das NFs, auditoria por parcela"
     },
     {
-      "hash": "3a4e911e",
+      "hash": "3a4e911eaf",
       "data": "26/09/2026",
       "titulo": "Desenhos e LQC deixam de depender da busca do Graph, que devolve 500"
     },
     {
-      "hash": "24663567",
+      "hash": "24663567b2",
       "data": "26/09/2026",
       "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
     },
     {
-      "hash": "13b279d4",
+      "hash": "13b279d41c",
       "data": "26/09/2026",
       "titulo": "Memória e revisão: o Terceiro soma na Qtd (decisão do Vitor)"
     },
     {
-      "hash": "72310a4e",
+      "hash": "72310a4e3e",
       "data": "26/09/2026",
       "titulo": "Estoque: o Terceiro soma na Qtd — é material da Torg e pode ser usado"
     },
     {
-      "hash": "b9bd0339",
+      "hash": "b9bd03395b",
       "data": "26/09/2026",
       "titulo": "docs: o search do Graph devolve 500 e derrubou 6 pontos — o que foi medido"
     },
     {
-      "hash": "676c23d5",
+      "hash": "676c23d54e",
       "data": "26/09/2026",
       "titulo": "Remove o cron sync-sharepoint do PCP — abandonado, e ninguém olhava"
     },
     {
-      "hash": "9b2368a8",
+      "hash": "9b2368a806",
       "data": "26/09/2026",
       "titulo": "CMR: reconciliação morria por tempo sem registrar — 300 s e varredura das pastas em paralelo"
     },
     {
-      "hash": "0ab3c374",
+      "hash": "0ab3c3749a",
       "data": "26/09/2026",
       "titulo": "SharePoint: a pasta da Engenharia é lida inteira, não só a 1ª página"
     },
     {
-      "hash": "e4074373",
+      "hash": "e4074373bf",
       "data": "25/09/2026",
       "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
     },
     {
-      "hash": "7a2d9ecd",
+      "hash": "7a2d9ecd0a",
       "data": "25/09/2026",
       "titulo": "R desativado fora da escolha; a separação passa a conferir o material"
     },
     {
-      "hash": "79e86348",
+      "hash": "79e86348c5",
       "data": "25/09/2026",
       "titulo": "Chapa de 10 mm é a de 3/8\" (9,5) e a de 12 mm é a de 1/2\" (12,5) — só chapa"
     },
     {
-      "hash": "c17f15b9",
+      "hash": "c17f15b9b5",
       "data": "25/09/2026",
       "titulo": "Relatório de ultrassom: todo o cabeçalho editável, no computador e no celular"
     },
     {
-      "hash": "3d84e169",
+      "hash": "3d84e169e6",
       "data": "25/09/2026",
       "titulo": "Data book: só relatório de inspeção assinado por todos entra"
     },
     {
-      "hash": "bb849b93",
+      "hash": "bb849b93b6",
       "data": "25/09/2026",
       "titulo": "Relatório de ultrassom: a peça ensaiada aparece na tabela"
     },
     {
-      "hash": "9acba6c0",
+      "hash": "9acba6c04c",
       "data": "25/09/2026",
       "titulo": "RNC: anexar mensagem de e-mail (.eml e .msg do Outlook)"
     },
     {
-      "hash": "c79184ab",
+      "hash": "c79184ab4e",
       "data": "25/09/2026",
       "titulo": "Memória: primeira rodada real do vínculo automático de certificados (76 em 7 livros)"
     },
     {
-      "hash": "5cdeb4e1",
+      "hash": "5cdeb4e1a8",
       "data": "25/09/2026",
       "titulo": "Data book: certificado que chega depois entra sozinho na seção já montada"
     },
     {
-      "hash": "696eb72d",
+      "hash": "696eb72d86",
       "data": "25/09/2026",
       "titulo": "Memória: data book da OP-102 fechado — 10 peças por troca SEM_R e 11 certificados na §04"
     },
     {
-      "hash": "9f3f4d3b",
+      "hash": "9f3f4d3b16",
       "data": "25/09/2026",
       "titulo": "RM: sobrar só item cotado é \"pronta pra pedido\", não \"aberta\"; a OP só recalcula RM que teve pedido"
     },
     {
-      "hash": "0c43bbcd",
+      "hash": "0c43bbcd6e",
       "data": "25/09/2026",
       "titulo": "CMR: localizador percorre a árvore inteira e não cai na busca quando a listagem falha"
     },
     {
-      "hash": "022bdf37",
+      "hash": "022bdf37e3",
       "data": "25/09/2026",
       "titulo": "Memória: CMR parado de 23 a 25/09, certificados da OP-102 e as 10 peças cortadas antes do material"
     },
     {
-      "hash": "ec19ab43",
+      "hash": "ec19ab4353",
       "data": "25/09/2026",
       "titulo": "Importação da LPC em lote: a T118B estourava os 300 s (HTTP 504)"
     },
     {
-      "hash": "d3ec58b9",
+      "hash": "d3ec58b915",
       "data": "25/09/2026",
       "titulo": "Memória: RIP-112-001 recriado com número, id e data originais"
-    },
-    {
-      "hash": "1e60d6d0",
-      "data": "25/09/2026",
-      "titulo": "CMR: a planilha é achada pela pasta da rastreabilidade — a busca do Graph está em 500"
     }
   ]
 }

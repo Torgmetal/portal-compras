@@ -38,10 +38,15 @@ tributárias — nada é apagado). A tela abre no **Simulador**. Consulta NCM e 
 aba, com um campo que aceita os dois. O upload de XML sai da Auditoria (continua no Assistente).
 
 **Tabela `FiscalRegraIbsCbs`** (DDL em `scripts/ensure-fiscal-tables.mjs`, idempotente — nunca
-`db push`): chave única `(ncm, cfop, ufDestino, pCbs, pIbsUf, pIbsMun)` — uma linha por combinação
-de ALÍQUOTAS observadas, para que divergência apareça como duas linhas e não como uma sobrescrita.
-Campos: `cstIbsCbs?`, `cClassTrib?` (se o Omie mandar), `qtdNotas`, `primeiraNf`, `primeiraEm`,
-`ultimaNf`, `ultimaEm`, `atualizadoEm`.
+`db push`): chave única `(ncm, cfop, pCbs, pIbsUf)` — uma linha por combinação de ALÍQUOTAS
+observadas, para que divergência apareça como duas linhas e não como uma sobrescrita. Campos:
+`qtdNotas`, `primeiraNf`, `primeiraEm`, `ultimaNf`, `ultimaEm`, `atualizadoEm`.
+
+⚠ **Ajuste medido ao planejar (26/09/2026):** o `ListarNF` NÃO traz a UF do destinatário
+(`nfDestInt` só tem razão, CNPJ e código), nem CST/cClassTrib de IBS/CBS, nem alíquota municipal.
+A chave fica **NCM × CFOP** — o CFOP já separa interna (5) de interestadual (6), e em 2026 a
+alíquota de teste é a mesma para todo destino. ⚠ A partir de 2027 o IBS é do DESTINO e varia: a
+chave vai precisar da UF (buscando o cliente por `nCodCli`). Registrado, não resolvido agora.
 
 **Coleta** (`lib/fiscal/regras-ibs-cbs.js`): lê `ListarNF` (saída, `tpAmb 1`) numa janela, extrai por
 item (NCM, CFOP, UF do destinatário, alíquotas) e faz upsert com `prismaDirect` e SQL constante (regra
@@ -49,7 +54,7 @@ de bulk write do CLAUDE.md). Cron diário (últimos 7 dias, com `aquecerBanco` e
 + botão "Atualizar regras das NFs" (ADMIN/FISCAL). Primeira carga: 2026 inteiro, mês a mês.
 ⚠ Item sem alíquota de IBS/CBS (nota antiga, remessa) não gera regra — ausência não é "0%".
 
-**Leitura**: `regraIbsCbs({ ncm, cfop, uf })` devolve `{ situacao: "UNICA" | "DIVERGENTE" | "SEM_NF",
+**Leitura**: `regraIbsCbs({ ncm, cfop })` devolve `{ situacao: "UNICA" | "DIVERGENTE" | "SEM_NF",
 linhas }`. A tela nunca escolhe entre divergentes; mostra as duas com as notas.
 
 ## Parte 2 — Simulador pela obra
@@ -89,7 +94,7 @@ Por item marcado, base = `quantidade da parcela × valor unitário`:
 | IPI | TIPI pelo NCM (motor `auditar` atual) | `ipi.aliquota` / CST / cEnq | OK / DIVERGENTE / NÃO AVALIÁVEL |
 | ICMS | `icms.js` por CFOP + UF da obra | `icms.aliquota` / CST | idem |
 | PIS / COFINS | `%` da `OPReceita` da obra casada pelo CFOP | — | informativo |
-| CBS / IBS | `FiscalRegraIbsCbs` (NCM, CFOP, UF) | — (o pedido não traz) | UNICA / DIVERGENTE / SEM_NF |
+| CBS / IBS | `FiscalRegraIbsCbs` (NCM, CFOP) | — (o pedido não traz) | UNICA / DIVERGENTE / SEM_NF |
 
 Rodapé: **total da parcela** por tributo (valores esperados) e contagem de divergências.
 
