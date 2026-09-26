@@ -1,7 +1,12 @@
 {
-  "build": 3483,
-  "gerado": "2026-09-25T19:25:09.430Z",
+  "build": 3484,
+  "gerado": "2026-09-26T13:30:17.702Z",
   "commits": [
+    {
+      "hash": "7a2d9ecd",
+      "data": "25/09/2026",
+      "titulo": "R desativado fora da escolha; a separação passa a conferir o material"
+    },
     {
       "hash": "79e86348",
       "data": "25/09/2026",
@@ -146,11 +151,6 @@
       "hash": "8c92271d",
       "data": "24/09/2026",
       "titulo": "Simulador de carga: a cabeceira tem altura (Resolução CONTRAN 945/2022, art. 8º)"
-    },
-    {
-      "hash": "51754018",
-      "data": "24/09/2026",
-      "titulo": "Simulador de carga: travamento por volume (escorar/amarrar) e cinta como fita"
     }
   ]
 }

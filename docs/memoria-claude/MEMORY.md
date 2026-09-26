@@ -56,7 +56,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Orçamento de Serviço](torg_orcamento_servico.md) — aba na Central de Orçamentos (/comercial/orcamentos/servicos); OrcamentoServico (SQL); step 1 pronto, abas da proposta pendentes
 - [Peso real da OP](torg_peso_real_op.md) — somar PecaConjunto cru dobra; usar `pesoRealPecas` de lib/peso-op.js (canônico=LE, senão LPC) em toda soma por OP
 - [Marca = avulsa; entrega = conjunto + marca](torg_marca_conjunto_croqui.md) — croqui é componente: fica na GRD, NÃO no Data Book nem em contagem de "marcas da OP"
-- [Portão do desenho na liberação](torg_portao_desenho.md) — só desce marca com PDF em 2.5.2; 2.5.5 (envio ao cliente) nunca conta; conferência tem que cobrir a LPC atual
+- [Portão do desenho na liberação](torg_portao_desenho.md) — só desce marca com PDF em 2.5.2; 2.5.5 (envio ao cliente) nunca conta; conferência tem que cobrir a LPC atual; ⚠ listagem do Graph é PAGINADA — `todasAsPaginas` (OP-118: 766 croquis na 2ª página)
 - [GRD da Engenharia (FORM 09)](torg_grd_engenharia.md) — /engenharia/grd lê a pasta 13. GRD por OP; alerta só R01 de quem já desceu; nº baixa o original (auditoria)
 - [GRD / desenhos da Engenharia](torg_grd_desenhos.md) — modal nas telas de produção/PCP busca PDFs (formato A1–A4 pela pasta 2.5.2 Fabricação); Imprimir+GRD grava GrdLiberacao
 - [Regularizar GRD de corte fora do portal](torg_grd_regularizacao.md) — data = 1º apontamento; NUNCA assinar por quem não emitiu nem carimbar retroativo
