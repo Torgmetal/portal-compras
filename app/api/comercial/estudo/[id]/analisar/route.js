@@ -5,6 +5,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { matchItensComOmie } from "@/lib/match-omie";
 import { assertBlobUrlSegura } from "@/lib/blob-url";
 import { log } from "@/lib/log";
+import { pedirJson } from "@/lib/ia-json";
+import { ESQUEMA_PESO_PROJETO } from "@/lib/ia-esquemas";
 
 const registro = log("api/comercial/estudo/[id]/analisar");
 
@@ -43,9 +45,9 @@ REGRAS DE EXTRACAO:
    - tipoMaterial: um dos valores: PERFIL_W, PERFIL_U, PERFIL_L, TUBO_REDONDO, TUBO_QUADRADO, TUBO_RETANGULAR, CHAPA, BARRA_REDONDA, BARRA_CHATA, BARRA_QUADRADA, BARRA_ROSCADA, TELA, GRADE_PISO, DEGRAU, OUTRO
    - norma: ASTM A572 Gr.50, ASTM A36, SAE 1020, DIN 2440, etc. se mencionada
    - comprimento: em metros (converter de mm se necessario). Se for chapa, a area em m2
-   - pesoUnitario: kg por metro (ou kg/m2 para chapas). Se o documento der peso total e comprimento, calcule: pesoUnit = pesoTotal / comprimento
+   - pesoUnitario: kg por metro (ou kg/m2 para chapas), como o documento informa; null se nao informar
    - quantidade: numero de pecas/barras
-   - pesoTotal: peso total em kg. Se nao informado diretamente, calcule: pesoUnitario x comprimento x quantidade (ou pesoUnitario x quantidade se nao tem comprimento)
+   - pesoTotal: peso total em kg, como o documento informa; null se nao informar (o portal faz a conta a partir de pesoUnitario, comprimento e quantidade)
 
 3. NOTACAO BRASILEIRA:
    - Virgula e decimal: "7,50" = 7.50
@@ -65,36 +67,20 @@ REGRAS DE EXTRACAO:
    - Se nao tem certeza da norma, use null
    - Se o documento nao e tecnico/de projeto, retorne itens vazio
 
-FORMATO DE SAIDA:
-Devolva APENAS um JSON valido envolvido em <json></json>:
+RESPOSTA:
+   - pesoTotalProjeto: kg total da estrutura, se o documento mencionar
+   - composicao: composicao tipica de peso por tipo (ex: 95% Perfis W, 3% U/UE, 2% L), se disponivel
+   - observacoes: notas relevantes sobre o projeto`;
 
-<json>
-{
-  "pesoTotalProjeto": "number ou null (kg total mencionado no documento)",
-  "composicao": "string ou null (ex: 95% Perfis W, 3% U/UE, 2% L)",
-  "observacoes": "string ou null (notas relevantes sobre o projeto)",
-  "itens": [
-    {
-      "descricao": "string",
-      "setor": "string ou null",
-      "tipoMaterial": "string (enum TipoMaterial)",
-      "norma": "string ou null",
-      "comprimento": "number ou null (metros ou m2)",
-      "pesoUnitario": "number (kg/m ou kg/m2)",
-      "quantidade": "number",
-      "pesoTotal": "number (kg)"
-    }
-  ]
-}
-</json>`;
-
-function extractJsonFromResponse(text) {
-  const tagged = text.match(/<json>([\s\S]*?)<\/json>/i);
-  if (tagged) return tagged[1].trim();
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start >= 0 && end > start) return text.substring(start, end + 1);
-  return text;
+// O peso que o documento declara manda; o que ele não declara, o portal calcula — a conta não
+// fica com a IA.
+function pesosDoItem(item) {
+  const comprimento = item.comprimento != null ? Number(item.comprimento) : null;
+  const quantidade = Math.max(1, Math.round(Number(item.quantidade) || 1));
+  const declarado = Number(item.pesoTotal) || 0;
+  const porMetro = declarado && comprimento ? declarado / (comprimento * quantidade) : 0;
+  const pesoUnitario = Number(item.pesoUnitario) || porMetro;
+  return { comprimento, pesoUnitario, quantidade, pesoTotal: declarado || pesoUnitario * (comprimento || 1) * quantidade };
 }
 
 // Baixa um arquivo do Blob e converte para base64
@@ -247,24 +233,19 @@ export async function POST(req, { params }) {
       text: `${contexto}\n\n${textoExtra ? `CONTEXTO ADICIONAL DO USUARIO:\n${textoExtra}\n\n` : ""}Analise os documentos acima e extraia TODOS os itens de material com seus pesos para o levantamento do projeto. Retorne o JSON conforme o schema do system prompt.`,
     });
 
-    const message = await anthropic.messages.create({
+    const { dados: resultado, texto: rawText, parada } = await pedirJson(anthropic, {
       model: "claude-sonnet-4-6",
       max_tokens: 16000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content }],
+      formato: ESQUEMA_PESO_PROJETO,
     });
 
-    const rawText = message.content[0]?.text || "";
-    const jsonStr = extractJsonFromResponse(rawText);
-
-    let resultado;
-    try {
-      resultado = JSON.parse(jsonStr);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: "IA retornou resposta invalida. Tente novamente.", raw: rawText.substring(0, 500) },
-        { status: 422 }
-      );
+    if (!resultado) {
+      const error = parada === "max_tokens"
+        ? "Os documentos deste lote geraram itens demais para uma resposta e a leitura foi cortada. Analise menos documentos por vez."
+        : "IA retornou resposta invalida. Tente novamente.";
+      return NextResponse.json({ success: false, error, raw: rawText.substring(0, 500) }, { status: 422 });
     }
 
     // Sanitizar itens
@@ -273,10 +254,7 @@ export async function POST(req, { params }) {
       setor: item.setor || null,
       tipoMaterial: item.tipoMaterial || "OUTRO",
       norma: item.norma || null,
-      comprimento: item.comprimento != null ? Number(item.comprimento) : null,
-      pesoUnitario: Number(item.pesoUnitario) || 0,
-      quantidade: Math.max(1, Math.round(Number(item.quantidade) || 1)),
-      pesoTotal: Number(item.pesoTotal) || 0,
+      ...pesosDoItem(item),
       ordem: idx,
     })).filter((i) => i.descricao && i.pesoTotal > 0);
 

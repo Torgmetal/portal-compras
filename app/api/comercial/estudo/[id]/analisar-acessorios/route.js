@@ -4,6 +4,8 @@ import { requireRole } from "@/lib/session";
 import Anthropic from "@anthropic-ai/sdk";
 import { assertBlobUrlSegura } from "@/lib/blob-url";
 import { log } from "@/lib/log";
+import { pedirJson } from "@/lib/ia-json";
+import { ESQUEMA_ACESSORIOS } from "@/lib/ia-esquemas";
 
 const registro = log("api/comercial/estudo/[id]/analisar-acessorios");
 
@@ -60,33 +62,9 @@ REGRAS:
 - Se um dado nao esta no documento, use null
 - NAO inventar dados
 
-FORMATO DE SAIDA:
-Devolva APENAS um JSON valido envolvido em <json></json>:
-
-<json>
-{
-  "observacoes": "string ou null (notas relevantes sobre acessorios do projeto)",
-  "itens": [
-    {
-      "categoria": "TELHA | CALHA | RUFO | GRADE_PISO | GALVANIZACAO | STEEL_DECK | POLICARBONATO | ISOLAMENTO | OUTRO",
-      "descricao": "string (descricao completa do item)",
-      "especificacao": "string ou null (detalhes tecnicos: espessura, material, modelo)",
-      "unidade": "string (un, m, m2, kg...)",
-      "quantidade": "number",
-      "observacao": "string ou null"
-    }
-  ]
-}
-</json>`;
-
-function extractJsonFromResponse(text) {
-  const tagged = text.match(/<json>([\s\S]*?)<\/json>/i);
-  if (tagged) return tagged[1].trim();
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start >= 0 && end > start) return text.substring(start, end + 1);
-  return text;
-}
+RESPOSTA:
+- observacoes: notas relevantes sobre os acessorios do projeto
+- por item: categoria, descricao completa, especificacao (detalhes tecnicos: espessura, material, modelo), unidade (un, m, m2, kg...), quantidade e observacao`;
 
 async function fetchBlobAsBase64(url) {
   assertBlobUrlSegura(url); // SSRF: só aceita URLs do Vercel Blob
@@ -184,24 +162,21 @@ export async function POST(req, { params }) {
 
     // Chamar Claude
     const anthropic = new Anthropic({ apiKey });
-    const message = await anthropic.messages.create({
+    const { dados: resultado, parada } = await pedirJson(anthropic, {
       model: "claude-sonnet-4-6",
       max_tokens: 8192,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content }],
+      formato: ESQUEMA_ACESSORIOS,
     });
-
-    const respText = message.content
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("\n");
-
-    const jsonStr = extractJsonFromResponse(respText);
-    const resultado = JSON.parse(jsonStr);
+    if (!resultado) {
+      const error = parada === "max_tokens" ? "A lista de acessorios ficou longa demais e foi cortada. Analise menos documentos por vez." : "IA retornou resposta invalida. Tente novamente.";
+      return NextResponse.json({ success: false, error }, { status: 422 });
+    }
 
     // Validar e sanitizar
     const itens = (resultado.itens || []).map((item) => ({
-      categoria: item.categoria || "OUTRO",
+      categoria: String(item.categoria || "OUTRO").toUpperCase(),
       descricao: item.descricao || "",
       especificacao: item.especificacao || null,
       unidade: item.unidade || "un",

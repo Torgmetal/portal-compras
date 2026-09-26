@@ -4,6 +4,8 @@ import { requireRole } from "@/lib/session";
 import Anthropic from "@anthropic-ai/sdk";
 import { assertBlobUrlSegura } from "@/lib/blob-url";
 import { log } from "@/lib/log";
+import { pedirJson } from "@/lib/ia-json";
+import { ESQUEMA_PARAFUSOS } from "@/lib/ia-esquemas";
 
 const registro = log("api/comercial/estudo/[id]/analisar-parafusos");
 
@@ -20,7 +22,7 @@ const MAX_DOCS_POR_LOTE = 5;
 const SYSTEM_PROMPT = `Voce e um engenheiro orcamentista de uma metalurgica (Torg Metal) especializada em estruturas metalicas.
 Seu trabalho e analisar documentos de projetos e extrair ou ESTIMAR todos os parafusos, porcas, arruelas, chumbadores e fixadores necessarios para o projeto.
 
-IMPORTANTE: Em muitos projetos os parafusos nao estao explicitamente listados. Nesse caso voce deve ESTIMAR com base em:
+Em muitos projetos os parafusos nao estao explicitamente listados. Nesse caso, estime com base em:
 - Tipo de estrutura (galpao, plataforma, mezanino, etc.)
 - Perfis utilizados (W, U, L, tubos)
 - Tipos de ligacoes tipicas (aparafusada, soldada+aparafusada)
@@ -51,36 +53,10 @@ DIAMETROS TIPICOS:
 - M22 / 7/8" — ligacoes pesadas, emendas
 - M24 / 1" — chumbadores de ancoragem
 
-FORMATO DE SAIDA:
-Devolva APENAS um JSON valido envolvido em <json></json>:
-
-<json>
-{
-  "observacoes": "string ou null (notas sobre parafusos do projeto, tipo de ligacoes identificadas)",
-  "itens": [
-    {
-      "tipo": "PARAFUSO | PORCA | ARRUELA | CHUMBADOR | BARRA_ROSCADA | CONECTOR | INSERTO | OUTRO",
-      "descricao": "string (descricao completa: Parafuso sextavado M16x50 ASTM A325)",
-      "especificacao": "string ou null (norma, acabamento: ASTM A325, galvanizado a fogo)",
-      "diametro": "string ou null (M16, 5/8, 3/4)",
-      "comprimento": "string ou null (50mm, 2 pol, 300mm)",
-      "unidade": "un",
-      "quantidade": "number",
-      "estimativa": "boolean (true se quantidade foi estimada, false se extraida do documento)",
-      "observacao": "string ou null (onde sera usado: ligacao viga-coluna, ancoragem, etc.)"
-    }
-  ]
-}
-</json>`;
-
-function extractJsonFromResponse(text) {
-  const tagged = text.match(/<json>([\s\S]*?)<\/json>/i);
-  if (tagged) return tagged[1].trim();
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start >= 0 && end > start) return text.substring(start, end + 1);
-  return text;
-}
+RESPOSTA:
+- observacoes: notas sobre os parafusos do projeto e os tipos de ligacao identificados
+- por item: descricao completa (ex: Parafuso sextavado M16x50 ASTM A325); especificacao (norma, acabamento: ASTM A325, galvanizado a fogo); diametro (M16, 5/8, 3/4); comprimento (50mm, 2 pol, 300mm); unidade ("un"); estimativa (true se a quantidade foi estimada, false se extraida do documento); observacao (onde sera usado: ligacao viga-coluna, ancoragem...)
+- campo de texto sem informacao: null`;
 
 async function fetchBlobAsBase64(url) {
   assertBlobUrlSegura(url); // SSRF: só aceita URLs do Vercel Blob
@@ -157,19 +133,20 @@ Analise os documentos e extraia ou ESTIME todos os parafusos, porcas, arruelas, 
     }
 
     const anthropic = new Anthropic({ apiKey });
-    const message = await anthropic.messages.create({
+    const { dados: resultado, parada } = await pedirJson(anthropic, {
       model: "claude-sonnet-4-6",
       max_tokens: 8192,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content }],
+      formato: ESQUEMA_PARAFUSOS,
     });
-
-    const respText = message.content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
-    const jsonStr = extractJsonFromResponse(respText);
-    const resultado = JSON.parse(jsonStr);
+    if (!resultado) {
+      const error = parada === "max_tokens" ? "A lista de fixadores ficou longa demais e foi cortada. Analise menos documentos por vez." : "IA retornou resposta invalida. Tente novamente.";
+      return NextResponse.json({ success: false, error }, { status: 422 });
+    }
 
     const itens = (resultado.itens || []).map((item) => ({
-      tipo: item.tipo || "PARAFUSO",
+      tipo: String(item.tipo || "PARAFUSO").toUpperCase(),
       descricao: item.descricao || "",
       especificacao: item.especificacao || null,
       diametro: item.diametro || null,

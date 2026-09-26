@@ -4,6 +4,8 @@ import { requireRole } from "@/lib/session";
 import Anthropic from "@anthropic-ai/sdk";
 import { assertBlobUrlSegura } from "@/lib/blob-url";
 import { log } from "@/lib/log";
+import { pedirJson } from "@/lib/ia-json";
+import { esquemaProdutividade } from "@/lib/ia-esquemas";
 
 const registro = log("api/comercial/estudo/[id]/analisar-produtividade");
 
@@ -106,34 +108,14 @@ GRUPO: Acessos (acessos industriais)
 6. Chapas, grades de piso e outros itens: classificar pelo tipo mais proximo
 7. Se o documento lista uma estrutura mista (ex: galpao com colunas W pesadas + trelicas de cobertura leves), SEPARE em tipos diferentes
 8. O pesoKg de cada tipo e a soma dos pesos de TODOS os perfis classificados naquela faixa
-9. NUNCA invente pesos — se nao tem informacao suficiente, use null no pesoKg
+9. Sem informacao suficiente para o peso de um tipo, use null no pesoKg — um peso inventado entra direto na media ponderada de Hh/ton
 
-═══ FORMATO DE SAIDA ═══
-Devolva APENAS JSON valido em <json></json>:
+═══ RESPOSTA ═══
+- pesoTotalEstimado: kg total do projeto, ou null
+- observacoes: notas sobre a analise, premissas adotadas, kg/m medio identificado por grupo
+- composicao: um item por tipo, com tipoObraId (da lista acima), pesoKg (peso total dos perfis classificados neste tipo), kgmMedio (kg/m medio dos perfis deste grupo) e elementosIdentificados (ex: 'L 3x3/8 (8.6 kg/m), L 2x1/4 (3.5 kg/m), U 4 (7.3 kg/m)')`;
 
-<json>
-{
-  "pesoTotalEstimado": "number ou null (kg total do projeto)",
-  "observacoes": "string (notas sobre a analise, premissas adotadas, kg/m medio identificado por grupo)",
-  "composicao": [
-    {
-      "tipoObraId": "string (ID exato da lista acima, ex: TRELICADA_LEVE)",
-      "pesoKg": "number (peso total dos perfis classificados neste tipo, em kg)",
-      "kgmMedio": "number (kg/m medio dos perfis deste grupo)",
-      "elementosIdentificados": "string (lista dos perfis: ex 'L 3x3/8 (8.6 kg/m), L 2x1/4 (3.5 kg/m), U 4 (7.3 kg/m)')"
-    }
-  ]
-}
-</json>`;
-
-function extractJsonFromResponse(text) {
-  const tagged = text.match(/<json>([\s\S]*?)<\/json>/i);
-  if (tagged) return tagged[1].trim();
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start >= 0 && end > start) return text.substring(start, end + 1);
-  return text;
-}
+const ESQUEMA_PRODUTIVIDADE = esquemaProdutividade(TIPOS_OBRA_REF.map((t) => t.id));
 
 async function fetchBlobAsBase64(url) {
   assertBlobUrlSegura(url); // SSRF: só aceita URLs do Vercel Blob
@@ -224,31 +206,26 @@ export async function POST(req, { params }) {
       text: `${contexto}\n\n${textoExtra ? `CONTEXTO ADICIONAL:\n${textoExtra}\n\n` : ""}Analise os documentos de projeto acima e classifique TODOS os elementos estruturais nos tipos padrao da Torg Metal, informando o peso estimado de cada tipo. Retorne o JSON conforme o schema do system prompt.`,
     });
 
-    const message = await anthropic.messages.create({
+    const { dados: resultado, texto: rawText, parada, message } = await pedirJson(anthropic, {
       model: "claude-sonnet-4-6",
       max_tokens: 8000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content }],
+      formato: ESQUEMA_PRODUTIVIDADE,
     });
 
-    const rawText = message.content[0]?.text || "";
-    const jsonStr = extractJsonFromResponse(rawText);
-
-    let resultado;
-    try {
-      resultado = JSON.parse(jsonStr);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: "IA retornou resposta invalida. Tente novamente.", raw: rawText.substring(0, 500) },
-        { status: 422 }
-      );
+    if (!resultado) {
+      const error = parada === "max_tokens"
+        ? "A analise ficou longa demais e foi cortada. Envie menos documentos por vez."
+        : "IA retornou resposta invalida. Tente novamente.";
+      return NextResponse.json({ success: false, error, raw: rawText.substring(0, 500) }, { status: 422 });
     }
 
     // Sanitizar e enriquecer composicao com dados da tabela TORG
     const composicao = (resultado.composicao || [])
       .filter((c) => c.tipoObraId && c.pesoKg > 0)
       .map((c) => {
-        const tipo = TIPOS_OBRA_REF.find((t) => t.id === c.tipoObraId);
+        const tipo = TIPOS_OBRA_REF.find((t) => t.id === String(c.tipoObraId).toUpperCase());
         return {
           tipoObraId: c.tipoObraId,
           label: tipo?.label || c.tipoObraId,

@@ -1,8 +1,10 @@
 // POST /api/comercial/op/[id]/kickoff/extrair — extrai dados de Kick Off do
-// PDF da proposta comercial via Claude (mesmo padrão do parse-cotacao-ai:
-// document block base64 + resposta em <json></json> + sanitização).
+// PDF da proposta comercial via Claude (document block base64 + resposta no
+// formato de ESQUEMA_KICKOFF + sanitização).
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { pedirJson } from "@/lib/ia-json";
+import { ESQUEMA_KICKOFF } from "@/lib/ia-esquemas";
 import { createRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 import { escopoDeCompraDoEstudo } from "@/lib/op-categorias";
 import { prisma } from "@/lib/prisma";
@@ -20,40 +22,28 @@ const MODELO_FIXO = "claude-sonnet-4-6";
 
 const SYSTEM_PROMPT = `Você é um analista comercial da Torg Metal (estruturas metálicas). Vai receber o PDF de uma PROPOSTA COMERCIAL emitida pela Torg para um cliente, e deve extrair as informações para o documento de KICK OFF — a reunião de alinhamento interna que divulga o contrato aos setores (engenharia, PCP, produção, compras, expedição).
 
-EXTRAIA (quando presente no documento — não invente; na dúvida, use null):
+EXTRAIA o que estiver no documento, sem inventar. Campo sem informação: texto vazio (""), número 0, lista vazia.
 
-- escopo: resumo MUITO CURTO do fornecimento (2-3 frases, máx. 400 caracteres) — só o que é a obra e o que a Torg entrega. PROIBIDO listar inclusões/exclusões aqui (elas têm campos próprios) e PROIBIDO usar bullets/tópicos.
+- escopo: resumo curto do fornecimento em 2-3 frases corridas (até 400 caracteres): o que é a obra e o que a Torg entrega. Inclusões e exclusões vão nos campos próprios, não aqui.
 - escopoIncluso: array de strings — itens que ESTÃO incluídos no fornecimento (fabricação, montagem, pintura, transporte, projetos, ART...). Frases curtas, um item por string.
 - escopoExcluso: array de strings — itens EXPRESSAMENTE excluídos / por conta do cliente (fundações, energia, andaimes, chumbadores...). Frases curtas.
-- resumoPesos: array de {descricao, qtd, pesoKg} — quando a proposta tiver tabela/lista de itens com pesos (estrutura, telhas, acessórios), traga o resumo por grupo. NUNCA inclua linha de "TOTAL" (o total é calculado). Números em kg. SEM valores em R$. [] se não houver.
-- dataEntregaAcordada: prazo de entrega acordado, como data "YYYY-MM-DD" se houver data explícita, senão null.
-- tipoFaturamento: como a proposta define o faturamento (ex.: "por medições mensais", "por eventos", "30/60/90"...). null se não disser.
-- faturamentoEventos: array de {descricao, percentual, valor, prazoPagamento, medicao, obsNF} — os eventos/parcelas de faturamento da proposta (ex.: {descricao: "Entrada", percentual: 10, valor: 150000, prazoPagamento: "28 dias após NF", medicao: null, obsNF: null}). Valores em número (sem R$ no texto). [] se não houver.
-- retencaoContratual: retenção contratual se houver (ex.: "5% — liberação após entrega/CND"). null se não houver menção.
-- segurosObrigatorios: seguros exigidos (garantia, RC, riscos de engenharia...). null se não houver menção.
-- padraoPintura: o esquema de pintura definido (primer/intermediário/acabamento, produtos, demãos, espessuras em µm, cor, norma). null se a proposta não definir.
+- resumoPesos: array de {descricao, qtd, pesoKg} — quando a proposta tiver tabela/lista de itens com pesos (estrutura, telhas, acessórios), traga o resumo por grupo. Sem a linha de "TOTAL": o total é calculado na tela. Números em kg, sem valores em R$.
+- dataEntregaAcordada: prazo de entrega acordado, como data "YYYY-MM-DD" se houver data explícita.
+- tipoFaturamento: como a proposta define o faturamento (ex.: "por medições mensais", "por eventos", "30/60/90"...).
+- faturamentoEventos: array de {descricao, percentual, valor, prazoPagamento, medicao, obsNF} — os eventos/parcelas de faturamento da proposta (ex.: {descricao: "Entrada", percentual: 10, valor: 150000, prazoPagamento: "28 dias após NF", medicao: "", obsNF: ""}). Valores em número (sem R$ no texto).
+- retencaoContratual: retenção contratual se houver (ex.: "5% — liberação após entrega/CND").
+- segurosObrigatorios: seguros exigidos (garantia, RC, riscos de engenharia...).
+- padraoPintura: o esquema de pintura definido (primer/intermediário/acabamento, produtos, demãos, espessuras em µm, cor, norma).
 - inspecao: requisitos de inspeção, ensaios, normas de qualidade, ITPs, visitas de inspetor do cliente, liberação de romaneio etc.
 - entregaEndereco: endereço ou local de ENTREGA da obra (cidade/UF no mínimo). Atenção: NÃO é o endereço fiscal do cliente.
-- frete: "TORG" se o frete é por conta da Torg (CIF/incluso), "CLIENTE" se por conta do cliente (FOB/retirada), null se não especificado.
+- frete: "TORG" se o frete é por conta da Torg (CIF/incluso), "CLIENTE" se por conta do cliente (FOB/retirada), vazio se não especificado.
 - pedidoCompraCliente: número do pedido de compra/ordem de compra do CLIENTE, se citado.
 - notaRetorno: true se houver menção a nota de retorno / remessa para industrialização / material do cliente que retorna; false se claramente não há; null se não dá para saber.
 - faturamentoObs: observações complementares de faturamento que não couberam nos eventos (impostos destacados, condições especiais). Curto.
 
 REGRAS
 - Não invente nada: só o que está escrito no documento.
-- Valores e percentuais: transcreva como estão.
-- NÃO extraia "pontos de atenção" — esse campo é de preenchimento interno do comercial.
-- Responda APENAS com um JSON válido envolvido em <json></json>, no formato:
-<json>{"escopo": "...", "escopoIncluso": ["..."], "escopoExcluso": ["..."], "resumoPesos": [{"descricao": "...", "qtd": 0, "pesoKg": 0}], "dataEntregaAcordada": null, "tipoFaturamento": null, "faturamentoEventos": [{"descricao": "Entrada", "percentual": 10, "valor": null, "prazoPagamento": null, "medicao": null, "obsNF": null}], "retencaoContratual": null, "segurosObrigatorios": null, "padraoPintura": null, "inspecao": null, "entregaEndereco": null, "frete": null, "pedidoCompraCliente": null, "notaRetorno": null, "faturamentoObs": null}</json>`;
-
-function extractJsonFromResponse(text) {
-  const tagged = text.match(/<json>([\s\S]*?)<\/json>/i);
-  if (tagged) return tagged[1].trim();
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start !== -1 && end > start) return text.slice(start, end + 1);
-  return null;
-}
+- Valores e percentuais: transcreva como estão.`;
 
 export async function POST(req, { params }) {
   let user;
@@ -86,7 +76,7 @@ export async function POST(req, { params }) {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const cleanB64 = pdfBase64.includes(",") ? pdfBase64.split(",")[1] : pdfBase64;
 
-    const message = await anthropic.messages.create({
+    const { dados, texto: rawText, parada, message } = await pedirJson(anthropic, {
       model: MODELO_FIXO,
       max_tokens: 4000,
       system: SYSTEM_PROMPT,
@@ -94,19 +84,18 @@ export async function POST(req, { params }) {
         role: "user",
         content: [
           { type: "document", source: { type: "base64", media_type: "application/pdf", data: cleanB64 } },
-          { type: "text", text: `Contexto: OP ${op.numero} — cliente ${op.cliente}${op.obra ? `, obra ${op.obra}` : ""}. Extraia os dados de kick off conforme o schema do system prompt.` },
+          { type: "text", text: `Contexto: OP ${op.numero} — cliente ${op.cliente}${op.obra ? `, obra ${op.obra}` : ""}. Extraia os dados de kick off.` },
         ],
       }],
+      formato: ESQUEMA_KICKOFF,
     });
 
-    const rawText = (message.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
-    const jsonStr = extractJsonFromResponse(rawText);
-    if (!jsonStr) {
-      return NextResponse.json({ error: "IA devolveu resposta não-JSON.", rawPreview: rawText.slice(0, 500) }, { status: 502 });
+    if (!dados) {
+      const error = parada === "max_tokens"
+        ? "A proposta gerou texto demais para uma resposta e a leitura foi cortada."
+        : "A leitura da proposta não devolveu dados. Tente de novo.";
+      return NextResponse.json({ error, rawPreview: rawText.slice(0, 500) }, { status: 502 });
     }
-    let dados;
-    try { dados = JSON.parse(jsonStr); }
-    catch { return NextResponse.json({ error: "JSON inválido na resposta da IA.", rawPreview: rawText.slice(0, 500) }, { status: 502 }); }
 
     // Sanitização leve
     const str = (v, max) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);

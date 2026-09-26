@@ -1,7 +1,12 @@
 {
-  "build": 3513,
-  "gerado": "2026-09-26T16:07:49.174Z",
+  "build": 3514,
+  "gerado": "2026-09-26T17:10:50.183Z",
   "commits": [
+    {
+      "hash": "18e2078d",
+      "data": "26/09/2026",
+      "titulo": "Estudo: parafusos e acessórios voltam a chamar um modelo que existe"
+    },
     {
       "hash": "02c4259c",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c17f15b9",
       "data": "25/09/2026",
       "titulo": "Relatório de ultrassom: todo o cabeçalho editável, no computador e no celular"
-    },
-    {
-      "hash": "3d84e169",
-      "data": "25/09/2026",
-      "titulo": "Data book: só relatório de inspeção assinado por todos entra"
     }
   ]
 }

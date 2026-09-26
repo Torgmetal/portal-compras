@@ -7,7 +7,8 @@ import { requireRole } from "@/lib/session";
 import { sugerirDocumentos } from "@/lib/auditoria-sugestao";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// ⚠ Uma lista ampla leva ~1 min só na IA (46 sugestões em 55 s, medido em 26/09): 60 s matava a rota.
+export const maxDuration = 180;
 
 const CATEGORIAS_AUDITORIA = ["SISTEMA", "EQUIPAMENTOS", "FUNCIONARIOS", "INSPETORES"];
 
