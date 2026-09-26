@@ -15,7 +15,12 @@ import { log } from "@/lib/log";
 const registro = log("api/cron/cmr-reconciliar");
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// ⚠⚠ 60 s MATAVA A RODADA SEM DEIXAR RASTRO (26/09/2026). Desde que a planilha é achada listando a
+// árvore da rastreabilidade (a busca do Graph está em 500 — ver lib/cmr-localizar), a reconciliação
+// procura o arquivo DUAS vezes (ler e reenviar) sobre uma planilha de ~17 MB; a sincronização do
+// mesmo arquivo já levava 62 s. Morta por tempo, a função nem chega ao `registrarExecucao` do catch:
+// o monitor só vê "sem sucesso há N h". Mesmo teto da sincronização.
+export const maxDuration = 300;
 
 export async function GET(req) {
   if (!temCronSecret(req) && process.env.NODE_ENV === "production") {

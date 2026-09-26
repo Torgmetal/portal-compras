@@ -222,3 +222,8 @@ listagem** (achado do Codex: `listAllFilesRecursive` engole erro e escolheria c�
 CMR escreve nesse arquivo). Falha de listagem PROPAGA; a busca só entra com a árvore listada inteira e sem a planilha, e metadado que falha nela é erro (achados do Codex, rodada 1). O erro traz code/mensagem/request-id.
 ⚠ LQC (`lib/lqc-sharepoint.js`) continua dependendo da busca — espalhada pela árvore de orçamentos.
 ⚠ As credenciais Azure NÃO estão no `.env.local`: não dá para chamar o Graph daqui.
+⚠⚠ **Depois disso a reconciliação morreu calada (26/09/2026)**: `maxDuration = 60` com a varredura
+da árvore feita duas vezes (ler + reenviar) — a Vercel mata a função antes do `registrarExecucao`
+do catch, e o monitor só vê "sem sucesso há N h", sem mensagem. Agora 300 s (cron, botão manual e
+espelhar, como a sincronização) e a varredura lista até 8 pastas por nível em paralelo.
+**Heartbeat que não muda de `lastRunAt` = função morta por tempo, não erro de lógica.**
