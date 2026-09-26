@@ -574,8 +574,8 @@ function DiagnosticoPanel({ diagnostico, onClose }) {
       {diagnostico.movEstoque && (
         <div className={`rounded p-2 text-xs ${diagnostico.movEstoque.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
           {diagnostico.movEstoque.ok
-            ? <p>✓ <strong>ListarMovEstoque:</strong> {diagnostico.movEstoque.totalNaPagina ?? "?"} movs na pg1</p>
-            : <>✗ <strong>ListarMovEstoque:</strong> {diagnostico.movEstoque.erro}</>}
+            ? <p>✓ <strong>ListarMovimentoEstoque:</strong> {diagnostico.movEstoque.totalRegistros ?? "?"} movs em 365 dias ({diagnostico.movEstoque.totalNaPagina ?? "?"} na pg1)</p>
+            : <>✗ <strong>ListarMovimentoEstoque:</strong> {diagnostico.movEstoque.erro}</>}
         </div>
       )}
     </div>

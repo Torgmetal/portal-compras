@@ -1,7 +1,12 @@
 {
-  "build": 3462,
-  "gerado": "2026-09-24T22:05:22.341Z",
+  "build": 3463,
+  "gerado": "2026-09-26T15:26:00.449Z",
   "commits": [
+    {
+      "hash": "1ad14826",
+      "data": "24/09/2026",
+      "titulo": "Busca da RM não devolve mais produto inativo no Omie"
+    },
     {
       "hash": "7f5778d4",
       "data": "24/09/2026",
@@ -146,11 +151,6 @@
       "hash": "99f932cc",
       "data": "23/09/2026",
       "titulo": "Fiscal: a cadeia de documentos de uma obra — e ela nunca diz \"falta uma nota\""
-    },
-    {
-      "hash": "b166069f",
-      "data": "23/09/2026",
-      "titulo": "Portal de campo: o que o inspetor digitava deixava de aparecer"
     }
   ]
 }

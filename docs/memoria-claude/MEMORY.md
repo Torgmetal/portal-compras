@@ -37,6 +37,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Upload trava em 4,5MB](torg_upload_4mb.md) — rota serverless trava ~4,5MB; "não anexa" costuma ser TAMANHO; fix = client-token (`*/upload-token` + `@vercel/blob/client`)
 - [Integração de IA (Claude)](torg_ia_integracao.md) — portal usa @anthropic-ai/sdk, model `claude-sonnet-4-6`, ANTHROPIC_API_KEY; extração em lib/extrair-*.js
 - [Omie recebimento/NF/pedido](torg_omie_recebimento.md) — etapa 15, tolerância de peso, chave nIdPedido, codigo_local_estoque por item
+- [Movimentações de estoque (Omie)](torg_omie_movimentos_estoque.md) — `ListarMovimentoEstoque` em estoque/consulta (`ListarMovEstoque` NÃO existe: 0 linhas até 24/09); `idProd` numérico → `ProdutoOmie.codigoOmie`; 2 locais ("TODOS"); falha agora LANÇA; saídas NÃO abatem reserva de OP (decisão 26/09, `abaterReservas`)
 - [Pedido — rescale de preço](torg_pedido_rescale.md) — escala preço pro totalProposta só se cobre a proposta INTEIRA; split inflava; corrigido ffa4b13 (guard + ≤15%)
 - [RH Documentos](torg_rh_documentos.md) — upload privado (client token >4MB), proxy de download, backup ISO no SharePoint
 - [RH Holerite + bug NaN/Zod](torg_rh_holerite.md) — import/disparo/ciência (PDF); bug "Invalid input: NaN" (z.number() rejeita NaN; `NaN ?? null` não vira null)
