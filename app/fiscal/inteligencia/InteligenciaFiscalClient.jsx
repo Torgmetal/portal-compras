@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, ChevronDown, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle, Upload, ShieldAlert, HelpCircle, Calculator, Ban } from "lucide-react";
+import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, ChevronDown, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle, ShieldAlert, HelpCircle, Calculator, Ban } from "lucide-react";
 import { useStore } from "@/lib/store";
 import CampoNcm from "./CampoNcm";
 import AbaClassificacoes from "./AbaClassificacoes";
@@ -9,6 +9,7 @@ import AbaRegras from "./AbaRegras";
 import AssistenteFiscal from "@/components/fiscal/assistente/AssistenteFiscal";
 import CitacaoLegal from "./CitacaoLegal";
 import SimuladorObra from "./SimuladorObra";
+import ParcelaMedicao from "./ParcelaMedicao";
 
 // ─── INTELIGÊNCIA FISCAL ─────────────────────────────────────────────────────
 //
@@ -519,7 +520,9 @@ const CHIP = {
 };
 
 function AbaAuditoria() {
-  const [arquivo, setArquivo] = useState(null);
+  // ⚠ Os itens da medição INTEIRA, da primeira auditoria: auditar uma parcela devolve só os itens
+  // dela, e a lista de onde se escolhe a próxima parcela não pode encolher junto.
+  const [itensDaMedicao, setItensDaMedicao] = useState(null);
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(false);
@@ -559,38 +562,23 @@ function AbaAuditoria() {
   // ⚠⚠ VALIDAR ANTES DE EMITIR É O PONTO INTEIRO. A auditoria de XML acha o erro DEPOIS — a
   // NF-e 973 custou R$ 7.026,56 e só apareceu quando alguém foi procurar. A medição é o mesmo
   // documento antes de existir, e o pedido do Omie já traz CST, cEnq e a descrição real do item.
-  const auditarMedicao = async (id) => {
+  const auditarMedicao = async (id, parcela = null) => {
     setMedicaoId(id);
-    if (!id) return;
-    setCarregando(true); setErro(null); setResultado(null); setArquivo(null);
+    if (!id) { setItensDaMedicao(null); return; }
+    if (!parcela) setItensDaMedicao(null);
+    setCarregando(true); setErro(null); setResultado(null);
     const minha = ++vez.current;
     try {
       const r = await fetch("/api/fiscal/inteligencia/auditoria", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ medicaoId: id }),
+        body: JSON.stringify(parcela ? { medicaoId: id, parcela } : { medicaoId: id }),
       });
       const d = await r.json().catch(() => null);
       if (minha !== vez.current) return;
       if (!r.ok || !d?.success) setErro(d?.error || `Não foi possível auditar a medição (HTTP ${r.status}).`);
-      else setResultado(d);
+      else { setResultado(d); if (!parcela) setItensDaMedicao(d.itensDoDoc ?? null); }
     } catch {
       if (minha === vez.current) setErro("Falha de rede ao auditar a medição.");
-    } finally { if (minha === vez.current) setCarregando(false); }
-  };
-
-  const enviar = async (f) => {
-    if (!f) return;
-    setCarregando(true); setErro(null); setResultado(null); setArquivo(f.name); setMedicaoId("");
-    const minha = ++vez.current;
-    try {
-      const fd = new FormData(); fd.append("xml", f);
-      const r = await fetch("/api/fiscal/inteligencia/auditoria", { method: "POST", body: fd });
-      const d = await r.json().catch(() => null);
-      if (minha !== vez.current) return;
-      if (!r.ok || !d?.success) setErro(d?.error || `Não foi possível auditar o arquivo (HTTP ${r.status}).`);
-      else setResultado(d);
-    } catch {
-      if (minha === vez.current) setErro("Falha de rede ao enviar o arquivo.");
     } finally { if (minha === vez.current) setCarregando(false); }
   };
 
@@ -635,13 +623,13 @@ function AbaAuditoria() {
         )}
       </div>
 
-      <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white py-10 transition hover:border-torg-blue/40 hover:bg-gray-50/60">
-        <input type="file" accept=".xml,text/xml,application/xml" className="hidden" disabled={carregando}
-          onChange={(e) => enviar(e.target.files?.[0])} />
-        {carregando ? <Loader2 size={26} className="animate-spin text-torg-blue" /> : <Upload size={26} className="text-gray-300" />}
-        <span className="mt-2 text-sm font-medium text-torg-dark">{carregando ? "Auditando…" : "Enviar o XML da NF-e"}</span>
-        <span className="mt-0.5 text-xs text-torg-gray">{arquivo && !carregando ? arquivo : "o arquivo é lido e descartado — nada é gravado"}</span>
-      </label>
+      {/* ⚠ O envio de XML saiu daqui (Matheus, 26/09/2026: tela mais simples) — a leitura de XML
+          continua no Assistente Fiscal. A auditoria é da MEDIÇÃO, antes de virar nota. */}
+      {itensDaMedicao && (
+        <ParcelaMedicao itens={itensDaMedicao} carregando={carregando}
+          onAuditar={(parcela) => auditarMedicao(medicaoId, parcela)}
+          esperados={resultado?.esperados ?? null} totais={resultado?.totaisParcela ?? null} />
+      )}
 
       {erro && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erro}</div>}
 

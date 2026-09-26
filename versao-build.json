@@ -1,7 +1,12 @@
 {
-  "build": 3506,
-  "gerado": "2026-09-26T15:41:07.090Z",
+  "build": 3507,
+  "gerado": "2026-09-26T15:41:07.322Z",
   "commits": [
+    {
+      "hash": "74a0d32919",
+      "data": "26/09/2026",
+      "titulo": "Fiscal: simulador pela obra — imposto do Comercial ao lado da regra"
+    },
     {
       "hash": "fee85ae72a",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "9f3f4d3b16",
       "data": "25/09/2026",
       "titulo": "RM: sobrar só item cotado é \"pronta pra pedido\", não \"aberta\"; a OP só recalcula RM que teve pedido"
-    },
-    {
-      "hash": "0c43bbcd6e",
-      "data": "25/09/2026",
-      "titulo": "CMR: localizador percorre a árvore inteira e não cai na busca quando a listagem falha"
     }
   ]
 }
