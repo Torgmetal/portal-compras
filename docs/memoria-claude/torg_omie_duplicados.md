@@ -139,3 +139,6 @@ de contas não precisa inativar"*.
   ⚠ Trocar o produto de um item de pedido na tela: o "Salvar" DO ITEM já grava no servidor; o Omie pergunta duas
   vezes (atualizar preço de venda dos demais / copiar impostos de custo para os demais) — responder **Não** nas duas;
   o item passa a trazer o CST/origem do cadastro do produto novo (90/0 aqui), sem mudar valor.
+- ✅ **Portal (26/09/2026, a pedido do Vitor — "essa obra já foi finalizada"):** os 2 itens da RM T102-001-R00 passaram
+  para `codigo`/`codigoOmieEstoque` 501000014 e a descrição do PERFIL W, com `AuditLog` (`ATUALIZAR_CODIGO_OMIE`,
+  entity `RMItem`, antes/depois). A cotação liga o item só pelo `rmItemId` — não havia código a trocar lá.

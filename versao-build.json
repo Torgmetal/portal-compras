@@ -1,7 +1,12 @@
 {
-  "build": 3525,
-  "gerado": "2026-09-26T22:08:22.613Z",
+  "build": 3526,
+  "gerado": "2026-09-26T22:20:46.945Z",
   "commits": [
+    {
+      "hash": "ddccd6aa",
+      "data": "26/09/2026",
+      "titulo": "docs: duplicados do Omie zerados e inativados; pedido 1721 no código que fica (26/09)"
+    },
     {
       "hash": "0fe8d0f6",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "f1c06c4a",
       "data": "26/09/2026",
       "titulo": "Spec: Inteligência Fiscal mais simples — simulador pela obra, IBS/CBS das NFs, auditoria por parcela"
-    },
-    {
-      "hash": "3a4e911e",
-      "data": "26/09/2026",
-      "titulo": "Desenhos e LQC deixam de depender da busca do Graph, que devolve 500"
     }
   ]
 }
