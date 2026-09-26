@@ -1,7 +1,12 @@
 {
-  "build": 3495,
-  "gerado": "2026-09-26T15:10:31.660Z",
+  "build": 3496,
+  "gerado": "2026-09-26T15:10:45.341Z",
   "commits": [
+    {
+      "hash": "ddcef2ed",
+      "data": "26/09/2026",
+      "titulo": "Estoque: o cron de produtos tinha 60 s e morria gravando — agora 300 s"
+    },
     {
       "hash": "24663567",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "b37d3d85",
       "data": "24/09/2026",
       "titulo": "Memória: o piloto no PRD00005 não deixou rastro nenhum no Omie"
-    },
-    {
-      "hash": "6b908b7b",
-      "data": "24/09/2026",
-      "titulo": "Prazos das RMs: data anterior da remarcação em destaque"
     }
   ]
 }

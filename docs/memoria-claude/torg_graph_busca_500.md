@@ -1,6 +1,6 @@
 ---
 name: torg_graph_busca_500
-description: O search do Graph neste drive devolve HTTP 500 desde 22–23/09/2026 e derrubou SEIS pontos do portal, só UM com alarme; listar por caminho funciona, delta e varredura cega NÃO servem (medido)
+description: O search do Graph neste drive devolve HTTP 500 desde 22–23/09/2026 e derrubou SEIS pontos, só UM com alarme; corrigidos os DOIS maiores (modal de desenhos e cron do LQC) listando por caminho — delta e varredura cega NÃO servem (medido)
 metadata:
   type: project
 ---
@@ -21,8 +21,8 @@ e tela que falha não manda e-mail para ninguém:
 
 | onde | o que para | alguém é avisado? |
 |---|---|---|
-| `lib/lqc-sharepoint.js` (`listarLqcs`) | cron `lqc-sharepoint` | **sim** — 65 h sem sucesso |
-| `app/api/producao/desenhos/route.js` | **modal de desenhos, em 7 telas de PCP/produção** | não |
+| ✅ `lib/lqc-sharepoint.js` (`listarLqcs`) | cron `lqc-sharepoint` | **sim** — 65 h sem sucesso |
+| ✅ `app/api/producao/desenhos/route.js` | **modal de desenhos, em 7 telas de PCP/produção** | não |
 | `lib/lqc-planilha.js` (`baixarModeloLqc`) | criar LQC no portal (modelo em branco) | não |
 | `lib/lqc-op-servidor.js` (`lerFonteLqc`) | gerar OP a partir da LQC | não |
 | `lib/databook-arquivo.js` (`procurarArquivoPorNome`) | 4º degrau que resgata certificado movido | não |
@@ -69,3 +69,36 @@ mede isso ANTES, porque o preço de errar sai no cron do vizinho.
 
 Ver [[torg_crons]], [[torg_sync_sharepoint_pcp]], [[torg_databook_certificado_movido]] e
 [[torg_orcamento_lqc_numero]].
+
+## O que foi corrigido em 26/09 (✅ na tabela) — e o que sobrou
+
+`lib/sharepoint-arvore.js` é a peça nova: `varrerArvore` lista por caminho, pagina o
+`@odata.nextLink`, respeita o `Retry-After` do 429 e **derruba a varredura inteira** se qualquer
+pasta falhar. ⚠ Raiz 404 é `null` (resposta legítima: OP sem pasta de projeto); subpasta 404 no
+meio é corrida normal e se ignora.
+
+⚠ **Não reaproveitei `listAllFilesRecursive` de propósito** — ela tem `catch { return }` por pasta
+e `maxDepth: 5`. No modal de desenhos isso seria o pior defeito possível: pasta que falha vira
+"a marca não tem desenho", indistinguível de não ter mesmo. Ela ficou intocada para os outros
+chamadores.
+
+**Modal de desenhos** (`lib/desenhos-fabricacao.js`): varre a `2.5.2 Fabricação` da OP e filtra a
+marca em memória. Medido contra a produção: OP-105 307 PDF em 5,7 s, OP-103 79 PDF em 2,9 s; a
+2ª abertura é **0 ms**.
+- ⚠⚠ **O CACHE GUARDA A PROMESSA, NÃO O RESULTADO.** Três marcas abertas juntas disparariam três
+  varreduras idênticas. E **falha não vira retrato**: o erro solta a entrada, senão o modal ficaria
+  quebrado por cinco minutos depois de um blip.
+- ⚠⚠ **TETO DE 600 PASTAS, menor que o padrão de 2.000.** Isto roda dentro do pedido do navegador:
+  a 2.000 pastas passaria de dois minutos e a Vercel mataria a rota — o operador receberia HTML no
+  lugar de JSON. `maxDuration` subiu de 60 para 120 s.
+- ⚠ **Obsoleto passou a ser barrado pelo CAMINHO INTEIRO.** Com a busca só dava para olhar o pai do
+  arquivo; agora um PDF em `…/A/OBSOLETOS/2025/` também é descartado.
+
+**Cron do LQC** (`varrerPastasDeLqc`): anda só até o `5.Estudos`, nunca mais fundo — é isso que
+segura a cota. Medido contra a produção: **46,5 s, 659 pastas, 90 LQC de 2026 em 83 orçamentos**,
+idêntico ao levantamento independente. ⚠ **De-dup pelo `id` do drive**: a mesma LQC aparece em duas
+pastas quando a obra sai de "Solicitados" para "Concluidos" e a cópia velha fica.
+
+⚠ **Sobraram quatro pontos, todos sem alarme** — criar LQC (`baixarModeloLqc`), gerar OP pela LQC
+(`lerFonteLqc`), o 4º degrau do Data Book (`procurarArquivoPorNome`) e o import de revisão de LPC
+(`buscarLpcDaOp`). Todos têm a pasta conhecida e resolvem com o mesmo `lib/sharepoint-arvore.js`.
