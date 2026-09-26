@@ -59,6 +59,13 @@ preciso um reprocessamento à parte. Outros pontos em aberto: transferência ent
 amostra (com "TODOS" viria como saída + entrada); `alocarSaidaFIFO` não é transacional (atualiza a
 reserva antes de criar a alocação).
 
+**No ar em 26/09/2026 (`ad69d555`), conferido em produção.** A rodada das 13h30 gravou 45 movimentos
+(37 entradas, 8 saídas) em 10,8 s, heartbeat `ok` com o resumo; nenhuma alocação nem reserva tocada. ⚠ As
+primeiras SAÍDAS reais: 1 **venda** do produto acabado (ARM000001 "armação de estruturas metálicas", 7.269 kg)
+e 7 **remessas** de tinta Jotun para fora — nenhuma é consumo de OP, e ambas abateriam reserva se a FIFO
+estivesse ligada. Duas tintas vieram com `cmc` 0 do próprio Omie. Histórico anterior a 24/09 NÃO foi trazido
+(a janela do cron é de 2 dias; carga maior só pelo botão, com `diasAtras`).
+
 **Achados de passagem, NÃO conferidos:** (1) `sincronizarProdutos` usa `nCodLocal` no
 `ListarPosEstoque`, parâmetro que não está na doc (lá é `codigo_local_estoque`) — com `catch { break; }`,
 `locaisQtd` provavelmente é sempre vazio; (2) `qtdAtual` vem do `ListarPosEstoque` SEM local — se isso

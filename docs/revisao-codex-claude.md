@@ -2298,3 +2298,11 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   o caminho FIFO segue testado atrás da opção, e o estorno continua fora dele mesmo ligado. Testes: +1 no
   `omie-estoque-movimentos` (26; o padrão ficou vermelho antes da mudança) e o do cron trava que a rota não liga a
   alocação. ⚠ **Para revisar:** ligar depois não aloca as saídas já gravadas (a rodada as vê como existentes).
+- **(26/09, 13h30) Movimentações de estoque: no ar (`ad69d555`, build 3499) e conferido em produção.** Push feito pelo
+  Vitor (o da sessão foi barrado pela proteção de deploy). Antes do deploy, rodada A SECO do código novo contra o Omie
+  e o banco reais com toda gravação interceptada: 45 movimentos, 0 não gravados, 0 sem CMC. Depois, só leitura no
+  banco: a rodada das 12h30 (código antigo) marcou `ok` em 1,9 s com 0 gravados — o defeito; a das **13h30** gravou
+  **45** (37 entradas / 8 saídas, 24–25/09) em 10,8 s, heartbeat `ok` com o resumo, **0 alocações e 0 reservas
+  tocadas**. As 8 saídas: 1 **venda** (ARM000001 "armação de estruturas metálicas", 7.269 kg, NF 1006) e 7
+  **remessas** de tinta Jotun (NF 1009) — nenhuma é consumo de OP pela regra original, o que reforça manter
+  `abaterReservas` desligado. ⚠ Duas tintas saíram com `cmc` 0 no próprio Omie (Penguard Universal A e B).
