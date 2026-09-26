@@ -60,3 +60,11 @@ multinormas). Ele lê a norma da DESCRIÇÃO (via esta planilha: `materialDe` + 
 - **Decisão do Vitor (26/09):** CIVIL 300 é o padrão; a USI CIVIL 350 (101000048/49, criadas em 29/04, nunca
   compradas) não será comprada. Faltavam de verdade só a cantoneira 4" x 7/16" (T64T, sem compra) e as chapas CIVIL 300
   (T92/T60B: 3; 4,75; 6,30; 9,50; 12,50; 16; 19; 31,50; 44,50 mm). Ver [[torg_omie_cadastro_fiscal]].
+- ✅ **Feito pela TELA do Omie em 26/09/2026 (16h), conferido pela API:** descrições corrigidas — 601000002 "…DN. 3POL X
+  **7,44**KG/M" e 501000103 "…DN. **W200** X 86,0KG/M"; chapas criadas **101000053–101000061** "CHAPA ACO CARBONO
+  LAMINADO USI CIVIL 300 ESPESSURA 3,00 / 4,75 / 6,30 / 9,50 / 12,50 / 16,00 / 19,00 / 31,50 / 44,50MM" (Matéria Prima,
+  KG, tipo 01, origem 0, peso 1/1, NCM pela espessura: 3,00 → .53; 4,75–9,50 → .52; 12,50+ → .51).
+  ⚠⚠ **"DUPLICAR" NO OMIE JÁ GRAVA A CÓPIA** ("Cópia de … em dd/mm/aaaa às hh:mm", código PRDnnnnn) antes de abrir
+  para edição — é daí que nasceram os "Cópia de" inativados. Duplicou, TEM de trocar código e descrição e salvar.
+  ⚠ Na tela, campo numérico/código (igEditor) não aceita o "type" da automação: foi clicar, End, Backspace e TECLA a
+  tecla — e a 1ª tentativa costuma não pegar; reler o valor do input antes de salvar.
