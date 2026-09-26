@@ -8,6 +8,7 @@ import AbaCadeia from "./AbaCadeia";
 import AbaRegras from "./AbaRegras";
 import AssistenteFiscal from "@/components/fiscal/assistente/AssistenteFiscal";
 import CitacaoLegal from "./CitacaoLegal";
+import SimuladorObra from "./SimuladorObra";
 
 // ─── INTELIGÊNCIA FISCAL ─────────────────────────────────────────────────────
 //
@@ -844,6 +845,10 @@ function AbaSimulador() {
 
   return (
     <div className="space-y-4">
+      {/* ⚠ O caminho do dia a dia vem primeiro (Matheus, 26/09/2026): escolher a obra traz o imposto
+          que o Comercial cadastrou. O formulário abaixo continua para simular sem obra. */}
+      <SimuladorObra ops={opcoes.ops} />
+      <h3 className="pt-2 text-xs font-semibold uppercase tracking-wide text-torg-gray">Simulação sem obra</h3>
       <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <div className="grid gap-3 md:grid-cols-3">
           <div className="md:col-span-1">
