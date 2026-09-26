@@ -1,7 +1,12 @@
 {
-  "build": 3489,
-  "gerado": "2026-09-26T14:30:59.590Z",
+  "build": 3490,
+  "gerado": "2026-09-26T14:31:19.026Z",
   "commits": [
+    {
+      "hash": "13b279d4",
+      "data": "26/09/2026",
+      "titulo": "Memória e revisão: o Terceiro soma na Qtd (decisão do Vitor)"
+    },
     {
       "hash": "72310a4e",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "244a50f4",
       "data": "24/09/2026",
       "titulo": "Engenharia: planilha de perfis e parafusos do Omie para o Tekla"
-    },
-    {
-      "hash": "30b6e233",
-      "data": "24/09/2026",
-      "titulo": "Rastreabilidade: a NF deixa de ser cobrada"
     }
   ]
 }

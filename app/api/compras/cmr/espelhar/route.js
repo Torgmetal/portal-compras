@@ -24,7 +24,7 @@ import { parseObsCmr } from "@/lib/cmr-reconciliar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300; // mesma planilha de ~17 MB da sincronização — ver lib/cmr-localizar
 const ROLES = ["ADMIN", "ALMOXARIFADO", "COMPRAS", "PCP", "PLANEJAMENTO", "QUALIDADE"];
 
 const schema = z.object({

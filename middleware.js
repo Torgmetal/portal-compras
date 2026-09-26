@@ -165,7 +165,6 @@ export default withAuth(
           // CRON_SECRET no handler. Sem isto o middleware redirecionava o cron
           // pro /entrar e NENHUM cron rodava (ex.: conciliação de recebimento).
           path.startsWith("/api/cron/") ||
-          path.startsWith("/api/producao/sync-sharepoint") ||
           (req.method === "GET" && CRONS_FORA_DO_PREFIXO.has(path)) ||
           // Resposta de cobranca de cronograma — publico via token
           path.startsWith("/planejamento/cronogramas/resposta/") ||

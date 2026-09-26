@@ -72,6 +72,30 @@ describe("listarPlanilhas", () => {
   });
 });
 
+describe("listarPlanilhas em paralelo", () => {
+  it("lista as pastas do mesmo nível ao mesmo tempo (a fila uma a uma estourava os 60 s)", async () => {
+    let emVoo = 0, pico = 0;
+    const get = vi.fn(async (url) => {
+      emVoo++; pico = Math.max(pico, emVoo);
+      await new Promise((r) => setTimeout(r, 5));
+      emVoo--;
+      if (url.includes(`root:${RAIZ}:/children`)) return json({ value: [pasta("A"), pasta("B"), pasta("C")] });
+      return json({ value: [arq(`${url.length}.pdf`, "2026-01-01")] });
+    });
+    await listarPlanilhas(get, "d", "/Almoxarifado/01. Rastreabilidade");
+    expect(pico).toBeGreaterThan(1);
+  });
+
+  it("⚠ uma pasta do lote falhando ainda derruba a listagem", async () => {
+    const get = falso([
+      [`root:${RAIZ}/B:/children`, json({ error: { code: "generalException" } }, 500)],
+      [`root:${RAIZ}/`, json({ value: [arq("CMR TORG-2026.xlsx", "2026-01-01")] })],
+      [`root:${RAIZ}:/children`, json({ value: [pasta("A"), pasta("B"), pasta("C")] })],
+    ]);
+    await expect(listarPlanilhas(get, "d", "/Almoxarifado/01. Rastreabilidade")).rejects.toThrow(/HTTP 500/);
+  });
+});
+
 describe("localizarCmr", () => {
   it("⚠⚠ acha pela PASTA sem tocar na busca (que está dando 500)", async () => {
     const get = falso([

@@ -2233,3 +2233,16 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   **4.156 passando**, `checar` limpo, build ok.
   ⚠ **Para revisar:** a exceção da "troca já registrada" compara perfil + R; uma troca antiga
   incompatível segue editável só para outro R compatível.
+- **(26/09) A pasta do SharePoint era lida só na 1ª página.** OP-118 (Gabriel): P470, P382 e P383 "sem
+  desenho" com o PDF na pasta. Medido no Graph: a "2.5.2.2 Croqui/B" tem 1.762 arquivos em 2 páginas; as três
+  estão na 2ª, e a P295 e a P315 (que passavam) na 1ª.
+  - A conferência (`pasta-engenharia.js`), a impressão em lote (`desenhos-lote.js`) e a pasta do dia
+    (`pastas-liberacao.js`) liam uma página só.
+  - Agora usam `todasAsPaginas` (`lib/graph-paginas.js`); falha em qualquer página = `ok: false`.
+  - `varrerDesenhosDaOp` e `listarNaLiberacao` foram exportadas para o teste.
+
+  Testes: `graph-paginas` (2) e `pasta-engenharia-paginas` (3, com a árvore da OP-118 e a Croqui/B em duas
+  páginas). **4.161 passando**, `checar` limpo, build ok.
+  ⚠ **Para revisar:** outras 12 listagens seguem na 1ª página (L.E. $top=100, prontuário e
+  sharepoint-lista $top=200, rotas de romaneio, SGQ e orçamento). Pastas pequenas hoje; ficam anotadas em
+  `torg_portao_desenho`.
