@@ -1,7 +1,12 @@
 {
-  "build": 3507,
-  "gerado": "2026-09-26T15:41:07.322Z",
+  "build": 3508,
+  "gerado": "2026-09-26T15:41:07.540Z",
   "commits": [
+    {
+      "hash": "c120743162",
+      "data": "26/09/2026",
+      "titulo": "Fiscal: auditoria da medição por parcela — itens e quantidades escolhidos"
+    },
     {
       "hash": "74a0d32919",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "696eb72d86",
       "data": "25/09/2026",
       "titulo": "Memória: data book da OP-102 fechado — 10 peças por troca SEM_R e 11 certificados na §04"
-    },
-    {
-      "hash": "9f3f4d3b16",
-      "data": "25/09/2026",
-      "titulo": "RM: sobrar só item cotado é \"pronta pra pedido\", não \"aberta\"; a OP só recalcula RM que teve pedido"
     }
   ]
 }
