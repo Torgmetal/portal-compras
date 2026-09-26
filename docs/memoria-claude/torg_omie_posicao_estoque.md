@@ -1,6 +1,6 @@
 ---
 name: torg_omie_posicao_estoque
-description: Posição de estoque do Omie por local — sem filtro o ListarPosEstoque devolve SÓ o local padrão (Almoxarifado); "TODOS" dá uma linha por (produto, local); 6 locais (endpoint estoque/local/, não localestoque); CMC é por local; sem cUnidade; saldo zero não vem; 100 linhas/página; a Qtd do portal = Almox + Fábrica (decisão pendente de confirmação); a tela cortava em 1.000 de 2.500
+description: Posição de estoque do Omie por local — sem filtro o ListarPosEstoque devolve SÓ o local padrão (Almoxarifado); "TODOS" dá uma linha por (produto, local); 6 locais (endpoint estoque/local/, não localestoque); CMC é por local; sem cUnidade; saldo zero não vem; 100 linhas/página; a Qtd do portal = Almox + Fábrica + Terceiro (Vitor, 26/09: é material da Torg), patrimônio fora; a tela cortava em 1.000 de 2.500
 metadata:
   type: project
 ---
@@ -45,9 +45,11 @@ sobre `sincronizarProdutos` levantadas na correção das movimentações ([[torg
 **Como ficou (25/09/2026, `lib/omie-estoque-posicao.js`):**
 - Uma leitura `"TODOS"`, inteira ou exceção (erro, página sem `produtos`/`nTotPaginas`, total ≠
   `nTotRegistros`); nada grava saldo antes disso; o cron registra `ok:false` com o motivo.
-- ⚠⚠ **Qtd (`qtdAtual`) = Almoxarifado + Fábrica** (`LOCAIS_NA_QTD`). **Decisão minha, PENDENTE de
-  confirmação do Vitor** (a pergunta foi feita e não respondida). Comparado nos dados reais: só Almox (antes)
-  227 positivos/31 negativos; Almox+Fábrica 478/26; Todos 638/19. Local novo não entra sozinho.
+- ⚠⚠ **Qtd (`qtdAtual`) = Almoxarifado + Fábrica + Terceiro** (`LOCAIS_NA_QTD`). **Vitor (26/09/2026):**
+  *"o material de terceiro sim é da Torg e pode ser usado"* — o nome engana, não é material de cliente. Os de
+  PATRIMÔNIO (máquinas, ferramentas, edificações) ficam fora: não são material de uso. Comparado nos dados
+  reais: só Almox (antes) 227 positivos/31 negativos; Almox+Fábrica 478/26; com o Terceiro 638/19 — ele fecha
+  a conta de 8 produtos que entraram no Terceiro e foram baixados na Fábrica. Local novo não entra sozinho.
   ⚠ Os códigos são FIXOS: se um local da Qtd sumir do cadastro do Omie (apagado/recriado = código novo), a
   sincronização LANÇA dizendo qual — senão a Qtd de tudo que estava nele cairia a zero, calada.
 - `locaisQtd` guarda CADA local, negativo inclusive; a tela mostra todos (negativo em vermelho, fora da Qtd

@@ -2052,17 +2052,16 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   "ESTOQUE"). Testes novos: `omie-estoque-posicao` (18), `omie-estoque-sincronizar` (7 — **7 vermelhos no código
   antigo**, ex. *"expected 1392.6 to be close to 1679.29"*), `api/cron-estoque-produtos` (3 — com a lib antiga o
   cron dava **200/`ok:true`** com a página do Omie falhando), `cron-agenda-descrever` (6), `compras-estoque-pagina`
-  (4), `estoque-catalogo-tela` (5). Commits `06ff92a5` (sincronização) e `a4764072` (tela), na branch
-  `claude/funny-lederberg-012e97`, sem push. Suíte final **4.078 passando**, 1 falha (a de data, item (g) abaixo);
-  build do Next EXIT=0 com o banco apontando para lugar nenhum. `checar` limpo; módulos novos sem aviso de ESLint; `sincronizarProdutos` caiu de
-  complexidade 78 → 45 e o `EstoqueClient` de 39 → 36. Simulação da regra nova sobre a posição medida: 478 produtos
-  com Qtd positiva (eram 227), 26 negativos, 153 só com saldo fora da Qtd (visíveis no detalhe).
-  ⚠⚠ **Decisão pendente (Vitor): o que soma a Qtd.** Ficou `LOCAIS_NA_QTD` = Almoxarifado + Fábrica (os dois em uso:
-  47 e 34 pedidos desde 28/08). O "ESTOQUE TERCEIRO" (273 itens, 1,43 mi, códigos de cliente TMSA/Vale/Jotun, 86
-  movimentos todos "24 Retorno de Remessa" jan–fev/2025 e nada depois) e os de patrimônio ficam só no detalhe.
-  Perguntei; a pergunta ficou sem resposta. Trocar é uma linha — mas 8 produtos (ex. W610×174: Fábrica −5.112,6,
-  Terceiro +126.606,4) ficam negativos sem o Terceiro.
-  ⚠ **Não rodei a sincronização contra a produção** (sem autorização): nada foi gravado. **Não validei a tela no
+  (4), `estoque-catalogo-tela` (5). Commits `06ff92a5` (sincronização), `a4764072` (tela) e `72310a4e` (o
+  Terceiro na Qtd). Suíte completa, já com a `main` de 25/09 junta: **4.199 passando**; build do Next EXIT=0 com o
+  banco apontando para lugar nenhum. `checar` limpo; módulos novos sem aviso de ESLint; `sincronizarProdutos` caiu de
+  complexidade 78 → 45 e o `EstoqueClient` de 39 → 36. Simulação da regra final sobre a posição medida: 638 dos 657
+  produtos com Qtd positiva (eram 227) e 19 negativos.
+  ⚠⚠ **Decisão do Vitor (26/09): o Terceiro soma na Qtd** — *"o material de terceiro sim é da Torg e pode ser
+  usado"*. `LOCAIS_NA_QTD` = Almoxarifado + Fábrica + Terceiro; os de patrimônio (máquinas, ferramentas,
+  edificações) ficam só no detalhe. Com o Terceiro fecham os 8 produtos que entraram nele e foram baixados na
+  Fábrica (W610×174: −5.112,6 + 126.606,4). Subida autorizada por ele (*"pode subir"*).
+  ⚠ **Não rodei a sincronização à mão**: a primeira gravação é a do cron, depois do deploy. **Não validei a tela no
   `npm run dev`**: exige login e não tenho credencial; a porta 3000 é de outro checkout. A tela está coberta por teste
   em jsdom, e o build do Next foi conferido com o banco apontando para lugar nenhum.
   ⚠ **Para revisar:** (a) o CMC muda para ~422 produtos — preço de fallback do `custo-material` e do orçamento por IA
