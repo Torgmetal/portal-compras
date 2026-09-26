@@ -1,7 +1,12 @@
 {
-  "build": 3512,
-  "gerado": "2026-09-26T16:05:22.904Z",
+  "build": 3513,
+  "gerado": "2026-09-26T16:07:49.174Z",
   "commits": [
+    {
+      "hash": "02c4259c",
+      "data": "26/09/2026",
+      "titulo": "Memória: o estudo 316 carregava dado da TMSA num orçamento do QWS"
+    },
     {
       "hash": "7a36e64a",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "3d84e169",
       "data": "25/09/2026",
       "titulo": "Data book: só relatório de inspeção assinado por todos entra"
-    },
-    {
-      "hash": "bb849b93",
-      "data": "25/09/2026",
-      "titulo": "Relatório de ultrassom: a peça ensaiada aparece na tabela"
     }
   ]
 }
