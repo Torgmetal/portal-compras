@@ -126,10 +126,32 @@ Gerar OP com a planilha errada é pior que esperar. `maxDuration` das duas rotas
 
 ## Dois achados de DADO que apareceram na prova (não são defeito de código)
 
-⚠ **Estudo 295** recusa com "há mais de uma cópia": são duas mesmo, a cópia velha ficou para trás
-quando a obra saiu de "Solicitados". Alguém precisa apagar uma.
-⚠ **Estudo 316** aponta para `LQC-316-26-TMSA-ETC-MB-0141-TORG-R00.xlsx`, e o que existe é
-`LQC-316-26-QWS-REVAMP-4-TORG-R000.xlsx`. A origem do estudo está desatualizada.
+⚠⚠ **ESTUDO 295 — RESOLVIDO EM 26/09, E QUASE APAGUEI O ARQUIVO ERRADO.** Eu tinha dito que a
+cópia sobrando era a de `1. Solicitados`, pela lógica de que a obra passou para "Concluidos" e a
+velha ficou para trás. **Era o contrário**, e só os bytes mostraram:
+
+| arquivo | tamanho | modificado |
+|---|---|---|
+| `1. Solicitados/24_09 - DANPOWER-REVISÃO - VITOR/…R01.xlsx` | **749.141 B** | 24/09 |
+| `2. Concluidos/295-26-DANPOWER-ENC0337/…R01.xlsx` | 472.033 B | 08/09 |
+| `2. Concluidos/295-26-DANPOWER-ENC0337/5.Estudos/…R00.xlsx` | 472.033 B | 08/09 |
+
+O "R01" que estava na pasta da obra era o **R00 renomeado** — sha256 idêntico ao arquivo logo
+abaixo. O R01 de verdade, 277 KB maior, é o da pasta de data. Apagar "a de Solicitados" teria
+destruído o único R01 com conteúdo. Apagado o renomeado (id `012SCVJYN7T4…`, com conferência de
+nome+pasta+tamanho+sha antes do DELETE); `lerFonteLqc` da 295 passou a funcionar.
+
+⚠⚠ **A LIÇÃO: "qual é a cópia velha" NÃO SE DEDUZ DA PASTA NEM DA DATA DE CRIAÇÃO.** As duas foram
+criadas com 35 s de diferença (23/09 19:39 e 19:40) — provavelmente a mesma operação de cópia. O
+que separou foi TAMANHO e HASH. Antes de apagar arquivo de proposta, baixe os dois e compare.
+
+⚠ **Estudo 316, ainda aberto**: aponta para `LQC-316-26-TMSA-ETC-MB-0141-TORG-R00.xlsx`, e o que
+existe é `LQC-316-26-QWS-REVAMP-4-TORG-R000.xlsx`. É a origem do estudo que está desatualizada —
+não dá para consertar do lado do SharePoint sem saber qual é a certa.
+
+⚠ Sobrou uma aresta cosmética na 295: o R01 vive numa pasta de data, então `lerFonteLqc` devolve
+`pasta: null` (ela só reconhece o formato `{grupo}/{orçamento}/…`). Não impede nada; some se o
+Comercial mover o arquivo para `295-26-DANPOWER-ENC0337/5.Estudos`.
 
 ## ⚠⚠ E um bug que a correção revelou: o modelo em branco era escolhido pela DATA
 
