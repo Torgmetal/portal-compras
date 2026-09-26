@@ -1,11 +1,26 @@
 {
-  "build": 3496,
-  "gerado": "2026-09-26T15:10:45.341Z",
+  "build": 3499,
+  "gerado": "2026-09-26T16:02:59.001Z",
   "commits": [
+    {
+      "hash": "f2050d99",
+      "data": "26/09/2026",
+      "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
+    },
     {
       "hash": "ddcef2ed",
       "data": "26/09/2026",
       "titulo": "Estoque: o cron de produtos tinha 60 s e morria gravando — agora 300 s"
+    },
+    {
+      "hash": "f1c06c4a",
+      "data": "26/09/2026",
+      "titulo": "Spec: Inteligência Fiscal mais simples — simulador pela obra, IBS/CBS das NFs, auditoria por parcela"
+    },
+    {
+      "hash": "3a4e911e",
+      "data": "26/09/2026",
+      "titulo": "Desenhos e LQC deixam de depender da busca do Graph, que devolve 500"
     },
     {
       "hash": "24663567",
@@ -136,21 +151,6 @@
       "hash": "6140d6cb",
       "data": "25/09/2026",
       "titulo": "Memória e revisão: posição de estoque por local no Omie"
-    },
-    {
-      "hash": "a4764072",
-      "data": "25/09/2026",
-      "titulo": "Compras › Estoque: a tela carregava 1.000 de 2.500 produtos; detalhe por local e agenda real"
-    },
-    {
-      "hash": "06ff92a5",
-      "data": "25/09/2026",
-      "titulo": "Estoque: saldo de todos os locais do Omie, e a falha da sincronização aparece"
-    },
-    {
-      "hash": "b37d3d85",
-      "data": "24/09/2026",
-      "titulo": "Memória: o piloto no PRD00005 não deixou rastro nenhum no Omie"
     }
   ]
 }

@@ -2256,3 +2256,7 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** (a) gravar em lote (UNNEST, padrão do CLAUDE.md) em vez de ~650 `updateMany` sequenciais;
   (b) o catálogo (`sincronizarCatalogo`) ainda usa 3 s por página sem retentativa — às 12h ele não gravou nada, e
   falha dele segue só como aviso no log; (c) até a próxima rodada completa, 149 itens seguem com o saldo antigo.
+  **Conferido às 13h02 (só leitura):** a rodada das 13h completou — `ok`, **102,9 s** (não caberia nos 60 s); os 6
+  locais salvos na configuração (Almoxarifado, Fábrica e Terceiro marcados na Qtd); 673 produtos com detalhe por
+  local, 651 com Qtd positiva e 22 negativos; unidade igual à do cadastro em 673 de 673 (eram 120 "UN" errados).
+  Chapa 3,00 mm: 7.399,89 kg (a Fábrica recebeu +4.328 desde a medição de 24/09). Item (c) resolvido.

@@ -62,6 +62,7 @@ sobre `sincronizarProdutos` levantadas na correção das movimentações ([[torg
   gravação: 508 dos 657 itens gravados, sem ponto no monitor, `locaisOmie` ainda null. Leitura até 39 s,
   ~650 `updateMany` ≈ 27 s. E vinha de antes: o código antigo levou 59,8 s às 8h, e 9h/10h/11h morreram sem
   registro. Agora `maxDuration` 300 s (cron e botão) e prazo de leitura de 180 s do início da rota.
+  Medido às 13h do mesmo dia: rodada completa em **~103 s**, `ok`, 673 produtos com posição.
   Próximo passo natural: gravar em lote (UNNEST, padrão anti-OOM do CLAUDE.md) em vez de 650 `updateMany`.
 
 **Achados de passagem, NÃO corrigidos (mesma causa):** `app/api/omie/buscar-produto` (fallback ao vivo da
