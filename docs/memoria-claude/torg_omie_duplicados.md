@@ -80,3 +80,19 @@ cuidado para não inativar o que estamos usando hoje"*.
   [[torg_omie_movimentos_estoque]].
 - Scripts desta verificação (scratchpad, não versionados): `_uso-omie.mjs`, `_inativar.mjs` (lista
   aprovada fixa + re-checagem ao vivo + diff campo a campo) — reaproveitáveis se um dia houver API.
+
+**Revalidado ao vivo em 26/09/2026 (tarde).** As 4 CHAPAS com ponto decimal foram inativadas HOJE na tela do Omie,
+entre 11h57 e 11h59, pelo usuário `P000414907` (o mesmo que criou o 101000050 e os códigos de 18/09 — é quem
+lança as notas): `101000036` (2.65, segura, sem saldo) e ⚠⚠ **três que estavam EM USO e COM SALDO**:
+`101000050` 12,70 → 9.798 kg; `101000037` 4.75 → 2.410 kg; `101000038` 6.35 → 2.013 kg (14,2 t, locais
+7320665233 e 7572486140). Os códigos que ficam: 12,70 → `101000007` (12,50, 1/2"), 4.75 → `101000003` (4,75),
+6.35 → `101000004` (6,30, 1/4"). CMC diferente dos dois lados (4.75: 8,63 × 5,35 R$/kg) → transferir o saldo é
+decisão de custo (Contabilidade), feita no Omie; nenhuma reserva de OP nas 3.
+- ⚠⚠ **No portal elas continuam ATIVAS e com saldo** (`EstoqueItem.ativo=true`, sinc 14h01): a sincronização de
+  estoque força `ativo:true` em todo produto com saldo (ver acima). Até o saldo ser transferido, aparecem para RM e
+  consulta de estoque, e documento no Omie com esses códigos falha. `ProdutoOmie` só atualiza na segunda.
+- Seguem ativos: os 3 seguros restantes (`PRD00005`, `PRD00015`, `501000082` — sem saldo, sem uso) e os perfis
+  "PERFIL H" em uso (`501000064` teve entrada de nota em 25/09; `501000070` com 15.336 kg; `501000071` com o
+  pedido 1721 aberto). Duplicados ativos hoje: 8 grupos (5 perfis, 3 tubos); cadastro com 2.493 produtos, 4 inativos.
+- Script da revalidação (scratchpad): `omie-validar.mjs` (cadastro ao vivo + pedidos abertos + saldo em TODOS os
+  locais + RM + entrada de nota + duplicados).

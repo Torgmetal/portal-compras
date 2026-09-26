@@ -1,7 +1,12 @@
 {
-  "build": 3519,
-  "gerado": "2026-09-26T17:32:39.833Z",
+  "build": 3520,
+  "gerado": "2026-09-26T17:40:12.458Z",
   "commits": [
+    {
+      "hash": "3e38aa95",
+      "data": "26/09/2026",
+      "titulo": "docs: Torguinho fica no Haiku (decisão do Vitor, 26/09)"
+    },
     {
       "hash": "7f48671c",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "676c23d5",
       "data": "26/09/2026",
       "titulo": "Remove o cron sync-sharepoint do PCP — abandonado, e ninguém olhava"
-    },
-    {
-      "hash": "9b2368a8",
-      "data": "26/09/2026",
-      "titulo": "CMR: reconciliação morria por tempo sem registrar — 300 s e varredura das pastas em paralelo"
     }
   ]
 }
