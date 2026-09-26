@@ -111,3 +111,8 @@ de contas não precisa inativar"*.
   (715 kg — fica o 501000003) têm aço de verdade: zerar sem dar entrada no código que fica tira o estoque contábil;
   perguntado ao Vitor se transfere. 501000071 está no pedido 1721 aberto. Inativar é só pela tela, e o Omie do Chrome
   pede login.
+- ✅ **Inativados em 26/09/2026, 15h43–15h49, pela TELA do Omie (Chrome logado, usuário P000792836)** e conferidos
+  pela API (`inativo:"S"`): PRD00004, PRD00005, PRD00009, PRD00011, PRD00015, 501000008, 501000082, 201000040,
+  201000098, 101000048, 101000049 — todos com saldo zero, nenhum ajuste de estoque. Caminho na tela: Compras, Estoque
+  e Produção › Produtos › Exibir todos › filtro na coluna Código › selecionar a linha › painel à direita › "Inativar"
+  (⚠ "Excluir" fica logo abaixo — clicar pelo elemento, nunca por coordenada).
