@@ -1,7 +1,12 @@
 {
-  "build": 3499,
-  "gerado": "2026-09-26T16:02:59.001Z",
+  "build": 3509,
+  "gerado": "2026-09-26T16:03:37.414Z",
   "commits": [
+    {
+      "hash": "d99aae0a",
+      "data": "26/09/2026",
+      "titulo": "Memória e revisão: a rodada das 13h completou (103 s) com o saldo por local"
+    },
     {
       "hash": "f2050d99",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7d79b377",
       "data": "25/09/2026",
       "titulo": "Memória: saldo dos duplicados em TODOS os locais do Omie"
-    },
-    {
-      "hash": "6140d6cb",
-      "data": "25/09/2026",
-      "titulo": "Memória e revisão: posição de estoque por local no Omie"
     }
   ]
 }

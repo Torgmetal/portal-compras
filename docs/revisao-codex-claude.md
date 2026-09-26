@@ -2029,6 +2029,38 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** (a) a chamada de piloto não deixou rastro no PRD00005 — nem a data de "última
   alteração" mudou (reconferido 1 h depois: segue 13/10/2025); (b) produto sem o campo `inativo` na
   resposta conta como ativo.
+- **(24/09, noite) Movimentações de estoque: o método não existia e o erro virava "0 com sucesso".** A tarefa aberta no
+  item anterior. `sincronizarMovimentacoes` chamava `ListarMovEstoque` em `estoque/movestoque/` — lá só existem
+  `ConsultarPrevisao` e `ListarMovimentos` (agregado por dia, sem id nem CMC) — e o `catch { break; }` com
+  `resp.movimentos || []` transformava o erro em zero: `EstoqueMovimentacao` com 0 linhas e o cron verde de hora em hora.
+  O certo é **`ListarMovimentoEstoque` em `estoque/consulta/`**, lido na doc e conferido em UMA chamada de leitura ao
+  vivo (17–24/09, `lista_local_estoque: "TODOS"`): 54 movimentos em 2 páginas de 50, todos `21 COM Compra de Produto
+  entrada`; `idMov` único por linha (um por item da NF); produto como `idProd` NUMÉRICO (nCodProd); `qtde` positiva;
+  `cmc` pós-movimento; dois locais em uso (7315778267 consumíveis, 7320665233 aço).
+  Nova `lib/omie-estoque-movimentos.js` (a função saiu de `lib/omie-estoque.js`, 445 → 368 linhas): janela em dias de
+  Brasília; `idProd` → `ProdutoOmie.codigoOmie` → código → `EstoqueItem`, com `ConsultarProduto{codigo_produto}` para
+  o que o cache semanal não tem (produto nasce na entrada da nota); data ao meio-dia UTC; estorno (cancelamento/
+  devolução "S") gravado com origem `OMIE_NF` e sem FIFO; ajuste (00) = `MANUAL`. **A falha aparece:** erro do Omie,
+  resposta sem `movProdutoListar`/`nTotPaginas` (`{}` não é vazio), movimento não gravado (produto/item/tipo) e
+  alocação FIFO que falhou (era `.catch(() => {})`) LANÇAM com `e.resumo` do que entrou → o cron registra `ok:false`;
+  `ultimaSincMov` só avança sem problema (e falhar ao gravá-lo não derruba a rodada). Cron com prazo de 45 s
+  (`maxDuration` 60) e resumo no heartbeat; rota manual com prazo de 55 s; diagnóstico corrigido (rota + rótulo).
+  Testes: `testes/lib/omie-estoque-movimentos.teste.js` (25 — **24 vermelhos no código antigo**, inclusive o central:
+  *"promise resolved `{entradas:0,saidas:0,total:0}` instead of rejecting"*) e `testes/api/cron-estoque-movimentacoes.teste.js`
+  (5 — 3 vermelhos na rota antiga). **4.049 passando**, `checar` limpo, ESLint sem aviso no módulo novo, build
+  EXIT=0 (com `DATABASE_URL` apontando para lugar nenhum — o worktree não tem `.env`).
+  ⚠ **Não rodei a sincronização contra a produção** (sem autorização): nenhuma linha foi gravada, e não houve
+  validação no `npm run dev` (roda contra o banco de produção; a tela do item não muda).
+  ⚠ **Para revisar / decidir:** (a) **a FIFO liga pela primeira vez** — cada SAÍDA que não é estorno consumirá
+  `EstoqueReserva` ATIVAS das OPs; nunca rodou em produção. A regra seguiu o desenho original (toda saída); em aberto
+  quais saídas são consumo (venda 11, remessa 14, ajuste 00, OP 28). Na semana medida não houve saída nenhuma;
+  (b) `alocarSaidaFIFO` não é transacional (atualiza a reserva antes de criar a alocação) — pré-existente;
+  (c) "Não existem registros" como janela vazia é o padrão do Omie, **não conferido neste método** — se vier outra
+  forma, o cron falha alto, não em silêncio; (d) transferência entre locais não apareceu na amostra: com "TODOS" viria
+  como saída + entrada, e a saída abateria reserva; (e) `qtdAtual` vem do `ListarPosEstoque` SEM local e
+  `sincronizarProdutos` passa `nCodLocal`, que não está na doc — o saldo por local (e talvez o do aço) pode estar
+  incompleto; não conferido, fora do escopo; (f) o rodapé da tela diz "diariamente às 06:00/06:30", mas a agenda é de
+  hora em hora (06–20 UTC).
 - **(25/09, madrugada) Estoque: a Qtd do portal era só o Almoxarifado — e a tela cortava em 1.000.** As suspeitas
   (e)/(f) que a sessão das movimentações deixou registradas (24/09, noite; aquele trabalho ainda está sem commit na
   worktree `silly-golick`). **Medido ao vivo, só leitura** (Omie + banco): `ListarPosEstoque` SEM
@@ -2260,3 +2292,9 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   locais salvos na configuração (Almoxarifado, Fábrica e Terceiro marcados na Qtd); 673 produtos com detalhe por
   local, 651 com Qtd positiva e 22 negativos; unidade igual à do cadastro em 673 de 673 (eram 120 "UN" errados).
   Chapa 3,00 mm: 7.399,89 kg (a Fábrica recebeu +4.328 desde a medição de 24/09). Item (c) resolvido.
+- **(26/09) Movimentações de estoque: decisão antes do deploy — as saídas NÃO abatem reserva de OP.** Perguntado,
+  Vitor escolheu subir gravando entradas e saídas sem a alocação FIFO nas `EstoqueReserva` até definir quais saídas
+  são consumo. `sincronizarMovimentacoes` ganhou `abaterReservas` (padrão `false`; nem o cron nem a rota manual passam);
+  o caminho FIFO segue testado atrás da opção, e o estorno continua fora dele mesmo ligado. Testes: +1 no
+  `omie-estoque-movimentos` (26; o padrão ficou vermelho antes da mudança) e o do cron trava que a rota não liga a
+  alocação. ⚠ **Para revisar:** ligar depois não aloca as saídas já gravadas (a rodada as vê como existentes).

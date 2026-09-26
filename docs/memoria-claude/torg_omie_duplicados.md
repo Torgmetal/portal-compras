@@ -76,6 +76,7 @@ cuidado para não inativar o que estamos usando hoje"*.
   código exato (último recurso, `ConsultarProduto`) — agora filtra `inativo === "S"`.
 - ⚠ **Achado de passagem:** a sincronização de movimentos de estoque (`sincronizarMovimentacoes`) chama
   `ListarMovEstoque`, que NÃO EXISTE no Omie ("Method not exists"); o erro é engolido e
-  `EstoqueMovimentacao` tem 0 linhas desde sempre. Aberta tarefa separada.
+  `EstoqueMovimentacao` tem 0 linhas desde sempre. **Corrigido no mesmo dia** — ver
+  [[torg_omie_movimentos_estoque]].
 - Scripts desta verificação (scratchpad, não versionados): `_uso-omie.mjs`, `_inativar.mjs` (lista
   aprovada fixa + re-checagem ao vivo + diff campo a campo) — reaproveitáveis se um dia houver API.

@@ -15,7 +15,6 @@ export const maxDuration = 30;
 const OMIE_FAMILIAS_URL = "https://app.omie.com.br/api/v1/geral/familias/";
 const OMIE_PROD_URL = "https://app.omie.com.br/api/v1/geral/produtos/";
 const OMIE_ESTOQUE_URL = "https://app.omie.com.br/api/v1/estoque/consulta/";
-const OMIE_MOV_URL = "https://app.omie.com.br/api/v1/estoque/movestoque/";
 
 async function callOmie(url, payload) {
   const resp = await fetch(url, {
@@ -336,15 +335,17 @@ export async function GET() {
     resultado.posEstoque = { ok: false, erro: e.message };
   }
 
-  // 6) ListarMovEstoque — 365 dias para capturar produtos com movimentacao historica
+  // 6) ListarMovimentoEstoque — 365 dias para capturar produtos com movimentacao historica
   // (incluindo chapas de aco que foram a zero). Expoe campos reais da resposta.
+  // ⚠ Era `ListarMovEstoque` em estoque/movestoque/, método que NÃO EXISTE no Omie. O certo mora em
+  // estoque/consulta/ e devolve a lista em `movProdutoListar` (ver lib/omie-estoque-movimentos.js).
   try {
     const ate = new Date();
     const de = new Date();
     de.setFullYear(de.getFullYear() - 1); // 365 dias atras
     const fmt = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-    const data = await callOmie(OMIE_MOV_URL, {
-      call: "ListarMovEstoque",
+    const data = await callOmie(OMIE_ESTOQUE_URL, {
+      call: "ListarMovimentoEstoque",
       app_key: APP_KEY,
       app_secret: APP_SECRET,
       param: [{
@@ -352,15 +353,10 @@ export async function GET() {
         nRegPorPagina: 20,
         dDtInicial: fmt(de),
         dDtFinal: fmt(ate),
+        lista_local_estoque: "TODOS",
       }],
     });
-    // Tenta varios campos possiveis onde o array de movimentos pode estar
-    const lista =
-      data.movimentos ||
-      data.listaMovimentos ||
-      data.lista_movimentos ||
-      data.registros ||
-      (Array.isArray(data) ? data : []);
+    const lista = Array.isArray(data.movProdutoListar) ? data.movProdutoListar : [];
     resultado.movEstoque = {
       ok: true,
       totalNaPagina: lista.length,

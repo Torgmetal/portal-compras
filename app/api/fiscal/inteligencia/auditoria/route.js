@@ -6,6 +6,11 @@ import { lerPedidoOmie } from "@/lib/fiscal/pedido-omie";
 import { auditar, indiceDaTipi } from "@/lib/fiscal/auditoria";
 import { verbetesAprovados } from "@/lib/fiscal/registro-classificacao";
 import { log } from "@/lib/log";
+import { montarParcela, totaisPorTributo } from "@/lib/fiscal/parcela";
+import { linhaDaReceita, impostosDaObra, ipiDaRegra } from "@/lib/fiscal/impostos-da-obra";
+import { ipiDaTipi, ambitoDe, daEscolhaDoCfop } from "@/lib/fiscal/simulador";
+import { estimarIcms } from "@/lib/fiscal/icms";
+import { regraIbsCbs } from "@/lib/fiscal/coleta-ibs-cbs";
 
 // Auditoria contra a TIPI de referência — de um XML de NF-e JÁ EMITIDA ou de uma MEDIÇÃO do Omie,
 // que é o mesmo documento ANTES de existir.
@@ -44,7 +49,7 @@ export async function POST(req) {
   }
 
   const tipoConteudo = req.headers.get("content-type") ?? "";
-  let doc, origem;
+  let doc, origem, obraDaMedicao = null;
 
   if (tipoConteudo.includes("application/json")) {
     // ── Uma medição do Omie: o documento ANTES de virar nota ────────────────
@@ -56,12 +61,22 @@ export async function POST(req) {
       select: {
         id: true, numeroPedidoOmie: true, descricao: true, data: true, valorBruto: true,
         tipoDocumento: true, status: true, etapa: true, ultimoSync: true, payload: true,
-        op: { select: { numero: true, cliente: true, clienteUF: true, clienteCnpj: true, clienteIE: true } },
+        op: { select: { numero: true, cliente: true, clienteUF: true, clienteCnpj: true, clienteIE: true,
+          receitas: { select: { id: true, descricao: true, cfop: true, valor: true, icmsPct: true, ipiPct: true, pisPct: true,
+            cofinsPct: true, issPct: true, irrfPct: true, csllPct: true }, orderBy: { ordem: "asc" } } } },
       },
     });
     if (!m) return NextResponse.json({ success: false, error: "Medição não encontrada." }, { status: 404 });
     doc = lerPedidoOmie(m.payload, { op: m.op });
     if (doc.erro) return NextResponse.json({ success: false, error: doc.erro }, { status: 400 });
+    // ⚠ A PARCELA (Matheus, 26/09/2026): parte da medição que vai nesta nota. Seleção inválida é 400,
+    // nunca "corrigida" — ver lib/fiscal/parcela.js.
+    if (body.parcela != null) {
+      const p = montarParcela(doc, body.parcela);
+      if (p.erro) return NextResponse.json({ success: false, error: p.erro }, { status: 400 });
+      doc = p.doc;
+    }
+    obraDaMedicao = m.op;
     origem = {
       tipo: "MEDICAO", medicaoId: m.id, pedido: m.numeroPedidoOmie, op: m.op.numero, cliente: m.op.cliente,
       uf: m.op.clienteUF, valorBruto: m.valorBruto, status: m.status, etapa: doc.etapa,
@@ -114,11 +129,33 @@ export async function POST(req) {
     vigenciaDeclarada: Boolean(versao.vigenciaInicio),
   });
 
+  // ── Como cada imposto DEVERIA sair, item a item (só medição: é a obra que diz UF e o cadastro) ──
+  let esperados = null, totaisParcela = null;
+  if (obraDaMedicao) {
+    const dig = (v) => String(v ?? "").replace(/\D/g, "");
+    const uf = obraDaMedicao.clienteUF;
+    esperados = await Promise.all(doc.itens.map(async (it) => {
+      const ncm = it.ncm || it.ncmDaDescricao;
+      const daNcm = linhas.filter((l) => l.codigo === ncm);
+      const geral = daNcm.find((l) => !l.ex) ?? null;
+      const ipiRegra = ipiDaRegra(geral ? ipiDaTipi(geral, daNcm.filter((l) => l.ex))
+        : { determinado: false, motivo: `O NCM ${ncm || "—"} não está na TIPI de referência.` });
+      const cfopObj = daEscolhaDoCfop(it.cfop, ambitoDe("SP", uf))?.cfop ?? null;
+      // ⚠ PIS/COFINS/ISS/IRRF/CSLL vêm da linha de receita da obra com o MESMO CFOP; sem ela, só a regra.
+      const rec = obraDaMedicao.receitas.find((r) => dig(r.cfop) === it.cfop) ?? null;
+      const r0 = impostosDaObra({ receita: linhaDaReceita(rec), valor: it.valor, ipiRegra,
+        icmsRegra: estimarIcms("SP", uf, it.valor, cfopObj), ibsCbs: await regraIbsCbs({ ncm, cfop: it.cfop }, prisma) });
+      return { item: it.item, noPedido: { ipi: it.ipi ?? null, icms: it.icms ?? null }, receitaCasada: rec?.descricao ?? null, ...r0 };
+    }));
+    totaisParcela = totaisPorTributo(esperados);
+  }
+
   registro.info(`${origem.tipo === "MEDICAO" ? `pedido ${origem.pedido}` : `NF ${r.numero}`} auditado por ${user.email}: ${r.resumo.alta} alta(s), estimado R$ ${r.resumo.diferencaEstimada}`);
-  return NextResponse.json({ success: true, ...r, origem, emitente: doc.emitente, destinatario: doc.destinatario,
+  return NextResponse.json({ success: true, ...r, origem, esperados, totaisParcela, emitente: doc.emitente, destinatario: doc.destinatario,
     itensDoDoc: doc.itens.map((i) => ({
       item: i.item, ncm: i.ncm, ncmDaDescricao: i.ncmDaDescricao ?? null, cfop: i.cfop,
       descricao: i.descricaoItem || i.descricao,
+      quantidade: i.quantidade ?? null, valorUnitario: i.valorUnitario ?? null,
       valor: i.valor, cst: i.ipi?.cst, cEnq: i.ipi?.cEnq, aliquota: i.ipi?.aliquota, ipi: i.ipi?.valor,
     })) });
 }

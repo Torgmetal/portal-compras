@@ -14,7 +14,13 @@ import { validarPreenchimentoLqc } from "@/lib/lqc-op-conferencia";
 import { criarOpComOrigemLqc } from "@/lib/lqc-op-criar";
 import { criarCronogramaPadrao } from "@/lib/cronograma-padrao";
 
-export const maxDuration = 60;
+// ⚠⚠ 300 s PORQUE LER A ORIGEM DA LQC VARRE AS PASTAS (26/09/2026). A busca do Graph devolve
+// HTTP 500 neste drive desde 22–23/09, e `lerFonteLqc` passou a varrer `ORÇAMENTOS_{ano}`: medido,
+// 45 s. Não estreitei a varredura para a pasta do próprio orçamento de propósito — a garantia
+// desta função é "existe UMA cópia desta planilha no servidor", e olhar só a pasta numerada
+// esconderia a cópia que ficou numa pasta de data em "1. Solicitados" (a LQC-295-26 tem as duas).
+// Gerar OP com a planilha errada é pior que esperar. Ver `docs/memoria-claude/torg_graph_busca_500.md`.
+export const maxDuration = 300;
 
 const itemSchema = z.object({
   categoria: z.string().min(1),

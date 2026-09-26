@@ -41,3 +41,4 @@ public/wasm/
 
 # Acervo local: matrizes, ensaios e arquivos tratados ficam fora do Git
 /output/banco-midias/
+.superpowers/

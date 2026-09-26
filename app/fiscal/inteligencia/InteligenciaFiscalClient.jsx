@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, ChevronDown, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle, Upload, ShieldAlert, HelpCircle, Calculator, Ban } from "lucide-react";
+import { Search, Scale, AlertTriangle, FileText, Loader2, ExternalLink, ChevronRight, ChevronDown, Info, RefreshCw, CheckCircle2, XCircle, MinusCircle, ShieldAlert, HelpCircle, Calculator, Ban } from "lucide-react";
 import { useStore } from "@/lib/store";
 import CampoNcm from "./CampoNcm";
 import AbaClassificacoes from "./AbaClassificacoes";
@@ -8,6 +8,8 @@ import AbaCadeia from "./AbaCadeia";
 import AbaRegras from "./AbaRegras";
 import AssistenteFiscal from "@/components/fiscal/assistente/AssistenteFiscal";
 import CitacaoLegal from "./CitacaoLegal";
+import SimuladorObra from "./SimuladorObra";
+import ParcelaMedicao from "./ParcelaMedicao";
 
 // ─── INTELIGÊNCIA FISCAL ─────────────────────────────────────────────────────
 //
@@ -518,7 +520,9 @@ const CHIP = {
 };
 
 function AbaAuditoria() {
-  const [arquivo, setArquivo] = useState(null);
+  // ⚠ Os itens da medição INTEIRA, da primeira auditoria: auditar uma parcela devolve só os itens
+  // dela, e a lista de onde se escolhe a próxima parcela não pode encolher junto.
+  const [itensDaMedicao, setItensDaMedicao] = useState(null);
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(false);
@@ -558,38 +562,23 @@ function AbaAuditoria() {
   // ⚠⚠ VALIDAR ANTES DE EMITIR É O PONTO INTEIRO. A auditoria de XML acha o erro DEPOIS — a
   // NF-e 973 custou R$ 7.026,56 e só apareceu quando alguém foi procurar. A medição é o mesmo
   // documento antes de existir, e o pedido do Omie já traz CST, cEnq e a descrição real do item.
-  const auditarMedicao = async (id) => {
+  const auditarMedicao = async (id, parcela = null) => {
     setMedicaoId(id);
-    if (!id) return;
-    setCarregando(true); setErro(null); setResultado(null); setArquivo(null);
+    if (!id) { setItensDaMedicao(null); return; }
+    if (!parcela) setItensDaMedicao(null);
+    setCarregando(true); setErro(null); setResultado(null);
     const minha = ++vez.current;
     try {
       const r = await fetch("/api/fiscal/inteligencia/auditoria", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ medicaoId: id }),
+        body: JSON.stringify(parcela ? { medicaoId: id, parcela } : { medicaoId: id }),
       });
       const d = await r.json().catch(() => null);
       if (minha !== vez.current) return;
       if (!r.ok || !d?.success) setErro(d?.error || `Não foi possível auditar a medição (HTTP ${r.status}).`);
-      else setResultado(d);
+      else { setResultado(d); if (!parcela) setItensDaMedicao(d.itensDoDoc ?? null); }
     } catch {
       if (minha === vez.current) setErro("Falha de rede ao auditar a medição.");
-    } finally { if (minha === vez.current) setCarregando(false); }
-  };
-
-  const enviar = async (f) => {
-    if (!f) return;
-    setCarregando(true); setErro(null); setResultado(null); setArquivo(f.name); setMedicaoId("");
-    const minha = ++vez.current;
-    try {
-      const fd = new FormData(); fd.append("xml", f);
-      const r = await fetch("/api/fiscal/inteligencia/auditoria", { method: "POST", body: fd });
-      const d = await r.json().catch(() => null);
-      if (minha !== vez.current) return;
-      if (!r.ok || !d?.success) setErro(d?.error || `Não foi possível auditar o arquivo (HTTP ${r.status}).`);
-      else setResultado(d);
-    } catch {
-      if (minha === vez.current) setErro("Falha de rede ao enviar o arquivo.");
     } finally { if (minha === vez.current) setCarregando(false); }
   };
 
@@ -634,13 +623,13 @@ function AbaAuditoria() {
         )}
       </div>
 
-      <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-white py-10 transition hover:border-torg-blue/40 hover:bg-gray-50/60">
-        <input type="file" accept=".xml,text/xml,application/xml" className="hidden" disabled={carregando}
-          onChange={(e) => enviar(e.target.files?.[0])} />
-        {carregando ? <Loader2 size={26} className="animate-spin text-torg-blue" /> : <Upload size={26} className="text-gray-300" />}
-        <span className="mt-2 text-sm font-medium text-torg-dark">{carregando ? "Auditando…" : "Enviar o XML da NF-e"}</span>
-        <span className="mt-0.5 text-xs text-torg-gray">{arquivo && !carregando ? arquivo : "o arquivo é lido e descartado — nada é gravado"}</span>
-      </label>
+      {/* ⚠ O envio de XML saiu daqui (Matheus, 26/09/2026: tela mais simples) — a leitura de XML
+          continua no Assistente Fiscal. A auditoria é da MEDIÇÃO, antes de virar nota. */}
+      {itensDaMedicao && (
+        <ParcelaMedicao itens={itensDaMedicao} carregando={carregando}
+          onAuditar={(parcela) => auditarMedicao(medicaoId, parcela)}
+          esperados={resultado?.esperados ?? null} totais={resultado?.totaisParcela ?? null} />
+      )}
 
       {erro && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erro}</div>}
 
@@ -844,6 +833,10 @@ function AbaSimulador() {
 
   return (
     <div className="space-y-4">
+      {/* ⚠ O caminho do dia a dia vem primeiro (Matheus, 26/09/2026): escolher a obra traz o imposto
+          que o Comercial cadastrou. O formulário abaixo continua para simular sem obra. */}
+      <SimuladorObra ops={opcoes.ops} />
+      <h3 className="pt-2 text-xs font-semibold uppercase tracking-wide text-torg-gray">Simulação sem obra</h3>
       <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <div className="grid gap-3 md:grid-cols-3">
           <div className="md:col-span-1">
@@ -1375,41 +1368,84 @@ function AbaSimulador() {
 // entrada — *"o colaborador não precisa descobrir sozinho qual tabela ou simulador utilizar"* — e é
 // explícito em manter as consultas tradicionais: quem já sabe qual tela quer não deve passar por
 // uma conversa para chegar nela.
-const ABAS = [{ id: "assistente", rotulo: "Assistente Fiscal" },
-  { id: "ncm", rotulo: "Consulta NCM" }, { id: "cfop", rotulo: "Consulta CFOP" }, { id: "simulador", rotulo: "Simulador" }, { id: "auditoria", rotulo: "Auditoria de NF-e" }, { id: "classificacoes", rotulo: "Classificação de produtos" }, { id: "cadeia", rotulo: "Cadeia de documentos" }, { id: "regras", rotulo: "Validação de regras" }, { id: "admin", rotulo: "Atualizações Tributárias" }];
+// ⚠⚠ QUATRO ABAS NO DIA A DIA (Matheus, 26/09/2026): *"a aba Inteligência está muito complexa com
+// muitas funções, precisamos deixar algo mais simples e usual"*. Eram nove. As outras quatro não foram
+// apagadas: moram em Administração, só para ADMIN. A tela abre no Simulador, o uso mais frequente.
+const ABAS = [
+  { id: "simulador", rotulo: "Simulador" },
+  { id: "auditoria", rotulo: "Auditoria de medição" },
+  { id: "consulta", rotulo: "Consulta NCM/CFOP" },
+  { id: "assistente", rotulo: "Assistente Fiscal" },
+];
+const ABAS_ADMIN = [
+  { id: "classificacoes", rotulo: "Classificação de produtos" },
+  { id: "cadeia", rotulo: "Cadeia de documentos" },
+  { id: "regras", rotulo: "Validação de regras" },
+  { id: "admin", rotulo: "Atualizações tributárias" },
+];
+
+const botaoSeg = (ativo) => `rounded-lg px-3 py-1.5 text-xs font-medium transition ${ativo ? "bg-torg-blue text-white" : "bg-gray-100 text-torg-gray hover:text-torg-dark"}`;
+
+/** NCM e CFOP numa aba só — as duas consultas continuam as mesmas, lado a lado num seletor. */
+function AbaConsulta({ referencia, cfops, operacoes, cstIpi, familias }) {
+  const [qual, setQual] = useState("ncm");
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <button type="button" className={botaoSeg(qual === "ncm")} onClick={() => setQual("ncm")}>NCM</button>
+        <button type="button" className={botaoSeg(qual === "cfop")} onClick={() => setQual("cfop")}>CFOP</button>
+      </div>
+      {qual === "ncm" ? <AbaNcm referencia={referencia} /> : <AbaCfop cfops={cfops} operacoes={operacoes} cstIpi={cstIpi} familias={familias} />}
+    </div>
+  );
+}
+
+function AbaAdministracao({ referencia, showToast }) {
+  const [qual, setQual] = useState("classificacoes");
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {ABAS_ADMIN.map((a) => (
+          <button key={a.id} type="button" className={botaoSeg(qual === a.id)} onClick={() => setQual(a.id)}>{a.rotulo}</button>
+        ))}
+      </div>
+      {qual === "classificacoes" && <AbaClassificacoes showToast={showToast} />}
+      {qual === "cadeia" && <AbaCadeia />}
+      {qual === "regras" && <AbaRegras showToast={showToast} />}
+      {qual === "admin" && <AbaAdmin referencia={referencia} ehAdmin />}
+    </div>
+  );
+}
 
 export default function InteligenciaFiscalClient({ referencia, cfops, operacoes, cstIpi, familias, ehAdmin }) {
-  const [aba, setAba] = useState("assistente");
+  const [aba, setAba] = useState("simulador");
   const { showToast } = useStore();
+  const abas = ehAdmin ? [...ABAS, { id: "administracao", rotulo: "Administração" }] : ABAS;
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <header>
         <h1 className="flex items-center gap-2 text-2xl font-bold text-torg-dark"><Scale size={24} className="text-torg-blue" /> Inteligência Fiscal</h1>
-        <p className="mt-1 text-sm text-torg-gray">Consulte NCM, CFOP e tributos aplicáveis às operações da TORG METAL.</p>
+        <p className="mt-1 text-sm text-torg-gray">Simule os impostos de uma obra, audite a medição antes de emitir e consulte NCM e CFOP.</p>
       </header>
 
-      <div className="flex gap-1 border-b border-gray-200">
-        {ABAS.map((a) => (
-          <button key={a.id} onClick={() => setAba(a.id)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${aba === a.id ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
+      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-gray-200">
+        {abas.map((a) => (
+          <button key={a.id} role="tab" aria-selected={aba === a.id} onClick={() => setAba(a.id)}
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition ${aba === a.id ? "border-torg-blue text-torg-blue" : "border-transparent text-torg-gray hover:text-torg-dark"}`}>
             {a.rotulo}
           </button>
         ))}
       </div>
 
-      {aba === "assistente" && <AssistenteFiscal showToast={showToast} />}
-      {aba === "ncm" && <AbaNcm referencia={referencia} />}
-      {aba === "cfop" && <AbaCfop cfops={cfops} operacoes={operacoes} cstIpi={cstIpi} familias={familias} />}
       {aba === "simulador" && <AbaSimulador />}
       {aba === "auditoria" && <AbaAuditoria />}
-      {aba === "classificacoes" && <AbaClassificacoes showToast={showToast} />}
-      {aba === "cadeia" && <AbaCadeia />}
-      {aba === "regras" && <AbaRegras showToast={showToast} />}
-      {aba === "admin" && <AbaAdmin referencia={referencia} ehAdmin={ehAdmin} />}
+      {aba === "consulta" && <AbaConsulta referencia={referencia} cfops={cfops} operacoes={operacoes} cstIpi={cstIpi} familias={familias} />}
+      {aba === "assistente" && <AssistenteFiscal showToast={showToast} />}
+      {aba === "administracao" && ehAdmin && <AbaAdministracao referencia={referencia} showToast={showToast} />}
 
       <p className="flex items-center gap-1.5 pt-2 text-xs text-torg-gray">
         <ExternalLink size={12} />
-        Fontes: TIPI (Receita Federal) e Nomenclatura Comum do Mercosul (Siscomex). O portal não calcula imposto devido — ele mostra o que a fonte oficial diz.
+        Fontes: TIPI (Receita Federal), Nomenclatura Comum do Mercosul (Siscomex), o cadastro do Comercial e as NF-e emitidas no Omie. O portal não calcula imposto devido — ele mostra o que as fontes dizem.
       </p>
     </div>
   );
