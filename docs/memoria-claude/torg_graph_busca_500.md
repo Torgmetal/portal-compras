@@ -145,9 +145,24 @@ nome+pasta+tamanho+sha antes do DELETE); `lerFonteLqc` da 295 passou a funcionar
 criadas com 35 s de diferença (23/09 19:39 e 19:40) — provavelmente a mesma operação de cópia. O
 que separou foi TAMANHO e HASH. Antes de apagar arquivo de proposta, baixe os dois e compare.
 
-⚠ **Estudo 316, ainda aberto**: aponta para `LQC-316-26-TMSA-ETC-MB-0141-TORG-R00.xlsx`, e o que
-existe é `LQC-316-26-QWS-REVAMP-4-TORG-R000.xlsx`. É a origem do estudo que está desatualizada —
-não dá para consertar do lado do SharePoint sem saber qual é a certa.
+⚠⚠ **ESTUDO 316 — A ORIGEM QUEBRADA ERA SINTOMA; O ESTUDO TINHA DADO DE OUTRA OBRA.** Ele
+apontava para `LQC-316-26-TMSA-ETC-MB-0141-TORG-R00.xlsx`, que não existe mais, e o **conteúdo**
+era da TMSA (21 linhas, 15.713 kg, áreas `ETC MB-0141`) dentro de um orçamento que a central E a
+pasta do SharePoint dizem ser **QWS Serviços / REVAMP-04**. Trocar só o ponteiro para a planilha do
+QWS deixaria o peso da TMSA com o nome do QWS — consistente por fora, errado por dentro.
+
+Reimportado em 26/09 da planilha certa (`LQC-316-26-QWS-REVAMP-4-TORG-R000.xlsx`): **32 linhas,
+25.365 kg, áreas `DE-REPLAN-200A-18-…`**, custo R$ 542.887, preço R$ 1.014.743 (R$ 40,00/kg). A
+estrutura bate com a do estudo 313, que o cron importou. Backup do estado anterior guardado antes
+de gravar.
+
+⚠ **R$ 40,00/kg é bem acima dos R$ 18,51 do 313** — vem do BDI da própria planilha (46,5% do
+preço), não de conta do portal. Vale o Comercial olhar antes de a proposta sair.
+
+⚠ **O cron teria consertado sozinho, e é por isso que o conserto da busca importa**: a planilha do
+QWS é de 25/09 e o estudo é de 23/09, então `decidirImportacao` devolve "atualizar". O que travava
+era o cron estar morto desde 23/09. ⚠ Ele roda **`40 6-20 * * 1-5`, só dia útil** — num sábado, a
+próxima chance seria segunda 6h40.
 
 ⚠ Sobrou uma aresta cosmética na 295: o R01 vive numa pasta de data, então `lerFonteLqc` devolve
 `pasta: null` (ela só reconhece o formato `{grupo}/{orçamento}/…`). Não impede nada; some se o

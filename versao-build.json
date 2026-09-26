@@ -1,11 +1,71 @@
 {
-  "build": 3509,
-  "gerado": "2026-09-26T16:03:37.414Z",
+  "build": 3512,
+  "gerado": "2026-09-26T16:05:22.904Z",
   "commits": [
+    {
+      "hash": "7a36e64a",
+      "data": "26/09/2026",
+      "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
+    },
     {
       "hash": "d99aae0a",
       "data": "26/09/2026",
       "titulo": "Memória e revisão: a rodada das 13h completou (103 s) com o saldo por local"
+    },
+    {
+      "hash": "ffd06f19",
+      "data": "26/09/2026",
+      "titulo": "Fiscal: cron de IBS/CBS no monitor; quantidade decimal da parcela não é mais recusada"
+    },
+    {
+      "hash": "71fc5484",
+      "data": "26/09/2026",
+      "titulo": "Fiscal: Inteligência com 4 abas do dia a dia; o resto em Administração (só ADMIN)"
+    },
+    {
+      "hash": "c1207431",
+      "data": "26/09/2026",
+      "titulo": "Fiscal: auditoria da medição por parcela — itens e quantidades escolhidos"
+    },
+    {
+      "hash": "74a0d329",
+      "data": "26/09/2026",
+      "titulo": "Fiscal: simulador pela obra — imposto do Comercial ao lado da regra"
+    },
+    {
+      "hash": "fee85ae7",
+      "data": "26/09/2026",
+      "titulo": "Fiscal: regras de IBS/CBS das NFs do Omie — tabela, coleta, cron e botão"
+    },
+    {
+      "hash": "042ddcf4",
+      "data": "26/09/2026",
+      "titulo": "Fiscal: regras de IBS/CBS extraídas das NFs do Omie (puro)"
+    },
+    {
+      "hash": "8c7fde32",
+      "data": "26/09/2026",
+      "titulo": "Plano: Inteligência Fiscal mais simples (6 tarefas) + spec ajustada (chave NCM×CFOP)"
+    },
+    {
+      "hash": "6a4f37aa",
+      "data": "26/09/2026",
+      "titulo": "Memória: a cópia duplicada da LQC 295 era a da pasta da obra, não a outra"
+    },
+    {
+      "hash": "ad69d555",
+      "data": "26/09/2026",
+      "titulo": "Merge remote-tracking branch 'origin/main' into claude/silly-golick-65af65"
+    },
+    {
+      "hash": "c6917010",
+      "data": "26/09/2026",
+      "titulo": "Estoque: movimentações do Omie pelo método que existe, e a falha da sincronização aparece"
+    },
+    {
+      "hash": "080eaa77",
+      "data": "26/09/2026",
+      "titulo": "Fecha os 4 pontos que ainda dependiam da busca do Graph"
     },
     {
       "hash": "f2050d99",
@@ -91,66 +151,6 @@
       "hash": "bb849b93",
       "data": "25/09/2026",
       "titulo": "Relatório de ultrassom: a peça ensaiada aparece na tabela"
-    },
-    {
-      "hash": "9acba6c0",
-      "data": "25/09/2026",
-      "titulo": "RNC: anexar mensagem de e-mail (.eml e .msg do Outlook)"
-    },
-    {
-      "hash": "c79184ab",
-      "data": "25/09/2026",
-      "titulo": "Memória: primeira rodada real do vínculo automático de certificados (76 em 7 livros)"
-    },
-    {
-      "hash": "5cdeb4e1",
-      "data": "25/09/2026",
-      "titulo": "Data book: certificado que chega depois entra sozinho na seção já montada"
-    },
-    {
-      "hash": "696eb72d",
-      "data": "25/09/2026",
-      "titulo": "Memória: data book da OP-102 fechado — 10 peças por troca SEM_R e 11 certificados na §04"
-    },
-    {
-      "hash": "9f3f4d3b",
-      "data": "25/09/2026",
-      "titulo": "RM: sobrar só item cotado é \"pronta pra pedido\", não \"aberta\"; a OP só recalcula RM que teve pedido"
-    },
-    {
-      "hash": "0c43bbcd",
-      "data": "25/09/2026",
-      "titulo": "CMR: localizador percorre a árvore inteira e não cai na busca quando a listagem falha"
-    },
-    {
-      "hash": "022bdf37",
-      "data": "25/09/2026",
-      "titulo": "Memória: CMR parado de 23 a 25/09, certificados da OP-102 e as 10 peças cortadas antes do material"
-    },
-    {
-      "hash": "ec19ab43",
-      "data": "25/09/2026",
-      "titulo": "Importação da LPC em lote: a T118B estourava os 300 s (HTTP 504)"
-    },
-    {
-      "hash": "d3ec58b9",
-      "data": "25/09/2026",
-      "titulo": "Memória: RIP-112-001 recriado com número, id e data originais"
-    },
-    {
-      "hash": "1e60d6d0",
-      "data": "25/09/2026",
-      "titulo": "CMR: a planilha é achada pela pasta da rastreabilidade — a busca do Graph está em 500"
-    },
-    {
-      "hash": "6ee5dca4",
-      "data": "25/09/2026",
-      "titulo": "Memória: o Neon guarda só 6 h de histórico e não tem snapshot"
-    },
-    {
-      "hash": "7d79b377",
-      "data": "25/09/2026",
-      "titulo": "Memória: saldo dos duplicados em TODOS os locais do Omie"
     }
   ]
 }
