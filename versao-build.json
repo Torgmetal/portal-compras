@@ -1,7 +1,12 @@
 {
-  "build": 3524,
-  "gerado": "2026-09-26T19:29:19.771Z",
+  "build": 3525,
+  "gerado": "2026-09-26T22:08:22.613Z",
   "commits": [
+    {
+      "hash": "0fe8d0f6",
+      "data": "26/09/2026",
+      "titulo": "docs: tubo 201000008 zerado e inativado; demais zeramentos e o pedido 1721 ficaram pendentes (26/09)"
+    },
     {
       "hash": "97965b46",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "3a4e911e",
       "data": "26/09/2026",
       "titulo": "Desenhos e LQC deixam de depender da busca do Graph, que devolve 500"
-    },
-    {
-      "hash": "24663567",
-      "data": "26/09/2026",
-      "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
     }
   ]
 }

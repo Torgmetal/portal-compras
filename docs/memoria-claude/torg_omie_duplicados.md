@@ -126,3 +126,16 @@ de contas não precisa inativar"*.
   (9.798); trocar os itens 7 e 8 do pedido 1721 (392,4 e 196,2 kg, nada recebido) de 501000071 para 501000014
   (Compra de Produto › Exibir todos › 1721 › Editar › Editar Item › Produto) e depois inativar o 501000071. ⚠ No
   portal, a RM T102-001-R00 continua com o código 501000071 nos 2 itens.
+- ✅ **Concluído em 26/09/2026 (fim da tarde), conferido pela API:** zerados 501000064 (715), 101000037 (2.298 +
+  112), 101000038 (2.013), 101000050 (9.798) e INATIVADOS, com o 501000071; os itens 7 e 8 do pedido 1721 (392,4 e
+  196,2 kg) passaram para o 501000014 (mesmo nCodItem, quantidade e preço). ⚠ No portal a RM T102-001-R00 segue com
+  501000071 nos 2 itens (não mexido: banco de produção).
+  ⚠⚠ **O OMIE RECUSA MOVIMENTAR PRODUTO INATIVO** ("O cadastro deste produto está inativo e por isso não é possível
+  realizar movimentações de estoque") — e a API recusa até LISTAR ajuste dele. Para zerar quem já foi inativado:
+  Ativar na tela → zerar → Inativar de novo. Por isso: zerar ANTES de inativar.
+  ⚠ Pela API o zeramento é `IncluirAjusteEstoque` com `tipo:"SLD"`, `quan:0` (é o saldo FINAL, igual à tela
+  "Ajustar o saldo de estoque do dia"), `motivo:"INV"`, `origem:"AJU"`, `valor` = CMC do local; a posição
+  (`ListarPosEstoque`) demora alguns segundos para refletir — reler depois, não na hora.
+  ⚠ Trocar o produto de um item de pedido na tela: o "Salvar" DO ITEM já grava no servidor; o Omie pergunta duas
+  vezes (atualizar preço de venda dos demais / copiar impostos de custo para os demais) — responder **Não** nas duas;
+  o item passa a trazer o CST/origem do cadastro do produto novo (90/0 aqui), sem mudar valor.
