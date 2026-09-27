@@ -1,7 +1,12 @@
 {
-  "build": 3529,
-  "gerado": "2026-09-27T00:16:17.015Z",
+  "build": 3530,
+  "gerado": "2026-09-27T00:54:58.421Z",
   "commits": [
+    {
+      "hash": "1bb16661",
+      "data": "26/09/2026",
+      "titulo": "docs: cadastro do Omie gravado (fiscal, pesos, unidades, CEST) e os \"duplicados\" que eram material de terceiro"
+    },
     {
       "hash": "bfc1fffe",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "c6917010",
       "data": "26/09/2026",
       "titulo": "Estoque: movimentações do Omie pelo método que existe, e a falha da sincronização aparece"
-    },
-    {
-      "hash": "080eaa77",
-      "data": "26/09/2026",
-      "titulo": "Fecha os 4 pontos que ainda dependiam da busca do Graph"
     }
   ]
 }

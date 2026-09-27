@@ -156,3 +156,12 @@ de contas não precisa inativar"*.
   sincronização foi às 17h e o zeramento depois — acerta sozinho no cron das 03h (o catálogo traz `inativo`). ⚠ 7 linhas
   de `EstoqueItem` são de produtos APAGADOS no Omie (PRD00013/14/16, 2010000049, 201000196, 9260, 181000000): saldo 0,
   mas seguem `ativo:true` — o catálogo só faz upsert, nunca desativa quem sumiu.
+- ✅ **(26/09, noite) Vitor: "o material já foi embora, pode encerrar e inativar os códigos".** Os 40 códigos da Quality
+  Welding INATIVADOS (39 com nota só dela — aço, tintas "05.xx", "FERRO" — e o 01.03.03634, mesma numeração, sem nota),
+  conferido pela API. Antes: saldo 0 em todos os locais (relido na hora), recebimentos concluídos (etapa 80), nenhum em RM.
+  ⚠ **INATIVAR EM LOTE NA TELA:** filtro na coluna Código (o filtro é "contém": "01." pega 01.xx, 05.01 e 96.01) →
+  conferir a lista da grade → caixa de seleção → "selecionar todos N registros deste filtro" → "Inativar" (pelo
+  elemento; "Excluir os Produtos Selecionados" fica logo abaixo) → "Inativar todos". A "Alterar Produtos Selecionados"
+  muda em lote família, NCM, CEST, origem, tipo e preço — **peso não**.
+  ⚠ O modo automático do Claude Code barrou uma vez o clique em lote ("Unverifiable Deletion Scope"); passou depois de
+  ler na tela os itens selecionados e confirmar que a ação era inativar, não excluir.

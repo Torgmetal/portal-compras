@@ -68,6 +68,24 @@ CEST e entrou depois (ver abaixo). Piloto de 4 antes; uma rodada só com `Altera
 - ⏳ **PERFIS SOLDADOS (VS/PS/CS) ESTÃO COM NCM SEM CONVENÇÃO — para o contador:** 9406.90.20 (construção
   pré-fabricada) ×6, 8205.59.00 (ferramenta manual!) ×1, 7306.30.00 (inexistente) ×2, 7308.90.10 ×2. Na tabela existe
   **7301.20.00 "Perfis"** (obtidos por soldadura), candidato natural; não mexi.
+- ⚠⚠ **ZERAR PELA API: mandar 0,0001.** O Omie grava peso com 3 casas e o `AlterarProduto` só ignora o zero LITERAL —
+  0,0001 passa pelo "não informado", é arredondado e vira 0,000 (medido em 26/09 no 701000036; 50 zerados assim e
+  conferidos). Vale para peso; para texto vazio (CEST) continua sendo a tela.
+- ⚠ **Peso declarado na NF (transporte.nPesoLiquido/nPesoBruto) NÃO serve para peso unitário**, nem em nota de 1 item:
+  HARDTOP XP comp. B 0,32 L = 90 kg; Penguard 4 L = 1 kg; airless Graco X70 = 0,36 kg. É o que o fornecedor digita.
+- **TIPI: 7308.90.90 tem Ex 01 = "Telhas de aço" (IPI 0; o geral é 3,25%)** — o Omie grava como `7308.90.90.01`. Telhas
+  passaram todas para ele (26/09). ⏳ Rufo, calha, tampa e bocal também estão no Ex 01 e não são telha: candidato é
+  7308.90.10 ("chapas… próprias para construções", IPI 0) ou o 7308.90.90 geral — decisão do contador. ⏳ Chapas
+  galvalume (103000001–005, 20003280/288) com 3 NCMs (7308.90.10, 7210.61.00, 7210.49.10); 7210.49.10 é zincado, não
+  Al-Zn — o texto da TIPI aponta 7210.61.00, mas fornecedor usa 7308.90.10. Contador.
+- **Telhas, calhas e rufos (Vitor, 26/09: "precisamos melhorar esses cadastros no geral").** O retrato: unidade M2 no
+  cadastro, mas VENCOB e A2 ROCHA vendem TELHA POR METRO LINEAR e o recebimento lançou ML como M2/PC/CJ (razão 1) — o
+  saldo mistura metro e peça; preço R$ 37,62 e bruto 32,14 copiados em quase todos; nota da H BREMER em "1 KG a R$
+  8.500" (lote); item genérico "TELHAS, CALHAS, RUFOS E ACESSORIOS" (CJ) recebendo metros de tudo; BOCAL duplicado
+  em Fixadores (150000013). Feito: NCM do selante (3506.10.90), lanternim (9406.20.00), genérico (7308.90.90) e 2 telhas
+  no Ex 01; pesos brutos copiados zerados; rufos/calha em m² de chapa = espessura × 7,85 + 0,15 (AZ150). ⏳ Proposta de
+  padrão (descrição "TELHA TRAPEZOIDAL TP40 GALVALUME ESPESSURA 0,43MM - LARGURA UTIL 980MM", telha em M com peso
+  9,42·e + 0,18 kg/m pela bobina de 1.200 mm, cumeeira/tampa/bocal em PC) aguardando o Vitor.
 - ⚠ Minha 1ª conferência do CEST disse "OK" com o CEST intacto: ela só procurava mudança A MAIS. **Conferência tem de
   checar também que o valor pedido FICOU**, não só que nada além mudou.
 
