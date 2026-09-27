@@ -1,7 +1,12 @@
 {
-  "build": 3528,
-  "gerado": "2026-09-26T23:41:35.778Z",
+  "build": 3529,
+  "gerado": "2026-09-27T00:16:17.015Z",
   "commits": [
+    {
+      "hash": "bfc1fffe",
+      "data": "26/09/2026",
+      "titulo": "Produtos do Omie: o cache do portal passa a sincronizar todo dia (era às segundas)"
+    },
     {
       "hash": "9fef5953",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "080eaa77",
       "data": "26/09/2026",
       "titulo": "Fecha os 4 pontos que ainda dependiam da busca do Graph"
-    },
-    {
-      "hash": "f2050d99",
-      "data": "26/09/2026",
-      "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
     }
   ]
 }

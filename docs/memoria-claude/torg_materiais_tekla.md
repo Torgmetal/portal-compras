@@ -57,6 +57,9 @@ multinormas). Ele lê a norma da DESCRIÇÃO (via esta planilha: `materialDe` + 
 - ⚠ **Chapa: o Tekla escolhe pela espessura e ignora a norma** (só xadrez/inox mudam o tipo), e lê os códigos de chapa
   da tabela dele (Omie.dat), não desta planilha (que não tem chapa). Chapa CIVIL 300 só sai sozinha depois de ajuste
   no programa do Tekla.
+  ⏳ **(26/09, noite) As duas correções do "Omie automático" aguardam o Vitor** (ele perguntou "no tekla está como
+  mesmo?" e recebeu a explicação): cantoneira métrica → polegada no `Canon`, e chapa pela norma (Omie.dat + `Escolher`).
+  É código da DLL, na sessão do PC Windows, e exige `Instalar-TORG.bat` em cada PC.
 - **Decisão do Vitor (26/09):** CIVIL 300 é o padrão; a USI CIVIL 350 (101000048/49, criadas em 29/04, nunca
   compradas) não será comprada. Faltavam de verdade só a cantoneira 4" x 7/16" (T64T, sem compra) e as chapas CIVIL 300
   (T92/T60B: 3; 4,75; 6,30; 9,50; 12,50; 16; 19; 31,50; 44,50 mm). Ver [[torg_omie_cadastro_fiscal]].

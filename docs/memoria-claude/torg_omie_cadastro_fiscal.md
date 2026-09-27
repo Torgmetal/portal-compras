@@ -1,6 +1,6 @@
 ---
 name: torg_omie_cadastro_fiscal
-description: Cadastro fiscal dos produtos do Omie pelas NF-e de compra (26/09/2026) — imposto NÃO fica no produto (Cenário de Impostos); pela API só NCM/CEST/origem/tipo SPED/peso/família; 7306.30.00 não existe; cantoneira ≥80 mm = 7216.40.10; proposta de 860 produtos pronta, gravação travada pelo modo automático do Claude Code
+description: Cadastro fiscal dos produtos do Omie pelas NF-e de compra — GRAVADO em 26/09/2026 (859+1 produtos: NCM/peso/origem/tipo; 536 pesos teóricos de fixadores pela norma); imposto NÃO fica no produto; a API IGNORA vazio e zero (CEST e peso só se limpam pela tela); troca de NCM zera o IBPT; CEST só é validado com recomendacoes_fiscais
 metadata:
   type: project
 ---
@@ -42,12 +42,52 @@ cadastro ≠ NCM das notas (27 com ≥2 fornecedores concordando).
 - ⚠ **Item "conforme desenho" (códigos TP…) fica FORA:** a chapa xadrez TP002156x tem 8437.90.00, NCM de peça da
   máquina do cliente — trocar pelo 7208.40 pode estar errado. Serviços também ficam fora.
 
-**Proposta pronta (não gravada)** — `proposta2.json` no scratchpad da sessão de 26/09: 860 produtos (peso 801, tubos
-69, cantoneiras 13, chapas 12, U/I 7, NCM vazio 8, 13 revisados um a um — lente 7015.90.20, diluente 3814.00.90,
-arame tubular 8311.20.00, autobrocante 7318.14.00…, origem 39, tipo 99→01 em 4 da Matéria Prima).
-⚠⚠ **O MODO AUTOMÁTICO DO CLAUDE CODE BLOQUEIA ESCRITA NO OMIE** ("Modify Shared Resources") mesmo com a autorização
-no chat — até a criação do script foi barrada. Para gravar: regra de permissão para o script, ou a sessão no modo
-que pede aprovação a cada comando. Ver [[torg_omie_duplicados]] e [[torg_materiais_tekla]].
+**GRAVADO (26/09/2026, noite — Vitor: "2 pode gravar").** `proposta2.json` (scratchpad da sessão): 860 produtos —
+peso 1 kg nos 801 em KG, tubos 69 (7306.30.00 → .30.90 / .61.00), cantoneiras 13, chapas 12, U/I 7, NCM vazio 8, 13
+revisados um a um (lente 7015.90.20, diluente 3814.00.90, arame tubular 8311.20.00, autobrocante 7318.14.00…), origem 39,
+tipo 99→01 em 4 da Matéria Prima. **859 gravados e conferidos campo a campo**; o 860º (lente 181000022) foi recusado pelo
+CEST e entrou depois (ver abaixo). Piloto de 4 antes; uma rodada só com `AlterarProduto` + releitura.
+- ⚠⚠ **TROCA DE NCM ZERA (OU RECALCULA) O `dadosIbpt`** — a carga aproximada da Lei da Transparência é por NCM. Em 31 dos
+  122 produtos com NCM trocado a conferência acusou só isso (alíquotas 18/13,83 → 0, ou 0 → 12 quando o Omie já recalculou).
+  Não é defeito: o Omie repõe pela tabela do IBPT. Conferência de NCM tem de tolerar `dadosIbpt.*`.
+- ⚠⚠ **O CEST SÓ É VALIDADO QUANDO `recomendacoes_fiscais` VAI JUNTO.** A lente (CEST 10.034.00 "Vidro estirado… em
+  folhas", do NCM antigo 7004) parou a rodada: *"CEST não cadastrado para o Código [1003400]"* — foi a única com origem E
+  NCM mudando. Os 6 que trocaram só o NCM passaram sem validar; reenviar o objeto como estava mostrou 3 CEST válidos
+  (protetor solar, tubo 28.999.00, óleo de corte) e 3 errados: desengripante com CEST de **"Bombas para combustíveis"**
+  (01.032.00) e os 2 diluentes com o de tinta (24.001.00, "Tintas, vernizes", para NCM de solvente 3814).
+- ⚠⚠ **A API IGNORA VALOR VAZIO E ZERO** — `id_cest: ""`, `peso_liq: 0` e `peso_bruto: 0` respondem "alterado com sucesso"
+  e não mudam nada (é o "não informado" deles). **Limpar CEST ou zerar peso é pela TELA**: Produtos → Editar →
+  aba "Recomendações Fiscais" (CEST) ou "Informações Adicionais" (Peso Líquido/Bruto). Os 4 CEST errados e 2 pesos foram
+  limpos assim, conferidos pela API. ⚠ Na tela, salvar produto com pedido/recebimento aberto PERGUNTA se leva a mudança
+  para esses documentos — respondi **Não** (o documento reflete o combinado com o fornecedor; a API também não leva).
+- **+9 no 7306.30.00 que a regra pulou por "SCH"** (SCH pode ser sem costura, 7304): 4 "COM COSTURA (CC)" e 3 com
+  100% das notas em 7306.30 → 7306.30.90; HSS 200×150 → 7306.61.00; curva 1½" (notas 100%) → 7307.22.00. Conferidos.
+  ⏳ **Restam 9 no código inexistente**, sem evidência limpa: curva SCH40 201000065 (notas 50% 7307.93.00), tubos DIN2440
+  "laminado" 201000097/099 (não diz costura), tubos SCH40 201000102/103/117/118 (notas trazem 7208.51, de chapa) e os CS
+  502000003/009.
+- ⏳ **PERFIS SOLDADOS (VS/PS/CS) ESTÃO COM NCM SEM CONVENÇÃO — para o contador:** 9406.90.20 (construção
+  pré-fabricada) ×6, 8205.59.00 (ferramenta manual!) ×1, 7306.30.00 (inexistente) ×2, 7308.90.10 ×2. Na tabela existe
+  **7301.20.00 "Perfis"** (obtidos por soldadura), candidato natural; não mexi.
+- ⚠ Minha 1ª conferência do CEST disse "OK" com o CEST intacto: ela só procurava mudança A MAIS. **Conferência tem de
+  checar também que o valor pedido FICOU**, não só que nada além mudou.
+
+**Unidades (26/09 — Vitor: "9 ajuste todas as unidades que estiverem erradas").** O estoque do portal já batia com o
+Omie (0 de 2.509 divergentes; a correção de 24–25/09 parou de sobrescrever com "UN"). No Omie, pelo PREÇO das notas (não
+pela sigla): CO₂ UN → **KG** (81/82 notas em kg a ~R$ 5,59/kg; o saldo de 2.140 é kg), revelador de trincas e
+"equipamentos de informática" KG → **UN**, botina **PA → PAR** (no Omie `PA` = Pacote). ⚠ **O GLP PARECE errado e não
+está**: a nota diz "KG" e cobra R$ 230/unidade — é o botijão, o UN está certo. ⚠ Na tabela de unidades do Omie, `MT` =
+"Material" (não metro) e `MN` = Metro Linear. Ficaram para decidir: 4 itens TP da TMSA em "Kg/M", energia (PRD00001) em
+"WATTS" com notas em MWh (não há MWh na tabela) e 2 códigos da Quality Welding em "MT".
+
+**Peso (26/09 — Vitor: "coloque o peso dos produtos que forem possíveis").** Antes: 1 de 2.489 com peso. Agora: os 801
+em KG (1 kg) + **536 pesos teóricos pela NORMA**, conferidos contra tabela publicada (porca DIN934 M12 ≈ 17 g, DIN933
+M12×40 ≈ 46 g, barra roscada ½" ≈ 0,80 kg/m, A325 ¾"×2" ≈ 0,19 kg): A325/A490 (ASME B18.2.6), A307 (B18.2.1), porca
+A194 2H/A563 (B18.2.2), F436 (½" acima), DIN 933/931/934/125, barra roscada; GLP P13/P20 (conteúdo) e selante 400 g.
+Geometria: sextavado 0,866·F² × altura (porca × 0,95), rosca a 0,9·d, aço 7,85. Fora, sem chute: "A994" (não é norma
+de arruela), parabolt, prisioneiro, cabo, tinta (densidade), grade de piso (catálogo). Script `pesos.mjs` no scratchpad.
+- ⚠⚠ **83 PRODUTOS TINHAM PESO BRUTO COPIADO DE OUTRO** (108,91 / 109,52 / 36,51 / 32,14 repetidos em tubo, tinta,
+  telha, selante…) — o "Duplicar" copia o peso. Os fixadores da lista ganharam o calculado nos dois campos; os 26 em KG
+  ficaram com bruto 1. ⏳ ~57 fora de KG (tintas, telhas, curvas, telas) seguem com o bruto errado: zerar só pela tela.
 
 **Famílias (26/09/2026, noite — Vitor: "notei alguns produtos sem família definida, consegue ajustar isso também").**
 ✅ 134 dos 171 sem família gravados pela API e conferidos campo a campo: Matéria Prima 43, Fixadores 29, Tinta e

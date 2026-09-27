@@ -36,8 +36,8 @@ Tekla→Omie na importação da RM ([[torg_materiais_tekla]]).
   inativado com saldo (inclusive negativo) volta a aparecer na busca da RM. Por isso: zerar saldo antes.
   O `ativo:true` forçado é de propósito (comentário antigo: produtos "inativos no cadastro geral mas
   ativos no estoque") — não mexer sem entender.
-- ⚠ `EstoqueItem.unidade` cai em "UN" quando o Omie não manda a unidade — chapa em KG aparece "UN". Para
-  unidade, usar o cadastro (`ProdutoOmie.unidade`).
+- ✅ ~~`EstoqueItem.unidade` cai em "UN"~~ — resolvido em 24–25/09 (a posição parou de sobrescrever a unidade do
+  catálogo). Medido em 26/09: 0 de 2.509 divergentes do Omie.
 - Scripts da análise (scratchpad, não versionados): classificação por tipo+designação+material (norma
   genérica "aço carbono"/sem norma = mesma chave), chapa por espessura + classe de polegada (±2%).
 
@@ -59,7 +59,7 @@ cuidado para não inativar o que estamos usando hoje"*.
   pendentes/parciais — o portal só conhece os pedidos que ele criou; eram 96), saldo ≠ 0 EM TODOS OS
   LOCAIS (`ListarPosEstoque` com `lista_local_estoque:"TODOS"` — ⚠⚠ sem isso vem SÓ o Almoxarifado, e o
   aço entra na Fábrica; ver [[torg_omie_posicao_estoque]]), data de cadastro (`info.dInc`).
-- ⚠ **O cache `ProdutoOmie` é semanal e estava velho:** PRD00016, 2010000049 e 201000196 já tinham sido
+- ⚠ **O cache `ProdutoOmie` era semanal (DIÁRIO desde 26/09/2026, 05:00 UTC) e estava velho:** PRD00016, 2010000049 e 201000196 já tinham sido
   APAGADOS no Omie. Antes de agir, ler o cadastro ao vivo.
 - ⚠ 01.03.20668 (U 8") e 01.03.16796 (L 4"x5/16") foram CRIADOS em 18/09/2026 (usuário P000414907, o
   mesmo que criou o 101000050): código com cara de fornecedor, provavelmente criado na entrada de nota.
@@ -142,3 +142,17 @@ de contas não precisa inativar"*.
 - ✅ **Portal (26/09/2026, a pedido do Vitor — "essa obra já foi finalizada"):** os 2 itens da RM T102-001-R00 passaram
   para `codigo`/`codigoOmieEstoque` 501000014 e a descrição do PERFIL W, com `AuditLog` (`ATUALIZAR_CODIGO_OMIE`,
   entity `RMItem`, antes/depois). A cotação liga o item só pelo `rmItemId` — não havia código a trocar lá.
+- ⚠⚠ **(26/09/2026, noite) OS CÓDIGOS "01.xx.xxxxx" DE AÇO NÃO SÃO DUPLICADOS — SÃO MATERIAL DA QUALITY WELDING.** Vitor
+  aprovou "achar os duplicados de aço entre os 372 [códigos fora do padrão] e zerar e inativar". Medido antes de mexer:
+  dos 67 itens de aço entre os 372, **32 "01.xx" entraram TODOS por notas da QUALITY WELDING SERVICOS S.A. com CFOP
+  5.915→1.915 (remessa para conserto) e 5.949→1.949** (27/08 a 03/09/2026) — é material do cliente com o código do ERP
+  dele (descrição cortada em 30 caracteres). Inclui os dois "para decidir" de 24/09 (01.03.20668 U 8", 01.03.16796 L 4").
+  Os outros: 17 TP… "conforme desenho" (peça do cliente), 11 chapas UHMW e 1 borracha (T…/0021043), 7 perfis dobrados
+  sob medida da FERRO EQUIPAMENTO (1.101+1.901). **Nenhum zerado, nenhum inativado**: nenhum tem saldo, e o retorno à
+  QW pode precisar desses códigos. Lição: **olhar o CFOP de ENTRADA antes de chamar de duplicado** — 1.9xx é material de
+  terceiro, não compra. ⚠ Eu mesmo tinha dado "01.42.00187 repete o 501000063" como exemplo de duplicado; estava errado.
+- **Inativo com saldo (26/09, "7 produtos inativos pode zerar o estoque"): 0.** `ListarPosEstoque` "TODOS" × cadastro
+  (18 inativos em 2.502). O portal ainda mostrava 4 deles com saldo e ativos (101000037/038/050, 501000064): a última
+  sincronização foi às 17h e o zeramento depois — acerta sozinho no cron das 03h (o catálogo traz `inativo`). ⚠ 7 linhas
+  de `EstoqueItem` são de produtos APAGADOS no Omie (PRD00013/14/16, 2010000049, 201000196, 9260, 181000000): saldo 0,
+  mas seguem `ativo:true` — o catálogo só faz upsert, nunca desativa quem sumiu.
