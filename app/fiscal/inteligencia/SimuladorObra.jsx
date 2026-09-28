@@ -7,7 +7,7 @@
 // lado da regra do portal. Ver lib/fiscal/impostos-da-obra.js.
 //
 // ⚠ A tela não corrige cadastro nenhum: onde os dois divergem, a linha fica âmbar com os dois números.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Building2, Loader2, AlertTriangle } from "lucide-react";
 
 const campo = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-torg-dark outline-none transition focus:border-torg-blue focus:ring-2 focus:ring-torg-blue/20";
@@ -24,9 +24,13 @@ export default function SimuladorObra({ ops }) {
   const [r, setR] = useState(null);
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(false);
+  // ⚠ Versão da seleção (Codex, 28/09/2026): trocar a obra ou a linha durante o POST invalida a
+  // resposta pendente — senão o resultado da obra A aparecia debaixo da obra B.
+  const versao = useRef(0);
+  const invalidar = () => { versao.current++; setCarregando(false); };
 
   useEffect(() => {
-    setReceitas(null); setReceitaId(""); setR(null); setErro(null);
+    invalidar(); setReceitas(null); setReceitaId(""); setR(null); setErro(null);
     if (!opId) return;
     let vivo = true;
     fetch(`/api/fiscal/inteligencia/simular-obra?opId=${encodeURIComponent(opId)}`).then((x) => x.json())
@@ -36,7 +40,7 @@ export default function SimuladorObra({ ops }) {
   }, [opId]);
 
   const escolherReceita = (rec) => {
-    setReceitaId(rec.id); setR(null); setErro(null);
+    invalidar(); setReceitaId(rec.id); setR(null); setErro(null);
     setF({ ncm: rec.ncm ?? "", cfop: rec.cfop ?? "", valor: rec.valor ? String(rec.valor).replace(".", ",") : "" });
   };
 
@@ -44,6 +48,8 @@ export default function SimuladorObra({ ops }) {
     if (f.cfop.replace(/\D/g, "").length !== 4) { setErro("Escolha o CFOP — a linha da obra não tem."); return; }
     if (f.ncm.replace(/\D/g, "").length !== 8) { setErro("Informe o NCM com 8 dígitos."); return; }
     if (!(numero(f.valor) > 0)) { setErro("Informe o valor."); return; }
+    const minha = ++versao.current;
+    const atual = () => minha === versao.current;
     setCarregando(true); setErro(null);
     try {
       const resp = await fetch("/api/fiscal/inteligencia/simular-obra", {
@@ -51,8 +57,9 @@ export default function SimuladorObra({ ops }) {
         body: JSON.stringify({ opId, receitaId: receitaId || null, ncm: f.ncm, cfop: f.cfop, valor: numero(f.valor) }),
       });
       const d = await resp.json().catch(() => null);
+      if (!atual()) return;
       if (!d?.success) { setErro(d?.error ?? `Falha ao simular (HTTP ${resp.status}).`); setR(null); } else setR(d);
-    } catch { setErro("Falha de rede."); } finally { setCarregando(false); }
+    } catch { if (atual()) setErro("Falha de rede."); } finally { if (atual()) setCarregando(false); }
   };
 
   return (

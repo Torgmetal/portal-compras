@@ -52,3 +52,48 @@ describe("Simulador pela obra", () => {
     expect(await screen.findByText(/Sem imposto cadastrado pelo Comercial/)).toBeTruthy();
   });
 });
+
+// Achado do Codex (28/09/2026): a resposta de uma simulação da obra A reaparecia depois de trocar
+// para a obra B — os seletores continuam livres durante o POST.
+describe("⚠ resposta atrasada de uma seleção antiga não aparece", () => {
+  const OPS = [{ id: "opA", numero: "105", cliente: "TMSA", clienteUF: "RS" }, { id: "opB", numero: "085", cliente: "DANPOWER", clienteUF: "SP" }];
+  let soltar;
+  beforeEach(() => {
+    global.fetch = vi.fn((url, opt) => {
+      if (!opt) return Promise.resolve({ json: async () => ({ success: true, receitas: [{ ...REC, cfop: "6101" }, { ...REC, id: "r2", descricao: "COBERTURA", cfop: "6101" }] }) });
+      return new Promise((r) => { soltar = () => r({ status: 200, json: async () => ({ success: true, obra: { numero: "105" }, total: 50,
+        linhas: [{ tributo: "IPI", cadastrado: 0, regra: 5, valor: 50, divergente: true, nota: null }] }) }); });
+    });
+  });
+
+  const simularNaObraA = async () => {
+    render(<SimuladorObra ops={OPS} />);
+    fireEvent.change(screen.getByLabelText("Obra"), { target: { value: "opA" } });
+    fireEvent.click((await screen.findAllByRole("radio"))[0]);
+    fireEvent.click(screen.getByRole("button", { name: /Simular/ }));
+  };
+
+  it("trocar a obra no meio descarta a resposta da anterior", async () => {
+    await simularNaObraA();
+    fireEvent.change(screen.getByLabelText("Obra"), { target: { value: "opB" } });
+    await screen.findAllByRole("radio");
+    soltar();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText("IPI")).toBeNull();
+    expect(screen.getByRole("button", { name: /Simular/ }).disabled).toBe(false);
+  });
+
+  it("trocar a linha de receita no meio também descarta", async () => {
+    await simularNaObraA();
+    fireEvent.click(screen.getAllByRole("radio")[1]);
+    soltar();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText("IPI")).toBeNull();
+  });
+
+  it("sem troca, a resposta aparece", async () => {
+    await simularNaObraA();
+    soltar();
+    expect(await screen.findByText("IPI")).toBeTruthy();
+  });
+});

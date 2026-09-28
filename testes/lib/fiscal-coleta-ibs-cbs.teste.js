@@ -113,3 +113,28 @@ describe("⚠ repetir a reconstrução não muda a contagem", () => {
     expect(await import("@/lib/fiscal/coleta-ibs-cbs")).not.toHaveProperty("gravarRegras");
   });
 });
+
+// Achado do Codex (28/09/2026, rodada 2): `total_de_paginas || 1` fazia uma resposta sem paginação
+// valer como "só uma página" — a coleta parava cedo e a reconstrução gravava metade do ano.
+describe("⚠ paginação ausente ou inválida é FALHA, nunca 'uma página só'", () => {
+  it.each([
+    ["sem total_de_paginas", { nfCadastro: [nf("1")] }],
+    ["total zero", { total_de_paginas: 0, nfCadastro: [nf("1")] }],
+    ["total texto", { total_de_paginas: "3", nfCadastro: [nf("1")] }],
+    ["total fracionário", { total_de_paginas: 1.5, nfCadastro: [nf("1")] }],
+  ])("%s derruba a coleta", async (_, resp) => {
+    await expect(coletarRegrasIbsCbs({ de: "01/09/2026", ate: "25/09/2026", listar: async () => resp }))
+      .rejects.toThrow(/pagina/i);
+  });
+
+  it("o total que muda no meio da coleta também derruba", async () => {
+    const listar = async (p) => (p.pagina === 1 ? pag(3, [nf("1")]) : pag(2, [nf("2")]));
+    await expect(coletarRegrasIbsCbs({ de: "01/09/2026", ate: "25/09/2026", listar })).rejects.toThrow(/pagina/i);
+  });
+
+  it("e a reconstrução não abre a transação", async () => {
+    const db = { $executeRawUnsafe: vi.fn(), $transaction: vi.fn() };
+    await expect(reconstruirRegras({ hoje: new Date(2026, 1, 10), db, listar: async () => ({ nfCadastro: [nf("1")] }) })).rejects.toThrow();
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+});

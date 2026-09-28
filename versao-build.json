@@ -1,7 +1,12 @@
 {
-  "build": 3543,
-  "gerado": "2026-09-30T14:40:02.609Z",
+  "build": 3544,
+  "gerado": "2026-09-30T14:40:08.432Z",
   "commits": [
+    {
+      "hash": "1f5aae6c9e",
+      "data": "30/09/2026",
+      "titulo": "Fiscal: regras de IBS/CBS não contam nota duas vezes nem apagam tudo com resposta ruim do Omie"
+    },
     {
       "hash": "dc036abea7",
       "data": "30/09/2026",
@@ -146,11 +151,6 @@
       "hash": "344ed047df",
       "data": "26/09/2026",
       "titulo": "IA: respostas no formato estruturado da API em vez de \"responda SOMENTE com JSON\""
-    },
-    {
-      "hash": "18e2078d86",
-      "data": "26/09/2026",
-      "titulo": "Estudo: parafusos e acessórios voltam a chamar um modelo que existe"
     }
   ]
 }
