@@ -1,7 +1,12 @@
 {
-  "build": 3530,
-  "gerado": "2026-09-27T00:54:58.421Z",
+  "build": 3531,
+  "gerado": "2026-09-28T12:56:09.106Z",
   "commits": [
+    {
+      "hash": "fd58db57",
+      "data": "26/09/2026",
+      "titulo": "docs: Quality Welding inativada, zerar peso pela API (0,0001) e o grupo de telhas"
+    },
     {
       "hash": "1bb16661",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ad69d555",
       "data": "26/09/2026",
       "titulo": "Merge remote-tracking branch 'origin/main' into claude/silly-golick-65af65"
-    },
-    {
-      "hash": "c6917010",
-      "data": "26/09/2026",
-      "titulo": "Estoque: movimentações do Omie pelo método que existe, e a falha da sincronização aparece"
     }
   ]
 }

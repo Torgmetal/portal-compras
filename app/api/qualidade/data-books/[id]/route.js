@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { calcStatusValidade, diasAlertaCategoria, usaMesInteiro } from "@/lib/qualidade-status";
-import { secaoUsaModulo1 , secaoCertaDoDoc, foraDoLivro } from "@/lib/databook-secoes";
+import { secaoUsaModulo1 , secaoCertaDoDoc, foraDoLivro, numeroExibido } from "@/lib/databook-secoes";
 import { fichasPorR, comFicha } from "@/lib/databook-ficha-r";
 import { resolverPitDataBook } from "@/lib/databook-pit";
 
@@ -153,11 +153,11 @@ export async function PATCH(req, { params }) {
       // descobrir qual instrumento estava fora da validade. Agora vem nomeado, com a data.
       const partes = [];
       const pend = det.secoes.filter((x) => x.estado !== "NA" && x.estado !== "ANEXADO");
-      if (pend.length) partes.push(`${pend.length} seção(ões) pendente(s): ${pend.map((x) => x.numero).join(", ")}`);
+      if (pend.length) partes.push(`${pend.length} seção(ões) pendente(s): ${pend.map((x) => numeroExibido(x.numero, det)).join(", ")}`);
 
       const vencidos = det.secoes
         .filter((x) => x.bloqueada)
-        .flatMap((x) => x.documentos.filter((d) => d.status === "VENCIDO").map((d) => `Seção ${x.numero} · ${d.nome}${d.dataValidade ? ` (venceu ${new Date(d.dataValidade).toLocaleDateString("pt-BR")})` : ""}`));
+        .flatMap((x) => x.documentos.filter((d) => d.status === "VENCIDO").map((d) => `Seção ${numeroExibido(x.numero, det)} · ${d.nome}${d.dataValidade ? ` (venceu ${new Date(d.dataValidade).toLocaleDateString("pt-BR")})` : ""}`));
       if (vencidos.length) partes.push(`documento(s) vencido(s):\n  · ${vencidos.slice(0, 12).join("\n  · ")}${vencidos.length > 12 ? `\n  · … e mais ${vencidos.length - 12}` : ""}`);
 
       return NextResponse.json(

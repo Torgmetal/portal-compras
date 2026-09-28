@@ -116,7 +116,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Inspetor vê produto final por FASE](torg_inspetor_produto_final_fase.md) — /api/campo/pecas: sem croqui (só `croquis=1` no dimensional avulsas) nem acessório (AC c/ hífen, comprado); `fase`/`fases` da frente da LPC ou letra da marca; chips FiltroFase nas 2 telas
 - [Portal da Qualidade](torg_qualidade.md) — setor (PQ-00/NBR 16775) na main; F1 Controle de Documentos, F2 CMR+casamento PDFs, F3/F5 Data Book (pdf-lib); falta F4 foto PWA
 - [Cotas A/B/C no dimensional](torg_cotas_abc.md) — cota simples com letra+espec+tolerância; a cota desenhada APONTA onde medir, não mede (some o problema de escala)
-- [Data Book — revisão e certificados](torg_databook_revisao.md) — emitido só muda por REVISÃO (zera assinaturas); validade congela na emissão; certificado puxa a ficha do CMR pelo R
+- [Data Book — revisão e certificados](torg_databook_revisao.md) — emitido só muda por REVISÃO (zera assinaturas); validade congela na emissão; certificado puxa a ficha do CMR pelo R; índice EXIBIDO de 1 a 19 (`numeroExibido`), número interno segue 19/20
 - [Anexo da Qualidade: itemId morre](torg_anexo_qualidade_itemid.md) — mover/renomear no SharePoint mata o `sharepointItemId`; a escada (drive provável → o outro → CAMINHO) vive em `lib/databook-arquivo.js` e TODO download passa por ela
 - [Planos de Ação 5W2H](torg_qualidade_plano_acao.md) — 3ª ABA de Auditorias Internas; 5W2H + status por ação (atrasado derivado do prazo); PDF paisagem; PlanoAcao (PA-001)
 - [RNC — Não Conformidades](torg_rnc.md) — /qualidade/rnc; NaoConformidade cobre FORM 20 + RTNC; 5 porquês; liga ao 5W2H; falta 2b (anexo+IA→plano→PDF) e 2c (indicadores); aceita e-mail (.eml/.msg) como anexo, tipo pela extensão

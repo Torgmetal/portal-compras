@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X, FileText, CheckCircle2, Lock, BookCheck, FileDown, Upload, Send, Users, FolderOpen, RotateCcw, History, Download, Eye, ListChecks } from "lucide-react";
 import NavegadorServidor from "./NavegadorServidor";
 import Volumes from "./Volumes";
-import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, gruposDaSecao, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO } from "@/lib/databook-secoes";
+import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, gruposDaSecao, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO, numeroExibido } from "@/lib/databook-secoes";
 import { secaoNavega } from "@/lib/databook-pastas-web";
 import { STATUS_COR } from "@/lib/qualidade-status";
 import { TIPO_DATABOOK_LABEL } from "@/lib/op-opcoes";
@@ -556,7 +556,7 @@ export default function DataBookDetalheClient({ id, userId }) {
           <SecaoCard key={s.id} secao={s} acaoLoading={acao === s.id}
             onEstado={(e) => setEstado(s, e)} onDesvincular={(docId) => desvincular(s, docId)}
             onPopularMaterial={() => popularMaterial(s)} onPopularEmpresa={() => popularEmpresa(s)} onEscolherEmpresa={(ids) => escolherEmpresa(s, ids)} onPopularProcedimentos={() => popularProcedimentos(s)}
-            onPuxarRelatorios={() => puxarRelatorios(s)} onSavePit={(itens) => savePit(s, itens)} onGerarLpc={() => gerarLpc(s)} onPuxarProjetos={() => puxarProjetos(s)} onReload={carregar} fechado={fechado} />
+            onPuxarRelatorios={() => puxarRelatorios(s)} onSavePit={(itens) => savePit(s, itens)} onGerarLpc={() => gerarLpc(s)} onPuxarProjetos={() => puxarProjetos(s)} onReload={carregar} fechado={fechado} rotulo={(n) => numeroExibido(n, data)} />
         ))}
       </div>
     </div>
@@ -683,7 +683,8 @@ function Campo({ label, v, onChange, type = "text" }) {
   );
 }
 
-function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMaterial, onPopularEmpresa, onEscolherEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onGerarLpc, onPuxarProjetos, onReload, fechado }) {
+// `rotulo` = o número que o leitor vê (1 a 19 — ver numeroExibido); as regras usam `secao.numero`.
+function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMaterial, onPopularEmpresa, onEscolherEmpresa, onPopularProcedimentos, onPuxarRelatorios, onSavePit, onGerarLpc, onPuxarProjetos, onReload, fechado, rotulo = (n) => n }) {
   const [navegador, setNavegador] = useState(false);
   const [escolher, setEscolher] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -735,7 +736,7 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "Erro");
       if (j.semSecao?.length) {
-        alert(`${j.total} movido(s).\n\nNão movi ${j.semSecao.map((x) => `${x.quantos} para a seção ${x.numero}`).join(", ")}: essa seção não existe neste data book (ficaria sem lugar nenhum).`);
+        alert(`${j.total} movido(s).\n\nNão movi ${j.semSecao.map((x) => `${x.quantos} para a seção ${rotulo(x.numero)}`).join(", ")}: essa seção não existe neste data book (ficaria sem lugar nenhum).`);
       }
       onReload?.();
     } catch (e) { alert(e.message); }
@@ -776,7 +777,7 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-torg-dark">
-            <span className="text-torg-gray font-mono">{secao.numero}</span> · {secao.titulo}
+            <span className="text-torg-gray font-mono">{rotulo(secao.numero)}</span> · {secao.titulo}
           </p>
           <p className="text-[11px] text-torg-gray mt-0.5">
             {secao.norma} · <span className="italic">{FONTE_LABEL[secao.fonte] || secao.fonte}</span>
@@ -814,8 +815,8 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
                     )}
                     {d.secaoCerta && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-medium shrink-0 whitespace-nowrap"
-                        title={`Este certificado é de outro grupo — o lugar dele é a seção ${d.secaoCerta}`}>
-                        é da §{d.secaoCerta}
+                        title={`Este certificado é de outro grupo — o lugar dele é a seção ${rotulo(d.secaoCerta)}`}>
+                        é da §{rotulo(d.secaoCerta)}
                       </span>
                     )}
                   </div>
@@ -967,13 +968,13 @@ function SecaoCard({ secao, acaoLoading, onEstado, onDesvincular, onPopularMater
               </>}
             </div>
           {escolher && (
-            <EscolherDocsEmpresa secao={secao} onClose={() => setEscolher(false)}
+            <EscolherDocsEmpresa secao={secao} rotulo={rotulo} onClose={() => setEscolher(false)}
               onConfirmar={(ids) => { setEscolher(false); onEscolherEmpresa?.(ids); }} />
           )}
           {navegador && (
             <NavegadorServidor
               secaoId={secao.id}
-              titulo={`Seção ${secao.numero} · ${secao.titulo}`}
+              titulo={`Seção ${rotulo(secao.numero)} · ${secao.titulo}`}
               onFechar={() => setNavegador(false)}
               onAnexado={(j) => {
                 onReload?.();
@@ -1128,7 +1129,7 @@ function PitEditor({ secao, acaoLoading, onSave }) {
  * sendo o automático, e a escolha existe para a obra antiga (relatório em papel) e para o
  * instrumento que o relatório não registrou. Quem escolheu fica no AuditLog.
  */
-function EscolherDocsEmpresa({ secao, onClose, onConfirmar }) {
+function EscolherDocsEmpresa({ secao, onClose, onConfirmar, rotulo = (n) => n }) {
   const [docs, setDocs] = useState(null);
   const [sel, setSel] = useState(() => new Set());
   const [erro, setErro] = useState("");
@@ -1154,7 +1155,7 @@ function EscolherDocsEmpresa({ secao, onClose, onConfirmar }) {
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <div>
             <p className="text-sm font-bold text-torg-dark">
-              {secao.numero === "19" ? "Escolher instrumentos" : "Escolher documentos"} · §{secao.numero}
+              {secao.numero === "19" ? "Escolher instrumentos" : "Escolher documentos"} · §{rotulo(secao.numero)}
             </p>
             <p className="text-[11px] text-torg-gray mt-0.5">
               {secao.numero === "19"

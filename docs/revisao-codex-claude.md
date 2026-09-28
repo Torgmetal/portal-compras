@@ -2351,3 +2351,16 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** (a) a compute do Neon já acorda de hora em hora pelo `pasta-engenharia` (`10 * * * *`), então
   02:00 não é um despertar a mais; (b) os 10 produtos criados desde segunda (entre eles as 9 chapas CIVIL 300 de
   26/09) só entram no cache na próxima madrugada — o botão "Atualizar produtos" faz na hora.
+- **(28/09) Data Book: o índice passa a ir de 1 a 19 (a §18 saiu em 16/06 e ficou o buraco 17 → 19 → 20).** Vitor:
+  *"só deixa certo do 1 ao 19"*. Só o número EXIBIDO muda (`numeroExibido`, `lib/databook-secoes.js`): 19 → 18
+  (calibração) e 20 → 19 (termo). O `DataBookSecao.numero` e toda regra de seção seguem em "19"/"20" — 519
+  certificados de calibração vinculados, pastas do servidor, volumes, filtro de docs da empresa. Data book FECHADO
+  antes de 28/09 (070, 102, 106, 114) mantém a numeração com que foi assinado/entregue (o PDF é regenerado a cada
+  clique) e passa para a nova ao abrir revisão. Aplicado na tela (lista, "é da §", mover, navegador, escolher), nas
+  mensagens de emissão, nos volumes e na tabela de pendências do PDF; `ESTADOS_FECHADOS` virou fonte única
+  (`ESTADOS_FECHADOS_DATABOOK`). Teste novo `testes/lib/databook-numeracao.teste.js` (9). Suíte 4.352/4.352,
+  `checar` limpo. Conferido contra o banco (só leitura): volume da calibração da OP-083 sai "Seção 18"; da OP-070
+  (aceita) segue "Seção 19". Tela não validada logada (servidor local fala com produção; sem credencial de teste).
+  ⚠ **Para revisar:** (a) a data de corte é fixa em 28/09/2026 00:00 BRT; (b) livro fechado sem `emitidoEm` (caso
+  OP-114) conta como anterior ao corte; (c) títulos de volume já gravados em `DataBookArquivo` antes do deploy
+  mantêm o texto antigo até serem regerados.

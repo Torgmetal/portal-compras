@@ -60,3 +60,19 @@ manda `ignorarConferencia: true`; a API registra `conferenciaPendente` no
 decisão de quem monta, nunca silencioso. Caso OP-106: cliente pediu o relatório de pintura na R00,
 ajuste feito na R01 e a assinatura ficou presa esperando um segundo ok.
 
+**Índice de 1 a 19 (28/09/2026).** Vitor viu que o data book não tinha o item 18. Era **"RNCs e concessões
+aprovadas"** (NBR 16775), removido em 16/06/2026 (b6f2d6dc); o índice ficou 17 → 19 → 20. Vitor: *"só deixa certo
+do 1 ao 19"*.
+- ⚠⚠ **MUDA SÓ O NÚMERO EXIBIDO** (`numeroExibido` em `lib/databook-secoes.js`): 19 (calibração) aparece como 18 e
+  20 (termo de aceite) como 19. O número INTERNO (`DataBookSecao.numero`) segue "19"/"20" — é por ele que andam os
+  **519 certificados de calibração vinculados**, as pastas do servidor (`databook-pastas`), os volumes, o filtro de
+  documentos da empresa e o `secao.numero === "19"` do "Escolher instrumentos". **Regra de seção: use `numero`;
+  texto para o leitor: use `numeroExibido`.**
+- ⚠⚠ **DATA BOOK FECHADO ANTES DE 28/09/2026 SEGUE COMO FOI ENTREGUE** (070, 106, 114 aceitos; 102 em assinatura): o
+  PDF é gerado de novo a cada clique — inclusive o link do cliente —, então renumerar um emitido faria o arquivo
+  de hoje diferir do assinado. Passa para a numeração nova quando abrir revisão (a revisão zera `emitidoEm`).
+  Emitido depois do corte já nasce com a nova e não volta. A lista de estados fechados agora é uma só
+  (`ESTADOS_FECHADOS_DATABOOK`, reexportada como `ESTADOS_FECHADOS` pela revisão).
+- O PDF do modelo novo (TORG_2026) numera pela taxonomia do dossiê (I-1, II-1…) e o cabeçalho de seção NÃO imprime o
+  número — onde o número aparece é na TELA, nos VOLUMES ("Seção 18 · …") e nas mensagens de emissão/pendências.
+
