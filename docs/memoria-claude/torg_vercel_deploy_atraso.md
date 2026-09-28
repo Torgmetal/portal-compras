@@ -19,3 +19,11 @@ metadata:
 - `curl https://www.vercel-status.com/api/v2/status.json` pra descartar incidente global.
 
 Lição: com "não achei o botão", antes de concluir bloqueio de infra, **conferir a hora do último deploy vs a hora do commit** e dar tempo ao webhook. Ver [[torg_vercel_neon_deploy]] (esse sim é bloqueio real: branch limit do Neon em preview).
+
+**Conferir se o deploy subiu SEM login na Vercel (28/09/2026).** O CLI do Mac perde a credencial (depois de reiniciar
+pediu login de novo) e o conector MCP da Vercel dá 403 no time `torg`. O GitHub guarda o resultado que a Vercel publica
+em cada commit, e dá para ler sem autenticação:
+`curl -s https://api.github.com/repos/Torgmetal/portal-compras/commits/<sha>/status` → `Vercel · Deployment has
+completed` (success) ou erro/pendente. Commit só de docs aparece como cancelado pelo `ignoreCommand`.
+⚠ Não abrir `vercel login` à toa: o fluxo por código expira em minutos e precisa do Vitor confirmando no navegador.
+

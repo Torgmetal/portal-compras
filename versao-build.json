@@ -1,7 +1,12 @@
 {
-  "build": 3531,
-  "gerado": "2026-09-28T12:56:09.106Z",
+  "build": 3532,
+  "gerado": "2026-09-28T13:23:13.775Z",
   "commits": [
+    {
+      "hash": "2d3d1310",
+      "data": "28/09/2026",
+      "titulo": "Data Book: índice de 1 a 19 (a §18 saiu em junho e ficou o buraco)"
+    },
     {
       "hash": "fd58db57",
       "data": "26/09/2026",
@@ -146,11 +151,6 @@
       "hash": "6a4f37aa",
       "data": "26/09/2026",
       "titulo": "Memória: a cópia duplicada da LQC 295 era a da pasta da obra, não a outra"
-    },
-    {
-      "hash": "ad69d555",
-      "data": "26/09/2026",
-      "titulo": "Merge remote-tracking branch 'origin/main' into claude/silly-golick-65af65"
     }
   ]
 }
