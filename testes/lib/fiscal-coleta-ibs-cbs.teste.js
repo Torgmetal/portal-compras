@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { coletarRegrasIbsCbs, regraIbsCbs } from "@/lib/fiscal/coleta-ibs-cbs";
 
 const pag = (total, nfs) => ({ total_de_paginas: total, nfCadastro: nfs });
@@ -55,5 +55,61 @@ describe("reconstruirRegras", () => {
     const db = { $executeRawUnsafe: vi.fn(), $transaction: vi.fn() };
     await expect(reconstruirRegras({ hoje: new Date(2026, 1, 10), db, listar })).rejects.toThrow(/Erro interno/);
     expect(db.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+// ⚠ Achado do Codex (28/09/2026): falha HTTP e JSON quebrado viravam `{}`, e `{}` passava por
+// "coleta vazia" — a reconstrução apagava a tabela e gravava o nada.
+describe("resposta que não é uma lista de notas é FALHA, nunca zero", () => {
+  it.each([
+    ["objeto vazio", {}],
+    ["sem nfCadastro", { total_de_paginas: 1 }],
+    ["nfCadastro que não é lista", { total_de_paginas: 1, nfCadastro: "x" }],
+  ])("%s derruba a coleta", async (_, resp) => {
+    await expect(coletarRegrasIbsCbs({ de: "01/09/2026", ate: "25/09/2026", listar: async () => resp }))
+      .rejects.toThrow(/inesperada/);
+  });
+
+  it("⚠ e a reconstrução não apaga nada", async () => {
+    const db = { $executeRawUnsafe: vi.fn(), $transaction: vi.fn() };
+    await expect(reconstruirRegras({ hoje: new Date(2026, 1, 10), db, listar: async () => ({}) })).rejects.toThrow();
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  describe("o cliente do Omie (fetch de verdade, mockado)", () => {
+    const antes = { ...process.env };
+    beforeEach(() => { process.env.OMIE_APP_KEY = "k"; process.env.OMIE_APP_SECRET = "s"; });
+    afterEach(() => { process.env = { ...antes }; vi.unstubAllGlobals(); });
+
+    it("HTTP 502 com HTML é erro, com o status na mensagem", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>Bad gateway</html>", { status: 502 })));
+      await expect(coletarRegrasIbsCbs({ de: "01/09/2026", ate: "25/09/2026" })).rejects.toThrow(/502/);
+    });
+
+    it("HTTP 200 com corpo que não é JSON é erro", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>manutenção</html>", { status: 200 })));
+      await expect(coletarRegrasIbsCbs({ de: "01/09/2026", ate: "25/09/2026" })).rejects.toThrow(/JSON/);
+    });
+
+    it("⚠ o 'não existem registros' do Omie vem com HTTP 500 — continua sendo zero", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ faultstring: "ERROR: Não existem registros para a página [1]!" }), { status: 500 })));
+      expect(await coletarRegrasIbsCbs({ de: "01/01/2026", ate: "02/01/2026" })).toEqual({ notas: 0, regras: [] });
+    });
+  });
+});
+
+describe("⚠ repetir a reconstrução não muda a contagem", () => {
+  it("duas rodadas seguidas: cada uma apaga antes e grava a mesma soma", async () => {
+    const listar = vi.fn(async (p) => (p.dEmiInicial.startsWith("01/01") ? pag(1, [nf("1")]) : pag(1, [nf("2"), nf("3")])));
+    const db = { $executeRawUnsafe: vi.fn(async () => 1), $transaction: vi.fn(async (ops) => Promise.all(ops)) };
+    await reconstruirRegras({ hoje: new Date(2026, 1, 10), db, listar });
+    await reconstruirRegras({ hoje: new Date(2026, 1, 10), db, listar });
+    const chamadas = db.$executeRawUnsafe.mock.calls;
+    expect(chamadas.map((c) => /DELETE/.test(c[0]))).toEqual([true, false, true, false]);
+    expect([chamadas[1][5], chamadas[3][5]]).toEqual(['{"3"}', '{"3"}']);
+  });
+
+  it("a gravação que somava não existe mais", async () => {
+    expect(await import("@/lib/fiscal/coleta-ibs-cbs")).not.toHaveProperty("gravarRegras");
   });
 });

@@ -8,8 +8,11 @@ Consulta NCM/CFOP, Assistente) + Administração só ADMIN. Spec e plano em `doc
 - **IBS/CBS vem do `ListarNF`**: por item `pAliqCbs`, `pAliqIBSUf`, `vBCIbsCbs` + NCM/CFOP pontuados.
   ⚠ NÃO traz UF do destinatário, CST/cClassTrib nem alíquota municipal → chave NCM×CFOP. ⚠ Em 2027 o
   IBS varia pelo destino: vai precisar da UF (cliente por `nCodCli`).
-- `FiscalRegraIbsCbs` (lib/fiscal/coleta-ibs-cbs.js): a gravação SOMA notas — cron só "ontem"; o botão
-  reconstrói o ano com DELETE na transação. Carga inicial: 484 NF de 2026 → 84 regras, 0 divergência.
+- `FiscalRegraIbsCbs` (lib/fiscal/coleta-ibs-cbs.js): SÓ RECONSTRUÇÃO — cron e botão "Atualizar regras
+  das NFs" (Simulador, ADMIN ou módulo FISCAL) coletam o ano e trocam a tabela numa transação. ⚠ Houve
+  uma gravação que SOMAVA "ontem": contava de novo o que a reconstrução já tinha contado (Codex,
+  28/09/2026). ⚠ HTTP/JSON inválido do Omie é ERRO, nunca coleta vazia — senão o DELETE apaga tudo.
+  Carga inicial: 484 NF de 2026 → 84 regras, 0 divergência.
 - ⚠ `ipiDaTipi` devolve `{valor,tipo}` (NT sem valor), não `{aliquota}` — use `ipiDaRegra`.
 - ⚠ Quantidade decimal em campo pt-BR: preencher com vírgula; `numero()` tira o ponto de milhar.
 - Achado de dado: OP-085 tem PIS 7,6 % e COFINS 1,65 % cadastrados (parecem invertidos).

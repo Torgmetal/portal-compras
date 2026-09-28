@@ -9,6 +9,7 @@ import AbaRegras from "./AbaRegras";
 import AssistenteFiscal from "@/components/fiscal/assistente/AssistenteFiscal";
 import CitacaoLegal from "./CitacaoLegal";
 import SimuladorObra from "./SimuladorObra";
+import AtualizarRegrasNf from "./AtualizarRegrasNf";
 import ParcelaMedicao from "./ParcelaMedicao";
 
 // ─── INTELIGÊNCIA FISCAL ─────────────────────────────────────────────────────
@@ -794,7 +795,7 @@ function CartaoClassificacao({ c }) {
   );
 }
 
-function AbaSimulador() {
+function AbaSimulador({ podeAtualizarRegras }) {
   const [opcoes, setOpcoes] = useState({ ops: [], cfops: [], pares: [], familias: [], cstIpi: [] });
   const [f, setF] = useState({ ncm: "", cfop: "", opId: "", ufDestino: "", valor: "", cstPretendido: "", descricaoProduto: "", codigoProduto: "" });
   const parEscolhido = opcoes.pares.find((c) => c.chave === f.cfop) ?? null;
@@ -836,6 +837,7 @@ function AbaSimulador() {
       {/* ⚠ O caminho do dia a dia vem primeiro (Matheus, 26/09/2026): escolher a obra traz o imposto
           que o Comercial cadastrou. O formulário abaixo continua para simular sem obra. */}
       <SimuladorObra ops={opcoes.ops} />
+      {podeAtualizarRegras && <AtualizarRegrasNf />}
       <h3 className="pt-2 text-xs font-semibold uppercase tracking-wide text-torg-gray">Simulação sem obra</h3>
       <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <div className="grid gap-3 md:grid-cols-3">
@@ -1417,7 +1419,7 @@ function AbaAdministracao({ referencia, showToast }) {
   );
 }
 
-export default function InteligenciaFiscalClient({ referencia, cfops, operacoes, cstIpi, familias, ehAdmin }) {
+export default function InteligenciaFiscalClient({ referencia, cfops, operacoes, cstIpi, familias, ehAdmin, podeAtualizarRegras }) {
   const [aba, setAba] = useState("simulador");
   const { showToast } = useStore();
   const abas = ehAdmin ? [...ABAS, { id: "administracao", rotulo: "Administração" }] : ABAS;
@@ -1437,7 +1439,7 @@ export default function InteligenciaFiscalClient({ referencia, cfops, operacoes,
         ))}
       </div>
 
-      {aba === "simulador" && <AbaSimulador />}
+      {aba === "simulador" && <AbaSimulador podeAtualizarRegras={podeAtualizarRegras} />}
       {aba === "auditoria" && <AbaAuditoria />}
       {aba === "consulta" && <AbaConsulta referencia={referencia} cfops={cfops} operacoes={operacoes} cstIpi={cstIpi} familias={familias} />}
       {aba === "assistente" && <AssistenteFiscal showToast={showToast} />}

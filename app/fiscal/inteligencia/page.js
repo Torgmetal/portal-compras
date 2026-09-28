@@ -22,6 +22,8 @@ export default async function InteligenciaFiscalPage() {
       familias={Object.values(FAMILIA)}
       // ⚠ O botão só aparece habilitado para ADMIN — e o SERVIDOR recusa de qualquer jeito.
       ehAdmin={user.tipo === "ADMIN"}
+      // ⚠ Mesma regra do POST de regras-ibs-cbs (requireRole ADMIN/FISCAL) — o servidor decide de novo.
+      podeAtualizarRegras={user.tipo === "ADMIN" || (user.modulos ?? []).includes("FISCAL")}
     />
   );
 }

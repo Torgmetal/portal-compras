@@ -1,25 +1,19 @@
-// Cron Vercel — aprende as regras de IBS/CBS das NF-e de saída de ONTEM (lib/fiscal/coleta-ibs-cbs).
-// ⚠ Só ontem: a gravação SOMA as notas, então a janela nunca pode se sobrepor à do dia anterior.
-// A reconstrução completa do ano é o botão (POST /api/fiscal/inteligencia/regras-ibs-cbs).
+// Cron Vercel — reaprende as regras de IBS/CBS das NF-e de saída do ano (lib/fiscal/coleta-ibs-cbs).
+// ⚠ RECONSTRÓI, não soma: é o mesmo que o botão "Atualizar regras das NFs" faz. Somar a janela de
+// ontem contava de novo as notas que a última reconstrução já tinha contado (achado do Codex, 28/09/2026).
 import { NextResponse } from "next/server";
 import { prisma, prismaDirect } from "@/lib/prisma";
 import { aquecerBanco } from "@/lib/db-retry";
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { temCronSecret } from "@/lib/cron-auth";
-import { coletarRegrasIbsCbs, gravarRegras } from "@/lib/fiscal/coleta-ibs-cbs";
+import { reconstruirRegras } from "@/lib/fiscal/coleta-ibs-cbs";
 import { log } from "@/lib/log";
 
 const registro = log("api/cron/fiscal-ibs-cbs");
 export const runtime = "nodejs";
-export const maxDuration = 120;
+// ⚠ O ano inteiro, mês a mês, com o backoff do Omie — mesmo teto do botão.
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
-
-/** Ontem em São Paulo, "dd/mm/aaaa" — o dia de quem emite, não o UTC. */
-const ontemEmSP = () => {
-  const d = new Date(Date.now() - 24 * 3600 * 1000);
-  const [a, m, dia] = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(d).split("-");
-  return `${dia}/${m}/${a}`;
-};
 
 export async function GET(req) {
   if (!temCronSecret(req) && process.env.NODE_ENV === "production") {
@@ -28,12 +22,10 @@ export async function GET(req) {
   const t0 = Date.now();
   try {
     await aquecerBanco(prisma);
-    const dia = ontemEmSP();
-    const { notas, regras } = await coletarRegrasIbsCbs({ de: dia, ate: dia });
-    await gravarRegras(regras, prismaDirect);
-    const mensagem = `${dia}: ${notas} NF(s) · ${regras.length} regra(s)`;
+    const { notas, regras } = await reconstruirRegras({ db: prismaDirect });
+    const mensagem = `${notas} NF(s) no ano · ${regras} regra(s)`;
     await registrarExecucao("fiscal-ibs-cbs", { ok: true, mensagem, duracaoMs: Date.now() - t0 });
-    return NextResponse.json({ ok: true, notas, regras: regras.length });
+    return NextResponse.json({ ok: true, notas, regras });
   } catch (e) {
     registro.erro("[cron fiscal-ibs-cbs] erro:", e?.message);
     await registrarExecucao("fiscal-ibs-cbs", { ok: false, mensagem: e?.message, duracaoMs: Date.now() - t0 });

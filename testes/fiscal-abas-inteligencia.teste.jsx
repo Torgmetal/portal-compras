@@ -38,3 +38,14 @@ describe("abas da Inteligência Fiscal", () => {
     expect(screen.getByText("simulador-obra-aqui")).toBeTruthy();
   });
 });
+
+describe("botão de atualizar as regras das NFs", () => {
+  it("aparece para quem pode (ADMIN ou módulo FISCAL)", () => {
+    render(<Cliente {...props} ehAdmin={false} podeAtualizarRegras />);
+    expect(screen.getByRole("button", { name: /Atualizar regras das NFs/ })).toBeTruthy();
+  });
+  it("não aparece para quem não pode (o servidor recusaria)", () => {
+    render(<Cliente {...props} ehAdmin={false} podeAtualizarRegras={false} />);
+    expect(screen.queryByRole("button", { name: /Atualizar regras das NFs/ })).toBeNull();
+  });
+});

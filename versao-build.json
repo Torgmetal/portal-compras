@@ -1,156 +1,156 @@
 {
-  "build": 3542,
-  "gerado": "2026-09-30T10:52:39.629Z",
+  "build": 3543,
+  "gerado": "2026-09-30T14:40:02.609Z",
   "commits": [
     {
-      "hash": "7c87a7c3",
+      "hash": "dc036abea7",
+      "data": "30/09/2026",
+      "titulo": "Docs: GRD da Engenharia parada de 31/08 a 30/09 — memória e registro de revisão"
+    },
+    {
+      "hash": "7c87a7c388",
       "data": "30/09/2026",
       "titulo": "GRD da Engenharia: GRD nova voltou a entrar — nenhuma entrava desde 31/08"
     },
     {
-      "hash": "b8700811",
+      "hash": "b8700811ae",
       "data": "29/09/2026",
       "titulo": "Docs: fila de assinatura do relatório de inspeção — memória e registro de revisão"
     },
     {
-      "hash": "8b0eb6b9",
+      "hash": "8b0eb6b972",
       "data": "29/09/2026",
       "titulo": "Inspeções: a tela diz quem está com a vez e quem espera na fila de assinatura"
     },
     {
-      "hash": "28b45ed0",
+      "hash": "28b45ed058",
       "data": "29/09/2026",
       "titulo": "Relatório de inspeção assina em fila: inspetor → Torg Metal → cliente"
     },
     {
-      "hash": "bd2a9976",
+      "hash": "bd2a99764b",
       "data": "29/09/2026",
       "titulo": "Docs: trava de assinatura do RIP de pintura — memória e registro de revisão"
     },
     {
-      "hash": "3aa31b1d",
+      "hash": "3aa31b1d40",
       "data": "29/09/2026",
       "titulo": "Pintura: RIP não vai para assinatura com procedimento, horários ou visual em branco"
     },
     {
-      "hash": "504c77a3",
+      "hash": "504c77a380",
       "data": "29/09/2026",
       "titulo": "Pintura: OP sem PLP passa a nascer com o procedimento de preparo do PO-05"
     },
     {
-      "hash": "30b49662",
+      "hash": "30b496626f",
       "data": "29/09/2026",
       "titulo": "Pintura: salvar no computador não corta mais os lotes da demão em 60 caracteres"
     },
     {
-      "hash": "1604458c",
+      "hash": "1604458c5a",
       "data": "28/09/2026",
       "titulo": "Cotação: fornecedor volta a conseguir declinar — rota faltava na allowlist do middleware"
     },
     {
-      "hash": "9146a41a",
+      "hash": "9146a41a27",
       "data": "28/09/2026",
       "titulo": "docs: conferir o deploy pela API de status do GitHub (sem login na Vercel)"
     },
     {
-      "hash": "2d3d1310",
+      "hash": "2d3d1310cf",
       "data": "28/09/2026",
       "titulo": "Data Book: índice de 1 a 19 (a §18 saiu em junho e ficou o buraco)"
     },
     {
-      "hash": "fd58db57",
+      "hash": "fd58db5762",
       "data": "26/09/2026",
       "titulo": "docs: Quality Welding inativada, zerar peso pela API (0,0001) e o grupo de telhas"
     },
     {
-      "hash": "1bb16661",
+      "hash": "1bb1666167",
       "data": "26/09/2026",
       "titulo": "docs: cadastro do Omie gravado (fiscal, pesos, unidades, CEST) e os \"duplicados\" que eram material de terceiro"
     },
     {
-      "hash": "bfc1fffe",
+      "hash": "bfc1fffec5",
       "data": "26/09/2026",
       "titulo": "Produtos do Omie: o cache do portal passa a sincronizar todo dia (era às segundas)"
     },
     {
-      "hash": "9fef5953",
+      "hash": "9fef5953b1",
       "data": "26/09/2026",
       "titulo": "docs: famílias de 134 produtos no Omie e três armadilhas da API de produto (26/09)"
     },
     {
-      "hash": "cc0a79f4",
+      "hash": "cc0a79f466",
       "data": "26/09/2026",
       "titulo": "docs: RM T102-001-R00 atualizada para o código que ficou (26/09)"
     },
     {
-      "hash": "ddccd6aa",
+      "hash": "ddccd6aaf9",
       "data": "26/09/2026",
       "titulo": "docs: duplicados do Omie zerados e inativados; pedido 1721 no código que fica (26/09)"
     },
     {
-      "hash": "0fe8d0f6",
+      "hash": "0fe8d0f6e2",
       "data": "26/09/2026",
       "titulo": "docs: tubo 201000008 zerado e inativado; demais zeramentos e o pedido 1721 ficaram pendentes (26/09)"
     },
     {
-      "hash": "97965b46",
+      "hash": "97965b4657",
       "data": "26/09/2026",
       "titulo": "docs: 9 chapas CIVIL 300 e 2 descrições corrigidas no Omie pela tela (26/09)"
     },
     {
-      "hash": "887cc351",
+      "hash": "887cc351d5",
       "data": "26/09/2026",
       "titulo": "docs: 11 produtos inativados no Omie pela tela em 26/09 (materiais sem saldo)"
     },
     {
-      "hash": "e61b33d3",
+      "hash": "e61b33d33f",
       "data": "26/09/2026",
       "titulo": "docs: normas do Tekla no Omie, cadastro fiscal pelas notas de compra e decisões dos PRD (26/09)"
     },
     {
-      "hash": "cb671756",
+      "hash": "cb67175679",
       "data": "26/09/2026",
       "titulo": "docs: duplicados do Omie revalidados em 26/09 — 3 chapas inativadas com saldo"
     },
     {
-      "hash": "3e38aa95",
+      "hash": "3e38aa9533",
       "data": "26/09/2026",
       "titulo": "docs: Torguinho fica no Haiku (decisão do Vitor, 26/09)"
     },
     {
-      "hash": "7f48671c",
+      "hash": "7f48671c39",
       "data": "26/09/2026",
       "titulo": "docs: registro da auditoria de prompts e memória (formato estruturado, Torguinho)"
     },
     {
-      "hash": "38af6f13",
+      "hash": "38af6f13f5",
       "data": "26/09/2026",
       "titulo": "CLAUDE.md: fatos atualizados e regras de módulo carregadas sob demanda"
     },
     {
-      "hash": "fe64938f",
+      "hash": "fe64938f77",
       "data": "26/09/2026",
       "titulo": "Assistente Fiscal: contrato das ferramentas descrito e cabeçalho beta de cache removido"
     },
     {
-      "hash": "cf3f61fe",
+      "hash": "cf3f61fe6c",
       "data": "26/09/2026",
       "titulo": "Torguinho: contrato das ferramentas corrigido e prompt sem instruções de modelos antigos"
     },
     {
-      "hash": "344ed047",
+      "hash": "344ed047df",
       "data": "26/09/2026",
       "titulo": "IA: respostas no formato estruturado da API em vez de \"responda SOMENTE com JSON\""
     },
     {
-      "hash": "18e2078d",
+      "hash": "18e2078d86",
       "data": "26/09/2026",
       "titulo": "Estudo: parafusos e acessórios voltam a chamar um modelo que existe"
-    },
-    {
-      "hash": "02c4259c",
-      "data": "26/09/2026",
-      "titulo": "Memória: o estudo 316 carregava dado da TMSA num orçamento do QWS"
     }
   ]
 }

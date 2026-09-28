@@ -26,4 +26,3 @@ em cada commit, e dá para ler sem autenticação:
 `curl -s https://api.github.com/repos/Torgmetal/portal-compras/commits/<sha>/status` → `Vercel · Deployment has
 completed` (success) ou erro/pendente. Commit só de docs aparece como cancelado pelo `ignoreCommand`.
 ⚠ Não abrir `vercel login` à toa: o fluxo por código expira em minutos e precisa do Vitor confirmando no navegador.
-
