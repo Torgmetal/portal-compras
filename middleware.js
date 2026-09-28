@@ -153,6 +153,9 @@ export default withAuth(
           path === "/api/parse-cotacao-ai" ||
           path.startsWith("/api/cotacao/submeter/") ||
           path.startsWith("/api/cotacao/anexar/") ||
+          // "Não vou cotar" — ficou de fora da lista desde que nasceu: nenhum declínio chegou a gravar
+          // (28/09/2026). testes/middleware-portal-fornecedor.teste.js cobra as APIs do portal.
+          path.startsWith("/api/cotacao/declinar/") ||
           path.startsWith("/api/fornecedores/entrega/") ||
           path.startsWith("/api/frete-cotacao/") ||
           path.startsWith("/api/estudo-cotacao/") ||
