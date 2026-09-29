@@ -1,7 +1,12 @@
 {
-  "build": 3539,
-  "gerado": "2026-09-29T19:02:16.378Z",
+  "build": 3540,
+  "gerado": "2026-09-29T19:08:30.331Z",
   "commits": [
+    {
+      "hash": "8b0eb6b9",
+      "data": "29/09/2026",
+      "titulo": "Inspeções: a tela diz quem está com a vez e quem espera na fila de assinatura"
+    },
     {
       "hash": "28b45ed0",
       "data": "29/09/2026",
@@ -146,11 +151,6 @@
       "hash": "d99aae0a",
       "data": "26/09/2026",
       "titulo": "Memória e revisão: a rodada das 13h completou (103 s) com o saldo por local"
-    },
-    {
-      "hash": "ffd06f19",
-      "data": "26/09/2026",
-      "titulo": "Fiscal: cron de IBS/CBS no monitor; quantidade decimal da parcela não é mais recusada"
     }
   ]
 }

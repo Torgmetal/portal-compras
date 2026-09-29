@@ -31,4 +31,7 @@ desenham o que ela devolve:
 sumia** do dimensional. Ninguém foi atingido porque nenhum dimensional tinha sido enviado com os 3 papéis.
 
 ⚠ Todo gerador passa `{ inspetor: rel.inspetor }` para o bloco — é o que permite a junção.
+
+⚠ **A mesma ordem das colunas é a ordem de ASSINATURA desde 29/09/2026** (`COLUNA_DO_CONVITE` →
+`ordemNaFila`): inspetor, depois Torg Metal, por último o cliente. Ver [[torg_relatorio_assinatura_fila]].
 Ver [[torg_assinatura_doc]], [[torg_relatorio_editar_assinado]].

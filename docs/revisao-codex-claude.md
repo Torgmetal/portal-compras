@@ -2397,3 +2397,34 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (c) aderência e condições ambientais da demão ficaram fora da trava;
   - (d) relatório sem nenhuma demão aplicada (só preparação) continua podendo ir, cobrando só o procedimento;
   - (e) "APROVADO" é texto livre nas duas telas, então qualquer texto satisfaz a inspeção visual.
+- **(29/09) Relatório de inspeção assina em fila: inspetor → Torg Metal → cliente.** Geraldo: *"primeiro
+  inspetor, depois torg e por último o cliente — o Davi recebeu o relatório ao mesmo tempo que eu (…) e
+  falou: está sem a assinatura de vocês"*. Dois commits, cada um no ar separado:
+  - `28b45ed0` — a ordem vem do papel do convite (`ordemNaFila`, `lib/assinatura-fila.js`; a mesma regra das
+    colunas do PDF). Papel livre vai com a Torg. O envio cria todos com `ordem` e convida só quem está com a
+    vez (`daVez`); reenviar convida de novo quem está com a vez. `convidadoEm` só é gravado se o e-mail saiu.
+    - O e-mail da vez (`/api/assinar/[token]`, a infraestrutura dos planos) ganhou texto próprio de
+      relatório.
+    - O espaço do cliente esconde o relatório de inspeção antes da vez dele, medindo pela fila e não pelo
+      `convidadoEm`.
+    - A tela de envio explica a ordem e diz quem recebeu e quem ficou na fila.
+    - Envio antigo (ordem nula) segue em paralelo.
+  - `8b0eb6b9` — lista e detalhe mostram "Com a vez: X (e-mail) · na fila: Y" (`linhaFaltamAssinar`). As duas
+    rotas passam a pedir `ordem`, e o teste usa um mock que respeita o `select`.
+
+  Testes novos:
+  - `assinatura-fila` (12);
+  - `relatorio-assinatura-fila` (7);
+  - `relatorio-assinatura-vez` (1);
+  - `cliente-relatorio-fila` (3);
+  - `inspecoes-assinaturas-ordem` (2);
+  - +1 em `inspecoes-lista`.
+
+  O vermelho foi visto antes de cada implementação; as guardas do envio antigo e do plano já passavam, como
+  deviam. Suíte 4.398/4.398, `checar` limpo, eslint sem erro. Tela não validada logada.
+  ⚠ **Para revisar:**
+  - (a) papel livre na posição da Torg (antes do cliente);
+  - (b) as cópias seguem recebendo o documento no envio, antes das assinaturas;
+  - (c) o e-mail da vez vai sem o PDF anexo, só com o link;
+  - (d) no espaço do cliente, falha ao ler a fila derruba a página, como as outras consultas principais;
+  - (e) envios em andamento (RIP-089-002/003) seguem em paralelo até a próxima revisão.
