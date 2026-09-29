@@ -1,7 +1,17 @@
 {
-  "build": 3535,
-  "gerado": "2026-09-29T18:23:36.837Z",
+  "build": 3537,
+  "gerado": "2026-09-29T18:26:53.554Z",
   "commits": [
+    {
+      "hash": "3e2eca44",
+      "data": "29/09/2026",
+      "titulo": "Pintura: RIP não vai para assinatura com procedimento, horários ou visual em branco"
+    },
+    {
+      "hash": "504c77a3",
+      "data": "29/09/2026",
+      "titulo": "Pintura: OP sem PLP passa a nascer com o procedimento de preparo do PO-05"
+    },
     {
       "hash": "30b49662",
       "data": "29/09/2026",
@@ -141,16 +151,6 @@
       "hash": "c1207431",
       "data": "26/09/2026",
       "titulo": "Fiscal: auditoria da medição por parcela — itens e quantidades escolhidos"
-    },
-    {
-      "hash": "74a0d329",
-      "data": "26/09/2026",
-      "titulo": "Fiscal: simulador pela obra — imposto do Comercial ao lado da regra"
-    },
-    {
-      "hash": "fee85ae7",
-      "data": "26/09/2026",
-      "titulo": "Fiscal: regras de IBS/CBS das NFs do Omie — tabela, coleta, cron e botão"
     }
   ]
 }

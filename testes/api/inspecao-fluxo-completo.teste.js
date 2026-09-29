@@ -40,7 +40,8 @@ it.each(['PINTURA','VISUAL_SOLDA'])('cria, preenche, reabre, gera PDF e coleta t
 });
 it('permite tentar novamente um convite que falhou sem duplicar assinantes',async()=>{
  const {sendEmail}=await import('@/lib/email');
- rel={id:'r',codigo:'RIP-106-TESTE',tipo:'PINTURA',opNumero:'106',marcas:['P1'],resultados:{quantidade:'2'},linhas:[],equipamentos:[]};
+ // o procedimento de preparo é cobrado antes do envio desde 29/09/2026 (testes/lib/pendencias-pintura)
+ rel={id:'r',codigo:'RIP-106-TESTE',tipo:'PINTURA',opNumero:'106',marcas:['P1'],resultados:{quantidade:'2',prepProcedimento:'Jateamento abrasivo'},linhas:[],equipamentos:[]};
  const body={destinatarios:[{nome:'Teste',email:'teste@example.test'}]};
  sendEmail.mockResolvedValueOnce({ok:false,error:'Falha simulada'}).mockResolvedValueOnce({ok:false,error:'Falha simulada'});
  const primeira=await enviar(req(body),{params:{id:'r'}});expect((await primeira.json()).enviados).toBe(0);
