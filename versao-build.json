@@ -1,7 +1,12 @@
 {
-  "build": 3534,
-  "gerado": "2026-09-29T18:17:06.526Z",
+  "build": 3535,
+  "gerado": "2026-09-29T18:23:36.837Z",
   "commits": [
+    {
+      "hash": "30b49662",
+      "data": "29/09/2026",
+      "titulo": "Pintura: salvar no computador não corta mais os lotes da demão em 60 caracteres"
+    },
     {
       "hash": "1604458c",
       "data": "28/09/2026",
@@ -146,11 +151,6 @@
       "hash": "fee85ae7",
       "data": "26/09/2026",
       "titulo": "Fiscal: regras de IBS/CBS das NFs do Omie — tabela, coleta, cron e botão"
-    },
-    {
-      "hash": "042ddcf4",
-      "data": "26/09/2026",
-      "titulo": "Fiscal: regras de IBS/CBS extraídas das NFs do Omie (puro)"
     }
   ]
 }
