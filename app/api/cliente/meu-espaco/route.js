@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { opsComFaturamentoPara } from "@/lib/cliente-faturamento-servidor";
 import { relatoriosParaConsulta } from "@/lib/cliente-relatorios";
+import { aguardaAVez } from "@/lib/assinatura-fila";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -129,12 +130,32 @@ export async function GET() {
     if (!docs.has(k)) docs.set(k, []);
     docs.get(k).push(doc);
   };
+  // ⚠⚠ RELATÓRIO DE INSPEÇÃO SÓ APARECE PARA O CLIENTE NA VEZ DELE (inspetor → Torg Metal → cliente).
+  // Geraldo (29/09/2026): "o Davi recebeu o relatório ao mesmo tempo que eu (…) e falou: está sem a
+  // assinatura de vocês". Tirar o e-mail dele da largada não bastava: esta lista mostrava o documento
+  // com "aguardando a vez" E com o PDF aberto — o mesmo documento, ainda sem a Torg.
+  // ⚠ A vez é medida pela FILA (quem vem antes já assinou), não pelo `convidadoEm`: um e-mail que não
+  // saiu não pode esconder o documento de quem já pode assinar. Plano (PLP/PIT) segue como era.
+  const relatorio = (a) => a.envio.tipo === "RELATORIO_INSPECAO";
+  const naFila = assinaturas.filter((a) => relatorio(a) && a.ordem != null && !a.assinadoEm);
+  const filaDoEnvio = new Map();
+  if (naFila.length) {
+    const todas = await prisma.assinaturaDocumento.findMany({
+      where: { envioId: { in: [...new Set(naFila.map((a) => a.envio.id))] } },
+      select: { envioId: true, ordem: true, assinadoEm: true },
+    });
+    for (const s of todas) {
+      if (!filaDoEnvio.has(s.envioId)) filaDoEnvio.set(s.envioId, []);
+      filaDoEnvio.get(s.envioId).push(s);
+    }
+  }
   for (const a of assinaturas) {
+    if (relatorio(a) && aguardaAVez(a, filaDoEnvio.get(a.envio.id))) continue;
     push(a.envio.opNumero, {
       titulo: a.envio.titulo, tipo: a.envio.tipo, papel: a.setor || null,
       revisao: a.envio.revisao, enviadoEm: a.envio.enviadoEm,
       assinadoEm: a.assinadoEm, ip: a.ip,
-      aguardandoVez: !a.assinadoEm && a.ordem != null && !a.convidadoEm,
+      aguardandoVez: !relatorio(a) && !a.assinadoEm && a.ordem != null && !a.convidadoEm,
       revisaoPedida: a.envio.status === "REVISAO_PEDIDA",
       link: `/assinar/${a.token}`, pdf: `/api/assinar/${a.token}/pdf`,
     });

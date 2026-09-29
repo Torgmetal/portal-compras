@@ -758,12 +758,19 @@ function EnviarAssinatura({ relatorio, onFechar, onEnviado }) {
       // assinar e não foi". A tela dizia "0 assinante(s) convidado(s)" — tecnicamente verdade, e
       // fácil de ler como sucesso. Agora diz o motivo do provedor e o que fazer: o link da
       // assinatura continua valendo e pode ser mandado por fora.
-      if (!j.enviados && !j.emCopia) {
+      const parciais = (j.falhas || []).length ? `\n\nNão saíram:\n${j.falhas.map((f) => `· ${f.email}: ${f.erro}`).join("\n")}` : "";
+      const semAnexo = j.semAnexo ? `\n\n${j.semAnexo} e-mail(s) foram sem o PDF anexo (o link tem o documento).` : "";
+      const quem = (p) => `${p.nome}${p.papel ? ` (${p.papel})` : ""}`;
+      if (j.emFila && !j.vez) {
+        alert("Todos os assinantes já assinaram este relatório.");
+      } else if (!j.enviados && !j.emCopia) {
         const motivo = (j.falhas || []).map((f) => `· ${f.email}: ${f.erro}`).join("\n") || "sem detalhe do provedor";
         alert(`NENHUM e-mail saiu.\n\n${motivo}\n\nO envio ficou registrado e os links de assinatura estão válidos — dá para copiar o link de cada assinante no quadro do relatório e mandar por fora enquanto o e-mail não volta.`);
+      } else if (j.emFila) {
+        // ⚠ em fila só UM convite sai por vez: "1 assinante convidado" pareceria que os outros ficaram de fora
+        const fila = j.naFila?.length ? `\n\nNa fila: ${j.naFila.map(quem).join(" → ")}. Cada um recebe o convite quando o anterior assinar.` : "";
+        alert(`${j.enviados ? `Convite enviado a ${quem(j.vez)}.` : `O convite de ${quem(j.vez)} NÃO saiu.`}${j.emCopia ? ` ${j.emCopia} em cópia.` : ""}${fila}${semAnexo}${parciais}`);
       } else {
-        const parciais = (j.falhas || []).length ? `\n\nNão saíram:\n${j.falhas.map((f) => `· ${f.email}: ${f.erro}`).join("\n")}` : "";
-        const semAnexo = j.semAnexo ? `\n\n${j.semAnexo} e-mail(s) foram sem o PDF anexo (o link tem o documento).` : "";
         alert(`${j.enviados} assinante(s) convidado(s)${j.emCopia ? ` e ${j.emCopia} em cópia` : ""}.${j.jaEstavam ? ` ${j.jaEstavam} já tinham sido convidados.` : ""}${semAnexo}${parciais}`);
       }
       onEnviado();
@@ -780,6 +787,10 @@ function EnviarAssinatura({ relatorio, onFechar, onEnviado }) {
     <div className="mt-3 border-t border-gray-100 pt-3">
       <p className="text-[11px] font-semibold text-torg-gray mb-2 inline-flex items-center gap-1.5">
         <ShieldCheck size={13} className="text-torg-blue" /> Enviar para assinatura eletrônica
+      </p>
+      {/* Geraldo (29/09/2026): "primeiro inspetor, depois torg e por último o cliente" — a ordem sai do papel escolhido */}
+      <p className="text-[11px] text-torg-gray mb-2">
+        Assina em ordem: <strong>Inspetor → Torg Metal → Cliente</strong>. O convite sai só para o primeiro da fila; cada um recebe quando o anterior assinar.
       </p>
       {pendencias.length > 0 && (
         <div className="mb-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">

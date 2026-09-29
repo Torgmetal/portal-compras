@@ -226,12 +226,20 @@ export async function POST(req, { params }) {
       const base = baseUrlDe(req);
       const def = DOCS[docDoTipo(a.envio.tipo)] || { nome: "documento" };
       const interno = String(a.envio.tipo).endsWith("_INTERNO");
+      // ⚠ relatório de inspeção em fila (inspetor → Torg Metal → cliente, 29/09/2026): o e-mail era o
+      // dos planos, "Aceite — documento". Quem recebe precisa saber que é o relatório e que ele já
+      // chega com as assinaturas de quem veio antes — foi a falta delas que fez o cliente devolver.
+      const ehRelatorio = a.envio.tipo === "RELATORIO_INSPECAO";
+      const cabecalho = ehRelatorio ? "Assinatura — Relatório de Inspeção" : `${interno ? "Verificação" : "Aceite"} — ${def.nome}`;
+      const chegou = ehRelatorio
+        ? `<strong>${a.nome}</strong> assinou o <strong>${a.envio.titulo}</strong> e agora é a sua vez. O documento já traz as assinaturas de quem veio antes.`
+        : `<strong>${a.nome}</strong> assinou e o <strong>${a.envio.titulo}</strong> chegou até você${proximo.setor ? ` para <strong>${String(proximo.setor).toLowerCase()}</strong>` : ""}.`;
       const link = `${base}/assinar/${proximo.token}`;
       const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0D1F3C">
-        ${cabecalhoEmail(`${interno ? "Verificação" : "Aceite"} — ${def.nome}`)}
+        ${cabecalhoEmail(cabecalho)}
         <div style="border:1px solid #e7ecf2;border-top:none;border-radius:0 0 8px 8px;padding:20px 24px">
           <p style="margin:0 0 10px">Olá, <strong>${proximo.nome}</strong>,</p>
-          <p style="margin:0 0 12px"><strong>${a.nome}</strong> assinou e o <strong>${a.envio.titulo}</strong> chegou até você${proximo.setor ? ` para <strong>${String(proximo.setor).toLowerCase()}</strong>` : ""}.</p>
+          <p style="margin:0 0 12px">${chegou}</p>
           <p style="text-align:center;margin:22px 0">
             <a href="${link}" style="background:#006EAB;color:#fff;text-decoration:none;padding:12px 26px;border-radius:8px;font-weight:bold;display:inline-block">Ver o documento e assinar</a>
           </p>

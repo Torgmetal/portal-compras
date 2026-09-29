@@ -1,7 +1,12 @@
 {
-  "build": 3537,
-  "gerado": "2026-09-29T18:34:59.667Z",
+  "build": 3538,
+  "gerado": "2026-09-29T18:58:33.934Z",
   "commits": [
+    {
+      "hash": "bd2a9976",
+      "data": "29/09/2026",
+      "titulo": "Docs: trava de assinatura do RIP de pintura — memória e registro de revisão"
+    },
     {
       "hash": "3aa31b1d",
       "data": "29/09/2026",
@@ -146,11 +151,6 @@
       "hash": "71fc5484",
       "data": "26/09/2026",
       "titulo": "Fiscal: Inteligência com 4 abas do dia a dia; o resto em Administração (só ADMIN)"
-    },
-    {
-      "hash": "c1207431",
-      "data": "26/09/2026",
-      "titulo": "Fiscal: auditoria da medição por parcela — itens e quantidades escolhidos"
     }
   ]
 }

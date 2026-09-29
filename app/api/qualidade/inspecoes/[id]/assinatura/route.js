@@ -17,6 +17,7 @@ import { gerarPDFdoRelatorio } from "@/lib/relatorio-render";
 import { baixarDesenho } from "@/lib/relatorio-dimensional";
 import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
 import { TIPO_LABEL, pendenciasParaAssinatura } from "@/lib/qualidade-campo";
+import { ordemNaFila, daVez } from "@/lib/assinatura-fila";
 import { sendEmail } from "@/lib/email";
 import { cabecalhoEmail } from "@/lib/email-layout";
 import { baseUrlDe } from "@/lib/databook-assinaturas";
@@ -112,9 +113,17 @@ export async function POST(req, { params }) {
 
   const jaTem = await prisma.assinaturaDocumento.findMany({
     where: { envioId },
-    select: { email: true, token: true, assinadoEm: true },
+    select: { id: true, nome: true, email: true, setor: true, token: true, assinadoEm: true, ordem: true, convidadoEm: true },
   });
   const existentes = new Map(jaTem.map(a => [a.email.toLowerCase(), a]));
+
+  // ⚠⚠ EM FILA: INSPETOR → TORG METAL → CLIENTE. Geraldo (29/09/2026): "primeiro inspetor, depois torg
+  // e por último o cliente — o Davi recebeu o relatório ao mesmo tempo que eu (…) e falou: está sem
+  // a assinatura de vocês". Só quem está com a vez recebe o convite; os outros ficam criados, com o
+  // token pronto, e /api/assinar/[token] convida o próximo no ato da assinatura (lib/assinatura-fila).
+  // ⚠ Envio antigo, criado em paralelo (`ordem` nula), segue em paralelo: pôr fila no meio dele
+  // deixaria metade dos assinantes com vez e metade sem.
+  const emFila = !jaTem.length || jaTem.some((a) => a.ordem != null);
 
   // ⚠ O ANEXO É O DOCUMENTO DE VERDADE. Aqui também estava o gerador antigo, que não conhece os
   // modelos novos — quem recebia o e-mail lia uma folha que não é o relatório. Mesmo despacho da
@@ -141,15 +150,8 @@ export async function POST(req, { params }) {
   // disse "0 assinante(s) convidado(s)" — sem motivo, sem o que fazer. O erro do provedor (limite
   // da conta, endereço recusado, anexo grande) é a única informação que resolve.
   const falhas = [];
-  for (const d of assinantes) {
-    const existente = existentes.get(d.email.toLowerCase());
-    if (existente?.assinadoEm) continue;
-    const token = existente?.token || gerarTokenForte(24);
-    if (!existente) {
-      await prisma.assinaturaDocumento.create({ data: { envioId, nome: d.nome, email: d.email, setor: d.setor, token } });
-      existentes.set(d.email.toLowerCase(), {token, assinadoEm:null});
-      novos++;
-    }
+  /** Manda o convite de UMA pessoa; true se o e-mail saiu. */
+  async function convidar(d, token) {
     const link = `${base}/assinar/${token}`;
     const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0D1F3C">
       ${cabecalhoEmail("Assinatura — Relatório de Inspeção")}
@@ -179,6 +181,48 @@ export async function POST(req, { params }) {
       else falhas.push({ email: d.email, erro: r?.error || semAnexo?.error || "não foi possível enviar" });
     }
     if (r?.ok) { enviados++; if (r.semAnexo) semAnexoN++; }
+    return !!r?.ok;
+  }
+
+  let vez = null;
+  let naFila = [];
+  if (emFila) {
+    const todos = [...jaTem];
+    // ⚠ a ordem sai do PAPEL: o Geraldo digita a si mesmo primeiro, e a fila começa pelo inspetor
+    const naOrdem = assinantes
+      .map((d, i) => ({ d, i, o: ordemNaFila(d.setor) }))
+      .sort((x, y) => x.o - y.o || x.i - y.i);
+    let seq = jaTem.length;
+    for (const { d } of naOrdem) {
+      if (existentes.has(d.email.toLowerCase())) continue;
+      const criada = await prisma.assinaturaDocumento.create({
+        data: { envioId, nome: d.nome, email: d.email, setor: d.setor, token: gerarTokenForte(24), ordem: ordemNaFila(d.setor, seq++) },
+      });
+      existentes.set(d.email.toLowerCase(), criada);
+      todos.push(criada);
+      novos++;
+    }
+    // reenviar chama de novo QUEM ESTÁ COM A VEZ — nunca quem vem depois
+    vez = daVez(todos);
+    if (vez && await convidar(vez, vez.token)) {
+      await prisma.assinaturaDocumento.update({ where: { id: vez.id }, data: { convidadoEm: new Date() } });
+    }
+    naFila = todos
+      .filter((a) => a !== vez && a.ordem != null && !a.assinadoEm)
+      .sort((x, y) => x.ordem - y.ordem)
+      .map((a) => ({ nome: a.nome, papel: a.setor || null }));
+  } else {
+    for (const d of assinantes) {
+      const existente = existentes.get(d.email.toLowerCase());
+      if (existente?.assinadoEm) continue;
+      const token = existente?.token || gerarTokenForte(24);
+      if (!existente) {
+        await prisma.assinaturaDocumento.create({ data: { envioId, nome: d.nome, email: d.email, setor: d.setor, token } });
+        existentes.set(d.email.toLowerCase(), {token, assinadoEm:null});
+        novos++;
+      }
+      await convidar(d, token);
+    }
   }
 
   // ── CÓPIAS: recebem o documento, sem link e sem linha no quadro de assinaturas ──
@@ -208,7 +252,7 @@ export async function POST(req, { params }) {
   await prisma.auditLog.create({
     data: {
       userId: user.id, action: "ENVIAR_RELATORIO_INSPECAO_ASSINATURA", entity: "RelatorioInspecao", entityId: id,
-      diff: { codigo: rel.codigo, destinatarios: dest.length, assinantes: assinantes.length, copias: copias.length, novos, enviados, emCopia, semAnexo: semAnexoN, falhas, vinculo },
+      diff: { codigo: rel.codigo, destinatarios: dest.length, assinantes: assinantes.length, copias: copias.length, novos, enviados, emCopia, semAnexo: semAnexoN, falhas, vinculo, emFila, vez: vez?.email || null, naFila: naFila.length },
     },
   }).catch(() => {});
 
@@ -218,5 +262,6 @@ export async function POST(req, { params }) {
     ok: enviados > 0 || emCopia > 0,
     envioId, novos, enviados, emCopia, semAnexo: semAnexoN, falhas,
     jaEstavam: assinantes.length - novos, vinculo,
+    emFila, vez: vez ? { nome: vez.nome, email: vez.email, papel: vez.setor || null } : null, naFila,
   });
 }
