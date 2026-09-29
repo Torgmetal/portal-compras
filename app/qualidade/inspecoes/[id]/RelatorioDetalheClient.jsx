@@ -7,7 +7,7 @@ import { useStore } from "@/lib/store";
 import { pecasDoRelatorio, pecasInformadasSchema, usaQuantidadeInspecao } from "@/lib/inspecao-pecas";
 import PecasInformadasEditor from "./PecasInformadasEditor";
 import { Loader2, ArrowLeft, Save, ExternalLink, AlertCircle, Check, Ruler, Lock, FolderOpen, Crop, RotateCcw } from "lucide-react";
-import { TIPO_LABEL, pendenciasParaAssinatura, faltamAssinar, rotuloAssinante, tarjaDoEnvio } from "@/lib/qualidade-campo";
+import { TIPO_LABEL, pendenciasParaAssinatura, faltamAssinar, linhaFaltamAssinar, tarjaDoEnvio } from "@/lib/qualidade-campo";
 import CampoTolerancia from "./CampoTolerancia";
 import {foraDaTolerancia} from "@/lib/tolerancia-inspecao";
 import MarcadorCotas from "./MarcadorCotas";
@@ -192,7 +192,7 @@ export default function RelatorioDetalheClient({ id }) {
               <span className="text-[11px] px-2 py-1 rounded-lg bg-gray-100 text-torg-gray inline-flex items-center gap-1.5"
                 title={[
                   assinaram.length ? `Já assinaram: ${assinaram.join(", ")}` : "Enviado para assinatura; ninguém assinou ainda",
-                  faltamNoEnvio.length ? `Falta: ${faltamNoEnvio.map(rotuloAssinante).join(", ")}` : "",
+                  faltamNoEnvio.length ? linhaFaltamAssinar(dados.assinaturas) : "",
                 ].filter(Boolean).join("\n")}>
                 <Lock size={12} />
                 {tarjaDoEnvio(dados.assinaturas, rel.revisao)}

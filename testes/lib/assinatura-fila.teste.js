@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ordemNaFila, daVez, aguardaAVez } from "@/lib/assinatura-fila";
-import { rotuloPendente } from "@/lib/qualidade-campo";
+import { linhaFaltamAssinar } from "@/lib/qualidade-campo";
 
 // Geraldo (29/09/2026): "precisa colocar uma lógica para aprovação de relatório: primeiro inspetor,
 // depois torg e por último o cliente — exemplo: o Davi recebeu o relatório ao mesmo tempo que eu
@@ -70,11 +70,25 @@ describe("quem ainda espera a vez", () => {
     expect(aguardaAVez(davi, [{ ...GERALDO, ordem: null, assinadoEm: null }, davi])).toBe(false);
   });
 
-  it("a tela diz quem está na fila, e não marca quem está com a vez", () => {
-    const geraldo = { ...GERALDO, ordem: 201, assinadoEm: null };
-    const davi = { ...DAVI, ordem: 302, assinadoEm: null };
-    const lista = [{ ...ALEXANDRE, ordem: 100, assinadoEm: ASSINOU }, geraldo, davi];
-    expect(rotuloPendente(geraldo, lista)).toBe("Geraldo Tank (qualidade@torg.com.br)");
-    expect(rotuloPendente(davi, lista)).toBe("Davi Pinho (pinho.davi@tmsa.ind.br) · na fila");
+});
+
+// "Falta assinar: Geraldo · Davi" parecia que o convite já tinha ido para o cliente.
+describe("a linha de quem falta assinar, na lista e no detalhe", () => {
+  it("em fila, diz quem está com a vez — com o e-mail do convite — e quem espera", () => {
+    const lista = [
+      { ...DAVI, ordem: 302, assinadoEm: null },
+      { ...ALEXANDRE, ordem: 100, assinadoEm: ASSINOU },
+      { ...GERALDO, ordem: 201, assinadoEm: null },
+    ];
+    expect(linhaFaltamAssinar(lista)).toBe("Com a vez: Geraldo Tank (qualidade@torg.com.br) · na fila: Davi Pinho");
+  });
+
+  it("envio antigo, em paralelo, segue dizendo todos os que faltam", () => {
+    const lista = [{ ...GERALDO, ordem: null, assinadoEm: null }, { ...DAVI, ordem: null, assinadoEm: null }];
+    expect(linhaFaltamAssinar(lista)).toBe("Falta assinar: Geraldo Tank (qualidade@torg.com.br) · Davi Pinho (pinho.davi@tmsa.ind.br)");
+  });
+
+  it("todos assinaram: nada a dizer", () => {
+    expect(linhaFaltamAssinar([{ ...GERALDO, ordem: 201, assinadoEm: ASSINOU }])).toBe("");
   });
 });

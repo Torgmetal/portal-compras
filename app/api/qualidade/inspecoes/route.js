@@ -63,7 +63,8 @@ export async function GET(req) {
   const assinaturas = envios.length
     ? await prisma.assinaturaDocumento.findMany({
         where: { envioId: { in: envios } },
-        select: { envioId: true, nome: true, setor: true, email: true, assinadoEm: true, token: podeVerToken },
+        // `ordem`: a tela diz quem está com a vez e quem espera na fila (29/09/2026)
+        select: { envioId: true, nome: true, setor: true, email: true, assinadoEm: true, ordem: true, token: podeVerToken },
       })
     : [];
   const porEnvio = new Map();

@@ -1,7 +1,12 @@
 {
-  "build": 3538,
-  "gerado": "2026-09-29T18:58:33.934Z",
+  "build": 3539,
+  "gerado": "2026-09-29T19:02:16.378Z",
   "commits": [
+    {
+      "hash": "28b45ed0",
+      "data": "29/09/2026",
+      "titulo": "Relatório de inspeção assina em fila: inspetor → Torg Metal → cliente"
+    },
     {
       "hash": "bd2a9976",
       "data": "29/09/2026",
@@ -146,11 +151,6 @@
       "hash": "ffd06f19",
       "data": "26/09/2026",
       "titulo": "Fiscal: cron de IBS/CBS no monitor; quantidade decimal da parcela não é mais recusada"
-    },
-    {
-      "hash": "71fc5484",
-      "data": "26/09/2026",
-      "titulo": "Fiscal: Inteligência com 4 abas do dia a dia; o resto em Administração (só ADMIN)"
     }
   ]
 }

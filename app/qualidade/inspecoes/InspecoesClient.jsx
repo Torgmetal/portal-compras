@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Loader2, FileText, Check, Send, AlertCircle, ChevronRight, ExternalLink, Plus, X, ShieldCheck, Trash2, Link2, Search, MoreHorizontal } from "lucide-react";
-import { TIPO_LABEL, TIPOS_RELATORIO, usaCotas, pendenciasParaAssinatura, faltamAssinar, rotuloAssinante } from "@/lib/qualidade-campo";
+import { TIPO_LABEL, TIPOS_RELATORIO, usaCotas, pendenciasParaAssinatura, faltamAssinar, linhaFaltamAssinar } from "@/lib/qualidade-campo";
 import { textoDoVinculo } from "@/lib/relatorio-vinculo-texto";
 import { rotuloFase } from "@/lib/fase-peca";
 import FiltroFase from "@/components/qualidade/FiltroFase";
@@ -259,7 +259,7 @@ function Relatorio({ r, onMudou, podeFechar = true }) {
             {resultado&&<span className={`text-[11px] ${r.resultadoInspecao==="APROVADO"?"text-emerald-700":"text-orange-700"}`}>{resultado}</span>}
           </div>
           <p className="text-xs text-torg-gray mt-1.5">{r.inspetor || r.criadoPorNome || "Inspetor não informado"}{r.fotos>0?` · ${r.fotos} fotos`:""}{r.emitidoEm?` · ${fmtDT(r.emitidoEm)}`:""}{r.envioAssinaturaId?` · ${assinadas}/${r.assinaturas.length} assinaturas`:""}</p>
-          {faltam.length > 0 && <p className="text-xs text-amber-800 mt-1 break-words">Falta assinar: {faltam.map(rotuloAssinante).join(" · ")}</p>}
+          {faltam.length > 0 && <p className="text-xs text-amber-800 mt-1 break-words">{linhaFaltamAssinar(r.assinaturas)}</p>}
           {!!r.marcas?.length&&<details className="mt-1 text-xs text-torg-gray"><summary className="cursor-pointer py-1 w-fit">{r.marcas.length} marca{r.marcas.length>1?"s":""} · ver peças</summary><p className="mt-1 break-words text-torg-dark leading-relaxed">{r.marcas.join(", ")}</p></details>}
         </div>
         <div className="flex shrink-0 items-center gap-1">

@@ -41,3 +41,16 @@ it('relatório aprovado esperando assinatura diz QUEM falta e PARA QUAL E-MAIL o
  expect(screen.getByText('Aguardando assinaturas')).toBeTruthy();
  expect(screen.getByText('Falta assinar: Alexandre Stival (alexandre_stival@yahoo.com.br)')).toBeTruthy();
 });
+it('relatório em fila diz quem está com a vez e quem espera (Geraldo, 29/09/2026)',async()=>{
+ // inspetor → Torg Metal → cliente: "Falta assinar: Geraldo · Davi" parecia que o Davi já tinha o convite
+ const assinaturas=[
+  {nome:'Davi Pinho',setor:'Cliente',email:'pinho.davi@tmsa.ind.br',assinadoEm:null,ordem:302},
+  {nome:'Alexandre Stival',setor:'Inspetor',email:'stival2112@gmail.com',assinadoEm:'2026-09-29T18:00:00Z',ordem:100},
+  {nome:'Geraldo Tank',setor:'Torg Metal',email:'qualidade@torg.com.br',assinadoEm:null,ordem:201},
+ ];
+ vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({soltas:[],relatorios:[rel('4',{codigo:'RIP-089-002',tipo:'PINTURA',resultadoInspecao:'APROVADO',envioAssinaturaId:'envio',emitidoEm:'2026-09-29T17:42:00Z',assinaturas})]})}));
+ render(<InspecoesClient podeFechar={false}/>);
+ await screen.findByRole('button',{name:/Aprovados/});
+ fireEvent.click(screen.getByRole('button',{name:/Aprovados/}));
+ expect(screen.getByText('Com a vez: Geraldo Tank (qualidade@torg.com.br) · na fila: Davi Pinho')).toBeTruthy();
+});

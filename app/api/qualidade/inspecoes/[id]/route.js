@@ -57,8 +57,9 @@ export async function GET(_req, { params }) {
     rel.envioAssinaturaId
       ? prisma.assinaturaDocumento.findMany({
           where: { envioId: rel.envioAssinaturaId },
-          select: { nome: true, email: true, setor: true, assinadoEm: true, ip: true },
-          orderBy: { nome: "asc" },
+          // `ordem`: quem está com a vez e quem espera na fila (29/09/2026); envio antigo segue por nome
+          select: { nome: true, email: true, setor: true, assinadoEm: true, ip: true, ordem: true },
+          orderBy: [{ ordem: "asc" }, { nome: "asc" }],
         })
       : Promise.resolve([]),
   ]);
