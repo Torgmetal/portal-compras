@@ -4,6 +4,7 @@ import { useComponenteEstavel } from "@/lib/react-estavel";
 import { Txt, TxtNA, Sel } from "./controles";
 import { CamposAmbiente, Veredito } from "./PinturaAmbiente";
 import { Paintbrush } from "lucide-react";
+import SeletorCor from "@/components/SeletorCor";
 import {
   GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, TEMPO, METODOS_APLICACAO, ETAPAS_AMBIENTE, CAMPO_DO_JATO,
   RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar,
@@ -274,10 +275,10 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
           <Txt rot="Fabricante" v={dem[aba]?.fabricante} onMudar={(v) => setDem(aba, "fabricante", v)} />
           <Sel rot="Método de aplicação" v={dem[aba]?.metodo} onMudar={(v) => setDem(aba, "metodo", v)} opcoes={METODOS_APLICACAO.map(t => ({ v: t, t }))} />
 
-          {cores.length > 0
-            ? <Sel rot="Cor aplicada" v={dem[aba]?.cor} onMudar={(v) => setDem(aba, "cor", v)}
-                opcoes={cores.map((c) => ({ v: c, t: c }))} />
-            : <Txt rot="Cor aplicada" v={dem[aba]?.cor} onMudar={(v) => setDem(aba, "cor", v)} />}
+          {/* ⚠ as cores do PLP, ou outra (RIP-094-001: Azul 2.5PB4/10 e Cinza N6,5 não estavam no PLP).
+              `key` por demão: cada aba decide sozinha se abre em lista ou em texto. */}
+          <SeletorCor key={aba} rotulo="Cor aplicada" valor={dem[aba]?.cor} cores={cores} onMudar={(v) => setDem(aba, "cor", v)}
+            classe="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none" />
 
 
           {/* ── A MICRAGEM SECA MÍNIMA, ABERTA ──────────────────────────────────

@@ -4,6 +4,7 @@ import { useComponenteEstavel } from "@/lib/react-estavel";
 import { AlertTriangle, Check, ClipboardList } from "lucide-react";
 import { escopoDoTipo, amostragemDoTipo } from "@/lib/pit-escopo";
 import PlpPainel from "./PlpPainel";
+import SeletorCor from "@/components/SeletorCor";
 import { tipoDoProduto, camposDoRelatorioPintura } from "@/lib/plp";
 import { GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, TEMPO, CAMPOS_DEMAO, RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar, ambientePorEtapa } from "@/lib/pintura-campos";
 
@@ -316,6 +317,11 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
                           ))}
                         </select>
                       </div>
+                    ) : k === "cor" ? (
+                      // ⚠ as cores do PLP, ou outra — a lista não pode ser o limite (RIP-094-001)
+                      <SeletorCor compacto rotulo={`Cor aplicada — ${n}ª demão`} valor={dem[n]?.cor} cores={cores}
+                        desabilitado={travado} onMudar={(v) => setDemao(n, "cor", v)}
+                        classe="w-full text-[11px] border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50" />
                     ) : (opcoes || dyn) ? (
                       <select value={dem[n]?.[k] || ""} disabled={travado} onChange={(e) => setDemao(n, k, e.target.value)}
                         className="w-full text-[11px] border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50">

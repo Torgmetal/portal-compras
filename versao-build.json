@@ -1,7 +1,12 @@
 {
-  "build": 3544,
-  "gerado": "2026-09-30T14:40:08.432Z",
+  "build": 3545,
+  "gerado": "2026-09-30T14:40:08.543Z",
   "commits": [
+    {
+      "hash": "b16f4ec907",
+      "data": "30/09/2026",
+      "titulo": "Fiscal: paginação inválida do Omie derruba a coleta; simulação antiga não reaparece na obra nova"
+    },
     {
       "hash": "1f5aae6c9e",
       "data": "30/09/2026",
@@ -146,11 +151,6 @@
       "hash": "cf3f61fe6c",
       "data": "26/09/2026",
       "titulo": "Torguinho: contrato das ferramentas corrigido e prompt sem instruções de modelos antigos"
-    },
-    {
-      "hash": "344ed047df",
-      "data": "26/09/2026",
-      "titulo": "IA: respostas no formato estruturado da API em vez de \"responda SOMENTE com JSON\""
     }
   ]
 }
