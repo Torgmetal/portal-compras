@@ -1,156 +1,156 @@
 {
-  "build": 3533,
-  "gerado": "2026-09-28T19:41:42.896Z",
+  "build": 3534,
+  "gerado": "2026-09-29T18:17:06.526Z",
   "commits": [
     {
-      "hash": "9146a41a27",
+      "hash": "1604458c",
+      "data": "28/09/2026",
+      "titulo": "Cotação: fornecedor volta a conseguir declinar — rota faltava na allowlist do middleware"
+    },
+    {
+      "hash": "9146a41a",
       "data": "28/09/2026",
       "titulo": "docs: conferir o deploy pela API de status do GitHub (sem login na Vercel)"
     },
     {
-      "hash": "2d3d1310cf",
+      "hash": "2d3d1310",
       "data": "28/09/2026",
       "titulo": "Data Book: índice de 1 a 19 (a §18 saiu em junho e ficou o buraco)"
     },
     {
-      "hash": "fd58db5762",
+      "hash": "fd58db57",
       "data": "26/09/2026",
       "titulo": "docs: Quality Welding inativada, zerar peso pela API (0,0001) e o grupo de telhas"
     },
     {
-      "hash": "1bb1666167",
+      "hash": "1bb16661",
       "data": "26/09/2026",
       "titulo": "docs: cadastro do Omie gravado (fiscal, pesos, unidades, CEST) e os \"duplicados\" que eram material de terceiro"
     },
     {
-      "hash": "bfc1fffec5",
+      "hash": "bfc1fffe",
       "data": "26/09/2026",
       "titulo": "Produtos do Omie: o cache do portal passa a sincronizar todo dia (era às segundas)"
     },
     {
-      "hash": "9fef5953b1",
+      "hash": "9fef5953",
       "data": "26/09/2026",
       "titulo": "docs: famílias de 134 produtos no Omie e três armadilhas da API de produto (26/09)"
     },
     {
-      "hash": "cc0a79f466",
+      "hash": "cc0a79f4",
       "data": "26/09/2026",
       "titulo": "docs: RM T102-001-R00 atualizada para o código que ficou (26/09)"
     },
     {
-      "hash": "ddccd6aaf9",
+      "hash": "ddccd6aa",
       "data": "26/09/2026",
       "titulo": "docs: duplicados do Omie zerados e inativados; pedido 1721 no código que fica (26/09)"
     },
     {
-      "hash": "0fe8d0f6e2",
+      "hash": "0fe8d0f6",
       "data": "26/09/2026",
       "titulo": "docs: tubo 201000008 zerado e inativado; demais zeramentos e o pedido 1721 ficaram pendentes (26/09)"
     },
     {
-      "hash": "97965b4657",
+      "hash": "97965b46",
       "data": "26/09/2026",
       "titulo": "docs: 9 chapas CIVIL 300 e 2 descrições corrigidas no Omie pela tela (26/09)"
     },
     {
-      "hash": "887cc351d5",
+      "hash": "887cc351",
       "data": "26/09/2026",
       "titulo": "docs: 11 produtos inativados no Omie pela tela em 26/09 (materiais sem saldo)"
     },
     {
-      "hash": "e61b33d33f",
+      "hash": "e61b33d3",
       "data": "26/09/2026",
       "titulo": "docs: normas do Tekla no Omie, cadastro fiscal pelas notas de compra e decisões dos PRD (26/09)"
     },
     {
-      "hash": "cb67175679",
+      "hash": "cb671756",
       "data": "26/09/2026",
       "titulo": "docs: duplicados do Omie revalidados em 26/09 — 3 chapas inativadas com saldo"
     },
     {
-      "hash": "3e38aa9533",
+      "hash": "3e38aa95",
       "data": "26/09/2026",
       "titulo": "docs: Torguinho fica no Haiku (decisão do Vitor, 26/09)"
     },
     {
-      "hash": "7f48671c39",
+      "hash": "7f48671c",
       "data": "26/09/2026",
       "titulo": "docs: registro da auditoria de prompts e memória (formato estruturado, Torguinho)"
     },
     {
-      "hash": "38af6f13f5",
+      "hash": "38af6f13",
       "data": "26/09/2026",
       "titulo": "CLAUDE.md: fatos atualizados e regras de módulo carregadas sob demanda"
     },
     {
-      "hash": "fe64938f77",
+      "hash": "fe64938f",
       "data": "26/09/2026",
       "titulo": "Assistente Fiscal: contrato das ferramentas descrito e cabeçalho beta de cache removido"
     },
     {
-      "hash": "cf3f61fe6c",
+      "hash": "cf3f61fe",
       "data": "26/09/2026",
       "titulo": "Torguinho: contrato das ferramentas corrigido e prompt sem instruções de modelos antigos"
     },
     {
-      "hash": "344ed047df",
+      "hash": "344ed047",
       "data": "26/09/2026",
       "titulo": "IA: respostas no formato estruturado da API em vez de \"responda SOMENTE com JSON\""
     },
     {
-      "hash": "18e2078d86",
+      "hash": "18e2078d",
       "data": "26/09/2026",
       "titulo": "Estudo: parafusos e acessórios voltam a chamar um modelo que existe"
     },
     {
-      "hash": "02c4259c70",
+      "hash": "02c4259c",
       "data": "26/09/2026",
       "titulo": "Memória: o estudo 316 carregava dado da TMSA num orçamento do QWS"
     },
     {
-      "hash": "7a36e64afd",
+      "hash": "7a36e64a",
       "data": "26/09/2026",
       "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
     },
     {
-      "hash": "d99aae0a29",
+      "hash": "d99aae0a",
       "data": "26/09/2026",
       "titulo": "Memória e revisão: a rodada das 13h completou (103 s) com o saldo por local"
     },
     {
-      "hash": "ffd06f194d",
+      "hash": "ffd06f19",
       "data": "26/09/2026",
       "titulo": "Fiscal: cron de IBS/CBS no monitor; quantidade decimal da parcela não é mais recusada"
     },
     {
-      "hash": "71fc548412",
+      "hash": "71fc5484",
       "data": "26/09/2026",
       "titulo": "Fiscal: Inteligência com 4 abas do dia a dia; o resto em Administração (só ADMIN)"
     },
     {
-      "hash": "c120743162",
+      "hash": "c1207431",
       "data": "26/09/2026",
       "titulo": "Fiscal: auditoria da medição por parcela — itens e quantidades escolhidos"
     },
     {
-      "hash": "74a0d32919",
+      "hash": "74a0d329",
       "data": "26/09/2026",
       "titulo": "Fiscal: simulador pela obra — imposto do Comercial ao lado da regra"
     },
     {
-      "hash": "fee85ae72a",
+      "hash": "fee85ae7",
       "data": "26/09/2026",
       "titulo": "Fiscal: regras de IBS/CBS das NFs do Omie — tabela, coleta, cron e botão"
     },
     {
-      "hash": "042ddcf4cc",
+      "hash": "042ddcf4",
       "data": "26/09/2026",
       "titulo": "Fiscal: regras de IBS/CBS extraídas das NFs do Omie (puro)"
-    },
-    {
-      "hash": "8c7fde322e",
-      "data": "26/09/2026",
-      "titulo": "Plano: Inteligência Fiscal mais simples (6 tarefas) + spec ajustada (chave NCM×CFOP)"
     }
   ]
 }

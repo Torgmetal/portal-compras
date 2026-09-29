@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { CAMPOS_CABECALHO_US } from "@/lib/us-campos";
+import { LIMITE_VALOR_DEMAO } from "@/lib/pintura-campos";
 import { limiteDoCampo } from "@/lib/campo-condicoes";
 import { PERFIS_CAMPO, TIPO_LABEL } from "@/lib/qualidade-campo";
 import { RESULTADOS, proximaRevisao, rotuloRevisao } from "@/lib/revisao-inspecao";
@@ -249,7 +250,8 @@ export async function PATCH(req, { params }) {
         for (const [k, v] of Object.entries(bloco)) {
           // ⚠ 300 e não 120: lote e validade são LISTAS ("L1 · L2 · L3"), porque uma demão usa mais
           // de uma lata. Com o corte antigo, a partir do quarto lote o registro era truncado.
-          limpo[k] = v == null || v === "" ? null : String(v).slice(0, 300);
+          // O teto mora em lib/pintura-campos.js, o mesmo da tela do computador.
+          limpo[k] = v == null || v === "" ? null : String(v).slice(0, LIMITE_VALOR_DEMAO);
         }
         dados.resultados.demaos[d] = limpo;
       }

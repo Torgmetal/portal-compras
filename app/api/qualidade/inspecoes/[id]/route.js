@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { CAMPOS_CABECALHO_US } from "@/lib/us-campos";
+import { LIMITE_VALOR_DEMAO } from "@/lib/pintura-campos";
 import { limiteDoCampo } from "@/lib/campo-condicoes";
 import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
 import { garantirDesenhos } from "@/lib/relatorio-dimensional";
@@ -279,7 +280,9 @@ export async function PATCH(req, { params }) {
         const bloco = r.demaos[d];
         if (!bloco || typeof bloco !== "object") continue;
         const limpo = {};
-        for (const [k, v] of Object.entries(bloco).slice(0, 30)) limpo[String(k).slice(0, 20)] = v == null ? null : String(v).slice(0, 60);
+        // ⚠ o mesmo teto do celular (LIMITE_VALOR_DEMAO): com 60 aqui, salvar no computador um relatório
+        // preenchido no campo cortava a lista de lotes da demão.
+        for (const [k, v] of Object.entries(bloco).slice(0, 30)) limpo[String(k).slice(0, 20)] = v == null ? null : String(v).slice(0, LIMITE_VALOR_DEMAO);
         dados.resultados.demaos[d] = limpo;
       }
     }
