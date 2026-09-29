@@ -112,6 +112,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [.env.local sem RESEND](torg_env_local_sem_resend.md) — script local não manda e-mail (chave vazia); reenvio de convite por script falhou calado em 21/09
 - [Pintura: condição ambiental por ETAPA](torg_pintura_condicoes_por_etapa.md) — jato/fundo/demais demãos; demão sem leitura herda a do jato (e diz); item 5.4 julga cada etapa
 - [Pintura: numeração das fotos](torg_pintura_fotos_numeracao.md) — "3 de 8" dentro do ENSAIO, em lib/fotos-evidencia.js; legenda não repete o nome do ensaio
+- [Pintura: o que barra a assinatura](torg_pintura_pendencias_assinatura.md) — sem procedimento de preparo, ou demão APLICADA sem data/horários/visual, não assina (29/09); aplicada = além de produto/fabricante/cor/método ou com espessura; `hFim` no celular só desde 22/09; OP sem PLP nasce "Jateamento abrasivo"
 - [Pintura: micragem seca mínima](torg_pintura_micragem_minima.md) — é do RELATÓRIO (editável nas 2 telas); PLP dá o total da obra; fundo ainda é julgado contra o total
 - [Inspetor vê produto final por FASE](torg_inspetor_produto_final_fase.md) — /api/campo/pecas: sem croqui (só `croquis=1` no dimensional avulsas) nem acessório (AC c/ hífen, comprado); `fase`/`fases` da frente da LPC ou letra da marca; chips FiltroFase nas 2 telas
 - [Portal da Qualidade](torg_qualidade.md) — setor (PQ-00/NBR 16775) na main; F1 Controle de Documentos, F2 CMR+casamento PDFs, F3/F5 Data Book (pdf-lib); falta F4 foto PWA

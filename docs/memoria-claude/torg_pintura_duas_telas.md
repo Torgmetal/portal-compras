@@ -30,4 +30,8 @@ resto de `/qualidade` continua fechado, a Sidebar mostra só "Inspeções" para 
 fechar**: `podeFecharRelatorio` (lib/qualidade-campo.js) guarda enviar para assinatura e excluir
 para ADMIN/QUALIDADE. Então **o ajuste de pintura continua tendo de ir nos DOIS formulários**.
 
+⚠ **Um campo existir nas duas telas não quer dizer que existia quando o relatório foi preenchido.** O
+horário final da demão só entrou no celular em 22/09/2026 — os RIPs anteriores não o têm, e o assinante
+devolveu dois por isso. O que barra a assinatura de pintura está em [[torg_pintura_pendencias_assinatura]].
+
 Ver [[torg_qualidade]].

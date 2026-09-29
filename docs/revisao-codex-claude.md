@@ -2364,3 +2364,36 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ **Para revisar:** (a) a data de corte é fixa em 28/09/2026 00:00 BRT; (b) livro fechado sem `emitidoEm` (caso
   OP-114) conta como anterior ao corte; (c) títulos de volume já gravados em `DataBookArquivo` antes do deploy
   mantêm o texto antigo até serem regerados.
+- **(29/09) Relatório de pintura: não vai para assinatura com procedimento de preparo, horários ou inspeção visual
+  em branco.** Geraldo: *"RIP 089-002 não está puxando o horário final"*; depois o procedimento e, no 003, o
+  "APROVADO" da 2ª e 3ª demão. **Não era o PDF**: os campos nunca foram gravados. O celular só ganhou `hFim` em
+  22/09 (`bf32c164`), e os dois RIPs são de 14/09. O `prepProcedimento` só vinha do PLP, e a OP-089 não tem. A
+  inspeção visual não foi marcada. Os dois voltaram duas vezes do assinante, e o reenvio das 14h42 não teve
+  nenhuma gravação desde a devolução (AuditLog). Vitor: *"não deixar ir para assinatura sem esses campos
+  preenchidos e já corrija esses outros pontos"*. Três commits, cada um no ar separado:
+  - `30b49662` — a rota do computador cortava cada valor da demão em 60 caracteres (o celular aceita 300); o
+    teto passa a ser um só, `LIMITE_VALOR_DEMAO`. Medido: nenhum RIP passava de 60.
+  - `504c77a3` — relatório novo nasce com `prepProcedimento` = `PLP_PADRAO.preparoMetodo` ("Jateamento
+    abrasivo") quando o PLP não existe ou não diz o método. O snapshot `padroesInspecao.plp` não ganha o padrão.
+  - `3aa31b1d` — `pendenciasPintura` dentro de `pendenciasParaAssinatura`. Cobra o procedimento de preparo
+    sempre e, em cada demão APLICADA, data, hIni, hFim e visual. Aplicada = tem algo além de
+    `CAMPOS_DEMAO_DA_OBRA` (produto/fabricante/cor/método, a mesma lista da memória da OP) ou tem leitura de
+    espessura.
+
+  Testes novos:
+  - `inspecao-demaos-limite` (2);
+  - `pendencias-pintura` (7);
+  - `padroes-inspecao` (+2).
+
+  O teste de reenvio de convite ganhou o procedimento no fixture. O vermelho foi provado no código de antes, numa
+  worktree limpa: 6 falhas, e os casos negativos passam. Suíte 4.372/4.372; o estado "só B" também fechou
+  4.365/4.365. `checar` limpo, eslint sem erro. Tela não validada logada (o servidor local fala com produção e não
+  há credencial de teste). **Dados: nada alterado.** Os 7 RIPs sem horário final (e 6 sem procedimento de
+  preparo) seguem como estão, e a hora real é do inspetor. O que já foi enviado não é barrado; o próximo envio
+  depois de uma revisão é.
+  ⚠ **Para revisar:**
+  - (a) a definição de demão aplicada;
+  - (b) o padrão do PO-05 também quando o PLP existe mas não diz o método;
+  - (c) aderência e condições ambientais da demão ficaram fora da trava;
+  - (d) relatório sem nenhuma demão aplicada (só preparação) continua podendo ir, cobrando só o procedimento;
+  - (e) "APROVADO" é texto livre nas duas telas, então qualquer texto satisfaz a inspeção visual.
