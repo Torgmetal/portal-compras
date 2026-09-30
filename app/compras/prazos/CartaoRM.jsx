@@ -175,7 +175,10 @@ function HistoricoPrevisao({ p }) {
                 de entrega para saber qual era a data inicial mais fácil"). A nova já está na linha
                 "Previsão" logo acima; o que a pessoa procura aqui é de onde ela saiu. */}
             {h.de && <> de <b data-data-anterior className="font-semibold text-torg-dark bg-amber-50 border border-amber-200 rounded px-1">{fmt(h.de)}</b></>}
-            {" "}para {fmt(h.para)} em {fmtDia(h.em)}
+            {/* ⚠ E a NOVA também (Matheus, 30/09/2026: "deixe a data nova mais destacada"), em AZUL:
+                âmbar é "de onde saiu", azul é "o que vale agora" — com a mesma cor as duas virariam
+                uma coisa só e a pessoa voltaria a ler a frase inteira para saber qual é qual. */}
+            {" "}para <b data-data-nova className="font-bold text-torg-blue bg-sky-50 border border-sky-300 rounded px-1">{fmt(h.para)}</b> em {fmtDia(h.em)}
             {h.motivo && <> — <span className={h.doFornecedor ? "italic" : "text-torg-dark"}>“{h.motivo}”</span></>}
             {h.por && <span className="text-gray-400"> · {h.por}</span>}
           </span>

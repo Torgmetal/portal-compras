@@ -73,6 +73,15 @@ describe("o cartão mostra a data de entrega remarcada", () => {
     expect(container.querySelector("[data-data-anterior]")?.textContent).toBe("08/09/2026");
   });
 
+  it("a data NOVA também sai destacada, com outra cor — Matheus (30/09/2026)", () => {
+    const [linha] = agruparPorRM([pedido([hist("h1", "2026-09-16", "2026-10-01", "Entrega Programada", "2026-09-24T21:48:00Z")])], AGORA);
+    const { container } = render(<CartaoRM l={linha} onDecidido={() => {}} />);
+    const nova = container.querySelector("[data-data-nova]");
+    expect(nova?.textContent).toBe("01/10/2026");
+    // ⚠ cor diferente da anterior: as duas lado a lado com o mesmo fundo virariam uma só coisa
+    expect(nova.className).not.toBe(container.querySelector("[data-data-anterior]").className);
+  });
+
   it("caso real #2010: sem observação, a alteração aparece mesmo assim", () => {
     const [linha] = agruparPorRM([pedido([hist("h1", "2026-09-09", "2026-10-30", null, "2026-09-24T21:50:00Z")])], AGORA);
     const { container } = render(<CartaoRM l={linha} onDecidido={() => {}} />);

@@ -1,7 +1,12 @@
 {
-  "build": 3545,
-  "gerado": "2026-09-30T14:40:08.543Z",
+  "build": 3546,
+  "gerado": "2026-09-30T14:40:08.658Z",
   "commits": [
+    {
+      "hash": "16141b04a4",
+      "data": "30/09/2026",
+      "titulo": "Inspeção de pintura: cor aplicada aceita 'Outra cor…' além das do PLP"
+    },
     {
       "hash": "b16f4ec907",
       "data": "30/09/2026",
@@ -146,11 +151,6 @@
       "hash": "fe64938f77",
       "data": "26/09/2026",
       "titulo": "Assistente Fiscal: contrato das ferramentas descrito e cabeçalho beta de cache removido"
-    },
-    {
-      "hash": "cf3f61fe6c",
-      "data": "26/09/2026",
-      "titulo": "Torguinho: contrato das ferramentas corrigido e prompt sem instruções de modelos antigos"
     }
   ]
 }
