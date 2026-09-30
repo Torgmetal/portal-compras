@@ -1,7 +1,12 @@
 {
-  "build": 3551,
-  "gerado": "2026-09-30T23:11:46.475Z",
+  "build": 3552,
+  "gerado": "2026-09-30T23:12:32.145Z",
   "commits": [
+    {
+      "hash": "35e58c86",
+      "data": "30/09/2026",
+      "titulo": "Docs: banner do Outubro Rosa — memória e registro de revisão"
+    },
     {
       "hash": "9b83f7f3",
       "data": "30/09/2026",
@@ -146,11 +151,6 @@
       "hash": "887cc351",
       "data": "26/09/2026",
       "titulo": "docs: 11 produtos inativados no Omie pela tela em 26/09 (materiais sem saldo)"
-    },
-    {
-      "hash": "e61b33d3",
-      "data": "26/09/2026",
-      "titulo": "docs: normas do Tekla no Omie, cadastro fiscal pelas notas de compra e decisões dos PRD (26/09)"
     }
   ]
 }

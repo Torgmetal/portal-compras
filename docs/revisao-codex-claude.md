@@ -2487,3 +2487,4 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (a) uma vez por APARELHO, não por pessoa: quem usa dois aparelhos vê duas vezes;
   - (b) o banner fica atrás do vídeo obrigatório do mural (z 90 × 100), caso os dois coincidam;
   - (c) a janela abre também para clientes sem login, e esse é o pedido.
+- **(30/09) Outubro Rosa aprovado.** Vitor: *"pode deixar tudo aprovado e pronto para ser publicado"*. O slogan ("A Torg Metal apoia a prevenção do câncer de mama.") deixa de ser proposta, o que fecha o item (a) da entrada de `f8af7d21`. Nada a publicar além do que já está no ar: faixa, laço, Torguinho, e-mail e banner trocam sozinhos às 00h00 de 01/10 (Brasília).

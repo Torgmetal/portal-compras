@@ -30,8 +30,8 @@ Vitor (30/09/2026): *"para amanhã precisamos mudar nossa campanha de marketing 
 - ⚠ **O `preview_start` sobe o CHECKOUT PRINCIPAL, não a worktree** — validar tela de uma worktree por ali
   mostra o código antigo. Validado em jsdom (`testes/campanha-telas.teste.jsx`) e, depois do deploy, no
   portal no ar com `?campanha=outubro-rosa` na tela de entrada (pública).
-- Slogan do Outubro Rosa **proposto** (30/09): "A Torg Metal apoia a prevenção do câncer de mama." — mesmo
-  registro do Setembro (a Torg apoia; sem telefone nem instrução médica na frente do cliente).
+- Slogan do Outubro Rosa **aprovado pelo Vitor** (30/09/2026): "A Torg Metal apoia a prevenção do câncer de
+  mama." — mesmo registro do Setembro (a Torg apoia; sem telefone nem instrução médica na frente do cliente).
 
 **Banner do primeiro acesso** (`components/BannerCampanha`, 30/09/2026): campanha com `banner` no calendário abre
 uma janela UMA vez por aparelho (localStorage `torg:campanha-vista:<id>:<ano>`), para equipe E clientes.
