@@ -1,7 +1,12 @@
 {
-  "build": 3540,
-  "gerado": "2026-09-29T19:08:30.331Z",
+  "build": 3541,
+  "gerado": "2026-09-30T10:47:39.944Z",
   "commits": [
+    {
+      "hash": "b8700811",
+      "data": "29/09/2026",
+      "titulo": "Docs: fila de assinatura do relatório de inspeção — memória e registro de revisão"
+    },
     {
       "hash": "8b0eb6b9",
       "data": "29/09/2026",
@@ -146,11 +151,6 @@
       "hash": "7a36e64a",
       "data": "26/09/2026",
       "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
-    },
-    {
-      "hash": "d99aae0a",
-      "data": "26/09/2026",
-      "titulo": "Memória e revisão: a rodada das 13h completou (103 s) com o saldo por local"
     }
   ]
 }
