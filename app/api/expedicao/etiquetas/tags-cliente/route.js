@@ -11,7 +11,7 @@
 // sem destino e a outra metade com o destino errado — ver `lib/parse-equivalencia-tag.js`.
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaDirect } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { parseEquivalenciaTag } from "@/lib/parse-equivalencia-tag";
 import { conferirCobertura, salvarTagsCliente, tagsDaOP } from "@/lib/etiqueta-tag-cliente";
@@ -86,7 +86,8 @@ export async function POST(req) {
 
   let resultado;
   try {
-    resultado = await salvarTagsCliente(prisma, dados.op.numero, lido.unidades);
+    // ⚠ conexão direta: o pooler estoura com o statement em lote (regra de bulk write do CLAUDE.md)
+    resultado = await salvarTagsCliente(prismaDirect, dados.op.numero, lido.unidades);
   } catch (e) {
     registro.erro("falha ao gravar:", e?.message);
     return NextResponse.json({ success: false, error: "Não consegui gravar: " + e.message }, { status: 500 });

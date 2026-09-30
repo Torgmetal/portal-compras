@@ -1,7 +1,12 @@
 {
-  "build": 3546,
-  "gerado": "2026-09-30T14:40:08.658Z",
+  "build": 3547,
+  "gerado": "2026-09-30T19:29:25.390Z",
   "commits": [
+    {
+      "hash": "82466563ba",
+      "data": "30/09/2026",
+      "titulo": "Prazos das RMs: data nova da remarcação destacada em azul, ao lado da anterior em âmbar"
+    },
     {
       "hash": "16141b04a4",
       "data": "30/09/2026",
@@ -146,11 +151,6 @@
       "hash": "38af6f13f5",
       "data": "26/09/2026",
       "titulo": "CLAUDE.md: fatos atualizados e regras de módulo carregadas sob demanda"
-    },
-    {
-      "hash": "fe64938f77",
-      "data": "26/09/2026",
-      "titulo": "Assistente Fiscal: contrato das ferramentas descrito e cabeçalho beta de cache removido"
     }
   ]
 }
