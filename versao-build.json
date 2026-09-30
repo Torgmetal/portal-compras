@@ -1,7 +1,12 @@
 {
-  "build": 3549,
-  "gerado": "2026-09-30T22:26:43.362Z",
+  "build": 3550,
+  "gerado": "2026-09-30T23:06:31.262Z",
   "commits": [
+    {
+      "hash": "3a561bab",
+      "data": "30/09/2026",
+      "titulo": "Docs: campanha do mês (Outubro Rosa) — memória e registro de revisão"
+    },
     {
       "hash": "f8af7d21",
       "data": "30/09/2026",
@@ -146,11 +151,6 @@
       "hash": "cb671756",
       "data": "26/09/2026",
       "titulo": "docs: duplicados do Omie revalidados em 26/09 — 3 chapas inativadas com saldo"
-    },
-    {
-      "hash": "3e38aa95",
-      "data": "26/09/2026",
-      "titulo": "docs: Torguinho fica no Haiku (decisão do Vitor, 26/09)"
     }
   ]
 }

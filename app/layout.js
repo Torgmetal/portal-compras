@@ -5,6 +5,7 @@ import NextAuthProvider from "@/components/SessionProvider";
 import TorguinhoChat from "@/components/TorguinhoChat";
 import AvisoVideoModal from "@/components/AvisoVideoModal";
 import FaixaCampanha from "@/components/FaixaCampanha";
+import BannerCampanha from "@/components/BannerCampanha";
 import FaixaDemo from "@/components/FaixaDemo";
 
 export const metadata = {
@@ -20,6 +21,7 @@ export default function RootLayout({ children }) {
           <StoreProvider>
             <FaixaDemo />
             <FaixaCampanha />
+            <BannerCampanha />
             {children}
             <Toast />
             <TorguinhoChat />
