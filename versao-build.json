@@ -1,7 +1,12 @@
 {
-  "build": 3541,
-  "gerado": "2026-09-30T10:47:39.944Z",
+  "build": 3542,
+  "gerado": "2026-09-30T10:52:39.629Z",
   "commits": [
+    {
+      "hash": "7c87a7c3",
+      "data": "30/09/2026",
+      "titulo": "GRD da Engenharia: GRD nova voltou a entrar — nenhuma entrava desde 31/08"
+    },
     {
       "hash": "b8700811",
       "data": "29/09/2026",
@@ -146,11 +151,6 @@
       "hash": "02c4259c",
       "data": "26/09/2026",
       "titulo": "Memória: o estudo 316 carregava dado da TMSA num orçamento do QWS"
-    },
-    {
-      "hash": "7a36e64a",
-      "data": "26/09/2026",
-      "titulo": "Merge remote-tracking branch 'origin/main' into claude/funny-lederberg-012e97"
     }
   ]
 }

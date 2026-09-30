@@ -16,6 +16,16 @@ Formato do arquivo: `FORM 09 - GRD-<nº>_R<rev>.xlsx`, uma aba. Cabeçalho traz 
 - ⚠️⚠️ **Ler o cabeçalho célula a célula, NUNCA o bloco de linhas de uma vez.** `map(txt)` sobre array de arrays transforma cada linha na string `",,PCP,,,,,,OP: T105B,,,"` — o regex casa nela e "Para" volta com a linha inteira dentro, enquanto data, peso e OP saem nulos. **Os itens continuam lendo certo**, o que torna o erro fácil de não ver.
 - ⚠️ **A chave é o `itemId` do arquivo, não o número da GRD.** Revisão vira arquivo novo (`_R01`) e as duas versões coexistem na pasta; guardar por número apagaria a R00 — e o histórico de revisão é o que o procedimento pede. Na tela a superada aparece esmaecida, não sumida.
 - ⚠️ **Só lê o que mudou** (compara `lastModifiedDateTime`): são 485 planilhas, e cada leitura é um download.
+- ⚠️⚠️ **DATA SE COMPARA COMO INSTANTE, NUNCA COMO TEXTO — e "cron ok" não prova que entrou algo.**
+  De 31/08 a 30/09/2026 nenhuma GRD nova entrou (faltavam a 482 a 515), com o heartbeat verde 3× por dia.
+  O Graph manda `2026-01-24T19:09:42Z` e o banco devolve `…:42.000Z`: comparando o texto, as 514 pareciam
+  alteradas, o limite de 40 pegava sempre GRD-00, 01, 02… e as novas nunca eram lidas. Conserto em
+  `arquivosPendentes` (compara `getTime()`, e a GRD nova vem antes da alterada). **Para conferir se está em
+  dia:** `max(createdAt)` de `GrdEngenharia` contra o arquivo mais novo da pasta, não o heartbeat.
+- ⚠️ **Nome com espaço antes do `.xlsx`** (`GRD-392_R00 .xlsx`, 411, 413) ficava fora do filtro da listagem e
+  nunca tinha entrado; `RX_GRD` aceita o espaço desde 30/09/2026 (`dadosDoNome` já aceitava).
+- ⚠️ A remessa (Engenharia → Gabriel) é gravada com a data em que o PORTAL registrou a GRD. As 37 que entraram
+  atrasadas em 30/09/2026 aparecem remetidas nesse dia, não no dia em que foram salvas na pasta.
 
 **A regra do alerta (Vitor, 31/08):** GRD nova **não** manda e-mail — é o fluxo normal, várias por dia, e avisar de todas vira ruído. Avisa só quando **um projeto que já desceu R00 volta em R01**, e só se o R00 estiver registrado no banco (GRD que chega direto em R01 nunca desceu pelo portal). Destinatário: Gabriel `engenharia3@torg.com.br`. Cron 11h/17h/21h em dia útil. As 470 da carga inicial foram marcadas `avisadoEm` para não disparar alerta retroativo.
 

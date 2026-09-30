@@ -2428,3 +2428,22 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (c) o e-mail da vez vai sem o PDF anexo, só com o link;
   - (d) no espaço do cliente, falha ao ler a fila derruba a página, como as outras consultas principais;
   - (e) envios em andamento (RIP-089-002/003) seguem em paralelo até a próxima revisão.
+- **(30/09) GRD da Engenharia: nenhuma GRD nova entrava desde 31/08.** Vitor: *"as GRDs do planejamento e da
+  Engenharia não estão atualizando"*. O heartbeat `grd-sincronizar` estava verde 3× por dia, mas o banco tinha
+  480 GRDs contra 514 na pasta. Faltavam a 482 a 515 (01/09 a 29/09).
+  - **Causa:** a comparação "mudou?" era de texto (`"…:42Z"` do Graph × `"…:42.000Z"` do banco), então todas
+    pareciam alteradas. O limite de 40 pegava sempre GRD-00, 01, 02…
+  - **`7c87a7c3`:** `arquivosPendentes` compara o instante e põe a nova antes da alterada. `RX_GRD` aceita
+    espaço antes do `.xlsx`, o que recupera a 392, a 411 e a 413, que também nunca tinham entrado.
+  - **Testes:** `grd-engenharia-sync` (6). Vermelho provado com a lógica antiga extraída sem mudança. Suíte
+    4.404/4.404, `checar` limpo.
+  - **Simulação contra a pasta real (só leitura):** 517 GRDs, 37 pendentes, e a próxima rodada lê as 37.
+  - **GRD do PCP (`/pcp/grd`) conferida e em dia:** 52 liberações em 30/09, a última às 07h26, todas com PDF
+    carimbado arquivado.
+
+  ⚠ **Para revisar:**
+  - (a) as 37 atrasadas entram com a remessa (Engenharia → Gabriel) datada no dia da importação, que é a
+    semântica documentada ("o portal registra"), e não na data do arquivo;
+  - (b) a 392, a 411 e a 413 são anteriores ao registro de remessa e mesmo assim ganham remessa, porque entram
+    como registro novo;
+  - (c) GRD R01 nova com R00 no banco dispara o e-mail de revisão ao Gabriel, que é o comportamento normal.
