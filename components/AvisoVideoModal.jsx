@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Headphones } from "lucide-react";
-import { LACO } from "@/lib/campanha";
+import { campanhaHoje } from "@/lib/campanha";
 
 // ─── COMUNICADO EM VÍDEO, COM CIÊNCIA OBRIGATÓRIA ─────────────────────────────
 // Vitor (30/08/2026): "não poderia dar para adiar, e registrar seria maravilhoso pois isso conta
@@ -59,6 +59,8 @@ export default function AvisoVideoModal() {
   }
 
   if (!aviso) return null;
+  // ⚠ o cabeçalho é o da campanha do MÊS; vídeo fora de campanha abre com o título do próprio aviso
+  const campanha = campanhaHoje();
 
   return (
     // sem onClick de fechar no fundo e sem tecla ESC: é obrigatório de propósito
@@ -67,33 +69,40 @@ export default function AvisoVideoModal() {
 
         {/* ── abertura ── */}
         <div className="relative overflow-hidden bg-[#0D1F3C]">
-          {/* o brilho amarelo atrás do laço: dá profundidade sem virar gradiente de banner */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0"
-            style={{ background: "radial-gradient(ellipse 60% 90% at 18% 50%, rgba(244,192,0,0.20), transparent 70%)" }}
-          />
+          {/* o brilho da cor da campanha atrás do laço: dá profundidade sem virar gradiente de banner */}
+          {campanha && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0"
+              style={{ background: `radial-gradient(ellipse 60% 90% at 18% 50%, rgba(${campanha.cor.brilho},0.20), transparent 70%)` }}
+            />
+          )}
           <div
             className={`relative flex items-center gap-6 px-8 transition-all duration-500 sm:gap-8 sm:px-12 ${
               tocando ? "py-5" : "py-10 sm:py-12"
             }`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={LACO}
-              alt=""
-              aria-hidden="true"
-              className={`shrink-0 drop-shadow-[0_6px_18px_rgba(244,192,0,0.35)] transition-all duration-500 ${
-                tocando ? "h-12 w-12" : "h-24 w-24 sm:h-28 sm:w-28"
-              }`}
-            />
+            {campanha && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={campanha.laco}
+                alt=""
+                aria-hidden="true"
+                style={{ filter: `drop-shadow(0 6px 18px rgba(${campanha.cor.brilho},0.35))` }}
+                className={`shrink-0 transition-all duration-500 ${
+                  tocando ? "h-12 w-12" : "h-24 w-24 sm:h-28 sm:w-28"
+                }`}
+              />
+            )}
             <div className="min-w-0">
               <h2
                 className={`font-light leading-none tracking-tight text-white transition-all duration-500 ${
                   tocando ? "text-xl" : "text-3xl sm:text-5xl"
                 }`}
               >
-                Setembro <span className="font-bold text-[#F4C000]">Amarelo</span>
+                {campanha ? (
+                  <>{campanha.partes[0]} <span className="font-bold" style={{ color: campanha.cor.destaque }}>{campanha.partes[1]}</span></>
+                ) : aviso.titulo}
               </h2>
               {!tocando ? (
                 <>

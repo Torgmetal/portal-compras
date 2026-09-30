@@ -11,7 +11,7 @@ import { AREAS, SECOES, SECAO } from "@/lib/portal-cliente";
 import ModeloObraCliente from "./ModeloObraCliente";
 import TorguinhoCliente from "./TorguinhoCliente";
 import MatrizComunicacao from "./MatrizComunicacao";
-import SeloSetembroAmarelo from "@/components/SeloSetembroAmarelo";
+import SeloCampanha from "@/components/SeloCampanha";
 
 const AREA_NOME = Object.fromEntries(AREAS.map((a) => [a.id, a.nome]));
 const AREA_RESUMO = Object.fromEntries(AREAS.map((a) => [a.id, a.resumo]));
@@ -175,7 +175,7 @@ export default function PortalClienteView({ token }) {
               ficar mais visível" — no navy da capa, a marca em h-9 sumia. As duas crescem JUNTAS:
               encolher a do cliente pra destacar a nossa contradiz o motivo delas estarem lado a
               lado. A sombra é pra capa com foto clara no topo, onde o logo branco encostava no céu. */}
-          {/* ⚠ o selo do Setembro Amarelo entra NESTA linha, não numa própria: Vitor pediu
+          {/* ⚠ o selo da campanha do mês entra NESTA linha, não numa própria: Vitor pediu
               "posicionado correto, igual ao nosso logo" — mesma altura das marcas, encostado à
               direita. Linha separada faria ele flutuar acima do logo e desalinhar o cabeçalho. */}
           <div className={`flex items-center gap-6 ${abaAtiva === "MODELO" ? "mb-4" : "mb-10"}`}>
@@ -192,7 +192,7 @@ export default function PortalClienteView({ token }) {
                 </span>
               </>
             )}
-            <SeloSetembroAmarelo className="ml-auto" />
+            <SeloCampanha className="ml-auto" />
           </div>
 
           <p className="text-[11px] tracking-[0.22em] font-semibold text-[#9fc0dd] uppercase">

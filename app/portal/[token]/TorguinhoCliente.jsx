@@ -14,10 +14,10 @@
 // (lib/portal-assistente). Esta tela é só a conversa.
 import { useEffect, useRef, useState } from "react";
 import { Send, Loader2, X, MessageCircle } from "lucide-react";
-import { emSetembroAmarelo, TORGUINHO_LACO } from "@/lib/campanha";
+import { campanhaHoje } from "@/lib/campanha";
 import { fraseDoDiaCliente } from "@/lib/torguinho-frases-cliente";
 
-const AVATAR = emSetembroAmarelo() ? TORGUINHO_LACO : "/torguinho.png";
+const AVATAR = campanhaHoje()?.torguinho || "/torguinho.png";
 
 const SUGESTOES = [
   "O que já foi expedido?",

@@ -5,11 +5,11 @@ import { X, Send, Loader2, ChevronDown, Paperclip, Download, FileSpreadsheet, Fi
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { fraseDoDia } from "@/lib/torguinho-frases";
-import { emSetembroAmarelo, TORGUINHO_LACO } from "@/lib/campanha";
+import { campanhaHoje } from "@/lib/campanha";
 
-// ⚠ Em setembro ele veste o laço — presença da campanha o mês inteiro, sem pesar em nada.
-// Volta ao normal sozinho em outubro (a conta é em horário de Brasília, ver lib/campanha).
-const AVATAR = emSetembroAmarelo() ? TORGUINHO_LACO : "/torguinho.png";
+// ⚠ No mês de campanha ele veste o laço dela (Setembro Amarelo, Outubro Rosa…) — presença o mês
+// inteiro, sem pesar em nada. Troca e volta ao normal sozinho (horário de Brasília, ver lib/campanha).
+const AVATAR = campanhaHoje()?.torguinho || "/torguinho.png";
 
 // ─── Renderiza markdown simples (negrito, listas, emojis) ─────────────────────
 function MensagemTexto({ texto }) {

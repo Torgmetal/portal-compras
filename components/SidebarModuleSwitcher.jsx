@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { ChevronDown, ChevronRight, LayoutGrid } from "lucide-react";
 import TorgLogo from "@/components/TorgLogo";
 import ToggleSidebar from "@/components/ToggleSidebar";
-import { emSetembroAmarelo, LACO } from "@/lib/campanha";
+import { campanhaExibida } from "@/lib/campanha";
 import { usarPrevia } from "@/lib/campanha-previa";
 import { modulosPermitidos } from "@/lib/modulos-portal";
 
@@ -46,7 +46,7 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
   const modulosVisiveis = modulosPermitidos(session?.user);
 
   // Só mostra o switcher se tem mais de 1 módulo acessível
-  const mostrarLaco = emSetembroAmarelo() || usarPrevia();
+  const campanha = campanhaExibida(usarPrevia());
   const temMultiplos = modulosVisiveis.length > 1;
 
   return (
@@ -67,9 +67,9 @@ export default function SidebarModuleSwitcher({ moduloAtual }) {
             superior de TODA tela do portal — o login a pessoa vê uma vez por dia, este ela vê o
             dia inteiro. Fica DEPOIS do logo e antes da seta, para não separar a marca do controle
             de troca de módulo. */}
-        {mostrarLaco ? (
+        {campanha ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={LACO} alt="Setembro Amarelo" title="Setembro Amarelo — a Torg Metal apoia a valorização da vida"
+          <img src={campanha.laco} alt={campanha.nome} title={`${campanha.nome} — ${campanha.slogan}`}
             // ⚠ `-ml-4`: o SVG do logo tem folga interna à direita, e com o gap normal o laço
             // ficava solto, parecendo outro elemento em vez de par da marca.
             className="-ml-4 h-7 w-7 shrink-0" />

@@ -1,156 +1,156 @@
 {
-  "build": 3547,
-  "gerado": "2026-09-30T19:29:25.390Z",
+  "build": 3548,
+  "gerado": "2026-09-30T22:19:06.253Z",
   "commits": [
     {
-      "hash": "82466563ba",
+      "hash": "1c98a64c",
+      "data": "30/09/2026",
+      "titulo": "Etiquetas: importar as TAGs do cliente grava em lote — a OP-105 estourava o tempo (504)"
+    },
+    {
+      "hash": "82466563",
       "data": "30/09/2026",
       "titulo": "Prazos das RMs: data nova da remarcação destacada em azul, ao lado da anterior em âmbar"
     },
     {
-      "hash": "16141b04a4",
+      "hash": "16141b04",
       "data": "30/09/2026",
       "titulo": "Inspeção de pintura: cor aplicada aceita 'Outra cor…' além das do PLP"
     },
     {
-      "hash": "b16f4ec907",
+      "hash": "b16f4ec9",
       "data": "30/09/2026",
       "titulo": "Fiscal: paginação inválida do Omie derruba a coleta; simulação antiga não reaparece na obra nova"
     },
     {
-      "hash": "1f5aae6c9e",
+      "hash": "1f5aae6c",
       "data": "30/09/2026",
       "titulo": "Fiscal: regras de IBS/CBS não contam nota duas vezes nem apagam tudo com resposta ruim do Omie"
     },
     {
-      "hash": "dc036abea7",
+      "hash": "dc036abe",
       "data": "30/09/2026",
       "titulo": "Docs: GRD da Engenharia parada de 31/08 a 30/09 — memória e registro de revisão"
     },
     {
-      "hash": "7c87a7c388",
+      "hash": "7c87a7c3",
       "data": "30/09/2026",
       "titulo": "GRD da Engenharia: GRD nova voltou a entrar — nenhuma entrava desde 31/08"
     },
     {
-      "hash": "b8700811ae",
+      "hash": "b8700811",
       "data": "29/09/2026",
       "titulo": "Docs: fila de assinatura do relatório de inspeção — memória e registro de revisão"
     },
     {
-      "hash": "8b0eb6b972",
+      "hash": "8b0eb6b9",
       "data": "29/09/2026",
       "titulo": "Inspeções: a tela diz quem está com a vez e quem espera na fila de assinatura"
     },
     {
-      "hash": "28b45ed058",
+      "hash": "28b45ed0",
       "data": "29/09/2026",
       "titulo": "Relatório de inspeção assina em fila: inspetor → Torg Metal → cliente"
     },
     {
-      "hash": "bd2a99764b",
+      "hash": "bd2a9976",
       "data": "29/09/2026",
       "titulo": "Docs: trava de assinatura do RIP de pintura — memória e registro de revisão"
     },
     {
-      "hash": "3aa31b1d40",
+      "hash": "3aa31b1d",
       "data": "29/09/2026",
       "titulo": "Pintura: RIP não vai para assinatura com procedimento, horários ou visual em branco"
     },
     {
-      "hash": "504c77a380",
+      "hash": "504c77a3",
       "data": "29/09/2026",
       "titulo": "Pintura: OP sem PLP passa a nascer com o procedimento de preparo do PO-05"
     },
     {
-      "hash": "30b496626f",
+      "hash": "30b49662",
       "data": "29/09/2026",
       "titulo": "Pintura: salvar no computador não corta mais os lotes da demão em 60 caracteres"
     },
     {
-      "hash": "1604458c5a",
+      "hash": "1604458c",
       "data": "28/09/2026",
       "titulo": "Cotação: fornecedor volta a conseguir declinar — rota faltava na allowlist do middleware"
     },
     {
-      "hash": "9146a41a27",
+      "hash": "9146a41a",
       "data": "28/09/2026",
       "titulo": "docs: conferir o deploy pela API de status do GitHub (sem login na Vercel)"
     },
     {
-      "hash": "2d3d1310cf",
+      "hash": "2d3d1310",
       "data": "28/09/2026",
       "titulo": "Data Book: índice de 1 a 19 (a §18 saiu em junho e ficou o buraco)"
     },
     {
-      "hash": "fd58db5762",
+      "hash": "fd58db57",
       "data": "26/09/2026",
       "titulo": "docs: Quality Welding inativada, zerar peso pela API (0,0001) e o grupo de telhas"
     },
     {
-      "hash": "1bb1666167",
+      "hash": "1bb16661",
       "data": "26/09/2026",
       "titulo": "docs: cadastro do Omie gravado (fiscal, pesos, unidades, CEST) e os \"duplicados\" que eram material de terceiro"
     },
     {
-      "hash": "bfc1fffec5",
+      "hash": "bfc1fffe",
       "data": "26/09/2026",
       "titulo": "Produtos do Omie: o cache do portal passa a sincronizar todo dia (era às segundas)"
     },
     {
-      "hash": "9fef5953b1",
+      "hash": "9fef5953",
       "data": "26/09/2026",
       "titulo": "docs: famílias de 134 produtos no Omie e três armadilhas da API de produto (26/09)"
     },
     {
-      "hash": "cc0a79f466",
+      "hash": "cc0a79f4",
       "data": "26/09/2026",
       "titulo": "docs: RM T102-001-R00 atualizada para o código que ficou (26/09)"
     },
     {
-      "hash": "ddccd6aaf9",
+      "hash": "ddccd6aa",
       "data": "26/09/2026",
       "titulo": "docs: duplicados do Omie zerados e inativados; pedido 1721 no código que fica (26/09)"
     },
     {
-      "hash": "0fe8d0f6e2",
+      "hash": "0fe8d0f6",
       "data": "26/09/2026",
       "titulo": "docs: tubo 201000008 zerado e inativado; demais zeramentos e o pedido 1721 ficaram pendentes (26/09)"
     },
     {
-      "hash": "97965b4657",
+      "hash": "97965b46",
       "data": "26/09/2026",
       "titulo": "docs: 9 chapas CIVIL 300 e 2 descrições corrigidas no Omie pela tela (26/09)"
     },
     {
-      "hash": "887cc351d5",
+      "hash": "887cc351",
       "data": "26/09/2026",
       "titulo": "docs: 11 produtos inativados no Omie pela tela em 26/09 (materiais sem saldo)"
     },
     {
-      "hash": "e61b33d33f",
+      "hash": "e61b33d3",
       "data": "26/09/2026",
       "titulo": "docs: normas do Tekla no Omie, cadastro fiscal pelas notas de compra e decisões dos PRD (26/09)"
     },
     {
-      "hash": "cb67175679",
+      "hash": "cb671756",
       "data": "26/09/2026",
       "titulo": "docs: duplicados do Omie revalidados em 26/09 — 3 chapas inativadas com saldo"
     },
     {
-      "hash": "3e38aa9533",
+      "hash": "3e38aa95",
       "data": "26/09/2026",
       "titulo": "docs: Torguinho fica no Haiku (decisão do Vitor, 26/09)"
     },
     {
-      "hash": "7f48671c39",
+      "hash": "7f48671c",
       "data": "26/09/2026",
       "titulo": "docs: registro da auditoria de prompts e memória (formato estruturado, Torguinho)"
-    },
-    {
-      "hash": "38af6f13f5",
-      "data": "26/09/2026",
-      "titulo": "CLAUDE.md: fatos atualizados e regras de módulo carregadas sob demanda"
     }
   ]
 }

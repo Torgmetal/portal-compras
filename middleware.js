@@ -261,6 +261,9 @@ export default withAuth(
 
 export const config = {
   matcher: [
+    // ⚠ `campanhas` (lib/campanha.js): laço e Torguinho de cada campanha do mês. Aparecem na tela de
+    // login, no portal do cliente e nos e-mails — lugares sem sessão. `laco-setembro` fica pelos e-mails
+    // de setembro de 2026, que apontam para o arquivo antigo.
     // ⚠ `laco-setembro` entra pelo mesmo motivo: o laço aparece na TELA DE LOGIN e nas telas do
     // cliente, onde não há sessão — sem a exceção o middleware manda o PNG para o /entrar (307) e
     // a campanha fica com um ícone de imagem quebrada.
@@ -271,6 +274,6 @@ export const config = {
     // portal do cliente não há sessão nenhuma — sem a exceção o middleware devolve o HTML do
     // /entrar no lugar do binário e o visualizador morre com "both async and sync fetching of the
     // wasm failed", que não diz a ninguém que o problema é de rota.
-    "/((?!_next/static|_next/image|favicon.ico|obras|torg-logo.*|estrutura-3d|equipe|laco-setembro|wasm).*)",
+    "/((?!_next/static|_next/image|favicon.ico|obras|torg-logo.*|estrutura-3d|equipe|laco-setembro|campanhas|wasm).*)",
   ],
 };
