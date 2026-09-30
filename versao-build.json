@@ -1,7 +1,12 @@
 {
-  "build": 3550,
-  "gerado": "2026-09-30T23:06:31.262Z",
+  "build": 3551,
+  "gerado": "2026-09-30T23:11:46.475Z",
   "commits": [
+    {
+      "hash": "9b83f7f3",
+      "data": "30/09/2026",
+      "titulo": "Outubro Rosa: banner com a mensagem no primeiro acesso, para equipe e clientes"
+    },
     {
       "hash": "3a561bab",
       "data": "30/09/2026",
@@ -146,11 +151,6 @@
       "hash": "e61b33d3",
       "data": "26/09/2026",
       "titulo": "docs: normas do Tekla no Omie, cadastro fiscal pelas notas de compra e decisões dos PRD (26/09)"
-    },
-    {
-      "hash": "cb671756",
-      "data": "26/09/2026",
-      "titulo": "docs: duplicados do Omie revalidados em 26/09 — 3 chapas inativadas com saldo"
     }
   ]
 }

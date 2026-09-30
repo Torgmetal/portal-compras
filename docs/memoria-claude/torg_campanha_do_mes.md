@@ -33,4 +33,13 @@ Vitor (30/09/2026): *"para amanhã precisamos mudar nossa campanha de marketing 
 - Slogan do Outubro Rosa **proposto** (30/09): "A Torg Metal apoia a prevenção do câncer de mama." — mesmo
   registro do Setembro (a Torg apoia; sem telefone nem instrução médica na frente do cliente).
 
+**Banner do primeiro acesso** (`components/BannerCampanha`, 30/09/2026): campanha com `banner` no calendário abre
+uma janela UMA vez por aparelho (localStorage `torg:campanha-vista:<id>:<ano>`), para equipe E clientes.
+- ⚠⚠ Texto aprovado pelo Vitor, com a **arte do laço** (ele preferiu à do Torguinho) e **sem mencionar câncer de
+  mama em homens** — pedido explícito dele. Fala com as mulheres (cuidar de si, conversar com o médico) e com os
+  homens (levar a conversa para casa). Sem idade/frequência de exame: orientação médica não é papel da Torg.
+- Não abre em login, assinatura, ata, aceite do data book nem na conferência de peça no pátio (tela cheia no
+  celular). A prévia mostra sempre, mesmo já dispensado.
+- ⚠ Teste com `localStorage`: o Node 26 não traz — usar `vi.stubGlobal("localStorage", …)` como os outros testes.
+
 Ver [[torg_campanha_mural]] (o vídeo com ciência obrigatória, que é outra peça, por data no banco).

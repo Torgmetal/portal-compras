@@ -2473,3 +2473,17 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (c) o avatar do Torguinho é calculado ao carregar a página, então quem estiver com a tela aberta na virada
     só troca ao recarregar;
   - (d) `usarPrevia` agora devolve o id, e não booleano.
+- **(30/09) Outubro Rosa: banner com mensagem no primeiro acesso, para equipe e clientes.** Vitor: *"um banner com a
+  informação e uma mensagem para todos que fizerem o primeiro acesso, incluindo clientes (…) que fale com as pessoas
+  e familiares pois temos homens e mulheres na equipe"*. O rascunho foi aprovado em imagem: arte com o laço e sem a
+  menção a câncer de mama em homens.
+  - **`9b83f7f3`:** `BannerCampanha` no layout raiz, com o texto em `lib/campanha.js` (`banner`). Abre uma vez por
+    aparelho, via localStorage.
+  - **Onde não abre:** login, assinatura, ata, aceite do data book e conferência no pátio. A prévia mostra sempre.
+  - **Testes:** `campanha-banner` (8). Suíte 4.469/4.469, `checar` limpo.
+  - **Conferido no portal no ar** com `?campanha=outubro-rosa`, em computador e celular (Playwright).
+
+  ⚠ **Para revisar:**
+  - (a) uma vez por APARELHO, não por pessoa: quem usa dois aparelhos vê duas vezes;
+  - (b) o banner fica atrás do vídeo obrigatório do mural (z 90 × 100), caso os dois coincidam;
+  - (c) a janela abre também para clientes sem login, e esse é o pedido.
