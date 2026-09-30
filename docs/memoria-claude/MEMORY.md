@@ -45,6 +45,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [RH Documentos](torg_rh_documentos.md) — upload privado (client token >4MB), proxy de download, backup ISO no SharePoint
 - [RH Holerite + bug NaN/Zod](torg_rh_holerite.md) — import/disparo/ciência (PDF); bug "Invalid input: NaN" (z.number() rejeita NaN; `NaN ?? null` não vira null)
 - [RH Ponto — horas extras](torg_rh_ponto_he.md) — ACJEF só marcações; totais confiáveis no PDF do cartão (TORG/VMI); Vitor optou manual
+- [Campanha do mês (laço, Torguinho, faixa, e-mail)](torg_campanha_do_mes.md) — calendário em lib/campanha.js (Setembro Amarelo, Outubro Rosa); troca pelo dia de Brasília; imagens em public/campanhas/<id>/ (middleware libera); material em Marketing/Workspace/Torguinho; Novembro Azul e Natal prontos
 - [Campanha em vídeo no mural](torg_campanha_mural.md) — MuralAviso+MuralCiencia, ciência obrigatória no login; 3 armadilhas (403 do FUNCIONARIO, /public sem sessão, falha do vídeo)
 - [Funcionário × usuário do portal](torg_funcionario_x_usuario.md) — `Funcionario.usuario` só tem 8 de 70; cruzar por e-mail, e domínio NÃO separa interno de externo
 - [Matriz de Competências](torg_matriz_competencias.md) — /rh/competencias (FORM-11/ISO §7.2); POR CARGO (79); falta edição UI, avaliação, PDF

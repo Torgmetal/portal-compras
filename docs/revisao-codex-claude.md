@@ -2447,3 +2447,29 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (b) a 392, a 411 e a 413 são anteriores ao registro de remessa e mesmo assim ganham remessa, porque entram
     como registro novo;
   - (c) GRD R01 nova com R00 no banco dispara o e-mail de revisão ao Gabriel, que é o comportamento normal.
+- **(30/09) Campanha do mês: Outubro Rosa entra sozinha à 00h de 01/10 (Brasília).** Vitor: *"para amanhã
+  precisamos mudar nossa campanha de marketing pois começa o Outubro Rosa (…) tem que ser horário de Brasília"*.
+  O material estava no SERVIDOR (`Marketing/Workspace/Torguinho/Outubro Rosa - 2026`).
+  - **`f8af7d21`:** `lib/campanha.js` virou um calendário (`CAMPANHAS`: mês, nome, laço, Torguinho, slogan,
+    cores), e todas as telas leem `campanhaHoje`/`campanhaExibida`: login, menu, Torguinho interno e do cliente,
+    `FaixaCampanha`, `SeloCampanha`, cabeçalho do vídeo do mural e o selo do e-mail.
+  - **Imagens:** ficam em `public/campanhas/<id>/`, liberadas no `matcher` do middleware. As de outubro foram
+    enquadradas em quadrado transparente (os originais são retrato). O `/laco-setembro.png` antigo ficou por causa
+    dos e-mails de setembro.
+  - **Prévia:** aceita o id da campanha.
+
+  Testes:
+  - `campanha` (11), incluindo a virada às 02h59Z × 03h00Z, as imagens em `public/` e a exceção no middleware;
+  - `campanha-telas` (7), React em jsdom com a data fixada;
+  - `email-layout` reescrito (3).
+
+  Suíte 4.454/4.454, `checar` limpo. O `preview_start` subiu o checkout principal (código antigo), então a
+  validação visual foi feita no portal no ar, depois do deploy: `/entrar?campanha=outubro-rosa` com o laço rosa
+  carregado e as imagens com HTTP 200 sem sessão.
+  ⚠ **Para revisar:**
+  - (a) o slogan do Outubro Rosa é proposta minha, a confirmar com o Vitor;
+  - (b) o `/torguinho.png` padrão, fora de campanha, continua sem exceção no middleware e deve aparecer quebrado
+    no portal público do cliente (defeito anterior; o de campanha agora carrega);
+  - (c) o avatar do Torguinho é calculado ao carregar a página, então quem estiver com a tela aberta na virada
+    só troca ao recarregar;
+  - (d) `usarPrevia` agora devolve o id, e não booleano.

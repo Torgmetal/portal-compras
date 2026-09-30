@@ -1,7 +1,12 @@
 {
-  "build": 3548,
-  "gerado": "2026-09-30T22:19:06.253Z",
+  "build": 3549,
+  "gerado": "2026-09-30T22:26:43.362Z",
   "commits": [
+    {
+      "hash": "f8af7d21",
+      "data": "30/09/2026",
+      "titulo": "Campanha do mês: Outubro Rosa entra sozinha à 00h de 01/10 (Brasília)"
+    },
     {
       "hash": "1c98a64c",
       "data": "30/09/2026",
@@ -146,11 +151,6 @@
       "hash": "3e38aa95",
       "data": "26/09/2026",
       "titulo": "docs: Torguinho fica no Haiku (decisão do Vitor, 26/09)"
-    },
-    {
-      "hash": "7f48671c",
-      "data": "26/09/2026",
-      "titulo": "docs: registro da auditoria de prompts e memória (formato estruturado, Torguinho)"
     }
   ]
 }
