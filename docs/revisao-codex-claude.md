@@ -2509,3 +2509,42 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (c) janela 8: relatório de inspeção se monta com consultas ao banco, e 8 em paralelo disputam o pool do Prisma;
   - (d) os volumes (fase A de `processarGeracao`) ainda baixam um por vez;
   - (e) a recusa por orçamento descarta o trabalho feito (até 150 s de espera antes do aviso).
+- **(01/10) Portal do cliente, "Onde a obra está": a OP-118 mostrava "Montagem 100% · 0 peças".** O print veio ao Vitor
+  pelo WhatsApp. Vitor: *"corrija o que for preciso mas deixe tudo certo"*.
+  - **Causa:** o "Diagrama de Montagem" (ENGENHARIA, 100%) era lido como a montagem da fábrica pelo nome, e o bloco pega o
+    maior percentual entre as tarefas da fase.
+  - **`cb0d7029`:** `etapaDaTarefa` (`lib/onde-obra-piso`) só aceita tarefa da FABRICACAO, lendo `departamento` ou `setor`.
+    É a mesma trava de `avancosDasTarefas`. Vale também para o piso declarado.
+  - **Conferido** com a mesma conta da rota e os dados reais: o código antigo reproduz o print, o novo dá Montagem 0%.
+  - **Também afetados:** os portais publicados das OPs 089, 102 e 113, e as tarefas do departamento MONTAGEM (campo,
+    OP-083/084).
+  - **Testes:** `onde-obra-piso` (+3).
+
+  ⚠ **Para revisar:** (a) tarefa sem departamento continua valendo pelo nome (cronograma antigo); (b) os outros chamadores
+  de `faseDaTarefa` foram conferidos e já filtravam (`listas-status` filtra `fab`; `avancoDaTarefa` só é chamado depois
+  da trava).
+- **(01/10) Volumes do data book: uma geração por vez.** Na OP-112, o Volume 3 foi montado duas vezes ao mesmo tempo,
+  depois de um segundo pedido no meio da geração.
+  - **`dbc24543`:** `processarGeracao` reserva a vez por data book (`comTravaDeCron`, chave `databook-volumes:<id>`, prazo
+    de 330 s) e relê o job já com a vez. A etapa diz o que está montando.
+  - **Tela:** consulta o andamento a cada 4 s, mostra os segundos da etapa e trata `ocupado` como "outra janela gerando".
+  - **Cron:** encerra a rodada com `ocupado`. No teste, o laço antigo derrubava o processo.
+  - **Testes:** `databook-volumes-trava` (4), `volumes-tela` (2), `cron-data-book` (+1).
+
+  ⚠ **Para revisar:** (a) se a função morrer no meio, a vez só volta quando o prazo de 330 s vence; nesse intervalo a
+  tela mostra "outra janela" e fica tentando; (b) o blob órfão de 49 MB da OP-112 continua no storage (não apaguei);
+  (c) o `paginas` do job da OP-112 ficou com 590, inflado; os volumes em si estão certos.
+- **(01/10) LPC: o importador confere o peso total.** O template novo do Tekla 2025 calcula
+  PESO TOTAL = (2·QTDE − 1) × unitário (T105D, T120B, T124A).
+  - **`278d6731`:** em `lib/parse-lpc`, posição e avulsa valem qtde × unitário quando divergem (tolerância de 2% ou 50 g).
+    Com a planilha já errada, o conjunto vira a soma das posições: a qtde da posição já soma as unidades, e o unitário sai
+    da divisão. Planilha coerente não é tocada.
+  - **Aviso:** `correcaoPeso` sai na resposta das duas rotas de importação, aparece na tela de Listas e fica na auditoria.
+  - **Conferido nos arquivos reais:** T124A 29.614 → 21.274 kg (37/39 conjuntos = LE, 2 a ~1%); T105D 4/4 e T120B 10/10 =
+    LE; T118B e T94A idênticas ao parser antigo. A primeira versão multiplicava de novo pelas unidades, e a prova pegou.
+  - **Testes:** `parse-lpc-peso` (6).
+
+  ⚠ **Para revisar:** (a) os dados já gravados das três fases só se corrigem reimportando (ou recalculando no banco, com
+  autorização); (b) os 2 conjuntos da T124A a ~1% da LE (T124A34, T124A35); (c) no template antigo a LPC pesa ~9% acima
+  da LE, diferença que já existia e em que não mexi; (d) `sync-lpc-sharepoint` herda a correção, mas não mostra aviso a
+  ninguém.

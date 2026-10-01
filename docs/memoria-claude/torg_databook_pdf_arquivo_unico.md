@@ -31,4 +31,20 @@ Geraldo (30/09/2026, chamado #3 da EV): o PDF do data book da OP-112 não abria 
   serviria.
 - Em risco antes da correção, por nº de anexos: OP-113 (244), 103 (198), 085 (193), 089 (187).
 
+**Volumes: uma geração por vez** (`dbc24543`, OP-112, 01/10/2026). Cada volume leva ~1 min, e a tela só
+se atualizava no fim de cada um. A barra ficou parada em "0 / 264", alguém pediu de novo e o **Volume 3 foi
+montado duas vezes**, a partir do mesmo cursor. Resultado: a segunda gravação passou por cima da primeira,
+ficaram 49 MB órfãos no Blob, e o job contou 590 páginas onde havia 433. O conjunto final fechou certo
+por sorte da ordem das gravações.
+- ⚠⚠ A vez é **do DATA BOOK** (`reservarVez`/`comTravaDeCron`, chave `databook-volumes:<id>`, prazo de
+  330 s, acima do `maxDuration` de 300). Quem chega com a vez tomada recebe `{ ocupado: true }` e não monta
+  nada. O cursor é relido já com a vez na mão.
+- ⚠ **O cron desiste com `ocupado`.** Sem isso, ele pedia o mesmo job sem parar até o fim do orçamento;
+  no teste, o laço derrubava o processo.
+- **Tela:**
+  - a etapa diz o que está montando;
+  - a tela consulta o andamento a cada 4 s;
+  - mostra os segundos da etapa no relógio da própria tela (não no do servidor);
+  - com a vez em outra janela, avisa e só acompanha.
+
 Ver [[torg_databook_revisao]], [[torg_databook_certificado_movido]], [[torg_upload_4mb]].
