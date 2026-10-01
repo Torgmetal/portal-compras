@@ -1,156 +1,156 @@
 {
-  "build": 3559,
-  "gerado": "2026-10-01T17:55:15.613Z",
+  "build": 3560,
+  "gerado": "2026-10-01T19:21:31.020Z",
   "commits": [
     {
-      "hash": "278d6731",
+      "hash": "3c117283f2",
+      "data": "01/10/2026",
+      "titulo": "Docs: portal 'Onde a obra está', volumes em fila e peso conferido da LPC — memória e revisão"
+    },
+    {
+      "hash": "278d6731df",
       "data": "01/10/2026",
       "titulo": "LPC: o importador confere o peso total (qtde × unitário) e avisa quando a planilha erra"
     },
     {
-      "hash": "dbc24543",
+      "hash": "dbc2454377",
       "data": "01/10/2026",
       "titulo": "Data book: volumes gerados um de cada vez, e a barra mostra o que está montando"
     },
     {
-      "hash": "cb0d7029",
+      "hash": "cb0d7029a8",
       "data": "01/10/2026",
       "titulo": "Portal do cliente: \"Onde a obra está\" deixa de ler o Diagrama de Montagem como a montagem da fábrica"
     },
     {
-      "hash": "d390d444",
+      "hash": "d390d44417",
       "data": "01/10/2026",
       "titulo": "Docs: listas do template novo do Tekla 2025 — LE no padrão, LPC com peso inflado (OP-124)"
     },
     {
-      "hash": "2fb3e914",
+      "hash": "2fb3e91402",
       "data": "01/10/2026",
       "titulo": "Docs: PDF do data book — anexos em paralelo, orçamento e streaming (memória e revisão)"
     },
     {
-      "hash": "a2253a97",
+      "hash": "a2253a9782",
       "data": "01/10/2026",
       "titulo": "Data book: anexos baixam 8 por vez e o PDF grande vira aviso de volumes, não 504"
     },
     {
-      "hash": "6fd69c7c",
+      "hash": "6fd69c7c9b",
       "data": "30/09/2026",
       "titulo": "Docs: Outubro Rosa aprovado pelo Vitor — slogan deixa de ser proposta"
     },
     {
-      "hash": "35e58c86",
+      "hash": "35e58c86c5",
       "data": "30/09/2026",
       "titulo": "Docs: banner do Outubro Rosa — memória e registro de revisão"
     },
     {
-      "hash": "9b83f7f3",
+      "hash": "9b83f7f3a6",
       "data": "30/09/2026",
       "titulo": "Outubro Rosa: banner com a mensagem no primeiro acesso, para equipe e clientes"
     },
     {
-      "hash": "3a561bab",
+      "hash": "3a561babd9",
       "data": "30/09/2026",
       "titulo": "Docs: campanha do mês (Outubro Rosa) — memória e registro de revisão"
     },
     {
-      "hash": "f8af7d21",
+      "hash": "f8af7d21da",
       "data": "30/09/2026",
       "titulo": "Campanha do mês: Outubro Rosa entra sozinha à 00h de 01/10 (Brasília)"
     },
     {
-      "hash": "1c98a64c",
+      "hash": "1c98a64c58",
       "data": "30/09/2026",
       "titulo": "Etiquetas: importar as TAGs do cliente grava em lote — a OP-105 estourava o tempo (504)"
     },
     {
-      "hash": "82466563",
+      "hash": "82466563ba",
       "data": "30/09/2026",
       "titulo": "Prazos das RMs: data nova da remarcação destacada em azul, ao lado da anterior em âmbar"
     },
     {
-      "hash": "16141b04",
+      "hash": "16141b04a4",
       "data": "30/09/2026",
       "titulo": "Inspeção de pintura: cor aplicada aceita 'Outra cor…' além das do PLP"
     },
     {
-      "hash": "b16f4ec9",
+      "hash": "b16f4ec907",
       "data": "30/09/2026",
       "titulo": "Fiscal: paginação inválida do Omie derruba a coleta; simulação antiga não reaparece na obra nova"
     },
     {
-      "hash": "1f5aae6c",
+      "hash": "1f5aae6c9e",
       "data": "30/09/2026",
       "titulo": "Fiscal: regras de IBS/CBS não contam nota duas vezes nem apagam tudo com resposta ruim do Omie"
     },
     {
-      "hash": "dc036abe",
+      "hash": "dc036abea7",
       "data": "30/09/2026",
       "titulo": "Docs: GRD da Engenharia parada de 31/08 a 30/09 — memória e registro de revisão"
     },
     {
-      "hash": "7c87a7c3",
+      "hash": "7c87a7c388",
       "data": "30/09/2026",
       "titulo": "GRD da Engenharia: GRD nova voltou a entrar — nenhuma entrava desde 31/08"
     },
     {
-      "hash": "b8700811",
+      "hash": "b8700811ae",
       "data": "29/09/2026",
       "titulo": "Docs: fila de assinatura do relatório de inspeção — memória e registro de revisão"
     },
     {
-      "hash": "8b0eb6b9",
+      "hash": "8b0eb6b972",
       "data": "29/09/2026",
       "titulo": "Inspeções: a tela diz quem está com a vez e quem espera na fila de assinatura"
     },
     {
-      "hash": "28b45ed0",
+      "hash": "28b45ed058",
       "data": "29/09/2026",
       "titulo": "Relatório de inspeção assina em fila: inspetor → Torg Metal → cliente"
     },
     {
-      "hash": "bd2a9976",
+      "hash": "bd2a99764b",
       "data": "29/09/2026",
       "titulo": "Docs: trava de assinatura do RIP de pintura — memória e registro de revisão"
     },
     {
-      "hash": "3aa31b1d",
+      "hash": "3aa31b1d40",
       "data": "29/09/2026",
       "titulo": "Pintura: RIP não vai para assinatura com procedimento, horários ou visual em branco"
     },
     {
-      "hash": "504c77a3",
+      "hash": "504c77a380",
       "data": "29/09/2026",
       "titulo": "Pintura: OP sem PLP passa a nascer com o procedimento de preparo do PO-05"
     },
     {
-      "hash": "30b49662",
+      "hash": "30b496626f",
       "data": "29/09/2026",
       "titulo": "Pintura: salvar no computador não corta mais os lotes da demão em 60 caracteres"
     },
     {
-      "hash": "1604458c",
+      "hash": "1604458c5a",
       "data": "28/09/2026",
       "titulo": "Cotação: fornecedor volta a conseguir declinar — rota faltava na allowlist do middleware"
     },
     {
-      "hash": "9146a41a",
+      "hash": "9146a41a27",
       "data": "28/09/2026",
       "titulo": "docs: conferir o deploy pela API de status do GitHub (sem login na Vercel)"
     },
     {
-      "hash": "2d3d1310",
+      "hash": "2d3d1310cf",
       "data": "28/09/2026",
       "titulo": "Data Book: índice de 1 a 19 (a §18 saiu em junho e ficou o buraco)"
     },
     {
-      "hash": "fd58db57",
+      "hash": "fd58db5762",
       "data": "26/09/2026",
       "titulo": "docs: Quality Welding inativada, zerar peso pela API (0,0001) e o grupo de telhas"
-    },
-    {
-      "hash": "1bb16661",
-      "data": "26/09/2026",
-      "titulo": "docs: cadastro do Omie gravado (fiscal, pesos, unidades, CEST) e os \"duplicados\" que eram material de terceiro"
     }
   ]
 }

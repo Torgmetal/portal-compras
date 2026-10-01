@@ -172,10 +172,8 @@ export async function POST(req, { params }) {
       .filter(Boolean)
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-    // Embute IPI no preco unitario enviado ao Omie pra que o TOTAL do pedido
-    // bata com o valor da nota fiscal que o fornecedor vai emitir.
-    // ICMS nao entra (ele vem implicito no preco bruto e e creditado pela Torg).
-    // PedidoOmie.total armazena o mesmo valor (com IPI), facilitando conciliacao.
+    // O preço vai LÍQUIDO e os impostos destacados no item (lib/pedido-itens): o IPI soma ao total,
+    // o ICMS não (já está no preço cotado). PedidoOmie.total guarda base + IPI, como a nota.
     // ⚠ a regra dos itens mora em lib/pedido-itens: as duas rotas que geram pedido (por RM e por
     // OP) precisam da MESMA conta, senão o mesmo fornecedor recebe dois números conforme a tela de
     // onde o comprador clicou.

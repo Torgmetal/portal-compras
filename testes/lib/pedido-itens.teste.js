@@ -141,3 +141,23 @@ describe("o que já existia continua valendo", () => {
     expect(divergenciaProposta(1000, 900, false).texto).toBe(null);
   });
 });
+
+// Matheus (01/10/2026): "aprovei uma cotação da RM T119-001-R00 da GERDAU e tinha preenchido ICMS mas
+// no pedido do Omie não preencheu o campo ICMS do item — deveria vir igual fizemos com IPI".
+describe("o ICMS da cotação vai destacado no item", () => {
+  it("valor do ICMS em reais, sobre a base arredondada — caso real GERDAU, pedido 2194", () => {
+    const { itens } = itensDoPedido([linha({ cotItem: { precoUnit: 6.41, qtdCotada: 121.16, ipiPct: 0, icmsPct: 12 } })]);
+    // base 6,41 × 121,16 = 776,6356 → 776,64; ICMS 12% = 93,1968 → 93,20
+    expect(itens[0]).toMatchObject({ icmsPct: 12, valorIcms: 93.2 });
+  });
+
+  it("⚠⚠ o ICMS NÃO entra no total — ele é 'por dentro', já está no preço cotado", () => {
+    const { itens } = itensDoPedido([linha({ cotItem: { precoUnit: 6.41, qtdCotada: 121.16, ipiPct: 0, icmsPct: 12 } })]);
+    expect(itens[0].totalComImpostos).toBe(776.64);
+  });
+
+  it("sem ICMS informado, não inventa imposto", () => {
+    const { itens } = itensDoPedido([linha({ cotItem: { precoUnit: 10, qtdCotada: 2, ipiPct: 0, icmsPct: null } })]);
+    expect(itens[0].valorIcms).toBe(0);
+  });
+});

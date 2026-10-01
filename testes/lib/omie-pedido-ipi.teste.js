@@ -88,3 +88,20 @@ describe("produtos_incluir — a observação do item", () => {
     expect(payloadEnviado().produtos_incluir[0].cObs).toHaveLength(255);
   });
 });
+
+describe("produtos_incluir — o ICMS vai destacado (Matheus, 01/10/2026)", () => {
+  it("nValorIcms leva o imposto em REAIS — campo conferido no pedido 2194 do Omie", async () => {
+    const { criarPedidoOmie } = await import("@/lib/omie-pedido-compra");
+    await criarPedidoOmie({ itens: [{ ...itemBase, icmsPct: 12, valorIcms: 93.2 }], nCodFor: 1 });
+    const p = payloadEnviado().produtos_incluir[0];
+    expect(p.nValorIcms).toBe(93.2);
+    // ⚠ o preço continua o cotado: ICMS é por dentro, destacar não mexe no unitário
+    expect(p.nValUnit).toBe(40.68);
+  });
+
+  it("⚠ item sem ICMS não manda o campo", async () => {
+    const { criarPedidoOmie } = await import("@/lib/omie-pedido-compra");
+    await criarPedidoOmie({ itens: [{ ...itemBase, icmsPct: 0, valorIcms: 0 }], nCodFor: 1 });
+    expect(payloadEnviado().produtos_incluir[0]).not.toHaveProperty("nValorIcms");
+  });
+});
