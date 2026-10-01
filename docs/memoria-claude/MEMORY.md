@@ -148,6 +148,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [⚠ Produção é LPC — sempre escolher a lista](torg_producao_e_lpc.md) — `SO_FABRICACAO` em toda consulta de fabricação; registro da LE mente sobre prontidão
 - [LPC: chave numérica duplica marcas](torg_lpc_chave_duplicada.md) — arquivo com várias fases entra sob o número da obra e duplica; import avisa e o Planejamento exclui a linha errada
 - [Listas LE/LPC (Engenharia)](torg_listas_le_lpc.md) — import → PecaConjunto (LE_IMPORT/LPC_IMPORT); DUAS "LEs"; bug opId órfão ("78"≠"078"); itens AC pro fim (lib/marca-ac.js)
+- [Templates novos do Tekla 2025 (listas)](torg_tekla2025_templates_listas.md) — abas "0x TORG_…" (OP-105/120/124); LE no padrão FORM 21; ⚠ LPC calcula PESO TOTAL = (2·QTDE−1)×unit e infla o kg no portal (T124A 29.614 × LE 21.255)
 - [Kick Off da OP](torg_kickoff.md) — /comercial/[id]/kickoff, 2 tipos GERAL (sem R$) e FISCAL (com R$); "Divulgar" e-mail+aceite por token; PDF pdf-lib padrão Torg
 - [Apresentação ao Cliente](torg_apresentacao_cliente.md) — /comercial/apresentacoes; página pública /apresentacao/[token] (capa+boas-vindas+docs); Resend; tabelas por SQL
 - [Acesso & notificações](torg_acesso_notificacoes.md) — acesso por `user.modulos[]` (requireRole = módulos); sino in-app só Compras; Eng/Produção dependem de e-mail

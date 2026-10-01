@@ -1,7 +1,12 @@
 {
-  "build": 3554,
-  "gerado": "2026-10-01T07:56:26.397Z",
+  "build": 3555,
+  "gerado": "2026-10-01T08:02:20.779Z",
   "commits": [
+    {
+      "hash": "2fb3e914",
+      "data": "01/10/2026",
+      "titulo": "Docs: PDF do data book — anexos em paralelo, orçamento e streaming (memória e revisão)"
+    },
     {
       "hash": "a2253a97",
       "data": "01/10/2026",
@@ -146,11 +151,6 @@
       "hash": "ddccd6aa",
       "data": "26/09/2026",
       "titulo": "docs: duplicados do Omie zerados e inativados; pedido 1721 no código que fica (26/09)"
-    },
-    {
-      "hash": "0fe8d0f6",
-      "data": "26/09/2026",
-      "titulo": "docs: tubo 201000008 zerado e inativado; demais zeramentos e o pedido 1721 ficaram pendentes (26/09)"
     }
   ]
 }
