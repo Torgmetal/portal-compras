@@ -1,7 +1,12 @@
 {
-  "build": 3552,
-  "gerado": "2026-09-30T23:12:32.145Z",
+  "build": 3553,
+  "gerado": "2026-10-01T07:51:11.472Z",
   "commits": [
+    {
+      "hash": "6fd69c7c",
+      "data": "30/09/2026",
+      "titulo": "Docs: Outubro Rosa aprovado pelo Vitor — slogan deixa de ser proposta"
+    },
     {
       "hash": "35e58c86",
       "data": "30/09/2026",
@@ -146,11 +151,6 @@
       "hash": "97965b46",
       "data": "26/09/2026",
       "titulo": "docs: 9 chapas CIVIL 300 e 2 descrições corrigidas no Omie pela tela (26/09)"
-    },
-    {
-      "hash": "887cc351",
-      "data": "26/09/2026",
-      "titulo": "docs: 11 produtos inativados no Omie pela tela em 26/09 (materiais sem saldo)"
     }
   ]
 }
