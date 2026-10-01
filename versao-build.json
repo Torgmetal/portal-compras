@@ -1,7 +1,12 @@
 {
-  "build": 3557,
-  "gerado": "2026-10-01T17:41:32.370Z",
+  "build": 3558,
+  "gerado": "2026-10-01T17:50:12.514Z",
   "commits": [
+    {
+      "hash": "dbc24543",
+      "data": "01/10/2026",
+      "titulo": "Data book: volumes gerados um de cada vez, e a barra mostra o que está montando"
+    },
     {
       "hash": "cb0d7029",
       "data": "01/10/2026",
@@ -146,11 +151,6 @@
       "hash": "bfc1fffe",
       "data": "26/09/2026",
       "titulo": "Produtos do Omie: o cache do portal passa a sincronizar todo dia (era às segundas)"
-    },
-    {
-      "hash": "9fef5953",
-      "data": "26/09/2026",
-      "titulo": "docs: famílias de 134 produtos no Omie e três armadilhas da API de produto (26/09)"
     }
   ]
 }

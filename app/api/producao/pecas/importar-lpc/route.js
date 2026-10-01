@@ -336,6 +336,8 @@ export async function POST(req) {
           sobrescrever: !!sobrescrever,
           pesoTotal: parsed.pesoTotal,
           areaTotal: parsed.areaTotal,
+          // a planilha veio com peso total errado e o portal gravou a conta (lib/parse-lpc)
+          correcaoPeso: parsed.correcaoPeso,
         },
       },
     });
@@ -361,6 +363,9 @@ export async function POST(req) {
     ignorados,
     pesoTotal: parsed.pesoTotal,
     areaTotal: parsed.areaTotal,
+    // ⚠ planilha com peso total errado (template novo do Tekla): o portal gravou qtde × unitário, mas o
+    // arquivo arquivado continua errado — a tela avisa para corrigir o template
+    correcaoPeso: parsed.correcaoPeso,
     diff,
     // o que aconteceu com a programação do Planejamento nesta importação
     remap,

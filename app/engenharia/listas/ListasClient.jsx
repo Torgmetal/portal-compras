@@ -230,6 +230,27 @@ function CardImport({ titulo, sigla, desc, endpoint, cor, destinatarios = [], op
             </div>
           )}
 
+          {/* ⚠⚠ PLANILHA COM PESO ERRADO. O template novo do Tekla 2025 (T105D, T120B, T124A — 29 e
+              30/09/2026) escreve peso total = (2·qtde − 1) × unitário; a T124A entrou com 29.614 kg
+              contra 21.255 da LE. O portal grava a conta certa (lib/parse-lpc), mas o arquivo da
+              pasta da obra continua errado — quem importou precisa saber para corrigir o template. */}
+          {res.correcaoPeso && (
+            <div className="mt-2.5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-[12px] text-amber-900">
+              <p className="font-semibold flex items-start gap-1.5">
+                <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+                A planilha veio com o peso total errado em {fmt(res.correcaoPeso.linhas)} linha(s)
+              </p>
+              <p className="mt-1">
+                O peso total não batia com quantidade × peso unitário. O portal gravou a conta certa:
+                <b> {fmt(res.correcaoPeso.contaKg)} kg</b> (a planilha somava {fmt(res.correcaoPeso.planilhaKg)} kg).
+              </p>
+              <p className="mt-1">
+                O arquivo na pasta da obra continua com o erro: corrija a fórmula do template do Tekla antes de
+                emitir a próxima revisão.
+              </p>
+            </div>
+          )}
+
           {/* ⚠⚠ "IMPORTADO" NÃO É "ENTROU". A LE R01 da OP-102 (13/08/2026) fechou com o aviso
               verde e o arquivo arquivado dizendo "18 incluídas" — e nenhuma das 18 chegou ao banco.
               O defeito era do importador e já foi corrigido, mas o que deixou isso passar quatro

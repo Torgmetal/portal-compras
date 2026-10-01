@@ -191,10 +191,16 @@ export async function POST(req) {
   const nRem = Array.isArray(resultado.removidas) ? resultado.removidas.length : (resultado.removidas || 0);
   const nCon = Array.isArray(resultado.conflitos) ? resultado.conflitos.length : (resultado.conflitos || 0);
   const semMudanca = !nAdd && !nRem && !nCon && !(resultado.mantidas || 0);
+  // ⚠ planilha com peso total errado (template novo do Tekla): o portal gravou qtde × unitário, e quem
+  // importou precisa saber que o ARQUIVO continua errado — ver lib/parse-lpc
+  const cp = parsed.correcaoPeso;
+  const avisoPeso = cp
+    ? ` ⚠ A planilha trazia o peso total errado em ${cp.linhas} linha(s): o portal gravou qtde × peso unitário (${cp.contaKg.toLocaleString("pt-BR")} kg; a planilha somava ${cp.planilhaKg.toLocaleString("pt-BR")} kg). Corrija o template antes da próxima revisão.`
+    : "";
   return NextResponse.json({
-    ok: true, arquivo: item.nome, ...resultado, semMudanca,
-    mensagem: semMudanca
+    ok: true, arquivo: item.nome, ...resultado, semMudanca, correcaoPeso: cp,
+    mensagem: (semMudanca
       ? `${item.nome} já estava carregada no portal, sem nenhuma diferença — nada a importar.`
-      : `${item.nome}: ${nAdd} nova(s), ${resultado.mantidas || 0} atualizada(s), ${nRem} removida(s)${nCon ? `, ${nCon} em conflito` : ""}.`,
+      : `${item.nome}: ${nAdd} nova(s), ${resultado.mantidas || 0} atualizada(s), ${nRem} removida(s)${nCon ? `, ${nCon} em conflito` : ""}.`) + avisoPeso,
   });
 }
