@@ -12,11 +12,34 @@ import { Loader2, Layers, FileDown, Play, AlertTriangle, CheckCircle2, RefreshCw
 
 const fmtMB = (b) => (!b ? "—" : b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 const fmtNum = (n) => Number(n || 0).toLocaleString("pt-BR");
+const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ⚠⚠ OP-112 (01/10/2026): cada volume leva ~1 min e a tela só se atualizava quando ele terminava —
+// a barra ficou parada em "0 / 264", pareceu travada, alguém pediu de novo e o Volume 3 foi montado
+// duas vezes. Agora a tela CONSULTA o andamento durante a espera, mostra o tempo da etapa correndo,
+// e quem pega a geração em andamento noutra janela só acompanha (o servidor responde "ocupado").
+const CONSULTA_MS = 4_000;
+const ESPERA_OCUPADO_MS = 4_000;
+
+// ⚠ o tempo da etapa corre no relógio da TELA, contado de quando a etapa mudou — comparar com a
+// hora gravada pelo servidor misturaria dois relógios (ver lib/cron-trava)
+function usarSegundosDaEtapa(etapa, ativo) {
+  const [desde, setDesde] = useState(() => Date.now());
+  useEffect(() => { setDesde(Date.now()); }, [etapa]);
+  const [, setTique] = useState(0);
+  useEffect(() => {
+    if (!ativo) return undefined;
+    const t = setInterval(() => setTique((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [ativo]);
+  return Math.max(0, Math.round((Date.now() - desde) / 1000));
+}
 
 export default function Volumes({ id }) {
   const [estado, setEstado] = useState(null);
   const [rodando, setRodando] = useState(false);
   const [erro, setErro] = useState("");
+  const [outraJanela, setOutraJanela] = useState(false);
   // ⚠ o laço tem que parar quando o componente sai da tela, senão continua
   // disparando volume depois que o usuário navegou para outra página.
   const vivo = useRef(true);
@@ -34,21 +57,31 @@ export default function Volumes({ id }) {
 
   // Um volume por chamada, até acabar. Cada volta atualiza a barra.
   const tocar = useCallback(async () => {
-    setRodando(true); setErro("");
+    setRodando(true); setErro(""); setOutraJanela(false);
     try {
-      for (let i = 0; i < 200 && vivo.current; i++) {
+      for (let i = 0; i < 400 && vivo.current; i++) {
         const r = await fetch(`/api/qualidade/data-books/${id}/gerar/continuar`, { method: "POST" });
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || "Falha ao gerar o volume");
+        // ⚠ vez tomada não é erro: outra janela (ou o cron) está montando este data book
+        setOutraJanela(!!j.ocupado);
         await carregar();
         if (j.semJob || j.concluido) break;
+        if (j.ocupado) await esperar(ESPERA_OCUPADO_MS);
       }
     } catch (e) {
       setErro(e.message);
     } finally {
-      if (vivo.current) { setRodando(false); carregar(); }
+      if (vivo.current) { setRodando(false); setOutraJanela(false); carregar(); }
     }
   }, [id, carregar]);
+
+  // durante a espera de um volume (~1 min), a barra acompanha o servidor em vez de ficar parada
+  useEffect(() => {
+    if (!rodando) return undefined;
+    const t = setInterval(carregar, CONSULTA_MS);
+    return () => clearInterval(t);
+  }, [rodando, carregar]);
 
   const gerar = useCallback(async () => {
     setRodando(true); setErro("");
@@ -68,6 +101,7 @@ export default function Volumes({ id }) {
   const emAndamento = g && (g.status === "NA_FILA" || g.status === "GERANDO");
   const pend = Array.isArray(g?.pendencias) ? g.pendencias : [];
   const pct = g?.totalItens ? Math.min(100, Math.round((g.cursor / g.totalItens) * 100)) : 0;
+  const segundos = usarSegundosDaEtapa(g?.etapa || "", rodando);
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
@@ -107,12 +141,17 @@ export default function Volumes({ id }) {
       {(rodando || emAndamento) && (
         <div className="mb-3">
           <div className="flex items-center justify-between text-[11px] text-torg-gray mb-1">
-            <span>{g?.etapa || "Preparando…"}</span>
+            <span>{g?.etapa || "Preparando…"}{rodando ? ` · ${segundos} s` : ""}</span>
             <span>{fmtNum(g?.cursor)} / {fmtNum(g?.totalItens)} anexos · {fmtNum(g?.paginas)} págs</span>
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full bg-torg-blue transition-all" style={{ width: `${pct}%` }} />
           </div>
+          {outraJanela && (
+            <p className="text-[10px] text-torg-blue mt-1">
+              Outra janela está gerando este data book — acompanhando o andamento.
+            </p>
+          )}
           <p className="text-[10px] text-torg-gray mt-1">
             Pode fechar esta página: a geração continua sozinha e termina em segundo plano.
           </p>

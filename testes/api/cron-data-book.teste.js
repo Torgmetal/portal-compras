@@ -57,4 +57,14 @@ describe("cron do data book", () => {
     expect(dados.ok).toBe(false);
     expect(dados.mensagem).toContain("P1001");
   });
+
+  it("geração com a vez tomada (alguém gerando pela tela) não vira laço: o cron desiste e segue", async () => {
+    // o job continua "parado" para o cron porque quem está com a vez é a tela — sem desistir, o cron
+    // pediria o mesmo job sem parar até estourar o orçamento
+    mocks.proximoJob.mockResolvedValue({ id: "g1" });
+    mocks.processar.mockResolvedValue({ ocupado: true });
+    const r = await rodar();
+    expect(r.status).toBe(200);
+    expect(mocks.processar).toHaveBeenCalledTimes(1);
+  });
 });

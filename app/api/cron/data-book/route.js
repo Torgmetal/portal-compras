@@ -49,6 +49,9 @@ async function terminarGeracoes(t0) {
     try {
       const r = await processarGeracao(job.id);
       feitos.push({ job: job.id, ...r });
+      // ⚠ vez tomada = alguém gerando pela tela. Para o cron o job segue "parado" (quem trabalha
+      // não é ele), e sem desistir ele pediria o mesmo job sem parar até o fim do orçamento.
+      if (r.ocupado) break;
       if (r.concluido) continue;
     } catch (e) {
       await prisma.dataBookGeracao.update({
