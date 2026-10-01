@@ -2488,3 +2488,24 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (b) o banner fica atrás do vídeo obrigatório do mural (z 90 × 100), caso os dois coincidam;
   - (c) a janela abre também para clientes sem login, e esse é o pedido.
 - **(30/09) Outubro Rosa aprovado.** Vitor: *"pode deixar tudo aprovado e pronto para ser publicado"*. O slogan ("A Torg Metal apoia a prevenção do câncer de mama.") deixa de ser proposta, o que fecha o item (a) da entrada de `f8af7d21`. Nada a publicar além do que já está no ar: faixa, laço, Torguinho, e-mail e banner trocam sozinhos às 00h00 de 01/10 (Brasília).
+- **(01/10) Data book: o "Baixar PDF" da OP-112 dava 504; agora os anexos baixam 8 por vez.** Chamado #3 da EV (Geraldo,
+  30/09). Vitor aprovou a recomendação em 01/10: *"pode usar sua recomendação"*.
+  - **`a2253a97`:**
+    - `lib/fila-downloads.js`: `filaDeDownloads` (janela 8, entrega na ordem do livro) e `comNovaTentativa` (429/5xx/rede,
+      sem dormir além do prazo);
+    - `gerarDataBookPDF`: usa a fila e aceita um `orcamento` opcional (`DATABOOK_GRANDE_DEMAIS`);
+    - rota `/api/qualidade/data-books/[id]/pdf`: `maxDuration` 300, orçamento de 150 s / 120 MB, PDF em partes
+      (`emPartes`, streaming), e o aviso de "Gerar volumes" sai como página HTML na aba do botão e como JSON para código.
+  - **Medido** com o livro real, só leitura: 406 páginas e o mesmo tamanho no código antigo e no novo, 0 pendência, de
+    59,6 s para 16,8 s no Mac. Download era 95% do tempo.
+  - **Testes:** `fila-downloads` (12), `databook-pdf-anexos` (5), `databook-pdf-rota` (9). Suíte 4.495/4.495, `checar`
+    limpo.
+
+  ⚠ **Para revisar:**
+  - (a) o teto de 4,5 MB da resposta é o que a Vercel documenta; não deu para confirmar na produção se ele já mordia antes
+    (logs da Vercel dão 403 pelo MCP). `emPartes` vale nos dois casos;
+  - (b) o tempo na Vercel (nos EUA, com banco e SharePoint no Brasil) não foi medido; a estimativa é a OP-112 bem dentro
+    dos 150 s;
+  - (c) janela 8: relatório de inspeção se monta com consultas ao banco, e 8 em paralelo disputam o pool do Prisma;
+  - (d) os volumes (fase A de `processarGeracao`) ainda baixam um por vez;
+  - (e) a recusa por orçamento descarta o trabalho feito (até 150 s de espera antes do aviso).

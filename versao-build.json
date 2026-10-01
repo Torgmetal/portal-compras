@@ -1,7 +1,12 @@
 {
-  "build": 3553,
-  "gerado": "2026-10-01T07:51:11.472Z",
+  "build": 3554,
+  "gerado": "2026-10-01T07:56:26.397Z",
   "commits": [
+    {
+      "hash": "a2253a97",
+      "data": "01/10/2026",
+      "titulo": "Data book: anexos baixam 8 por vez e o PDF grande vira aviso de volumes, não 504"
+    },
     {
       "hash": "6fd69c7c",
       "data": "30/09/2026",
@@ -146,11 +151,6 @@
       "hash": "0fe8d0f6",
       "data": "26/09/2026",
       "titulo": "docs: tubo 201000008 zerado e inativado; demais zeramentos e o pedido 1721 ficaram pendentes (26/09)"
-    },
-    {
-      "hash": "97965b46",
-      "data": "26/09/2026",
-      "titulo": "docs: 9 chapas CIVIL 300 e 2 descrições corrigidas no Omie pela tela (26/09)"
     }
   ]
 }
