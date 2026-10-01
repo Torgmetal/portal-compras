@@ -1,7 +1,12 @@
 {
-  "build": 3555,
-  "gerado": "2026-10-01T08:02:20.779Z",
+  "build": 3556,
+  "gerado": "2026-10-01T17:33:10.492Z",
   "commits": [
+    {
+      "hash": "d390d444",
+      "data": "01/10/2026",
+      "titulo": "Docs: listas do template novo do Tekla 2025 — LE no padrão, LPC com peso inflado (OP-124)"
+    },
     {
       "hash": "2fb3e914",
       "data": "01/10/2026",
@@ -146,11 +151,6 @@
       "hash": "cc0a79f4",
       "data": "26/09/2026",
       "titulo": "docs: RM T102-001-R00 atualizada para o código que ficou (26/09)"
-    },
-    {
-      "hash": "ddccd6aa",
-      "data": "26/09/2026",
-      "titulo": "docs: duplicados do Omie zerados e inativados; pedido 1721 no código que fica (26/09)"
     }
   ]
 }

@@ -50,3 +50,33 @@ it("sem linha de fase no cronograma, o acumulado é medido em todas as etapas co
   expect(r.map((e) => `${e.nome} ${e.pct}%`)).toEqual(["Preparação 100%", "Montagem 50%", "Solda 50%", "Acabamento 50%", "Jato 50%"]);
   expect(r[0].origem).toBe("medido");
 });
+
+// OP-118 (01/10/2026): o portal do cliente mostrava "Montagem 100% · 0 peças" com a Preparação em
+// 62%. O 100% era o "Diagrama de Montagem" — desenho da ENGENHARIA, concluído —, lido como a fase de
+// montagem da fábrica só porque o nome tem "montagem". O sincronismo do Syneco já tinha essa trava
+// (`avancosDasTarefas`: só FABRICACAO recebe avanço do chão); este bloco não tinha.
+const op118 = [
+  { nome: "Diagrama de Montagem", setor: "ENGENHARIA", feito: 100 },
+  { nome: "Preparação", setor: "FABRICACAO", feito: 62 },
+  { nome: "Montagem", setor: "FABRICACAO", feito: 0 },
+  { nome: "Solda", setor: "FABRICACAO", feito: 0 },
+  { nome: "Pintura", setor: "FABRICACAO", feito: 0 },
+];
+
+it("tarefa de outro departamento não é fase da fábrica: o 'Diagrama de Montagem' não vira Montagem 100%", () => {
+  const dist = new Map([["Preparação", { n: 545, kg: 75000 }]]);
+  const r = acumuladoPorEtapa(dist, 81613, op118);
+  expect(r.map((e) => `${e.nome} ${e.pct}% ${e.pecas}pç`)).toEqual(["Preparação 62% 545pç", "Montagem 0% 0pç", "Solda 0% 0pç", "Pintura 0% 0pç"]);
+});
+
+it("o piso também ignora tarefa da Engenharia marcada 100% à mão (senão empurraria as peças para a Montagem)", () => {
+  expect(pisoDeclarado([
+    { nome: "Diagrama de Montagem", departamento: "ENGENHARIA", avancoManual: true, percentualRealizado: 100 },
+    { nome: "Preparação", departamento: "FABRICACAO", avancoManual: true, percentualRealizado: 62 },
+  ])).toBeNull();
+  expect(pisoDeclarado([{ nome: "Corte", departamento: "FABRICACAO", avancoManual: true, percentualRealizado: 100 }])).toBe("Preparação");
+});
+
+it("tarefa sem departamento continua valendo pelo nome (cronogramas antigos)", () => {
+  expect(pisoDeclarado([{ nome: "Montagem", avancoManual: true, percentualRealizado: 100 }])).toBe("Montagem");
+});
