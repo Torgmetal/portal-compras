@@ -1,7 +1,12 @@
 {
-  "build": 3569,
-  "gerado": "2026-10-02T20:04:42.316Z",
+  "build": 3570,
+  "gerado": "2026-10-02T20:04:42.425Z",
   "commits": [
+    {
+      "hash": "f258f5fe5f",
+      "data": "02/10/2026",
+      "titulo": "Cotação: lançamento manual e 'adicionar RM' também não passam por cima do encerramento"
+    },
     {
       "hash": "35f47e5562",
       "data": "02/10/2026",
@@ -146,11 +151,6 @@
       "hash": "b8700811ae",
       "data": "29/09/2026",
       "titulo": "Docs: fila de assinatura do relatório de inspeção — memória e registro de revisão"
-    },
-    {
-      "hash": "8b0eb6b972",
-      "data": "29/09/2026",
-      "titulo": "Inspeções: a tela diz quem está com a vez e quem espera na fila de assinatura"
     }
   ]
 }

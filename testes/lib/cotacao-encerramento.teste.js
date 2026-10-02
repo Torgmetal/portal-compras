@@ -11,14 +11,22 @@ const cot = (over = {}) => ({
   ...over,
 });
 
-function db(cotacoes, { atualiza = 1 } = {}) {
-  return {
+/**
+ * `relida`: o que a releitura DENTRO da trava devolve (o estado no instante da gravação). Por padrão
+ * é a mesma cotação da lista — sem corrida.
+ */
+function db(cotacoes, { relida } = {}) {
+  const d = {
     cotacao: {
       findMany: vi.fn(async () => cotacoes),
-      updateMany: vi.fn(async () => ({ count: atualiza })),
+      findUnique: vi.fn(async ({ where }) => (relida !== undefined ? relida : cotacoes.find((c) => c.id === where.id))),
+      update: vi.fn(async () => ({})),
     },
     auditLog: { create: vi.fn(async () => ({})) },
+    $queryRaw: vi.fn(async () => []),
   };
+  d.$transaction = vi.fn(async (cb) => cb(d));
+  return d;
 }
 
 describe("cotacaoPodeEncerrar", () => {
@@ -44,17 +52,18 @@ describe("encerrarCotacoesDaRM", () => {
   let enviar;
   beforeEach(() => { enviar = vi.fn(async () => ({ ok: true })); });
 
-  it("grava ENCERRADA condicionado ao status lido, registra e avisa", async () => {
+  it("trava a cotação, relê e grava ENCERRADA; registra e avisa", async () => {
     const d = db([cot()]);
     const r = await encerrarCotacoesDaRM(d, "rm1", { enviar });
-    expect(d.cotacao.updateMany).toHaveBeenCalledWith({ where: { id: "c1", status: { in: ["PENDENTE", "VENCIDA"] } }, data: { status: "ENCERRADA" } });
+    expect(d.$queryRaw).toHaveBeenCalled(); // SELECT … FOR UPDATE na linha da cotação
+    expect(d.cotacao.update).toHaveBeenCalledWith({ where: { id: "c1" }, data: { status: "ENCERRADA" } });
     expect(d.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "ENCERRAR_COTACAO_PEDIDO_GERADO", entityId: "c1" }) }));
     expect(enviar).toHaveBeenCalledWith(expect.objectContaining({ to: "vendas@gerdau.com", cc: ["compras@torg.com.br"], replyTo: "compras@torg.com.br" }));
     expect(r).toEqual([{ cotacaoId: "c1", fornecedor: "GERDAU", aviso: "enviado" }]);
   });
 
   it("⚠⚠ a gravação vem ANTES do e-mail — e quem perdeu a corrida (outra chamada já encerrou) não manda de novo", async () => {
-    const d = db([cot()], { atualiza: 0 });
+    const d = db([cot()], { relida: cot({ status: "ENCERRADA" }) });
     const r = await encerrarCotacoesDaRM(d, "rm1", { enviar });
     expect(enviar).not.toHaveBeenCalled();
     expect(r).toEqual([]);
@@ -71,7 +80,7 @@ describe("encerrarCotacoesDaRM", () => {
     enviar = vi.fn(async () => { throw new Error("Resend fora"); });
     const d = db([cot()]);
     const r = await encerrarCotacoesDaRM(d, "rm1", { enviar });
-    expect(d.cotacao.updateMany).toHaveBeenCalled();
+    expect(d.cotacao.update).toHaveBeenCalled();
     expect(r[0].aviso).toBe("falhou");
   });
 
@@ -89,7 +98,7 @@ describe("encerrarCotacoesDaRM", () => {
     const aberta = cot({ id: "c2", itens: [{ rmItem: { rm: { id: "rm2", numero: "B", status: "ABERTA" } } }] });
     const d = db([cot(), aberta]);
     await encerrarCotacoesDaRM(d, "rm1", { enviar });
-    expect(d.cotacao.updateMany).toHaveBeenCalledTimes(1);
+    expect(d.cotacao.update).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -103,5 +112,24 @@ describe("o texto do e-mail (neutro — aprovado por Matheus, 02/10/2026)", () =
   });
   it("⚠ o nome do fornecedor é escapado no HTML", () => {
     expect(emailDeEncerramento(cot({ fornecedorNome: "<b>X</b>" })).html).toContain("&lt;b&gt;X&lt;/b&gt;");
+  });
+});
+
+// Achado do Codex (02/10/2026, rodada 3): a lista é lida ANTES da gravação; entre as duas, "adicionar
+// RM" pode incluir na cotação uma RM ainda aberta. A elegibilidade é RELIDA dentro da trava.
+describe("⚠⚠ corrida com 'adicionar RM'", () => {
+  it("RM aberta incluída entre a leitura e a gravação: não encerra e não avisa", async () => {
+    const enviar = vi.fn(async () => ({ ok: true }));
+    const comRmAberta = cot({ itens: [...cot().itens, { rmItem: { rm: { id: "rm2", numero: "B", status: "EM_COTACAO" } } }] });
+    const d = db([cot()], { relida: comRmAberta });
+    expect(await encerrarCotacoesDaRM(d, "rm1", { enviar })).toEqual([]);
+    expect(d.cotacao.update).not.toHaveBeenCalled();
+    expect(enviar).not.toHaveBeenCalled();
+  });
+
+  it("proposta chegou entre a leitura e a gravação (RECEBIDA): não encerra", async () => {
+    const d = db([cot()], { relida: cot({ status: "RECEBIDA" }) });
+    expect(await encerrarCotacoesDaRM(d, "rm1", { enviar: vi.fn() })).toEqual([]);
+    expect(d.cotacao.update).not.toHaveBeenCalled();
   });
 });

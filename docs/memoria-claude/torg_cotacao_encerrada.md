@@ -11,7 +11,7 @@ públicas/internas recusam com 409. E-mail **neutro** (não diz que outro ganhou
 
 - Status próprio, não CANCELADA: a página de cancelada diz "o comprador cancelou".
 - Cotação consolidada só encerra quando TODAS as RMs dos itens estão PEDIDO_GERADO/CANCELADA.
-- Grava ENCERRADA (condicionado ao status lido) ANTES do e-mail; quem perde a corrida não manda.
+- Grava ENCERRADA ANTES do e-mail, com a cotação TRAVADA (FOR UPDATE) e RELIDA na transação; submeter, declinar, lançar-manual e adicionar-rm gravam condicionados ao status — nenhum reabre uma encerrada.
 - Nunca lança: roda depois do pedido existir no Omie.
 - Ganchos: `reavaliarStatusRM` (gerar-pedidos RM/OP), gerar-pedido-direto, fechar-como-pedido,
   atender-estoque, pedido-fd-avulso, vincular-rm. Escritor novo de PEDIDO_GERADO precisa chamar.
