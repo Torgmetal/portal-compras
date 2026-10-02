@@ -23,7 +23,11 @@ gerar relatórios de teste para garantir que não tenha nenhum erro"*). O que va
   conferir espaço foi a causa de: assinatura fora do papel (US, EVS, LP, pintura), observação cortada sem aviso (todos).
   Sais e poeira usam o fluxo desde `9fa3355e`.
 - `blocoTexto` agora CRESCE até `linhas` e devolve o que não coube; `alturaTexto`, `alturaInstrumentos`,
-  `alturaAssinaturas` dão as alturas para quem precisa reservar antes.
+  `alturaAssinaturas` e `medirInfo` (linha de identificação, função pura) dão as alturas para quem reserva antes.
+- **Dimensional** (`8d6a3deb`): o corpo é o que sobra DEPOIS da identificação e dos comentários, desenho a desenho;
+  comentário que não cabe vai para uma "folha de comentários" no fim. ⚠ O RESULTADO lê `resultadoInspecao` antes do
+  campo do formulário — e a reinspeção limpa resultado/verificações (dimensional) e laudo/espessuras (pintura).
+- ⚠ **Título de coluna de UMA palavra encolhe, não quebra** ("Toleranci/as" foi o que a quebra fez).
 - ⚠⚠ **PARA OLHAR O PDF: `sips -s format png arquivo.pdf --out x.png`** (PDFKit do macOS). O `pdftoppm` e o leitor de PDF
   do Claude NÃO desenham a Helvetica padrão (não embutida) — a folha sai só com caixas e fotos, parecendo defeito do
   gerador. `sips` só faz a 1ª folha: separe as outras com pdf-lib (`copyPages`).

@@ -2577,3 +2577,23 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   gravação (para não perder a medição no campo) — a RNC automática do celular ainda abre se marcarem REPROVADO;
   (c) o local do teste de poeira passou a ser opcional; (d) Pull-off e Recebimento de Tintas ainda não têm tipo próprio
   (o pull-off vive dentro do RIP; o recebimento, no CMR).
+- **(02/10) Dimensional e pré-montagem: nada some do documento; reinspeção e rotas acertadas.** Achados do agente que
+  verificou os modelos A (dimensional, pré-montagem, visual de solda, LP).
+  - **`8d6a3deb`:** RESULTADO = resultado da inspeção primeiro (a reinspeção aprovada no celular saía "Reprovado");
+    `proximaRevisao` limpa resultado + 3 verificações (dimensional) e laudo + espessuras (pintura); identificação
+    cresce e mede antes (`medirInfo`), PROCEDIMENTO impresso, várias marcas sem desenho com quantidade somada; letra da
+    cota sempre na tabela; comentários + observação de cada cota inteiros, com folha de comentários quando não cabem;
+    "FOLHA x DE y" conta comentários e fotos; folha de fotos com os papéis do formulário; números com vírgula.
+  - **Celular:** as 3 verificações do dimensional (e a trava de assinatura que as exige, com a contradição
+    APROVADO × verificação reprovada); laudo e soldador/sinete da indicação do US.
+  - **Rotas:** os mesmos tetos nas duas (20 instrumentos com ou sem id; EPS e soldador 60).
+  - **Moldura:** `blocoTexto` cresce e devolve o que não coube; `alturaTexto`, `alturaInstrumentos`.
+  - **Testes:** `dimensional-verif` (9), `campo-verif-dimensional-us` (2), `rotas-limites-inspecao` (2), revisão (+2),
+    pré-montagem (+2), `campo-linhas` (+1). 4.657 passando na cópia limpa.
+
+  ⚠ **Para revisar:** (a) relatório dimensional/pré-montagem em andamento passa a exigir as 3 verificações para ir à
+  assinatura; (b) descrição de cota com mais de 2 linhas ainda corta com "…" (a coluna é estreita por decisão do
+  Vitor — o desenho ganhou a largura); (c) a folha de comentários usa o quadro de assinatura comum (data, sem hora/IP),
+  como a folha de fotos; (d) pré-montagem continua sem procedimento (`POR_TIPO`) e sem filtro de instrumentos —
+  decisão do Vitor; (e) o `blocoTexto` que cresce chega aos geradores de pintura, US, EVS e LP antes dos ajustes deles
+  (em andamento por agentes): caixa até 8 pt mais alta.

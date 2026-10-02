@@ -1,7 +1,12 @@
 {
-  "build": 3566,
-  "gerado": "2026-10-02T19:52:39.627Z",
+  "build": 3567,
+  "gerado": "2026-10-02T19:59:43.473Z",
   "commits": [
+    {
+      "hash": "8d6a3deb",
+      "data": "02/10/2026",
+      "titulo": "Dimensional e pré-montagem: nada some do documento; reinspeção e rotas acertadas"
+    },
     {
       "hash": "952b92b4",
       "data": "02/10/2026",
@@ -146,11 +151,6 @@
       "hash": "bd2a9976",
       "data": "29/09/2026",
       "titulo": "Docs: trava de assinatura do RIP de pintura — memória e registro de revisão"
-    },
-    {
-      "hash": "3aa31b1d",
-      "data": "29/09/2026",
-      "titulo": "Pintura: RIP não vai para assinatura com procedimento, horários ou visual em branco"
     }
   ]
 }
