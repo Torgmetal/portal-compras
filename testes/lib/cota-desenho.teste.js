@@ -8,7 +8,8 @@
 // chamada escapavam do quadro e da folha, e a folha do T84A1 dizia "Nenhuma cota marcada".
 import { describe, it, expect, vi } from "vitest";
 import { PDFPage } from "pdf-lib";
-vi.mock("@/lib/relatorio-form-pdf", () => ({ imagemAssinada: vi.fn() }));
+// só a assinatura é trocada; o tratamento de texto (`san`, `quebrarTexto`) é o de verdade
+vi.mock("@/lib/relatorio-form-pdf", async (original) => ({ ...(await original()), imagemAssinada: vi.fn() }));
 vi.mock("@/lib/vista-desenho", () => ({ recortarVista: vi.fn() }));
 import { gerarDimensionalPDF } from "@/lib/relatorio-dimensional-pdf";
 import { desenhoDaLinha, agruparPorDesenho, trocarCotasDoDesenho } from "@/lib/cota-marcacao";

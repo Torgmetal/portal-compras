@@ -1,7 +1,7 @@
 import {it,expect,vi} from 'vitest';
 import fs from 'node:fs';
 import {PDFPage} from 'pdf-lib';
-vi.mock('@/lib/relatorio-form-pdf',()=>({imagemAssinada:vi.fn()}));
+vi.mock('@/lib/relatorio-form-pdf',async(original)=>({...(await original()),imagemAssinada:vi.fn()}));
 vi.mock('@/lib/vista-desenho',()=>({recortarVista:vi.fn()}));
 import {gerarDimensionalPDF} from '@/lib/relatorio-dimensional-pdf';
 import {linhasReprovadas} from '@/lib/revisao-inspecao';
