@@ -53,6 +53,8 @@ it("ultrassom: a indicação ganha laudo e soldador (com o sinete) no celular", 
   await waitFor(() => expect(screen.getByLabelText("Soldador da indicação").querySelectorAll("option").length).toBe(2));
   fireEvent.change(screen.getByLabelText("Soldador da indicação"), { target: { value: "EBERTON ALVES" } });
   fireEvent.click(screen.getByLabelText("Laudo da indicação: Reprovado"));
+  fireEvent.change(screen.getByLabelText("Compr. inspecionado (mm)"), { target: { value: "300" } });
   await gravar();
-  expect(enviado.medidas[0]).toMatchObject({ laudo: "R", soldador: "EBERTON ALVES", sinete: "S-02" });
+  // ⚠ e o "Comprimento Inspecionado" do modelo, que nenhuma tela tinha
+  expect(enviado.medidas[0]).toMatchObject({ laudo: "R", soldador: "EBERTON ALVES", sinete: "S-02", inspecionado: "300" });
 });

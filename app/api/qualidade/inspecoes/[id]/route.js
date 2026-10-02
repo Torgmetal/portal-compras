@@ -217,7 +217,8 @@ export async function PATCH(req, { params }) {
       tamanho: l?.tamanho ? String(l.tamanho).slice(0, 30) : null,
       tipoDefeito: l?.tipoDefeito ? String(l.tipoDefeito).slice(0, 10) : null,
       // ── a indicação (ensaio por ultrassom) ──
-      ...Object.fromEntries(["peca", "indicacao", "angulo", "face", "comprimento", "db_indicacao",
+      // ⚠ `inspecionado` = o "Comprimento Inspecionado" do modelo, que nenhuma tela tinha (02/10/2026)
+      ...Object.fromEntries(["peca", "indicacao", "angulo", "face", "comprimento", "inspecionado", "db_indicacao",
         "db_referencia", "db_atenuacao", "db_classe", "reprovado", "percurso", "profundidade",
         "dist_x", "dist_y", "nivel"].map((k) => [k, l?.[k] ? String(l[k]).slice(0, 40) : null])),
     }));

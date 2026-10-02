@@ -177,10 +177,14 @@ export default function FormUS({ rel, linhas, res, travado, setLinhas, setResult
                   </label>
                 </div>
 
-                <div className="grid sm:grid-cols-6 gap-2 mt-2">
+                {/* ⚠ "Compr. inspecionado" é coluna do modelo do RUS e o PDF sempre a imprimiu, mas
+                    nenhuma tela pedia o valor (verificação do ultrassom, 02/10/2026). Grava em
+                    `inspecionado` — `comprimento` é o REPROVADO, ver linhasTabelaUS. */}
+                <div className="grid sm:grid-cols-7 gap-2 mt-2">
                   <N l={l} i={i} k="db_indicacao" rot="a — indicação (dB)" />
                   <N l={l} i={i} k="db_referencia" rot="b — referência (dB)" />
                   <N l={l} i={i} k="percurso" rot="Percurso sônico (mm)" />
+                  <N l={l} i={i} k="inspecionado" rot="Compr. inspecionado (mm)" />
                   <N l={l} i={i} k="comprimento" rot="Compr. reprovado (mm)" />
                   <N l={l} i={i} k="profundidade" rot="Profund. face A (mm)" />
                   <N l={l} i={i} k="nivel" rot="Nível de defeito" />

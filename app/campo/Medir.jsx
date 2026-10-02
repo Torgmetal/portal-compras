@@ -197,8 +197,11 @@ function IndicacaoUS({ l, set, soldadores = [] }) {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        {num("inspecionado", "Compr. inspecionado (mm)")}
         {num("comprimento", "Compr. reprovado (mm)")}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
         {num("profundidade", "Profund. face A (mm)")}
         {num("nivel", "Nível de defeito")}
       </div>
@@ -482,7 +485,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           : ehUS
           ? {
               laudo: l.laudo, marca: l.marca, indicacao: l.indicacao, angulo: l.angulo, face: l.face,
-              comprimento: l.comprimento, db_indicacao: l.db_indicacao, db_referencia: l.db_referencia,
+              comprimento: l.comprimento, inspecionado: l.inspecionado, db_indicacao: l.db_indicacao, db_referencia: l.db_referencia,
               db_atenuacao: l.db_atenuacao, db_classe: l.db_classe, percurso: l.percurso,
               reprovado: l.reprovado, profundidade: l.profundidade, dist_x: l.dist_x, dist_y: l.dist_y,
               soldador: l.soldador, sinete: l.sinete, nivel: l.nivel,
