@@ -1,11 +1,11 @@
 {
   "build": 3566,
-  "gerado": "2026-10-02T19:32:09.463Z",
+  "gerado": "2026-10-02T19:52:39.627Z",
   "commits": [
     {
-      "hash": "733f0734",
+      "hash": "952b92b4",
       "data": "02/10/2026",
-      "titulo": "WIP memória sais/poeira (sobe depois do deploy)"
+      "titulo": "Memória e revisão: relatórios de sais e poeira, e o texto que derrubava os PDFs"
     },
     {
       "hash": "9fa3355e",

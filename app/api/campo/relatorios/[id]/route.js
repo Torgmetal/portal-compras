@@ -12,7 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { CAMPOS_CABECALHO_US } from "@/lib/us-campos";
 import { LIMITE_VALOR_DEMAO } from "@/lib/pintura-campos";
-import { limiteDoCampo } from "@/lib/campo-condicoes";
+import { limiteDoCampo, VERIFICACOES_DIMENSIONAL } from "@/lib/campo-condicoes";
 import { PERFIS_CAMPO, TIPO_LABEL } from "@/lib/qualidade-campo";
 import { RESULTADOS, proximaRevisao, rotuloRevisao } from "@/lib/revisao-inspecao";
 import { numeroBR } from "@/lib/numero-br";
@@ -133,7 +133,7 @@ export async function PATCH(req, { params }) {
   const dados = { linhas };
   if (Array.isArray(body.equipamentos)) {
     dados.equipamentos = body.equipamentos.slice(0, 20).map((e) => ({
-      id: e?.id || null, nome: String(e?.nome || "").slice(0, 120),
+      id: e?.id || null, nome: String(e?.nome || "").slice(0, 160),
       // o código (TR 04, LX-01) vem do mapa de calibração — é a coluna "Código" do modelo
       codigo: e?.codigo ? String(e.codigo).slice(0, 40) : null,
       certificado: e?.certificado ? String(e.certificado).slice(0, 60) : null,
@@ -230,6 +230,15 @@ export async function PATCH(req, { params }) {
     }
     // ⚠ sais e poeira (02/10/2026): a mesma regra única da rota do computador (lib/superficie-gravacao)
     if (rel.tipo === "SAIS" || rel.tipo === "POEIRA") Object.assign(dados.resultados, limparResultadosSuperficie(c));
+    // ⚠ as três verificações do dimensional (02/10/2026): só APROVADO/REPROVADO, como no computador, e só
+    // nos dois tipos que as têm — nos outros a chave nem existe no modelo
+    if (rel.tipo === "DIMENSIONAL" || rel.tipo === "PRE_MONTAGEM") {
+      for (const k of VERIFICACOES_DIMENSIONAL) {
+        if (c[k] === undefined) continue;
+        const v = String(c[k] || "").toUpperCase();
+        dados.resultados[k] = v === "APROVADO" || v === "REPROVADO" ? v : null;
+      }
+    }
 
     // ⚠ ESTRUTURA NÃO PASSA POR String(). As leituras e as demãos são listas e objetos; o laço
     // acima transformaria cada uma numa string ("[object Object]") e o relatório de pintura

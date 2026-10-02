@@ -59,11 +59,12 @@ describe("quadro de assinaturas dos relatórios de inspeção", () => {
       "Inspetor Cliente": "Davi Pinho",
     });
 
-    // a folha de fotos repete o quadro pela MESMA regra
+    // a folha de fotos repete o quadro pela MESMA regra — e, desde 02/10/2026, com os MESMOS papéis do
+    // formulário (antes dizia "Realizado por / Aprovado por" e parecia folha de outro documento)
     expect(vezes(fotos, "Geraldo Tank")).toBe(1);
-    expect(quadros(fotos, ["Realizado por · Aprovado por", "Cliente / Fiscalização"])).toEqual({
-      "Realizado por · Aprovado por": "Geraldo Tank",
-      "Cliente / Fiscalização": "Davi Pinho",
+    expect(quadros(fotos, ["Inspetor Torg Metal · Fiscalização Torg Metal", "Inspetor Cliente"])).toEqual({
+      "Inspetor Torg Metal · Fiscalização Torg Metal": "Geraldo Tank",
+      "Inspetor Cliente": "Davi Pinho",
     });
   });
 

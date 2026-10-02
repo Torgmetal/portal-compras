@@ -149,7 +149,7 @@ function Txt({ rot, v, onMudar, tipo = "text" }) {
  * não foram cadastradas; dizer "aprovado" a partir de uma tabela que não tenho seria a pior forma
  * de errar aqui. Mostra o "d" e o laudo é do inspetor.
  */
-function IndicacaoUS({ l, set }) {
+function IndicacaoUS({ l, set, soldadores = [] }) {
   const { c, d } = classificacaoIndicacao({ a: l.db_indicacao, b: l.db_referencia, percursoMm: l.percurso });
   const num = (campo, rot) => (
     <label className="block">
@@ -205,6 +205,36 @@ function IndicacaoUS({ l, set }) {
       <div className="grid grid-cols-2 gap-2">
         {num("dist_x", "Distância X (mm)")}
         {num("dist_y", "Distância Y (mm)")}
+      </div>
+
+      {/* ⚠⚠ SOLDADOR E LAUDO DA INDICAÇÃO (verificação de 02/10/2026). O celular não os tinha: a indicação
+          lançada no campo saía no PDF sem avaliação e sem sinete, enquanto as peças sem indicação saíam
+          "A". Escolher o soldador grava o SINETE junto, como no visual de solda. */}
+      <label className="block">
+        <span className="block text-[11px] text-torg-gray mb-0.5">Soldador (sinete)</span>
+        <select value={l.soldador || ""} aria-label="Soldador da indicação"
+          onChange={(e) => {
+            const x = soldadores.find((y) => y.nome === e.target.value);
+            set("soldador", e.target.value);
+            set("sinete", x?.sinete || null);
+          }}
+          className="w-full text-[14px] border-2 border-gray-200 rounded-lg px-2 py-2 outline-none">
+          <option value="">—</option>
+          {soldadores.map((x) => <option key={x.id || x.nome} value={x.nome}>{x.sinete ? `${x.sinete} · ` : ""}{x.nome}</option>)}
+        </select>
+      </label>
+      <div className="grid grid-cols-3 gap-1.5">
+        {LAUDOS.map((v) => {
+          const on = l.laudo === v.c;
+          const cor = v.c === "A" ? "bg-emerald-600 border-emerald-600" : v.c === "R" ? "bg-red-600 border-red-600" : "bg-amber-500 border-amber-500";
+          return (
+            <button key={v.c} onClick={() => set("laudo", on ? "" : v.c)} aria-label={`Laudo da indicação: ${v.nome}`}
+              className={`rounded-lg py-2 border leading-tight ${on ? `${cor} text-white` : "text-torg-dark border-gray-200 active:bg-gray-50"}`}>
+              <span className="block text-[15px] font-bold">{v.c}</span>
+              <span className={`block text-[10px] ${on ? "text-white/85" : "text-torg-gray"}`}>{v.curto}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -466,7 +496,8 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       }));
       const r = await fetch(`/api/campo/relatorios/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pecasInformadas, medidas, removidas, equipamentos, observacoes, assumirInspetor: !rel.inspetor, condicoes: ehDim ? undefined : (({ __espec, ...resto }) => resto)(cond), resultadoInspecao: resultado }),
+        // ⚠ no dimensional só vão as três verificações — é o único `cond` que a tela dele edita
+        body: JSON.stringify({ pecasInformadas, medidas, removidas, equipamentos, observacoes, assumirInspetor: !rel.inspetor, condicoes: ehDim ? { dimensional: cond.dimensional, alinhamento: cond.alinhamento, acabamento: cond.acabamento } : (({ __espec, ...resto }) => resto)(cond), resultadoInspecao: resultado }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
@@ -656,7 +687,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
               </div>
 
               {ehUS ? (
-                <IndicacaoUS l={l} set={(campo, v) => set(i, campo, v)} />
+                <IndicacaoUS l={l} set={(campo, v) => set(i, campo, v)} soldadores={listas.soldadores} />
               ) : ehLp ? (
                 <IndicacaoLP l={l} set={(campo, v) => set(i, campo, v)} />
               ) : ehDim ? (
@@ -863,6 +894,28 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           ⚠ Só APROVADO fecha o relatório. Reprovado volta para reparo e "exame complementar" ainda
           vai ter ensaio — nos dois ele continua aberto e volta para a lista, à espera da
           reinspeção. */}
+      {/* ⚠ AS TRÊS VERIFICAÇÕES DO MODELO DIMENSIONAL (02/10/2026). O celular não as tinha: o relatório
+          medido no campo ia para assinatura com DIMENSIONAL, ALINHAMENTO e ACABAMENTO em branco. */}
+      {ehDim && (
+        <div className="mt-5 bg-white border border-gray-200 rounded-2xl p-3 space-y-2">
+          <p className="text-[13px] font-semibold text-torg-dark">Verificações</p>
+          {[["dimensional", "Dimensional"], ["alinhamento", "Alinhamento"], ["acabamento", "Acabamento"]].map(([k, rot]) => (
+            <div key={k} className="flex items-center gap-2">
+              <span className="text-[13px] text-torg-dark w-28 shrink-0">{rot}</span>
+              {[["APROVADO", "A", "bg-emerald-600 border-emerald-600"], ["REPROVADO", "R", "bg-red-600 border-red-600"]].map(([v, sigla, cor]) => {
+                const on = cond[k] === v;
+                return (
+                  <button key={v} onClick={() => setCond((c) => ({ ...c, [k]: on ? "" : v }))} aria-label={`${rot}: ${RESULTADO_LABEL[v]}`}
+                    className={`flex-1 rounded-xl py-2.5 border text-[14px] font-bold ${on ? `${cor} text-white` : "text-torg-dark border-gray-200 active:bg-gray-50"}`}>
+                    {sigla}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="mt-5">
         <p className="text-[12px] font-semibold text-torg-gray mb-1.5">Resultado da inspeção</p>
         <div className="grid grid-cols-3 gap-1.5">

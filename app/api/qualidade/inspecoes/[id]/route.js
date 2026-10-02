@@ -152,14 +152,16 @@ export async function PATCH(req, { params }) {
   // hoje. Quando o certificado for renovado, o relatório antigo continua mostrando o que valia no
   // dia da inspeção.
   if (Array.isArray(body.equipamentos)) {
-    dados.equipamentos = body.equipamentos.slice(0, 12).map((e) => ({
-      id: String(e?.id || ""),
+    // ⚠ OS MESMOS TETOS DO CELULAR (verificação de 02/10/2026): aqui eram 12 instrumentos e só os com
+    // id; o celular grava 20, com ou sem id. Salvar no computador depois do celular cortava em silêncio.
+    dados.equipamentos = body.equipamentos.slice(0, 20).map((e) => ({
+      id: e?.id ? String(e.id) : null,
       nome: String(e?.nome || "").slice(0, 160),
       codigo: e?.codigo ? String(e.codigo).slice(0, 40) : null,
       certificado: e?.certificado ? String(e.certificado).slice(0, 60) : null,
       validade: e?.validade ? String(e.validade).slice(0, 10) : null,
       vencido: !!e?.vencido,
-    })).filter((e) => e.id && e.nome);
+    })).filter((e) => e.nome);
   }
 
   // ⚠ ESTE SANITIZADOR RECONSTRÓI A LINHA CAMPO A CAMPO, e por isso qualquer campo que não esteja
@@ -198,8 +200,10 @@ export async function PATCH(req, { params }) {
       // altura dela também... deixar mais comprida ou mais curta".
       afastamento: num(l?.afastamento),
       // ── a junta inspecionada (visual de solda) ──
-      eps: l?.eps ? String(l.eps).slice(0, 30) : null,
-      soldador: l?.soldador ? String(l.soldador).slice(0, 40) : null,
+      // ⚠ 60, como o celular (lib/campo-linhas): com 30/40 aqui, a EPS e o soldador lançados no campo
+      // voltavam cortados depois de um salvar no computador
+      eps: l?.eps ? String(l.eps).slice(0, 60) : null,
+      soldador: l?.soldador ? String(l.soldador).slice(0, 60) : null,
       // sinete do soldador (S-01, S-04…) — vem da RSQ; é o que identifica quem soldou
       sinete: l?.sinete ? String(l.sinete).slice(0, 20) : null,
       descontinuidade: l?.descontinuidade ? String(l.descontinuidade).slice(0, 40) : null,

@@ -25,7 +25,19 @@ describe("revisão nova de sais e poeira", () => {
     expect(r.resultados.fitaAdesiva).toBe("25 mm");
   });
 
+  it("dimensional e pré-montagem: o resultado e as três verificações da rodada anterior não passam para o R01", () => {
+    for (const tipo of ["DIMENSIONAL", "PRE_MONTAGEM"]) {
+      const r = proximaRevisao({ tipo, linhas: [], resultados: { resultado: "Reprovado", dimensional: "REPROVADO", alinhamento: "APROVADO", acabamento: "APROVADO", procedimento: "PO-04", qtdPeca: { T1: 2 } } });
+      expect(r.resultados).toMatchObject({ resultado: null, dimensional: null, alinhamento: null, acabamento: null, procedimento: "PO-04", qtdPeca: { T1: 2 } });
+    }
+  });
+
+  it("pintura: limpa o laudo do formulário e as espessuras; a rugosidade e o resto ficam", () => {
+    const r = proximaRevisao({ tipo: "PINTURA", linhas: [], resultados: { limpeza: "SA2.5", laudo: "REPROVADO", espessuras: { 1: ["120", "130"] }, rugosidade: { leituras: ["60"] } } });
+    expect(r.resultados).toMatchObject({ limpeza: "SA2.5", laudo: null, espessuras: {}, rugosidade: { leituras: ["60"] } });
+  });
+
   it("os outros tipos seguem como antes (não ganham `resultados` na revisão)", () => {
-    expect(proximaRevisao({ tipo: "PINTURA", linhas: [], resultados: { limpeza: "SA2.5" } }).resultados).toBeUndefined();
+    expect(proximaRevisao({ tipo: "VISUAL_SOLDA", linhas: [], resultados: { eps: "EPS 01" } }).resultados).toBeUndefined();
   });
 });

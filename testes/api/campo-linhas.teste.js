@@ -3,7 +3,7 @@ import { mockPrisma } from "@/testes/apoio/prisma";
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 vi.mock("@/lib/session", () => ({ requireRole: vi.fn().mockResolvedValue({ id: "u", name: "Alexandre Stival" }) }));
 import { PATCH } from "@/app/api/campo/relatorios/[id]/route";
-import { CAMPOS_CONDICAO_CAMPO } from "@/lib/campo-condicoes";
+import { CAMPOS_CONDICAO_CAMPO, VERIFICACOES_DIMENSIONAL } from "@/lib/campo-condicoes";
 
 // "ESTÁ SUMINDO ALGUMAS INFORMAÇÕES QUE ELA COLOCOU" (Vitor, 23/09/2026). A rota do celular reconstrói
 // cada linha pela lista do que o campo pode escrever — e o que não está na lista some na gravação.
@@ -97,9 +97,20 @@ describe("a lixeira do celular", () => {
 
 it("todo campo que a tela do celular carrega, a rota grava — senão ele voltaria em branco", async () => {
   rel = { id: "r", tipo: "ULTRASSOM", marcas: ["P1"], linhas: [], equipamentos: [], resultados: {} };
-  const condicoes = Object.fromEntries(CAMPOS_CONDICAO_CAMPO.map((k, n) => [k, `v${n}`]));
+  // ⚠ as três verificações do dimensional são A/R e só valem nos dois tipos que as têm (teste abaixo)
+  const textos = CAMPOS_CONDICAO_CAMPO.filter((k) => !VERIFICACOES_DIMENSIONAL.includes(k));
+  const condicoes = Object.fromEntries(textos.map((k, n) => [k, `v${n}`]));
   const r = await patch({ condicoes });
   expect(r.status).toBe(200);
-  const perdidos = CAMPOS_CONDICAO_CAMPO.filter((k) => rel.resultados[k] !== condicoes[k]);
+  const perdidos = textos.filter((k) => rel.resultados[k] !== condicoes[k]);
   expect(perdidos).toEqual([]);
+});
+
+it("dimensional e pré-montagem: o celular grava as três verificações, só como aprovado ou reprovado", async () => {
+  for (const tipo of ["DIMENSIONAL", "PRE_MONTAGEM"]) {
+    rel = { id: "r", tipo, marcas: ["P1"], linhas: [], equipamentos: [], resultados: {} };
+    const r = await patch({ condicoes: { dimensional: "APROVADO", alinhamento: "reprovado", acabamento: "talvez" } });
+    expect(r.status).toBe(200);
+    expect(rel.resultados).toMatchObject({ dimensional: "APROVADO", alinhamento: "REPROVADO", acabamento: null });
+  }
 });
