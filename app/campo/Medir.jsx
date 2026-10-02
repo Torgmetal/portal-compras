@@ -8,7 +8,7 @@ import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2, Camera,
 import LeitorQR from "./LeitorQR";
 import VistaCotas from "./VistaCotas";
 import { desenhoDaLinha } from "@/lib/cota-marcacao";
-import { marcaDoQR, TIPOS_RELATORIO, usaCotas } from "@/lib/qualidade-campo";
+import { marcaDoQR, TIPOS_RELATORIO, usaCotas, semJunta } from "@/lib/qualidade-campo";
 import {useStore} from "@/lib/store";
 import PecasInformadasEditor from "../qualidade/inspecoes/[id]/PecasInformadasEditor";
 import {usaQuantidadeInspecao, pecasDoRelatorio, pecasInformadasSchema} from "@/lib/inspecao-pecas";
@@ -21,6 +21,8 @@ import { reduzImagem } from "@/lib/imagem-cliente";
 import { lerJson } from "@/lib/resposta-json";
 import { evidenciasDoTipo } from "@/lib/fotos-evidencia";
 import FormularioUSCampo from "./FormularioUSCampo";
+import FormularioSaisCampo from "./FormularioSaisCampo";
+import FormularioPoeiraCampo from "./FormularioPoeiraCampo";
 import JuntaSoldada from "./JuntaSoldada";
 import { rotuloEps } from "@/lib/eps-casa";
 import { ANGULOS, FACES, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL } from "@/lib/us-campos";
@@ -332,6 +334,10 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   // ⚠ o LP tem junta como o visual de solda, mas o que se registra é OUTRA COISA: número
   // da indicação, local, tamanho e tipo (IL/IA/INR) — não soldador, EPS e descontinuidade.
   const ehLp = rel.tipo === "LP";
+  // sais e poeira (02/10/2026): ensaios da superfície, como a pintura — sem junta (ver `semJunta`)
+  const ehSais = rel.tipo === "SAIS";
+  const ehPoeira = rel.tipo === "POEIRA";
+  const ehSemJunta = semJunta(rel.tipo);
   const set = (i, campo, v) => setLinhas((p) => p.map((l, k) => (k === i ? { ...l, [campo]: v } : l)));
 
   function alternarDefeito(i, cod) {
@@ -538,13 +544,15 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
 
       {usaQuantidadeInspecao(rel.tipo) && <section className="my-3" aria-label="Peças do relatório"><h2 className="text-sm font-semibold text-torg-dark">Peças do relatório</h2><PecasInformadasEditor pecas={pecasQuantidades} quantidadesLista={quantidadesLista} onChange={setPecasQuantidades} disabled={salvando} /></section>}
       {ehPintura && <Pintura cond={cond} setCond={setCond} tintas={tintas} plp={plp} />}
+      {ehSais && <FormularioSaisCampo rel={rel} cond={cond} setCond={setCond} resultado={resultado} />}
+      {ehPoeira && <FormularioPoeiraCampo rel={rel} cond={cond} setCond={setCond} resultado={resultado} />}
 
       {ehLp && <ParametrosLP cond={cond} setCond={setCond} />}
       {/* ⚠ a junta soldada (EPS, RQS, processo, metal de adição, tipo de junta) — só existia no
           computador, e os EVS/LP da OP-102 foram para assinatura com os cinco em branco (23/09/2026) */}
       {ehLp && <JuntaSoldada cond={cond} setCond={setCond} eps={listas.eps} />}
 
-      {!ehDim && !ehUS && !ehPintura && !ehLp && (
+      {!ehDim && !ehUS && !ehLp && !ehSemJunta && (
         <div className="mt-3 space-y-2.5">
           <p className="text-[12px] font-semibold text-torg-gray">Condições do ensaio</p>
 
@@ -616,7 +624,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         </div>
       )}
 
-      {!ehPintura && (
+      {!ehSemJunta && (
       <p className="text-[12px] font-semibold text-torg-gray mt-4 mb-1.5 inline-flex items-center gap-1.5">
         <Ruler size={13} className="text-torg-blue" /> {ehDim ? "Cotas a medir" : ehLp ? "Juntas ensaiadas" : "Juntas a inspecionar"} · {medir.length}
       </p>
@@ -781,7 +789,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
 
       {/* ⚠ ler QR / digitar peça não existe na pintura: não se inspeciona junta, e sim o
           revestimento, demão a demão. Botão que não leva a nada é pior que botão faltando. */}
-      {!ehDim && !ehPintura && (
+      {!ehDim && !ehSemJunta && (
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button onClick={() => setLendoQR(true)}
             className="bg-white border-2 border-torg-blue text-torg-blue active:bg-torg-blue/5 rounded-xl py-3.5 text-[15px] font-semibold inline-flex items-center justify-center gap-2">
@@ -800,7 +808,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
           a junta nasce aqui (Ler QR / Digitar), e a frase antiga mandava o inspetor esperar por algo
           que ninguém ia fazer: o EVS-102-001 foi para assinatura sem nenhuma junta (23/09/2026).
           Pintura não tem junta — ali a frase só confundia. */}
-      {!medir.length && !ehPintura && (
+      {!medir.length && !ehSemJunta && (
         <p className="text-sm text-torg-gray">
           {ehDim
             ? "Este relatório ainda não tem cotas marcadas. Quem monta faz isso no computador."

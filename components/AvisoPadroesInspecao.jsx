@@ -5,6 +5,8 @@ const CAMPOS = {
   VISUAL_SOLDA: 'técnica, critério de inspeção e a junta soldada (EPS, RQS, processo, metal de adição e tipo de junta)',
   LP: 'tipo de penetrante, método, fabricante, removedor, revelador, critério e a junta soldada (EPS, RQS, processo, metal de adição e tipo de junta)',
   ULTRASSOM: 'acoplante, bloco padrão, local e critérios',
+  SAIS: 'documento de referência, ordem de compra, volume de água, área da célula, requisito de aceitação, aparelho e termômetro',
+  POEIRA: 'documentos de referência, ordem de compra, fita adesiva e ampliação',
 };
 export default function AvisoPadroesInspecao({ tipo, resultados = {} }) {
   if (!CAMPOS[tipo]) return null;

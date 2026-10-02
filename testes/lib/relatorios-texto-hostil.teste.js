@@ -26,6 +26,8 @@ const CASOS = {
   ULTRASSOM: { linhas: [{ peca: "T112A1", numero: "1", angulo: "70", face: "A", db_indicacao: "50", db_referencia: "48", laudo: "A", obs: "x" }], resultados: { procedimento: "PI-QUA-003", acoplante: "Metilcelulose", tag: "TAG" } },
   PINTURA: { linhas: [], resultados: { abrasivo: "Granalha", rugosidade: { especificada: "50-75", leituras: ["60", "", "70"] }, demaos: { 1: { produto: "Primer", cor: "Cinza", espessuras: ["120", "", "130"] } }, obsFotos: "x", descricao: "Pintura" } },
   LP: { linhas: [{ junta: "J1", numero: "1", local: "Alma", tamanho: "2", tipo: "Linear", laudo: "A", obs: "x" }], resultados: { procedimento: "PO-15", juntaSoldada: "Topo", penetrante: "Magnaflux" } },
+  SAIS: { linhas: [], resultados: { documentoReferencia: "PO-05", ordemCompra: "PC 1", etapaPintura: "Após o jateamento", peca: "T112A1", requisito: "20", aparelho: "Condutivímetro", apModelo: "EC-33", apTag: "CD-01", amostras: [{ condAgua: "1", condAmostra: "11", hora: "09:10" }] } },
+  POEIRA: { linhas: [], resultados: { documentoReferencia: "PO-05", ordemCompra: "PC 1", etapaPintura: "Após o jateamento", fitaAdesiva: "Fita 25 mm", ampliacao: "Lupa 10×", testes: [{ local: "Alma", quantidade: "1", tamanho: "2", obs: "x" }], classificacao: "2" } },
 };
 
 describe("nenhum relatório derruba com texto estranho em qualquer campo", () => {

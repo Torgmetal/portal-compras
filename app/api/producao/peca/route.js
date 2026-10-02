@@ -41,6 +41,8 @@ const TIPO_RELATORIO = {
   ULTRASSOM: "Ultrassom",
   LP: "Líquido penetrante",
   PINTURA: "Pintura",
+  SAIS: "Sais (salinidade)",
+  POEIRA: "Poeira",
   MONTAGEM: "Montagem",
   GERAL: "Geral",
 };

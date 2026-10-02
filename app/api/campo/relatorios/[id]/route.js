@@ -17,6 +17,7 @@ import { PERFIS_CAMPO, TIPO_LABEL } from "@/lib/qualidade-campo";
 import { RESULTADOS, proximaRevisao, rotuloRevisao } from "@/lib/revisao-inspecao";
 import { numeroBR } from "@/lib/numero-br";
 import { linhasDoCampo } from "@/lib/campo-linhas";
+import { limparResultadosSuperficie, CAMPOS_TEXTO_SUPERFICIE } from "@/lib/superficie-gravacao";
 
 export const runtime = "nodejs";
 
@@ -222,9 +223,13 @@ export async function PATCH(req, { params }) {
                      // ultrassom: a junta ensaiada, que o PDF já imprimia sem ter onde preencher
                      "chanfro", "desenho",
                      // ⚠ e TODO o cabeçalho do US (25/09/2026) — material e espessura eram descartados aqui
-                     ...CAMPOS_CABECALHO_US.map((x) => x.k)]) {
+                     ...CAMPOS_CABECALHO_US.map((x) => x.k),
+                     // sais e poeira (02/10/2026): o cabeçalho dos dois modelos
+                     ...CAMPOS_TEXTO_SUPERFICIE]) {
       if (c[k] !== undefined) dados.resultados[k] = c[k] == null || c[k] === "" ? null : String(c[k]).slice(0, limiteDoCampo(k));
     }
+    // ⚠ sais e poeira (02/10/2026): a mesma regra única da rota do computador (lib/superficie-gravacao)
+    if (rel.tipo === "SAIS" || rel.tipo === "POEIRA") Object.assign(dados.resultados, limparResultadosSuperficie(c));
 
     // ⚠ ESTRUTURA NÃO PASSA POR String(). As leituras e as demãos são listas e objetos; o laço
     // acima transformaria cada uma numa string ("[object Object]") e o relatório de pintura

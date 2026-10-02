@@ -17,6 +17,8 @@ import FormEVS from "./FormEVS";
 import FormUS from "./FormUS";
 import FormPintura from "./FormPintura";
 import FormLP from "./FormLP";
+import FormSais from "./FormSais";
+import FormPoeira from "./FormPoeira";
 import Equipamentos from "./Equipamentos";
 import AnexarProjeto from "./AnexarProjeto";
 import EscolherProjeto from "./EscolherProjeto";
@@ -355,6 +357,18 @@ export default function RelatorioDetalheClient({ id }) {
         </div>
       )}
 
+      {/* ── sais e poeira (Vitor, 02/10/2026: modelos "Relatório de Sais" e "Relatório de Poeira") ── */}
+      {rel.tipo === "SAIS" && (
+        <div className="mt-4">
+          <FormSais rel={rel} res={res} travado={travado} setResultado={setResultado} />
+        </div>
+      )}
+      {rel.tipo === "POEIRA" && (
+        <div className="mt-4">
+          <FormPoeira rel={rel} res={res} travado={travado} setResultado={setResultado} />
+        </div>
+      )}
+
       {/* ── preenchimento do ensaio visual de solda ──────────────────────────────────────── */}
       {rel.tipo === "VISUAL_SOLDA" && (
         <div className="mt-4">
@@ -409,7 +423,7 @@ export default function RelatorioDetalheClient({ id }) {
 
 
 
-          {linhas.length > 0 && !["VISUAL_SOLDA", "ULTRASSOM", "PINTURA", "LP"].includes(rel.tipo) && (
+          {linhas.length > 0 && !["VISUAL_SOLDA", "ULTRASSOM", "PINTURA", "LP", "SAIS", "POEIRA"].includes(rel.tipo) && (
             <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5"><Ruler size={13} className="text-torg-blue" /> Dimensões</p>

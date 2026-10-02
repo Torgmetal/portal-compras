@@ -46,6 +46,8 @@ export default function EscopoQualidade({ valor, onChange, compacto = false }) {
               <input type="checkbox" checked={tipos.includes(t.id)} onChange={() => marcar(t.id)}
                 className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
               <span className="font-mono text-[11px] text-torg-gray">{t.sigla}</span> {t.label}
+              {/* ⚠ sais e poeira acompanham a pintura (lib/qualidade-escopo) — dito aqui, onde se escolhe */}
+              {t.id === "PINTURA" && <span className="text-[10px] text-torg-gray">(inclui sais e poeira)</span>}
             </label>
           ))}
         </div>
