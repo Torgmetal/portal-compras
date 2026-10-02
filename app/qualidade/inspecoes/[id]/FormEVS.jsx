@@ -142,6 +142,13 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
         </div>
 
         {!linhas.length && <p className="text-[12px] text-torg-gray">Nenhuma junta lançada. Toque em “Nova junta”.</p>}
+        {/* ⚠ EVS SEM PEÇA (verificação das travas, 02/10/2026): o seletor só oferecia "—" e a trava cobra a peça da
+            junta. Agora ela se digita — e a tela diz onde incluir as peças do relatório, para saírem no cabeçalho */}
+        {!marcas.length && linhas.length > 0 && (
+          <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5 mb-2">
+            Este relatório não tem peças: digite a marca em cada junta, e inclua as peças em “Peças do relatório” para saírem no cabeçalho.
+          </p>
+        )}
 
         <div className="space-y-2">
           {linhas.map((l, i) => {
@@ -152,11 +159,17 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
                 <div className="grid sm:grid-cols-[1fr_60px_1.6fr_1fr_1.4fr_auto] gap-2 items-end">
                   <label className="block">
                     <span className="block text-[10px] text-torg-gray mb-0.5">Peça</span>
-                    <select value={l.marca || ""} disabled={travado} onChange={(e) => set(i, "marca", e.target.value)}
-                      className="w-full text-[12px] border border-gray-200 rounded px-1.5 py-1 font-mono disabled:bg-gray-50">
-                      <option value="">—</option>
-                      {marcas.map((m) => <option key={m} value={m}>{m}</option>)}
-                    </select>
+                    {marcas.length ? (
+                      <select value={l.marca || ""} disabled={travado} onChange={(e) => set(i, "marca", e.target.value)} aria-label={`Peça da junta ${i + 1}`}
+                        className="w-full text-[12px] border border-gray-200 rounded px-1.5 py-1 font-mono disabled:bg-gray-50">
+                        <option value="">—</option>
+                        {marcas.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    ) : (
+                      <input value={l.marca || ""} disabled={travado} maxLength={60} placeholder="marca" aria-label={`Peça da junta ${i + 1}`}
+                        onChange={(e) => set(i, "marca", e.target.value.toUpperCase())}
+                        className="w-full text-[12px] border border-gray-200 rounded px-1.5 py-1 font-mono disabled:bg-gray-50" />
+                    )}
                   </label>
                   <label className="block">
                     <span className="block text-[10px] text-torg-gray mb-0.5">Qtde</span>

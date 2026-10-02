@@ -39,7 +39,11 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
   const faseDefinida = useRef(false);
   const escolherFase = (f) => { faseDefinida.current = true; setFase(f); };
 
-  const tipos = TIPOS_RELATORIO.filter((t) => !op.tipos || op.tipos.includes(t.id));
+  // ⚠⚠ A PRÉ-MONTAGEM NÃO NASCE AQUI (verificação das travas, 02/10/2026): ela nasce do PROJETO — o diagrama de
+  // montagem escolhido na pasta da obra —, e o celular não tem onde escolhê-lo; a criação voltava sempre 400.
+  // Nasce no computador; o celular a encontra na lista e mede.
+  const noEscopo = (id) => !op.tipos || op.tipos.includes(id);
+  const tipos = TIPOS_RELATORIO.filter((t) => noEscopo(t.id) && t.id !== "PRE_MONTAGEM");
 
   // ⚠ PRODUTO FINAL, NÃO COMPONENTE. Vitor (14/09/2026): "está aparecendo peças de croqui no
   // relatório de pintura e também acessórios, isso não pode aparecer na tela do inspetor". A API
@@ -99,9 +103,15 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
               <span className="block text-[12px] text-torg-gray font-mono">{t.sigla}</span>
             </button>
           ))}
-          {!tipos.length && (
+          {!tipos.length && !noEscopo("PRE_MONTAGEM") && (
             <p className="text-sm text-torg-gray">
               Esta obra não tem relatório de inspeção previsto no escopo de qualidade.
+            </p>
+          )}
+          {noEscopo("PRE_MONTAGEM") && (
+            <p className="text-[12px] text-torg-gray bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
+              A pré-montagem nasce do projeto (o diagrama de montagem da pasta da obra): crie no computador, em
+              Qualidade › Inspeções — depois ela aparece aqui na lista para medir.
             </p>
           )}
         </div>

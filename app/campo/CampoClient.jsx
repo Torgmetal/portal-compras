@@ -184,7 +184,7 @@ function EscolherOP({ onEscolher, nome }) {
  * medir com o mesmo instrumento e não registrar nada — o relatório sairia sem dizer com o que foi
  * medido, que é pior. Aparece, avisa, e quem decide é quem está lá.
  */
-function Equipamentos({ escolhidos, onMudar, tipo = null }) {
+export function Equipamentos({ escolhidos, onMudar, tipo = null }) {
   const [abrir, setAbrir] = useState(false);
   const [lista, setLista] = useState(null);
   // ⚠ só os do procedimento, com escape. Ver a nota em lib/instrumentos-por-relatorio.js:
@@ -203,6 +203,10 @@ function Equipamentos({ escolhidos, onMudar, tipo = null }) {
   const temVencido = escolhidos.some((e) => e.vencido);
   const doProc = tipo && !todos ? instrumentosDoTipo(lista || [], tipo) : (lista || []);
   const escondidos = (lista || []).length - doProc.length;
+  // ⚠⚠ o já escolhido que não está na lista (venceu, renomeado, ou marcado em "ver todos") vem no topo, marcado,
+  // para poder ser desmarcado — antes ficava no relatório para sempre (verificação das travas, 02/10/2026)
+  const exibidos = new Set(doProc.map((e) => e.id));
+  const naTela = lista ? [...escolhidos.filter((e) => !exibidos.has(e.id)), ...doProc] : [];
 
   const alternar = (eq) => {
     onMudar(marcados.has(eq.id) ? escolhidos.filter((x) => x.id !== eq.id) : [...escolhidos, eq]);
@@ -259,7 +263,7 @@ function Equipamentos({ escolhidos, onMudar, tipo = null }) {
                 )}
               </div>
             )}
-            {doProc.map((eq) => {
+            {naTela.map((eq) => {
               const on = marcados.has(eq.id);
               return (
                 <button key={eq.id} onClick={() => alternar(eq)}
@@ -274,12 +278,13 @@ function Equipamentos({ escolhidos, onMudar, tipo = null }) {
                           é um impedimento — instrumento fora de calibração invalida o ensaio. */}
                       {eq.certificado ? `cert ${eq.certificado}` : "sem certificado"}
                       {eq.vencido ? " · VENCIDO" : ""}
+                      {!exibidos.has(eq.id) ? " · escolhido, fora desta lista" : ""}
                     </span>
                   </span>
                 </button>
               );
             })}
-            {lista && !doProc.length && <p className="p-4 text-sm text-torg-gray">Nenhum instrumento previsto para este relatório.</p>}
+            {lista && !naTela.length && <p className="p-4 text-sm text-torg-gray">Nenhum instrumento previsto para este relatório.</p>}
           </div>
         </div>
       )}

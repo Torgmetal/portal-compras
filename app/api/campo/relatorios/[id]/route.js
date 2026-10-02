@@ -104,7 +104,24 @@ export async function PATCH(req, { params }) {
       return NextResponse.json({ error: "Só relatório reprovado (ou com exame complementar) entra em reinspeção." }, { status: 409 });
     }
     const dados = proximaRevisao(rel, { por: user.name || null });
+    // ⚠⚠ O R01 NASCE SEM O ENVIO DO R00 (verificação das travas, 02/10/2026) — como o "Abrir revisão" do
+    // computador (lib/relatorio-revisao). Mantido, o envio seguinte reusava o antigo sem passar pela trava, e um
+    // R00 todo assinado fazia o R01 entrar no data book como assinado por quem nunca o viu. A rodada fechada
+    // guarda quem assinou e quando, e os links antigos passam a dizer "em revisão".
+    if (rel.envioAssinaturaId) {
+      const assinaturas = (await prisma.assinaturaDocumento.findMany({
+        where: { envioId: rel.envioAssinaturaId }, select: { nome: true, setor: true, email: true, assinadoEm: true },
+      }).catch(() => [])) || [];
+      Object.assign(dados.revisoes[dados.revisoes.length - 1], {
+        envioAssinaturaId: rel.envioAssinaturaId,
+        assinaturas: assinaturas.map((a) => ({ nome: a.nome, setor: a.setor ?? null, email: a.email ?? null, assinadoEm: a.assinadoEm ? new Date(a.assinadoEm).toISOString() : null })),
+      });
+      Object.assign(dados, { envioAssinaturaId: null, status: "RASCUNHO", emitidoEm: null });
+    }
     const atualizado = await prisma.relatorioInspecao.update({ where: { id }, data: dados });
+    if (rel.envioAssinaturaId) {
+      await prisma.envioAssinatura.update({ where: { id: rel.envioAssinaturaId }, data: { status: "REVISAO_PEDIDA" } }).catch(() => {});
+    }
 
     // ⚠ a revisão que acabou de fechar vai para o data book como documento PRÓPRIO, ao lado da
     // vigente: é o que evidencia o retrabalho. Falhar aqui não pode impedir a reinspeção — o

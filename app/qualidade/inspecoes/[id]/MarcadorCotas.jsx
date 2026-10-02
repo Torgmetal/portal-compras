@@ -1,5 +1,6 @@
 "use client";
 import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Loader2, AlertCircle, Trash2, Undo2, Maximize2, X, Eraser, ZoomIn, ZoomOut, Ruler, ArrowLeftRight, Minus, Plus } from "lucide-react";
 import { layoutCotas, setaEm, PADDING, letraDaCota, descricaoPadraoCota, renumerarCotas } from "@/lib/cota-marcacao";
@@ -586,7 +587,8 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
       // apenas isso: cota A, Cota B e Cota C". Quem diz o que medir é a marca no desenho, não um
       // nome repetido na tabela.
       descricao: descricaoPadraoCota(letra),
-      projetoMm: espec === "" ? null : Number(espec),
+      // ⚠ NaN não é valor de projeto: ia ao banco como null e a trava cobrava "dimensão de projeto em branco"
+      projetoMm: espec == null || espec === "" || !Number.isFinite(Number(espec)) ? null : Number(espec),
       tolerancia: tol ? `± ${tol}` : "",
       encontradoMm: null,
       ...rascunho,
@@ -635,7 +637,24 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
     onChange(cotas.map((x, k) => (k === i ? { ...x, afastamento: novo } : x)));
   }
 
-  if (erro) return <p className="text-[12px] text-red-600 inline-flex items-center gap-1.5"><AlertCircle size={14} /> {erro}</p>;
+  // ⚠⚠ DESENHO QUE NÃO ABRE NÃO PRENDE AS COTAS (verificação das travas, 02/10/2026). Antes o erro tomava o lugar
+  // de tudo: a cota com valor de projeto em branco — que a trava de assinatura cobra — não tinha onde ser
+  // corrigida enquanto o PDF não voltasse, e não dava para criar cota sem marcação.
+  if (erro) return (
+    <div>
+      <p className="text-[12px] text-red-600 inline-flex items-center gap-1.5"><AlertCircle size={14} /> {erro}</p>
+      {!rascunho && (
+        <button onClick={() => setRascunho({})} className="block mt-1.5 text-[11px] text-torg-blue hover:text-torg-dark font-medium">
+          + cota sem marcação no desenho
+        </button>
+      )}
+      {rascunho && (
+        <BarraCota letra={LETRAS[cotas.length] || "?"} valores={[]} semDesenho tol={tol} onTol={setTol} sugestao={sugestao}
+          onConfirmar={confirmar} onCancelar={() => setRascunho(null)} />
+      )}
+      <ListaCotas cotas={cotas} onChange={onChange} registrar={registrar} remover={remover} />
+    </div>
+  );
   if (!dados) return <p className="text-[12px] text-torg-gray inline-flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" /> lendo o desenho…</p>;
 
   const conteudo = (
@@ -762,36 +781,8 @@ export default function MarcadorCotas({ relatorioId, marca, cotas, onChange, ocu
         />
       )}
 
-      {cotas.length > 0 && (
-        <ul className="mt-2 space-y-1 max-w-2xl">
-          {cotas.map((c, i) => (
-            <li key={i} className="flex items-center gap-2 text-[12px]">
-              <span className="w-5 h-5 rounded-full bg-torg-orange text-white font-bold text-[10px] inline-flex items-center justify-center shrink-0">{c.letra}</span>
-              {/* ⚠ a descrição é DIGITÁVEL: é ela que sai na coluna "Descrição" da tabela do
-                  relatório (lib/relatorio-inspecao-pdf). No desenho continua só a letra. */}
-              <input value={c.descricao ?? ""} onFocus={registrar}
-                onChange={(e) => onChange(cotas.map((linha, j) => (j === i ? { ...linha, descricao: e.target.value } : linha)))}
-                placeholder={descricaoPadraoCota(c.letra)}
-                aria-label={`Descrição da cota ${c.letra}`}
-                className="flex-1 min-w-0 px-1.5 py-0.5 rounded border border-gray-200 text-torg-dark focus:outline-none focus:border-torg-blue" />
-              <span className="font-mono text-torg-dark">{c.projetoMm ?? "—"}</span>
-              <CampoTolerancia value={c.tolerancia} label={`Tolerância da cota ${c.letra} (mm)`} onFocus={registrar}
-                onChange={valor=>onChange(cotas.map((linha,j)=>j===i?{...linha,tolerancia:valor}:linha))}/>
-              {c.ax != null && (<>
-                <span className="inline-flex items-center rounded border border-gray-200 overflow-hidden shrink-0">
-                  <button onClick={() => ajustarAfastamento(i, -8)} title="Linha mais curta (mais perto da peça)"
-                    className="text-torg-gray hover:text-torg-blue hover:bg-torg-blue-50 px-1 py-0.5"><Minus size={11} /></button>
-                  <button onClick={() => ajustarAfastamento(i, 8)} title="Linha mais comprida (mais longe da peça)"
-                    className="text-torg-gray hover:text-torg-blue hover:bg-torg-blue-50 px-1 py-0.5 border-l border-gray-200"><Plus size={11} /></button>
-                </span>
-                <button onClick={() => trocarLado(i)} title="Trocar de lado a linha de chamada desta cota"
-                  className="text-torg-gray hover:text-torg-blue"><ArrowLeftRight size={13} /></button>
-              </>)}
-              <button onClick={() => remover(i)} className="text-torg-gray hover:text-red-600"><Trash2 size={13} /></button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ListaCotas cotas={cotas} onChange={onChange} registrar={registrar} remover={remover}
+        ajustarAfastamento={ajustarAfastamento} trocarLado={trocarLado} comDesenho />
     </div>
   );
 
@@ -863,9 +854,10 @@ function BarraCota({ letra, valores, semDesenho, tol, onTol, sugestao, onConfirm
       <div className="flex items-center gap-2 mt-1.5">
         <CampoDecimal value={outro} onChange={(txt) => setOutro(txt)}
           placeholder="outro valor (mm)"
-          onKeyDown={(e) => { if (e.key === "Enter" && outro !== "") onConfirmar(Number(outro)); }}
+          onKeyDown={(e) => { if (e.key === "Enter" && outro !== "") onConfirmar(numeroBR(outro, null)); }}
           className="w-40 border border-gray-200 rounded px-2 py-1 text-[12px] font-mono" />
-        <button onClick={() => outro !== "" && onConfirmar(Number(outro))} disabled={outro === ""}
+        {/* ⚠ numeroBR, não Number: "1250,5" virava NaN e a cota nascia sem valor de projeto */}
+        <button onClick={() => outro !== "" && onConfirmar(numeroBR(outro, null))} disabled={outro === ""}
           className="text-[12px] text-torg-blue font-medium disabled:opacity-40">usar este</button>
         <span className="flex-1" />
         <button onClick={onCancelar} className="text-[12px] text-torg-gray">Cancelar</button>
@@ -874,3 +866,46 @@ function BarraCota({ letra, valores, semDesenho, tol, onTol, sugestao, onConfirm
   );
 }
 
+/**
+ * As cotas marcadas, com descrição, VALOR DE PROJETO e tolerância editáveis.
+ * ⚠ O valor de projeto é editável aqui (verificação das travas, 02/10/2026): a trava de assinatura o cobra, e
+ * depois de criada a cota só dava para apagá-la e refazer — perdendo a medida e re-letrando as outras.
+ * `comDesenho` liga os ajustes da linha de chamada, que dependem do desenho aberto.
+ */
+function ListaCotas({ cotas, onChange, registrar, remover, comDesenho = false, ajustarAfastamento, trocarLado }) {
+  if (!cotas.length) return null;
+  const mudar = (i, campo, valor) => onChange(cotas.map((linha, j) => (j === i ? { ...linha, [campo]: valor } : linha)));
+  return (
+    <ul className="mt-2 space-y-1 max-w-2xl">
+      {cotas.map((c, i) => (
+        <li key={i} className="flex items-center gap-2 text-[12px]">
+          <span className="w-5 h-5 rounded-full bg-torg-orange text-white font-bold text-[10px] inline-flex items-center justify-center shrink-0">{c.letra}</span>
+          {/* ⚠ a descrição é DIGITÁVEL: é ela que sai na coluna "Descrição" da tabela do
+              relatório (lib/relatorio-inspecao-pdf). No desenho continua só a letra. */}
+          <input value={c.descricao ?? ""} onFocus={registrar}
+            onChange={(e) => mudar(i, "descricao", e.target.value)}
+            placeholder={descricaoPadraoCota(c.letra)}
+            aria-label={`Descrição da cota ${c.letra}`}
+            className="flex-1 min-w-0 px-1.5 py-0.5 rounded border border-gray-200 text-torg-dark focus:outline-none focus:border-torg-blue" />
+          <CampoDecimal value={c.projetoMm ?? ""} onFocus={registrar} aria-label={`Valor de projeto da cota ${c.letra} (mm)`}
+            placeholder="projeto"
+            onChange={(txt) => mudar(i, "projetoMm", String(txt).trim() === "" ? null : numeroBR(txt, null))}
+            className="w-20 px-1.5 py-0.5 rounded border border-gray-200 text-torg-dark font-mono text-right focus:outline-none focus:border-torg-blue" />
+          <CampoTolerancia value={c.tolerancia} label={`Tolerância da cota ${c.letra} (mm)`} onFocus={registrar}
+            onChange={(valor) => mudar(i, "tolerancia", valor)} />
+          {comDesenho && c.ax != null && (<>
+            <span className="inline-flex items-center rounded border border-gray-200 overflow-hidden shrink-0">
+              <button onClick={() => ajustarAfastamento(i, -8)} title="Linha mais curta (mais perto da peça)"
+                className="text-torg-gray hover:text-torg-blue hover:bg-torg-blue-50 px-1 py-0.5"><Minus size={11} /></button>
+              <button onClick={() => ajustarAfastamento(i, 8)} title="Linha mais comprida (mais longe da peça)"
+                className="text-torg-gray hover:text-torg-blue hover:bg-torg-blue-50 px-1 py-0.5 border-l border-gray-200"><Plus size={11} /></button>
+            </span>
+            <button onClick={() => trocarLado(i)} title="Trocar de lado a linha de chamada desta cota"
+              className="text-torg-gray hover:text-torg-blue"><ArrowLeftRight size={13} /></button>
+          </>)}
+          <button onClick={() => remover(i)} className="text-torg-gray hover:text-red-600"><Trash2 size={13} /></button>
+        </li>
+      ))}
+    </ul>
+  );
+}

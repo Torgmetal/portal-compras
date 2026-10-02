@@ -48,7 +48,11 @@ export default function Equipamentos({ escolhidos = [], onMudar, travado, tipo =
     onMudar(marcados.has(eq.id) ? escolhidos.filter((x) => x.id !== eq.id) : [...escolhidos, eq]);
 
   const doProcedimento = tipo && !todos ? instrumentosDoTipo(lista || [], tipo) : (lista || []);
-  const filtrada = doProcedimento.filter((e) => !q || e.nome.toLowerCase().includes(q.toLowerCase()));
+  // ⚠⚠ O JÁ ESCOLHIDO QUE NÃO ESTÁ NA LISTA (verificação das travas, 02/10/2026): venceu, foi renomeado ou foi
+  // marcado em "ver todos". Sem isto ele não aparecia para desmarcar, e o relatório ficava com ele para sempre.
+  const exibidos = new Set(doProcedimento.map((e) => e.id));
+  const filtrada = [...escolhidos.filter((e) => !exibidos.has(e.id)), ...doProcedimento]
+    .filter((e) => !q || String(e.nome || "").toLowerCase().includes(q.toLowerCase()));
   const escondidos = (lista || []).length - doProcedimento.length;
 
   return (
@@ -125,7 +129,7 @@ export default function Equipamentos({ escolhidos = [], onMudar, travado, tipo =
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[12px] text-torg-dark truncate">{e.nome}</span>
-                      <span className="block text-[10px] text-torg-gray">cert {e.certificado || "—"}</span>
+                      <span className="block text-[10px] text-torg-gray">cert {e.certificado || "—"}{!exibidos.has(e.id) && " · escolhido, fora desta lista"}{e.vencido && " · VENCIDO"}</span>
                     </span>
                   </button>
                 );

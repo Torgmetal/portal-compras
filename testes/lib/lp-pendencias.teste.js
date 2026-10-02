@@ -27,3 +27,12 @@ describe("trava de assinatura do LP", () => {
     expect(pendenciasParaAssinatura({ ...rel, resultadoInspecao: "REPROVADO" })).toEqual([]);
   });
 });
+
+// Verificação das travas (02/10/2026): "Laudo em branco em: linha N" contava a posição dentro da lista das SEM
+// laudo, não a linha do relatório — com a 2ª e a 4ª em branco, a mensagem mandava conferir a 1ª e a 2ª.
+describe("a mensagem do laudo em branco aponta a linha certa", () => {
+  it("sem marca, cita a linha do relatório", () => {
+    const rel = { ...completo(), linhas: [{ laudo: "A" }, {}, { laudo: "A", marca: "T1" }, { laudo: "" }] };
+    expect(pendenciasParaAssinatura(rel)).toContain("Laudo em branco em: linha 2, linha 4.");
+  });
+});

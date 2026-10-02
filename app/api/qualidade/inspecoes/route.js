@@ -33,10 +33,18 @@ export async function GET(req) {
   const url = new URL(req.url);
   const opNumero = url.searchParams.get("opNumero");
 
-  const [soltas, relatorios] = await Promise.all([
+  // ⚠⚠ O QUE AINDA DÁ TRABALHO VEM SEMPRE (verificação das travas, 02/10/2026). A lista trazia só os 100 MAIS
+  // RECENTES — e o único botão de enviar para assinatura fica nela. Do 101º em diante, um relatório em andamento,
+  // aprovado sem envio ou com assinatura aberta sumia da tela e não tinha por onde seguir. A fila vem inteira (com
+  // teto de segurança); os 100 recentes continuam vindo como histórico, sem repetir.
+  const doOp = opNumero ? { opNumero } : {};
+  const enviosAbertos = (await prisma.envioAssinatura.findMany({
+    where: { tipo: "RELATORIO_INSPECAO", status: { not: "CONCLUIDO" } }, select: { id: true }, take: 2000,
+  }).catch(() => [])) || [];
+  const [soltas, fila, recentes] = await Promise.all([
     // fotos que ainda não viraram documento — é o trabalho pendente da Qualidade
     prisma.fotoInspecao.findMany({
-      where: { relatorioId: null, ...(opNumero ? { opNumero } : {}) },
+      where: { relatorioId: null, ...doOp },
       select: {
         id: true, opId: true, opNumero: true, tipo: true, marca: true, origemMarca: true,
         observacao: true, url: true, autorNome: true, capturadaEm: true,
@@ -45,11 +53,23 @@ export async function GET(req) {
       take: 400,
     }),
     prisma.relatorioInspecao.findMany({
-      where: opNumero ? { opNumero } : {},
+      where: {
+        ...doOp,
+        OR: [
+          { resultadoInspecao: null }, { resultadoInspecao: { not: "APROVADO" } }, // em andamento
+          { envioAssinaturaId: null },                                              // sem envio
+          ...(enviosAbertos.length ? [{ envioAssinaturaId: { in: enviosAbertos.map((e) => e.id) } }] : []), // assinando
+        ],
+      },
       orderBy: [{ createdAt: "desc" }],
-      take: 100,
+      take: 1000,
     }),
+    prisma.relatorioInspecao.findMany({ where: doOp, orderBy: [{ createdAt: "desc" }], take: 100 }),
   ]);
+  const vistos = new Set();
+  const relatorios = [...fila, ...recentes]
+    .filter((r) => (vistos.has(r.id) ? false : vistos.add(r.id)))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   // contagem de fotos por relatório, numa consulta só
   const ids = relatorios.map((r) => r.id);
