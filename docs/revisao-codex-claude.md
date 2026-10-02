@@ -2548,3 +2548,32 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   autorização); (b) os 2 conjuntos da T124A a ~1% da LE (T124A34, T124A35); (c) no template antigo a LPC pesa ~9% acima
   da LE, diferença que já existia e em que não mexi; (d) `sync-lpc-sharepoint` herda a correção, mas não mostra aviso a
   ninguém.
+- **(02/10) Relatórios: caractere de controle não derruba mais o PDF (todos os tipos).** Achado comum dos 4 agentes que
+  verificaram os 10 modelos do SGQ: TAB colado do Excel, quebra de linha em campo de uma linha, caractere C1 ou "≥"
+  estouravam "WinAnsi cannot encode" — caíam prévia, link de assinatura, arquivamento e data book.
+  - **`030ab8ce`:** `san` troca controle/quebra por espaço (é texto de UMA linha); `quebrarTexto` separa parágrafos antes
+    e parte palavra maior que a coluna no separador; símbolos que mudam o sentido viram equivalentes; o dimensional
+    (cópia própria de `san`) e o EVS (largura medida no texto cru) passam pela moldura comum; `linhaInfoCresce` encolhe
+    a letra antes de partir.
+  - **Testes:** `relatorios-texto-hostil` (cada tipo com o pior texto em todos os campos), `relatorio-form-pdf-texto` (6).
+
+  ⚠ **Para revisar:** (a) o gerador genérico `relatorio-inspecao-pdf` (rede de segurança para tipo sem folha própria)
+  ainda tem `san` próprio — nenhum tipo cai nele hoje; (b) os outros ~20 geradores de PDF do portal (atas, kickoff,
+  auditorias…) têm `san` próprio e não foram tocados.
+- **(02/10) Relatórios de sais (RCS) e poeira (RTP) nas Inspeções e na Inspeção de campo.** Vitor: *"garanta que todos os
+  campos de informações tenham como preencher (…) coloque mais de um agente para verificar todos os modelos"*.
+  - **`9fa3355e`:** tipos SAIS e POEIRA (§14), acompanhando a pintura no escopo; telas do computador e do celular das
+    mesmas listas; gravação única (`lib/superficie-gravacao`) nas duas rotas; pré-preenchimento com memória por obra;
+    densidade pela ISO 8502-9; laudo da poeira = Resultado da inspeção; data do ensaio; PDF em folhas que fluem
+    (`lib/relatorio-fluxo-pdf`); RNC do celular descreve as leituras; reinspeção limpa leituras e data.
+  - **Verificação:** 4 agentes (sais, poeira, modelos A, modelos B) geraram PDFs nos limites; os achados de sais e poeira
+    entraram neste commit.
+  - **Testes:** `sais-poeira-campos` (23), `relatorio-superficie-fluxo` (14, lê texto e posição de volta),
+    `relatorio-sais-poeira-pdf`, `sais-poeira-telas` (10), `sais-poeira-gravacao-rotas`, `superficie-gravacao`,
+    `revisao-sais-poeira`, `rnc-superficie`, `qualidade-escopo-superficie`, `padroes-sais-poeira`. 4.639 passando.
+
+  ⚠ **Para revisar:** (a) aparelho sem modelo/tag virou pendência (o condutivímetro não está no mapa de calibração) —
+  pode travar quem não sabe o modelo; (b) resultado marcado contra a conta do laudo de sais é pendência, NÃO bloqueia a
+  gravação (para não perder a medição no campo) — a RNC automática do celular ainda abre se marcarem REPROVADO;
+  (c) o local do teste de poeira passou a ser opcional; (d) Pull-off e Recebimento de Tintas ainda não têm tipo próprio
+  (o pull-off vive dentro do RIP; o recebimento, no CMR).

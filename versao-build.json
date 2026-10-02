@@ -1,7 +1,17 @@
 {
-  "build": 3564,
-  "gerado": "2026-10-02T19:23:53.577Z",
+  "build": 3566,
+  "gerado": "2026-10-02T19:32:09.463Z",
   "commits": [
+    {
+      "hash": "733f0734",
+      "data": "02/10/2026",
+      "titulo": "WIP memória sais/poeira (sobe depois do deploy)"
+    },
+    {
+      "hash": "9fa3355e",
+      "data": "02/10/2026",
+      "titulo": "Relatórios de sais (RCS) e poeira (RTP) nas Inspeções e na Inspeção de campo"
+    },
     {
       "hash": "102a6e74",
       "data": "02/10/2026",
@@ -141,16 +151,6 @@
       "hash": "3aa31b1d",
       "data": "29/09/2026",
       "titulo": "Pintura: RIP não vai para assinatura com procedimento, horários ou visual em branco"
-    },
-    {
-      "hash": "504c77a3",
-      "data": "29/09/2026",
-      "titulo": "Pintura: OP sem PLP passa a nascer com o procedimento de preparo do PO-05"
-    },
-    {
-      "hash": "30b49662",
-      "data": "29/09/2026",
-      "titulo": "Pintura: salvar no computador não corta mais os lotes da demão em 60 caracteres"
     }
   ]
 }
