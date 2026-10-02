@@ -9,7 +9,8 @@ afterEach(cleanup);
 it('mantém alternativas selecionáveis no celular e permite trocar limpeza e aplicação',()=>{
  function Tela(){const [cond,setCond]=useState({limpeza:'SA2.5',abrasivo:'Granalha',demaos:{1:{metodo:'Airless'}}});return <Pintura cond={cond} setCond={setCond}/>;}
  render(<Tela/>);
- const limpeza=screen.getByLabelText('Grau de limpeza obtido');expect(limpeza.value).toBe('SA2.5');expect(limpeza.options.length).toBe(7);
+ // ⚠ 9 graus + "—": WJ1, WJ2 e WJ3 (caixas do modelo) entraram na lista na verificação de 02/10/2026
+ const limpeza=screen.getByLabelText('Grau de limpeza obtido');expect(limpeza.value).toBe('SA2.5');expect(limpeza.options.length).toBe(10);
  fireEvent.change(limpeza,{target:{value:'SA3'}});expect(limpeza.value).toBe('SA3');
  const metodo=screen.getByLabelText('Método de aplicação');expect(metodo.value).toBe('Airless');fireEvent.change(metodo,{target:{value:'Rolo'}});expect(metodo.value).toBe('Rolo');
  expect(screen.getByLabelText('Abrasivo').value).toBe('Granalha');

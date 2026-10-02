@@ -208,6 +208,9 @@ export async function PATCH(req, { params }) {
                      // era só leitura aqui: a peça com outro esquema media certo e a tela acendia
                      // vermelho contra um mínimo que não era dela. Ajustar aqui NÃO mexe no PLP.
                      "espessuraMinima",
+                     // a DESCRIÇÃO e a OBS. do registro fotográfico do modelo — a rota do computador já
+                     // gravava; o celular não tinha onde preencher (02/10/2026)
+                     "descricao", "obsFotos",
                      "limpeza", "abrasivo", "intemperismo", "prepData", "prepIni", "prepFim", "rugObtido",
                      "poeira", "salinidade", "tempo", "prepTAmb", "prepTSup", "prepOrvalho",
                      "prepUmidade", "laudo",

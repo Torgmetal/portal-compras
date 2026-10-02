@@ -2,13 +2,14 @@
 import { useState } from "react";
 import { useComponenteEstavel } from "@/lib/react-estavel";
 import { Txt, TxtNA, Sel } from "./controles";
-import { CamposAmbiente, Veredito } from "./PinturaAmbiente";
+import { CamposAmbiente, Veredito, LeiturasEspessura } from "./PinturaAmbiente";
 import { Paintbrush } from "lucide-react";
 import SeletorCor from "@/components/SeletorCor";
+import { limiteDoCampo } from "@/lib/campo-condicoes";
 import {
   GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, TEMPO, METODOS_APLICACAO, ETAPAS_AMBIENTE, CAMPO_DO_JATO,
-  RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar,
-  leiturasAmbientais,
+  RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, numeroComVirgula, condicoesPermitemPintar,
+  leiturasAmbientais, demaoFinal,
 } from "@/lib/pintura-campos";
 
 // ─── PINTURA NO CELULAR ───────────────────────────────────────────────────────
@@ -25,6 +26,17 @@ import {
 // Limites especificados continuam visíveis para conferência; medições nascem vazias.
 
 const DEMAOS = ["1", "2", "3"];
+
+/** Texto de mais de uma linha, no tamanho do dedo (descrição, OBS. das fotos). */
+function TextoLongo({ rot, v, max, onMudar, dica = null }) {
+  return (
+    <label className="block">
+      <span className="block text-[12px] text-torg-gray mb-1">{rot}{dica && <span className="text-[11px]"> · {dica}</span>}</span>
+      <textarea rows={2} value={v ?? ""} maxLength={max} onChange={(e) => onMudar(e.target.value)}
+        className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-2.5 focus:border-torg-blue outline-none" />
+    </label>
+  );
+}
 
 export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
   const [aba, setAba] = useState("1");
@@ -152,6 +164,10 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
 
   return (
     <div className="mt-3 space-y-4">
+      {/* ⚠ "Descrição" é do cabeçalho do modelo e nenhuma tela a preenchia: o PDF saía sempre em branco
+          (verificação dos modelos, 02/10/2026). */}
+      <TextoLongo rot="Descrição" v={cond.descricao} max={limiteDoCampo("descricao")} onMudar={(v) => set("descricao", v)} />
+
       {/* o que o PLP mandou — conferência, não edição */}
       {(espec.abrasivo || espec.rugEspec || espec.espessuraMinima || espec.prepProcedimento) && (
         <div className="rounded-xl bg-gray-100 px-3 py-2">
@@ -194,7 +210,7 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
             </div>
             {mRug != null && (
               <p className={`text-center text-[13px] mt-1 font-semibold ${rugFora ? "text-red-600" : "text-emerald-700"}`}>
-                média {mRug} µm {rugFora ? "· fora da faixa do PO-05" : "· dentro"}
+                média {numeroComVirgula(mRug)} µm {rugFora ? "· fora da faixa do PO-05" : "· dentro"}
               </p>
             )}
           </div>
@@ -298,29 +314,10 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
               className="w-full text-base border-2 border-gray-200 rounded-xl px-3 py-3 focus:border-torg-blue outline-none" />
           </label>
 
-          <div>
-            <p className="text-[12px] text-torg-gray mb-1">
-              Espessura seca — 5 leituras (µm){minEspessura ? ` · mínimo ${minEspessura}` : ""}
-            </p>
-            <div className="grid grid-cols-5 gap-1.5">
-              {(Array.isArray(esp[aba]) ? esp[aba] : ["", "", "", "", ""]).map((v, i) => {
-                const min = Number(minEspessura);
-                // ⚠ o PO-05 item 5.5.3.1 é literal: "nenhuma medição pode ser inferior à espessura
-                // mínima definida no PLP" — por isso a leitura acende sozinha, uma a uma.
-                const baixa = Number.isFinite(min) && min > 0 && v !== "" && v != null && Number(v) < min;
-                return (
-                  <input key={i} type="number" inputMode="decimal" value={v ?? ""} onChange={(e) => setEsp(aba, i, e.target.value)}
-                    className={`w-full text-base font-mono text-center border-2 rounded-xl py-2.5 outline-none ${
-                      baixa ? "border-red-400 bg-red-50 text-red-700" : "border-gray-200 focus:border-torg-blue"}`} />
-                );
-              })}
-            </div>
-            {mediaEspessura(esp[aba]) != null && (
-              <p className="text-center text-[13px] mt-1 font-semibold text-torg-dark">
-                média {mediaEspessura(esp[aba])} µm
-              </p>
-            )}
-          </div>
+          {/* ⚠⚠ a leitura é ACUMULADA: só a demão que fecha a película se compara com a micragem do
+              sistema — a 1ª e a 2ª acendiam vermelho à toa (ver LeiturasEspessura, 02/10/2026) */}
+          <LeiturasEspessura leituras={esp[aba]} demao={aba} final={demaoFinal(cond)} minimo={minEspessura}
+            onMudar={(i, v) => setEsp(aba, i, v)} />
 
           <Txt rot="Aderência (ensaio X)" v={dem[aba]?.aderencia} onMudar={(v) => setDem(aba, "aderencia", v)} />
           <Txt rot="Inspeção visual" v={dem[aba]?.visual} onMudar={(v) => setDem(aba, "visual", v)} />
@@ -340,6 +337,10 @@ export default function Pintura({ cond, setCond, tintas = [], plp = null }) {
           <TxtNA rot="Tipo de ruptura" v={cond.pullOffRuptura} onMudar={(v) => set("pullOffRuptura", v)} />
         </div>
       </div>
+
+      {/* ⚠ o PDF tem o campo "OBS." na folha das fotos e nenhuma tela o preenchia (02/10/2026) */}
+      <TextoLongo rot="OBS. do registro fotográfico" dica="sai na folha das fotos do PDF" v={cond.obsFotos}
+        max={limiteDoCampo("obsFotos")} onMudar={(v) => set("obsFotos", v)} />
     </div>
   );
 }

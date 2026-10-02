@@ -1,7 +1,12 @@
 {
-  "build": 3573,
-  "gerado": "2026-10-02T20:27:21.841Z",
+  "build": 3574,
+  "gerado": "2026-10-02T20:29:38.952Z",
   "commits": [
+    {
+      "hash": "da26b921",
+      "data": "02/10/2026",
+      "titulo": "Ultrassom: assinaturas nunca fora da folha, nada cortado, comprimento inspecionado e trava de assinatura"
+    },
     {
       "hash": "12dd2654",
       "data": "02/10/2026",
@@ -146,11 +151,6 @@
       "hash": "b16f4ec9",
       "data": "30/09/2026",
       "titulo": "Fiscal: paginação inválida do Omie derruba a coleta; simulação antiga não reaparece na obra nova"
-    },
-    {
-      "hash": "1f5aae6c",
-      "data": "30/09/2026",
-      "titulo": "Fiscal: regras de IBS/CBS não contam nota duas vezes nem apagam tudo com resposta ruim do Omie"
     }
   ]
 }

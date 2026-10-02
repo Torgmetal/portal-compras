@@ -6,7 +6,9 @@ import { escopoDoTipo, amostragemDoTipo } from "@/lib/pit-escopo";
 import PlpPainel from "./PlpPainel";
 import SeletorCor from "@/components/SeletorCor";
 import { tipoDoProduto, camposDoRelatorioPintura } from "@/lib/plp";
-import { GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, TEMPO, CAMPOS_DEMAO, RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, condicoesPermitemPintar, ambientePorEtapa } from "@/lib/pintura-campos";
+import { GRAUS_LIMPEZA, GRAUS_INTEMPERISMO, TEMPO, CAMPOS_DEMAO, RUGOSIDADE_MIN, RUGOSIDADE_MAX, mediaRugosidade, mediaEspessura, numeroComVirgula, laudoDoRelatorio, condicoesPermitemPintar, ambientePorEtapa } from "@/lib/pintura-campos";
+import { RESULTADO_LABEL } from "@/lib/revisao-inspecao";
+import { limiteDoCampo } from "@/lib/campo-condicoes";
 
 /**
  * O PREENCHIMENTO DA INSPEÇÃO DE PINTURA.
@@ -133,7 +135,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
   // podermos informar número ou N/A, e Pull-off precisamos ter que colocar N/A". Campo em branco
   // num relatório assinado é ambíguo — não se sabe se o ensaio não se aplicava ou se esqueceram.
   // "N/A" é o inspetor dizendo que conferiu e não se aplica.
-  const Campo = useComponenteEstavel(({ rot, k, tipo = "text", opcoes = null, largura = "", na = false }) => (
+  const Campo = useComponenteEstavel(({ rot, k, tipo = "text", opcoes = null, largura = "", na = false, max = undefined }) => (
     <label className={`block ${largura}`}>
       <span className="flex items-center gap-1.5 text-[10px] font-semibold text-torg-gray mb-0.5">
         <span>{rot}</span>
@@ -154,7 +156,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
         </select>
       ) : (
         <input type={res[k] === "N/A" ? "text" : tipo} value={res[k] ?? ""} disabled={travado || res[k] === "N/A"}
-          onChange={(e) => setResultado(k, e.target.value)}
+          maxLength={max} onChange={(e) => setResultado(k, e.target.value)}
           placeholder={doPlp[k] != null && typeof doPlp[k] !== "object" ? String(doPlp[k]) : ""}
           className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
       )}
@@ -167,6 +169,13 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
 
   const mediaRug = mediaRugosidade(rug);
   const rugFora = mediaRug != null && (mediaRug < RUGOSIDADE_MIN || mediaRug > RUGOSIDADE_MAX);
+
+  // ⚠⚠ O LAUDO É O RESULTADO DA INSPEÇÃO (os botões A / R / REC desta página). O select "Laudo final"
+  // gravava `resultados.laudo`, que o PDF preferia ao resultado: um relatório REPROVADO saía com a
+  // caixa "Aprovado" marcada (verificação dos modelos, 02/10/2026). Duas fontes para a mesma decisão
+  // divergem na primeira troca — o select saiu, e aqui fica escrito o que vai para o PDF e onde muda.
+  const laudo = laudoDoRelatorio({ ...rel, resultados: res });
+  const laudoAntigo = !rel.resultadoInspecao && !!laudo;
 
   const desligados = Object.entries(esc).filter(([, v]) => !v).length;
 
@@ -183,6 +192,17 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
             : <>Esta OP ainda não tem PIT na §10 do data book — valendo o escopo <strong>padrão</strong> do PO-05.</>}
           {amostragem && <> Amostragem: <strong>{amostragem}</strong>.</>}
         </span>
+      </div>
+
+      {/* ── identificação ─────────────────────────────────────────────────────────────
+          ⚠ "Descrição" é campo do cabeçalho do modelo e não tinha onde ser preenchida: a rota
+          aceitava, o PDF imprimia, e saía sempre em branco (verificação de 02/10/2026). */}
+      <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
+        <Campo rot="Descrição" k="descricao" max={limiteDoCampo("descricao")} />
+        <p className="text-[10px] text-torg-gray mt-1">
+          Procedimento / rev.: <strong className="text-torg-dark">{res.procedimento || "—"}</strong>
+          {res.procedimento && <span> · do Controle de Documentos</span>}
+        </p>
       </div>
 
       {/* ── preparação de superfície ──────────────────────────────────────────────── */}
@@ -220,7 +240,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
             <span className={`text-[12px] font-semibold rounded px-2 py-1 border ${
               mediaRug == null ? "text-torg-gray border-gray-200"
                 : rugFora ? "text-red-700 bg-red-50 border-red-200" : "text-emerald-700 bg-emerald-50 border-emerald-200"}`}>
-              média {mediaRug ?? "—"} µm {rugFora && "· fora da faixa"}
+              média {mediaRug == null ? "—" : numeroComVirgula(mediaRug)} µm {rugFora && "· fora da faixa"}
             </span>
           </div>
         </div>
@@ -370,7 +390,7 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
             <tr className="border-t border-gray-200 bg-gray-50/60">
               <td className="py-1.5 font-bold text-torg-dark">Média geral</td>
               {["1", "2", "3"].map((n) => (
-                <td key={n} className="py-1.5 text-center font-bold text-torg-dark">{mediaEspessura(esp[n]) ?? "—"}</td>
+                <td key={n} className="py-1.5 text-center font-bold text-torg-dark">{numeroComVirgula(mediaEspessura(esp[n])) || "—"}</td>
               ))}
             </tr>
           </tbody>
@@ -379,7 +399,15 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
           {/* ⚠ "(PLP)" no rótulo fazia o campo parecer travado — ele é do RELATÓRIO, e o número do
               plano da obra aparece como dica logo abaixo (Vitor, 22/09/2026). */}
           <Campo rot="Micragem seca mínima (µm)" k="espessuraMinima" />
-          <Campo rot="Laudo final" k="laudo" opcoes={["Aprovado", "Reprovado"]} />
+          <div>
+            <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Laudo final</span>
+            <p className="text-[12px] text-torg-dark py-1.5">
+              <strong>{RESULTADO_LABEL[laudo] || "a marcar"}</strong>
+              <span className="text-[10px] text-torg-gray">
+                {laudoAntigo ? " · laudo antigo deste relatório — confirme em “Resultado da inspeção”, abaixo" : " · vem do “Resultado da inspeção” (A / R / REC), abaixo"}
+              </span>
+            </p>
+          </div>
         </div>
       </div>
       )}
@@ -399,6 +427,19 @@ export default function FormPintura({ rel, res, travado, setResultado }) {
           <Campo rot="Mínimo exigido (MPa)" k="pullOffMin" tipo="number" na />
           <Campo rot="Tipo de ruptura" k="pullOffRuptura" na />
         </div>
+      </div>
+
+      {/* ── a OBS. da folha do registro fotográfico ──────────────────────────────────
+          ⚠ O PDF tem o campo "OBS." na folha das fotos e nenhuma tela o preenchia (02/10/2026). */}
+      <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
+        <label className="block">
+          <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">
+            OBS. do registro fotográfico <span className="font-normal">· sai na folha das fotos do PDF</span>
+          </span>
+          <textarea rows={2} value={res.obsFotos || ""} disabled={travado} maxLength={limiteDoCampo("obsFotos")}
+            onChange={(e) => setResultado("obsFotos", e.target.value)}
+            className="w-full text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
+        </label>
       </div>
     </div>
   );
