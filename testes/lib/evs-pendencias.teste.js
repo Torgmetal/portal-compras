@@ -19,12 +19,16 @@ describe("trava de assinatura do EVS", () => {
     expect(p).toMatch(/Iluminação em branco/);
     expect(p).toMatch(/Nenhum instrumento/);
   });
-  it("junta sem peça, sem laudo ou sem soldador aponta qual é", () => {
+  it("junta sem peça ou sem laudo aponta qual é", () => {
     const rel = { ...completo(), linhas: [{ marca: "", laudo: "", soldador: "" }, { marca: "T102A2", laudo: "A", sinete: "S-04" }] };
     const p = pendenciasParaAssinatura(rel);
     expect(p).toContain("Peça em branco na junta 1.");
     expect(p).toContain("Laudo em branco na junta 1.");
-    expect(p.join(" ")).toMatch(/Soldador em branco na junta 1 —/); // a junta 2 tem o sinete: basta
+  });
+
+  it("soldador em branco NÃO trava: a lista vem do RH, e o terceirizado não teria como ser preenchido", () => {
+    const rel = { ...completo(), linhas: [{ marca: "T102A1", laudo: "A", soldador: "", sinete: "" }] };
+    expect(pendenciasParaAssinatura(rel)).toEqual([]);
   });
   it("trinca com laudo A e aprovado com junta R são o documento se contradizendo", () => {
     const comTrinca = { ...completo(), linhas: [{ ...completo().linhas[0], descontinuidade: "TL" }] };

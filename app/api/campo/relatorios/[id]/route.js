@@ -276,7 +276,7 @@ export async function PATCH(req, { params }) {
   }
 
   if (body.pecasInformadas !== undefined) {
-    if (!usaQuantidadeInspecao(rel.tipo)) return NextResponse.json({error:"Quantidades por peça disponíveis apenas para pintura e solda."},{status:400});
+    if (!usaQuantidadeInspecao(rel.tipo)) return NextResponse.json({error:"Quantidades por peça disponíveis apenas para pintura, solda e dimensional."},{status:400});
     const v=pecasInformadasSchema.safeParse(body.pecasInformadas);
     if(!v.success) return NextResponse.json({error:v.error.issues[0].message},{status:400});
     const marcas=(rel.marcas || []).map(m=>m.trim().toUpperCase());

@@ -79,7 +79,7 @@ export async function POST(req) {
 
   let pecasInformadas;
   if (body.pecasInformadas !== undefined) {
-    if (!usaQuantidadeInspecao(tipo)) return NextResponse.json({error:"Quantidades por peça disponíveis apenas para pintura e solda."},{status:400});
+    if (!usaQuantidadeInspecao(tipo)) return NextResponse.json({error:"Quantidades por peça disponíveis apenas para pintura, solda e dimensional."},{status:400});
     const v = pecasInformadasSchema.safeParse(body.pecasInformadas);
     if (!v.success) return NextResponse.json({error:v.error.issues[0].message},{status:400});
     if (v.data.length !== marcas.length || v.data.some(p=>!marcas.includes(p.marca))) return NextResponse.json({error:"As quantidades devem corresponder às peças selecionadas."},{status:400});

@@ -1,7 +1,12 @@
 {
-  "build": 3575,
-  "gerado": "2026-10-02T20:39:31.335Z",
+  "build": 3576,
+  "gerado": "2026-10-02T21:18:13.717Z",
   "commits": [
+    {
+      "hash": "c5fdda58",
+      "data": "02/10/2026",
+      "titulo": "Memória e revisão: LP, EVS, US e pintura (b2a2ccd1, 12dd2654, da26b921, 524205ee)"
+    },
     {
       "hash": "524205ee",
       "data": "02/10/2026",
@@ -146,11 +151,6 @@
       "hash": "82466563",
       "data": "30/09/2026",
       "titulo": "Prazos das RMs: data nova da remarcação destacada em azul, ao lado da anterior em âmbar"
-    },
-    {
-      "hash": "16141b04",
-      "data": "30/09/2026",
-      "titulo": "Inspeção de pintura: cor aplicada aceita 'Outra cor…' além das do PLP"
     }
   ]
 }

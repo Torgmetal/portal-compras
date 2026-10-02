@@ -263,6 +263,8 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   const {showToast}=useStore();
   const [rel, setRel] = useState(null);
   const [pecasQuantidades, setPecasQuantidades] = useState([]);
+  // ⚠ se o inspetor MEXEU nas quantidades — só então uma quantidade em branco impede de gravar (ver gravar)
+  const [pecasMexidas, setPecasMexidas] = useState(false);
   const [quantidadesLista, setQuantidadesLista] = useState({});
   const [erro, setErro] = useState("");
   const [linhas, setLinhas] = useState([]);
@@ -307,6 +309,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       .then((j) => {
         setRel(j.relatorio);
         setPecasQuantidades(pecasDoRelatorio(j.relatorio,j.quantidadesLista));
+        setPecasMexidas(false);
         setQuantidadesLista(j.quantidadesLista || {});
         setResultado(j.relatorio.resultadoInspecao || null);
         // ⚠ cada linha leva o índice que tem NO BANCO (`__i`): é por ele que o servidor mescla, e a
@@ -464,9 +467,12 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   async function gravar() {
     let pecasInformadas;
     if(usaQuantidadeInspecao(rel.tipo)){
-      const v=pecasInformadasSchema.safeParse(pecasQuantidades.map(p=>({...p,quantidade:Number(p.quantidade)})));
-      if(!v.success){showToast(v.error.issues[0].message,"error");return false;}
-      pecasInformadas=v.data;
+      // ⚠⚠ QUANTIDADE EM BRANCO QUE NINGUÉM TOCOU NÃO SEGURA A MEDIÇÃO (02/10/2026). Antes, uma marca sem
+      // quantidade na lista impedia de gravar QUALQUER medida no celular — o inspetor ficava travado no
+      // pátio. Agora, como no computador: só cobra se ele editou as quantidades; senão grava o resto.
+      const v=pecasInformadasSchema.safeParse(pecasQuantidades.map(p=>({...p,quantidade:p.quantidade===""?null:Number(p.quantidade)})));
+      if(!v.success&&pecasMexidas){showToast(v.error.issues[0].message,"error");return false;}
+      if(v.success) pecasInformadas=v.data;
     }
     setSalvando(true);
     try {
@@ -576,7 +582,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
         <FormularioUSCampo rel={rel} cond={cond} setCond={setCond} />
       )}
 
-      {usaQuantidadeInspecao(rel.tipo) && <section className="my-3" aria-label="Peças do relatório"><h2 className="text-sm font-semibold text-torg-dark">Peças do relatório</h2><PecasInformadasEditor pecas={pecasQuantidades} quantidadesLista={quantidadesLista} onChange={setPecasQuantidades} disabled={salvando} /></section>}
+      {usaQuantidadeInspecao(rel.tipo) && <section className="my-3" aria-label="Peças do relatório"><h2 className="text-sm font-semibold text-torg-dark">Peças do relatório</h2><PecasInformadasEditor pecas={pecasQuantidades} quantidadesLista={quantidadesLista} onChange={(ps)=>{setPecasQuantidades(ps);setPecasMexidas(true);}} disabled={salvando} /></section>}
       {ehPintura && <Pintura cond={cond} setCond={setCond} tintas={tintas} plp={plp} />}
       {ehSais && <FormularioSaisCampo rel={rel} cond={cond} setCond={setCond} resultado={resultado} />}
       {ehPoeira && <FormularioPoeiraCampo rel={rel} cond={cond} setCond={setCond} resultado={resultado} />}
