@@ -1,7 +1,12 @@
 {
-  "build": 3568,
-  "gerado": "2026-10-02T20:04:37.596Z",
+  "build": 3569,
+  "gerado": "2026-10-02T20:04:42.316Z",
   "commits": [
+    {
+      "hash": "35f47e5562",
+      "data": "02/10/2026",
+      "titulo": "Cotação: proposta e declínio não reabrem cotação encerrada no meio do envio"
+    },
     {
       "hash": "de1143fa20",
       "data": "02/10/2026",
@@ -146,11 +151,6 @@
       "hash": "8b0eb6b972",
       "data": "29/09/2026",
       "titulo": "Inspeções: a tela diz quem está com a vez e quem espera na fila de assinatura"
-    },
-    {
-      "hash": "28b45ed058",
-      "data": "29/09/2026",
-      "titulo": "Relatório de inspeção assina em fila: inspetor → Torg Metal → cliente"
     }
   ]
 }

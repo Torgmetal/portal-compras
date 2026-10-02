@@ -13,6 +13,9 @@ const schema = z.object({
   itensIds: z.array(z.string()).min(1).optional(), // se vazio, pega TODOS itens cotaveis das RMs
 });
 
+/** A cotação fechou entre a leitura e a gravação — a transação desfaz e a rota responde 409. */
+class CotacaoFechada extends Error {}
+
 export async function POST(req, { params }) {
   let user;
   try {
@@ -96,7 +99,18 @@ export async function POST(req, { params }) {
     );
   }
 
+  try {
   await prisma.$transaction(async (tx) => {
+    // ⚠ TRAVA A COTAÇÃO NO STATUS DE AGORA (mesma corrida do submeter, achado do Codex, 02/10/2026):
+    // entre a leitura e aqui a RM pode ter virado Pedido gerado e a cotação ENCERRADA — acrescentar
+    // itens a ela poria RM aberta num link que já diz "encerrada". O UPDATE trava a linha; contou 0,
+    // desfaz.
+    const viva = await tx.cotacao.updateMany({
+      where: { id: cotacao.id, status: { in: ["PENDENTE", "RECEBIDA", "VENCIDA"] } },
+      data: { updatedAt: new Date() },
+    });
+    if (!viva.count) throw new CotacaoFechada();
+
     await tx.cotacaoItem.createMany({
       data: itensLiquidos.map((it) => {
         const peso = Number(it.peso) || 0;
@@ -165,6 +179,12 @@ export async function POST(req, { params }) {
       },
     });
   });
+  } catch (e) {
+    if (e instanceof CotacaoFechada) {
+      return NextResponse.json({ error: "A cotação foi encerrada ou cancelada enquanto você incluía a RM. Crie uma nova cotação." }, { status: 409 });
+    }
+    throw e;
+  }
 
   return NextResponse.json({
     ok: true,

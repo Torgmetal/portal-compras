@@ -135,6 +135,9 @@ async function unidadesDosItens(itens) {
   return new Map(rows.map((i) => [i.id, unidadeEfetivaDoItem(i)]));
 }
 
+/** A cotação fechou entre a leitura e a gravação — a transação desfaz e a rota responde 409. */
+class CotacaoFechada extends Error {}
+
 export async function POST(req, { params }) {
   let user;
   try {
@@ -224,6 +227,7 @@ export async function POST(req, { params }) {
   // tem de falhar primeiro é a transação (que desfaz tudo), não a função (que morre sem resposta).
   const OPCOES_TX = { maxWait: 10_000, timeout: 45_000 };
 
+  try {
   await prisma.$transaction(async (tx) => {
     // ⚠ As linhas são independentes (uma por rmItemId), então vão juntas em vez de uma de cada vez
     // — é o mesmo que /api/cotacao/submeter já faz. O laço sequencial pagava uma ida e volta ao
@@ -280,8 +284,12 @@ export async function POST(req, { params }) {
     obsParts.push("Lançada manualmente por " + user.name);
     const obsCombinada = obsParts.filter(Boolean).join(" | ");
 
-    await tx.cotacao.update({
-      where: { id: cotacao.id },
+    // ⚠⚠ CONDICIONADA AO STATUS DE AGORA (achado do Codex, 02/10/2026): a leitura lá em cima pode ter
+    // visto PENDENTE e, enquanto esta rota esperava o Omie, a RM virou Pedido gerado — a cotação foi
+    // ENCERRADA e o fornecedor avisado. Gravar RECEBIDA por cima reabriria o link dele. Contou 0: a
+    // exceção desfaz a transação inteira, inclusive os itens já gravados acima.
+    const gravada = await tx.cotacao.updateMany({
+      where: { id: cotacao.id, status: { notIn: ["CANCELADA", "ENCERRADA"] } },
       data: {
         status: "RECEBIDA",
         recebidaEm: new Date(),
@@ -295,6 +303,7 @@ export async function POST(req, { params }) {
         ...(eRevisao ? { numeroRevisao: { increment: 1 } } : {}),
       },
     });
+    if (!gravada.count) throw new CotacaoFechada();
 
     // Atualiza RMItens dos itens lancados pra COTADO (se ainda EM_COTACAO/PENDENTE)
     await tx.rMItem.updateMany({
@@ -347,6 +356,12 @@ export async function POST(req, { params }) {
       },
     });
   }, OPCOES_TX);
+  } catch (e) {
+    if (e instanceof CotacaoFechada) {
+      return NextResponse.json({ error: "Esta cotação foi encerrada: o processo de compra já foi concluído." }, { status: 409 });
+    }
+    throw e;
+  }
 
   return NextResponse.json({ ok: true, total, ...(comConversao.length ? { conversoes: comConversao } : {}) });
 }
