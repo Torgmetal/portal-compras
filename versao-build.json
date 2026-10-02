@@ -1,7 +1,12 @@
 {
-  "build": 3574,
-  "gerado": "2026-10-02T20:29:38.952Z",
+  "build": 3575,
+  "gerado": "2026-10-02T20:39:31.335Z",
   "commits": [
+    {
+      "hash": "524205ee",
+      "data": "02/10/2026",
+      "titulo": "Pintura: média sem a leitura em branco, laudo do resultado da inspeção, nada cortado nem fora da folha"
+    },
     {
       "hash": "da26b921",
       "data": "02/10/2026",
@@ -146,11 +151,6 @@
       "hash": "16141b04",
       "data": "30/09/2026",
       "titulo": "Inspeção de pintura: cor aplicada aceita 'Outra cor…' além das do PLP"
-    },
-    {
-      "hash": "b16f4ec9",
-      "data": "30/09/2026",
-      "titulo": "Fiscal: paginação inválida do Omie derruba a coleta; simulação antiga não reaparece na obra nova"
     }
   ]
 }

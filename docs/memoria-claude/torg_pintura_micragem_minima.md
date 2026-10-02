@@ -24,3 +24,9 @@ o aço**, então a 2ª demão passa e **o fundo acende vermelho sempre**. Baixar
 apaga o vermelho mas faz o PDF declarar ao cliente um sistema de 80 µm. O conserto de verdade é um
 **mínimo por demão** (o PLP tem `demaos[].espessuraMin`) — não implementado porque exige confirmar
 se o valor do PLP é por demão ou acumulado.
+
+**02/10/2026 (`524205ee`): o vermelho falso do fundo acabou no celular.** Como a leitura por demão é
+acumulada, o mínimo do sistema só é comparado na demão que FECHA a película (a última prevista no
+relatório ou a última medida); as anteriores mostram onde o mínimo é conferido, sem vermelho.
+⚠ Continua pendente o **mínimo por demão** do PLP (`demaos[].espessuraMin`): relatório só de fundo que
+nasce com as demãos 2 e 3 pré-preenchidas pela memória da OP não acende o fundo. Decisão do Vitor.

@@ -33,5 +33,16 @@ gerar relatórios de teste para garantir que não tenha nenhum erro"*). O que va
   gerador. `sips` só faz a 1ª folha: separe as outras com pdf-lib (`copyPages`).
 - **Teste que vale:** gerar o PDF e LER DE VOLTA com `unpdf` — texto (`extractText`) e posição
   (`getDocumentProxy` → `getTextContent()`, `transform[5]` = y). "Todo texto entre y=28 e altura−28" pega o que sai do papel.
+  ⚠⚠ **E EXIGIR QUE O TEXTO ESTEJA LÁ:** o pdf.js NÃO devolve texto desenhado abaixo de y=0. O teste de
+  limites passava com 12 instrumentos sem provar nada — o nome de quem assinou tinha saído do papel e
+  simplesmente não aparecia. Cobrar o nome e a data de quem assinou em CADA folha.
+  ⚠ O "µ" da WinAnsi volta do pdf.js como "μ" (U+03BC): comparar com isso em mente.
+- **02/10/2026 — os 8 geradores passaram pela verificação.** Sais, poeira, LP, EVS e pintura usam o
+  `criarFluxo`; o US (folha deitada) e o dimensional (corpo que ocupa a sobra) fazem a mesma conta à
+  mão. Todos: assinatura em toda folha, "FOLHA x DE y" contando fotos, nada cortado com "…" em dado
+  de documento (descrição de cota além de 2 linhas e legenda de foto além de 3 ainda cortam).
+- **Travas de assinatura** (`pendenciasParaAssinatura`): LP, EVS e US não tinham nenhuma até 02/10/2026
+  (o EVS-102-001 foi sem junta). Regras em `lib/lp-campos.js`, `lib/evs-campos.js`, `lib/us-relatorio.js`;
+  dimensional/pré-montagem passaram a exigir as 3 verificações.
 
 Ver [[torg_relatorios_sais_poeira]], [[torg_pintura_tinta]], [[torg_cotas_abc]].

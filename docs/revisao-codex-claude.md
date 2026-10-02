@@ -2597,3 +2597,26 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   como a folha de fotos; (d) pré-montagem continua sem procedimento (`POR_TIPO`) e sem filtro de instrumentos —
   decisão do Vitor; (e) o `blocoTexto` que cresce chega aos geradores de pintura, US, EVS e LP antes dos ajustes deles
   (em andamento por agentes): caixa até 8 pt mais alta.
+- **(02/10) LP, EVS, US e pintura: os achados da verificação dos modelos, um lote por relatório.** Corrigidos por 4
+  agentes em paralelo (arquivos exclusivos), revisados, testados numa cópia limpa e subidos um a um.
+  - **`b2a2ccd1` LP:** o laudo não se escolhia no computador desde 22/08 (`x.id` × `c`); gerador sobre o fluxo
+    (assinaturas nunca fora do papel, observações e obs. por linha inteiras, FOLHA com fotos); DESENHO TORG com
+    campo; "O.P (Order)"; data sem fuso; REC laranja; trava de assinatura nova.
+  - **`12dd2654` EVS:** gerador sobre o fluxo (mais de 26 juntas sem perder assinatura; obs. da junta embaixo dela;
+    4 EPS/RQS; tipo de estrutura; DESENHO CLIENTE vazio não vira REF. CLIENTE); `paginaDeFotos` com CLIENTE/OBRA
+    que crescem; trava de assinatura nova (inclui descontinuidade grave com laudo A).
+  - **`da26b921` US:** fecho medido antes (assinatura com imagem saía da folha 4); tipo de estrutura e ganho
+    impressos; "Comprimento Inspecionado" com campo e gravado; nada cortado; REC laranja; vírgula; trava mínima
+    (indicação sem laudo; aprovado com indicação R). Declaração NÃO mudou (decisão do Vitor).
+  - **`524205ee` pintura:** leitura em branco não entra mais como zero na média; laudo = resultado da inspeção (o
+    select "Laudo final" saiu); gerador sobre o fluxo; "Outro: St 3"; herdado do jato com "*"; datas e vírgulas;
+    celular compara o mínimo só na demão que fecha a película; Descrição e OBS. das fotos com campo e gravadas.
+  - **Testes:** +130 nos quatro lotes; 4.805 passando na cópia limpa depois do último.
+
+  ⚠ **Para revisar:** (a) as travas novas (LP, EVS, US e as 3 verificações do dimensional) podem segurar relatórios
+  em andamento — de propósito; (b) EVS exige soldador e instrumento: se a Qualidade achar demais, afrouxar em
+  `pendenciasEVS`; (c) LP: o teto de 30 min do PO-15 item 11 é da interpretação ou do intervalo secagem→revelador?
+  (só o rótulo do aviso mudou); (d) LP: falta o NÍVEL do inspetor (campo por relatório ou do cadastro?);
+  (e) pintura: mínimo por demão do PLP e "fabricante" vindo do fornecedor do CMR; (f) EVS e LP no celular
+  continuam sem DESENHO CLIENTE/REV (o computador preenche); (g) legenda de foto com mais de 3 linhas ainda corta
+  com "…" (`blocoFotos`).
