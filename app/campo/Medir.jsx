@@ -803,7 +803,8 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
                 </>
               )}
 
-              <input value={l.obs || ""} onChange={(e) => set(i, "obs", e.target.value)} placeholder="observação (opcional)"
+              {/* ⚠ 160 é o teto das duas rotas: sem o limite aqui, o resto era cortado calado ao gravar */}
+              <input value={l.obs || ""} maxLength={160} onChange={(e) => set(i, "obs", e.target.value)} placeholder="observação (opcional)"
                 className="mt-2 w-full text-[13px] border border-gray-200 rounded-lg px-2.5 py-2 outline-none focus:border-torg-blue" />
             </div>
           );

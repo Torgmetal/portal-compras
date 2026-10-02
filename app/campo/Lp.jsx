@@ -26,6 +26,14 @@ export function ParametrosLP({ cond, setCond }) {
 
   return (
     <div className="mt-3 space-y-2.5">
+      {/* ⚠ o PDF imprime o DESENHO TORG e a rota do campo o grava (até 500 caracteres, para caber uma
+          lista), mas nenhuma tela tinha onde preenchê-lo (verificação, 02/10/2026) */}
+      <p className="text-[12px] font-semibold text-torg-gray">Identificação</p>
+      <Txt rot="Desenho Torg" v={cond.desenho} onMudar={(v) => set("desenho", v)} />
+      {!String(cond.desenho ?? "").trim() && (
+        <p className="text-[11px] text-torg-gray -mt-1.5">Em branco, o PDF sai com as peças do relatório.</p>
+      )}
+
       <p className="text-[12px] font-semibold text-torg-gray">Parâmetros do ensaio</p>
       <p className="text-[11px] text-torg-gray -mt-1.5">Uma vez por ensaio — valem para todas as juntas desta folha.</p>
 

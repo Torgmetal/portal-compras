@@ -63,6 +63,9 @@ export default function FormLP({ rel, linhas, res, travado, setLinhas, setResult
           <Campo rot="Documento de inspeção" k="documentoInspecao" />
           <Campo rot="Data de inspeção" k="dataInspecao" tipo="date" />
           <Campo rot="Componente inspecionado" k="componente" />
+          {/* ⚠ o PDF imprime o DESENHO TORG e as duas rotas o gravam, mas não havia onde preenchê-lo
+              (verificação, 02/10/2026): saía sempre a relação de peças no lugar */}
+          <Campo rot="Desenho Torg" k="desenho" dica={dicaDoDesenho(rel, res)} />
           <Campo rot="Revisão do desenho" k="revisaoDesenho" />
           <Campo rot="Desenho do cliente" k="desenhoCliente" />
           <Campo rot="Revisão do cliente" k="revisaoCliente" />
@@ -140,51 +143,15 @@ export default function FormLP({ rel, linhas, res, travado, setLinhas, setResult
               <th className="pb-1 font-semibold">Tamanho</th>
               <th className="pb-1 font-semibold">Tipo</th>
               <th className="pb-1 font-semibold">Laudo</th>
+              <th className="pb-1 font-semibold">Obs.</th>
               <th />
             </tr>
           </thead>
           <tbody>
-            {linhas.map((l, i) => {
-              const sug = tipoSugerido(l.tamanho);
-              return (
-                <tr key={i} className="border-t border-gray-50">
-                  {["marca", "indicacaoLp", "local", "tamanho"].map((k) => (
-                    <td key={k} className="py-1 pr-1">
-                      <input value={l[k] ?? ""} disabled={travado} onChange={(e) => set(i, k, e.target.value)}
-                        className="w-full text-[11px] border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50" />
-                    </td>
-                  ))}
-                  <td className="py-1 pr-1">
-                    <select value={l.tipoDefeito || ""} disabled={travado} onChange={(e) => set(i, "tipoDefeito", e.target.value)}
-                      className="w-full text-[11px] border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50"
-                      title={TIPOS_INDICACAO.map((t) => `${t.id}: ${t.desc}`).join("\n")}>
-                      <option value="">—</option>
-                      {TIPOS_INDICACAO.map((t) => <option key={t.id} value={t.id}>{t.id}</option>)}
-                    </select>
-                    {/* ⚠ o portal SUGERE, não decide: abaixo de 1,5 mm o item 14.1.1 diz que a
-                        indicação não é relevante, mas quem julga é quem viu a peça. */}
-                    {sug && l.tipoDefeito !== sug && (
-                      <span className="block text-[9px] text-amber-700">PO-15: {sug}?</span>
-                    )}
-                  </td>
-                  <td className="py-1 pr-1">
-                    <select value={l.laudo || ""} disabled={travado} onChange={(e) => set(i, "laudo", e.target.value)}
-                      className={`w-full text-[11px] border rounded px-1 py-0.5 disabled:bg-gray-50 ${
-                        l.laudo === "R" ? "border-red-300 bg-red-50 text-red-700 font-bold" : "border-gray-200"}`}>
-                      <option value="">—</option>
-                      {LAUDOS.map((x) => <option key={x.id} value={x.id}>{x.id}</option>)}
-                    </select>
-                  </td>
-                  <td className="py-1 w-6">
-                    {!travado && (
-                      <button onClick={() => setLinhas(linhas.filter((_, j) => j !== i))} className="text-torg-gray hover:text-red-600">
-                        <Trash2 size={12} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {linhas.map((l, i) => (
+              <LinhaLP key={i} l={l} i={i} travado={travado} set={set}
+                remover={() => setLinhas(linhas.filter((_, j) => j !== i))} />
+            ))}
           </tbody>
         </table>
 
@@ -213,5 +180,69 @@ export default function FormLP({ rel, linhas, res, travado, setLinhas, setResult
         </p>
       </div>
     </div>
+  );
+}
+
+/** Em branco, o PDF imprime a relação de peças no DESENHO TORG — a tela avisa, para não surpreender. */
+function dicaDoDesenho(rel, res) {
+  return !String(res.desenho ?? "").trim() && rel.marcas?.length ? "Em branco, o PDF sai com as peças do relatório" : null;
+}
+
+/**
+ * Uma linha da tabela de resultados.
+ * ⚠ Fora do FormLP de propósito: componente declarado dentro do pai nasce de novo a cada render e o
+ * campo perde o foco a cada tecla (ver lib/react-estavel).
+ */
+function LinhaLP({ l, i, travado, set, remover }) {
+  const sug = tipoSugerido(l.tamanho);
+  return (
+    <tr className="border-t border-gray-50">
+      {["marca", "indicacaoLp", "local", "tamanho"].map((k) => (
+        <td key={k} className="py-1 pr-1">
+          <input value={l[k] ?? ""} disabled={travado} onChange={(e) => set(i, k, e.target.value)}
+            className="w-full text-[11px] border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50" />
+        </td>
+      ))}
+      <td className="py-1 pr-1">
+        <select value={l.tipoDefeito || ""} disabled={travado} onChange={(e) => set(i, "tipoDefeito", e.target.value)}
+          className="w-full text-[11px] border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50"
+          title={TIPOS_INDICACAO.map((t) => `${t.id}: ${t.desc}`).join("\n")}>
+          <option value="">—</option>
+          {TIPOS_INDICACAO.map((t) => <option key={t.id} value={t.id}>{t.id}</option>)}
+        </select>
+        {/* ⚠ o portal SUGERE, não decide: abaixo de 1,5 mm o item 14.1.1 diz que a
+            indicação não é relevante, mas quem julga é quem viu a peça. */}
+        {sug && l.tipoDefeito !== sug && (
+          <span className="block text-[9px] text-amber-700">PO-15: {sug}?</span>
+        )}
+      </td>
+      <td className="py-1 pr-1">
+        {/* ⚠⚠ A LISTA DE LAUDOS TEM `c`, NÃO `id` (lib/evs-campos). Lida por `x.id`, saíam três
+            opções em branco desde 22/08/2026, e escolher qualquer uma APAGAVA o laudo vindo
+            do celular (verificação, 02/10/2026). */}
+        <select value={l.laudo || ""} disabled={travado} onChange={(e) => set(i, "laudo", e.target.value)}
+          aria-label={`Laudo da linha ${i + 1}`} title={LAUDOS.map((x) => `${x.c}: ${x.nome}`).join("\n")}
+          className={`w-full text-[11px] border rounded px-1 py-0.5 disabled:bg-gray-50 ${
+            l.laudo === "R" ? "border-red-300 bg-red-50 text-red-700 font-bold" : "border-gray-200"}`}>
+          <option value="">—</option>
+          {LAUDOS.map((x) => <option key={x.c} value={x.c}>{x.c}</option>)}
+        </select>
+      </td>
+      <td className="py-1 pr-1">
+        {/* ⚠ a observação da linha é pedida no celular e o PDF a imprime embaixo da linha:
+            quem aprova no computador precisa ler — e poder corrigir — o que vai ao cliente.
+            160 é o teto das duas rotas: mais que isso seria cortado calado ao gravar. */}
+        <input value={l.obs ?? ""} disabled={travado} maxLength={160} onChange={(e) => set(i, "obs", e.target.value)}
+          aria-label={`Observação da linha ${i + 1}`}
+          className="w-full min-w-[8rem] text-[11px] border border-gray-200 rounded px-1 py-0.5 disabled:bg-gray-50" />
+      </td>
+      <td className="py-1 w-6">
+        {!travado && (
+          <button onClick={remover} className="text-torg-gray hover:text-red-600">
+            <Trash2 size={12} />
+          </button>
+        )}
+      </td>
+    </tr>
   );
 }

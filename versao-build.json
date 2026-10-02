@@ -1,156 +1,156 @@
 {
-  "build": 3570,
-  "gerado": "2026-10-02T20:04:42.425Z",
+  "build": 3571,
+  "gerado": "2026-10-02T20:16:17.598Z",
   "commits": [
     {
-      "hash": "f258f5fe5f",
+      "hash": "de60f23a",
+      "data": "02/10/2026",
+      "titulo": "Cotação: o encerramento trava e relê a cotação antes de fechar"
+    },
+    {
+      "hash": "f258f5fe",
       "data": "02/10/2026",
       "titulo": "Cotação: lançamento manual e 'adicionar RM' também não passam por cima do encerramento"
     },
     {
-      "hash": "35f47e5562",
+      "hash": "35f47e55",
       "data": "02/10/2026",
       "titulo": "Cotação: proposta e declínio não reabrem cotação encerrada no meio do envio"
     },
     {
-      "hash": "de1143fa20",
+      "hash": "de1143fa",
       "data": "02/10/2026",
       "titulo": "Memória e revisão: dimensional, reinspeção e rotas (8d6a3deb)"
     },
     {
-      "hash": "8d6a3deb3e",
+      "hash": "8d6a3deb",
       "data": "02/10/2026",
       "titulo": "Dimensional e pré-montagem: nada some do documento; reinspeção e rotas acertadas"
     },
     {
-      "hash": "952b92b485",
+      "hash": "952b92b4",
       "data": "02/10/2026",
       "titulo": "Memória e revisão: relatórios de sais e poeira, e o texto que derrubava os PDFs"
     },
     {
-      "hash": "9fa3355e1f",
+      "hash": "9fa3355e",
       "data": "02/10/2026",
       "titulo": "Relatórios de sais (RCS) e poeira (RTP) nas Inspeções e na Inspeção de campo"
     },
     {
-      "hash": "102a6e74c2",
+      "hash": "102a6e74",
       "data": "02/10/2026",
       "titulo": "Cotação: RM em Pedido gerado encerra as cotações sem resposta e avisa o fornecedor"
     },
     {
-      "hash": "030ab8cee2",
+      "hash": "030ab8ce",
       "data": "02/10/2026",
       "titulo": "Caractere de controle não derruba mais o PDF dos relatórios de inspeção"
     },
     {
-      "hash": "2836f3e0bc",
+      "hash": "2836f3e0",
       "data": "02/10/2026",
       "titulo": "OP: coluna Prazo de entrega na lista de pedidos de compra, igual a Prazos das RMs"
     },
     {
-      "hash": "14613a2d58",
+      "hash": "14613a2d",
       "data": "01/10/2026",
       "titulo": "Pedido de compra: ICMS da cotação vai destacado no item do Omie (nValorIcms)"
     },
     {
-      "hash": "3c117283f2",
+      "hash": "3c117283",
       "data": "01/10/2026",
       "titulo": "Docs: portal 'Onde a obra está', volumes em fila e peso conferido da LPC — memória e revisão"
     },
     {
-      "hash": "278d6731df",
+      "hash": "278d6731",
       "data": "01/10/2026",
       "titulo": "LPC: o importador confere o peso total (qtde × unitário) e avisa quando a planilha erra"
     },
     {
-      "hash": "dbc2454377",
+      "hash": "dbc24543",
       "data": "01/10/2026",
       "titulo": "Data book: volumes gerados um de cada vez, e a barra mostra o que está montando"
     },
     {
-      "hash": "cb0d7029a8",
+      "hash": "cb0d7029",
       "data": "01/10/2026",
       "titulo": "Portal do cliente: \"Onde a obra está\" deixa de ler o Diagrama de Montagem como a montagem da fábrica"
     },
     {
-      "hash": "d390d44417",
+      "hash": "d390d444",
       "data": "01/10/2026",
       "titulo": "Docs: listas do template novo do Tekla 2025 — LE no padrão, LPC com peso inflado (OP-124)"
     },
     {
-      "hash": "2fb3e91402",
+      "hash": "2fb3e914",
       "data": "01/10/2026",
       "titulo": "Docs: PDF do data book — anexos em paralelo, orçamento e streaming (memória e revisão)"
     },
     {
-      "hash": "a2253a9782",
+      "hash": "a2253a97",
       "data": "01/10/2026",
       "titulo": "Data book: anexos baixam 8 por vez e o PDF grande vira aviso de volumes, não 504"
     },
     {
-      "hash": "6fd69c7c9b",
+      "hash": "6fd69c7c",
       "data": "30/09/2026",
       "titulo": "Docs: Outubro Rosa aprovado pelo Vitor — slogan deixa de ser proposta"
     },
     {
-      "hash": "35e58c86c5",
+      "hash": "35e58c86",
       "data": "30/09/2026",
       "titulo": "Docs: banner do Outubro Rosa — memória e registro de revisão"
     },
     {
-      "hash": "9b83f7f3a6",
+      "hash": "9b83f7f3",
       "data": "30/09/2026",
       "titulo": "Outubro Rosa: banner com a mensagem no primeiro acesso, para equipe e clientes"
     },
     {
-      "hash": "3a561babd9",
+      "hash": "3a561bab",
       "data": "30/09/2026",
       "titulo": "Docs: campanha do mês (Outubro Rosa) — memória e registro de revisão"
     },
     {
-      "hash": "f8af7d21da",
+      "hash": "f8af7d21",
       "data": "30/09/2026",
       "titulo": "Campanha do mês: Outubro Rosa entra sozinha à 00h de 01/10 (Brasília)"
     },
     {
-      "hash": "1c98a64c58",
+      "hash": "1c98a64c",
       "data": "30/09/2026",
       "titulo": "Etiquetas: importar as TAGs do cliente grava em lote — a OP-105 estourava o tempo (504)"
     },
     {
-      "hash": "82466563ba",
+      "hash": "82466563",
       "data": "30/09/2026",
       "titulo": "Prazos das RMs: data nova da remarcação destacada em azul, ao lado da anterior em âmbar"
     },
     {
-      "hash": "16141b04a4",
+      "hash": "16141b04",
       "data": "30/09/2026",
       "titulo": "Inspeção de pintura: cor aplicada aceita 'Outra cor…' além das do PLP"
     },
     {
-      "hash": "b16f4ec907",
+      "hash": "b16f4ec9",
       "data": "30/09/2026",
       "titulo": "Fiscal: paginação inválida do Omie derruba a coleta; simulação antiga não reaparece na obra nova"
     },
     {
-      "hash": "1f5aae6c9e",
+      "hash": "1f5aae6c",
       "data": "30/09/2026",
       "titulo": "Fiscal: regras de IBS/CBS não contam nota duas vezes nem apagam tudo com resposta ruim do Omie"
     },
     {
-      "hash": "dc036abea7",
+      "hash": "dc036abe",
       "data": "30/09/2026",
       "titulo": "Docs: GRD da Engenharia parada de 31/08 a 30/09 — memória e registro de revisão"
     },
     {
-      "hash": "7c87a7c388",
+      "hash": "7c87a7c3",
       "data": "30/09/2026",
       "titulo": "GRD da Engenharia: GRD nova voltou a entrar — nenhuma entrava desde 31/08"
-    },
-    {
-      "hash": "b8700811ae",
-      "data": "29/09/2026",
-      "titulo": "Docs: fila de assinatura do relatório de inspeção — memória e registro de revisão"
     }
   ]
 }

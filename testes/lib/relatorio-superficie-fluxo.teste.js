@@ -56,6 +56,7 @@ describe.each([["sais", sais], ["poeira", poeira]])("%s — nada falta, nada sai
     for (let i = 1; i <= 900; i++) expect(todo).toContain(`palavra${String(i).padStart(3, "0")}`);
     expect(paginas.length).toBeGreaterThan(1);
     expect(todo).toContain("OBSERVAÇÕES (continuação)");
+    expect(todo).toContain("(continua na folha seguinte)"); // a folha que para no meio diz que não acabou
   });
 
   it("12 instrumentos, assinatura desenhada, 2 fotos e observação longa: todo texto dentro da folha, assinaturas em todas", async () => {
