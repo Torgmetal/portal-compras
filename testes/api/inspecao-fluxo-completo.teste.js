@@ -24,7 +24,10 @@ it.each(['PINTURA','VISUAL_SOLDA'])('cria, preenche, reabre, gera PDF e coleta t
  expect((await criar(req({opNumero:'106',tipo,escopo:'AVULSAS',marcas:['P1','P2'],pecasInformadas}))).status).toBe(200);
  expect((await abrir(null,{params:{id:'r'}})).status).toBe(200);
  pecasInformadas[0].quantidade=200;
- expect((await salvar(req({pecasInformadas,condicoes:{poeira:'N/A',salinidade:'N/A',pullOffValor:'7',iluminacao:'600',rugLeituras:[50,51,52,53,54]},resultadoInspecao:'APROVADO'}),{params:{id:'r'}})).status).toBe(200);
+ // ⚠ o EVS ganhou trava de assinatura em 02/10/2026 (testes/lib/evs-pendencias): junta com peça, laudo e
+ // soldador, e o instrumento — sem isso o envio abaixo dá 409, como deve
+ const doEVS=tipo==='VISUAL_SOLDA'?{equipamentos:[{id:'lx',nome:'Luxímetro LX-01',certificado:'C-1'}],medidas:(rel.linhas?.length?rel.linhas:[{marca:'P1'},{marca:'P2'}]).map((l,i)=>({i,marca:l.marca,laudo:'A',soldador:'Soldador Teste',sinete:'S-01'}))}:{};
+ expect((await salvar(req({pecasInformadas,condicoes:{poeira:'N/A',salinidade:'N/A',pullOffValor:'7',iluminacao:'600',rugLeituras:[50,51,52,53,54]},resultadoInspecao:'APROVADO',...doEVS}),{params:{id:'r'}})).status).toBe(200);
  const reaberto=(await (await abrir(null,{params:{id:'r'}})).json()).relatorio;
  expect(reaberto.resultados).toMatchObject({quantidade:'216',poeira:'N/A',salinidade:'N/A',pullOffValor:'7'});
  const pdf=await gerarPDFdoRelatorio({rel:reaberto});expect((await extractText(new Uint8Array(pdf),{mergePages:true})).text).toContain('216');

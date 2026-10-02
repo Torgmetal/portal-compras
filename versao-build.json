@@ -1,7 +1,12 @@
 {
-  "build": 3571,
-  "gerado": "2026-10-02T20:16:17.598Z",
+  "build": 3572,
+  "gerado": "2026-10-02T20:21:28.030Z",
   "commits": [
+    {
+      "hash": "b2a2ccd1",
+      "data": "02/10/2026",
+      "titulo": "LP: nada sai do papel nem é cortado, o laudo volta a ser escolhido no computador, e trava de assinatura"
+    },
     {
       "hash": "de60f23a",
       "data": "02/10/2026",
@@ -146,11 +151,6 @@
       "hash": "dc036abe",
       "data": "30/09/2026",
       "titulo": "Docs: GRD da Engenharia parada de 31/08 a 30/09 — memória e registro de revisão"
-    },
-    {
-      "hash": "7c87a7c3",
-      "data": "30/09/2026",
-      "titulo": "GRD da Engenharia: GRD nova voltou a entrar — nenhuma entrava desde 31/08"
     }
   ]
 }

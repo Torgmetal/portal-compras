@@ -65,8 +65,8 @@ describe("pendências do relatório de pintura antes da assinatura", () => {
   });
 
   it("os outros tipos sem cota seguem como estavam", () => {
-    // ⚠ o LP ganhou trava própria em 02/10/2026 (testes/lib/lp-pendencias.teste.js)
-    for (const tipo of ["ULTRASSOM", "VISUAL_SOLDA"]) {
+    // ⚠ LP e EVS ganharam trava própria em 02/10/2026 (lp-pendencias, evs-pendencias)
+    for (const tipo of ["ULTRASSOM"]) {
       expect(pendenciasParaAssinatura({ tipo, resultados: { demaos: { 1: { data: "2026-09-02" } } } })).toEqual([]);
     }
   });

@@ -269,11 +269,29 @@ export default function FormEVS({ rel, linhas, res, travado, setLinhas, setResul
                     })}
                   </div>
                 )}
+                <ObsDaJunta valor={l.obs} travado={travado} onMudar={(v) => set(i, "obs", v)} />
               </div>
             );
           })}
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * A observação de uma junta.
+ *
+ * ⚠ ELA SAI NO PDF, logo abaixo da junta (verificação do EVS, 02/10/2026). O celular sempre pediu e
+ * gravou; a mesa não via — e não dá para conferir o que não se vê. 160 é o teto das duas rotas: além
+ * disso o texto seria cortado ao salvar.
+ * ⚠ De módulo, não de dentro do FormEVS: definido lá dentro, o React troca a identidade a cada render e
+ * o campo perde o foco a cada tecla (ver lib/react-estavel.js).
+ */
+function ObsDaJunta({ valor, travado, onMudar }) {
+  return (
+    <input aria-label="Observação da junta" value={valor || ""} disabled={travado} maxLength={160}
+      onChange={(e) => onMudar(e.target.value)} placeholder="observação da junta (opcional) — sai no PDF abaixo dela"
+      className="mt-2 w-full text-[12px] border border-gray-200 rounded px-1.5 py-1 disabled:bg-gray-50" />
   );
 }
