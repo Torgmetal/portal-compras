@@ -1,7 +1,12 @@
 {
-  "build": 3560,
-  "gerado": "2026-10-01T19:21:31.020Z",
+  "build": 3561,
+  "gerado": "2026-10-02T13:36:11.398Z",
   "commits": [
+    {
+      "hash": "14613a2d58",
+      "data": "01/10/2026",
+      "titulo": "Pedido de compra: ICMS da cotação vai destacado no item do Omie (nValorIcms)"
+    },
     {
       "hash": "3c117283f2",
       "data": "01/10/2026",
@@ -146,11 +151,6 @@
       "hash": "2d3d1310cf",
       "data": "28/09/2026",
       "titulo": "Data Book: índice de 1 a 19 (a §18 saiu em junho e ficou o buraco)"
-    },
-    {
-      "hash": "fd58db5762",
-      "data": "26/09/2026",
-      "titulo": "docs: Quality Welding inativada, zerar peso pela API (0,0001) e o grupo de telhas"
     }
   ]
 }

@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { Loader2, DollarSign, Package, Truck, FileText, AlertCircle, TrendingUp, Wallet } from "lucide-react";
 import { getCategoria } from "@/lib/op-categorias";
+import PrazoEntregaCelula from "@/components/PrazoEntregaCelula";
 
 const fmtMoeda = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -288,6 +289,8 @@ export default function ControleFinanceiroOP({ opId }) {
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">NF</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  {/* ⚠ o mesmo prazo de Compras › Prazos das RMs (Matheus, 02/10/2026) */}
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Prazo de entrega</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                 </tr>
               </thead>
@@ -321,6 +324,7 @@ export default function ControleFinanceiroOP({ opId }) {
                         );
                       })()}
                     </td>
+                    <td className="px-4 py-2 text-xs"><PrazoEntregaCelula prazo={p.prazo} /></td>
                     <td className="px-4 py-2 text-torg-gray text-xs whitespace-nowrap">{fmtData(p.createdAt)}</td>
                   </tr>
                 ))}
@@ -329,7 +333,7 @@ export default function ControleFinanceiroOP({ opId }) {
                 <tr className="bg-torg-blue-50/40 font-semibold">
                   <td colSpan={3} className="px-4 py-2 text-right text-xs text-torg-blue">Total pedidos</td>
                   <td className="px-4 py-2 text-right tabular-nums text-torg-blue">{fmtMoeda(pedidos.total)}</td>
-                  <td colSpan={3}></td>
+                  <td colSpan={4}></td>
                 </tr>
               </tfoot>
             </table>

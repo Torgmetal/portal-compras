@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { CAMPOS_PRAZO_PEDIDO, prazoDoPedido } from "@/lib/prazo-do-pedido";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -58,7 +59,7 @@ export async function GET(req, { params }) {
     // - via opId direto (FD avulsos)
     // - via cotacao de uma RM desta OP
     const rmIds = op.rms.map((r) => r.id);
-    const allPedidos = await prisma.pedidoOmie.findMany({
+    const brutos = await prisma.pedidoOmie.findMany({
       where: {
         OR: [
           { opId: id },
@@ -67,6 +68,8 @@ export async function GET(req, { params }) {
         status: { not: "REVERTIDO" },
       },
       select: {
+        // ⚠ o prazo de entrega é o de Prazos das RMs (Matheus, 02/10/2026) — `lib/prazo-do-pedido`
+        ...CAMPOS_PRAZO_PEDIDO,
         id: true,
         fornecedorNome: true,
         numeroPedido: true,
@@ -78,10 +81,17 @@ export async function GET(req, { params }) {
         faturamentoDireto: true,
         // por onde o pedido acha a categoria da verba que consumiu ↓
         categoriaItem: true,
-        cotacao: { select: { rm: { select: { categoriasOP: true } } } },
+        cotacao: { select: { ...CAMPOS_PRAZO_PEDIDO.cotacao.select, rm: { select: { categoriasOP: true } } } },
       },
       orderBy: { createdAt: "desc" },
     });
+    // ⚠ A tela recebe só o resumo do prazo — o histórico e as etapas servem à conta, não à tabela.
+    // Pedido que não chegou ao Omie (erro) não tem prazo a mostrar.
+    const allPedidos = brutos.map(({ prazoHistorico: _h, acompanhamentos: _a, recebidoPor: _r, ...p }) => ({
+      ...p,
+      prazo: p.status === "CRIADO" ? prazoDoPedido({ ...p, prazoHistorico: _h, acompanhamentos: _a, recebidoPor: _r }) : null,
+      cotacao: p.cotacao ? { rm: p.cotacao.rm } : null,
+    }));
 
     // Itens atendidos por estoque (flatten de todas as RMs)
     const itensEstoque = op.rms.flatMap((rm) =>
