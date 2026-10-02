@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { CAMPOS_CABECALHO_US } from "@/lib/us-campos";
 import { LIMITE_VALOR_DEMAO } from "@/lib/pintura-campos";
-import { limiteDoCampo } from "@/lib/campo-condicoes";
+import { limiteDoCampo, LIMITE_OBSERVACOES } from "@/lib/campo-condicoes";
 import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
 import { garantirDesenhos } from "@/lib/relatorio-dimensional";
 import { usaCotas } from "@/lib/qualidade-campo";
@@ -122,7 +122,7 @@ export async function PATCH(req, { params }) {
   const dados = {};
 
   if (body.titulo !== undefined) dados.titulo = String(body.titulo || "").trim() || null;
-  if (body.observacoes !== undefined) dados.observacoes = String(body.observacoes || "").trim() || null;
+  if (body.observacoes !== undefined) dados.observacoes = String(body.observacoes || "").trim().slice(0, LIMITE_OBSERVACOES) || null;
   if (body.inspetor !== undefined) dados.inspetor = String(body.inspetor || "").trim() || null;
   // ⚠ as PEÇAS INFORMADAS (marcas) editam-se aqui, não só na criação. Vitor (11/09/2026), OP-106:
   // "permitir que eu consiga editar as peças informadas, pois isso também não consigo fazer no

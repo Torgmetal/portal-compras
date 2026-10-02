@@ -12,7 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { CAMPOS_CABECALHO_US } from "@/lib/us-campos";
 import { LIMITE_VALOR_DEMAO } from "@/lib/pintura-campos";
-import { limiteDoCampo, VERIFICACOES_DIMENSIONAL } from "@/lib/campo-condicoes";
+import { limiteDoCampo, VERIFICACOES_DIMENSIONAL, LIMITE_OBSERVACOES } from "@/lib/campo-condicoes";
 import { PERFIS_CAMPO, TIPO_LABEL } from "@/lib/qualidade-campo";
 import { RESULTADOS, proximaRevisao, rotuloRevisao } from "@/lib/revisao-inspecao";
 import { numeroBR } from "@/lib/numero-br";
@@ -146,7 +146,7 @@ export async function PATCH(req, { params }) {
   // NAQUELA cota; isto é o que vale para o documento inteiro (condição da peça, o que atrapalhou a
   // medição, o que o cliente pediu na hora) — é o quadro COMENTÁRIOS da folha.
   if (body.observacoes !== undefined) {
-    dados.observacoes = String(body.observacoes || "").trim().slice(0, 1000) || null;
+    dados.observacoes = String(body.observacoes || "").trim().slice(0, LIMITE_OBSERVACOES) || null;
   }
   // quem mediu assina o campo do inspetor, se ainda estiver vazio
   if (body.assumirInspetor) dados.inspetor = user.name || null;
