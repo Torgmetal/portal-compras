@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { encerrarCotacoesDaRM } from "@/lib/cotacao-encerramento";
 
 export const runtime = "nodejs";
 
@@ -78,6 +79,7 @@ export async function PATCH(req, { params }) {
       where: { id: rmNova.id },
       data: { status: "PEDIDO_GERADO" },
     });
+    await encerrarCotacoesDaRM(prisma, rmNova.id, { userId: user.id });
   }
 
   // Se TINHA outra RM antes: reverter o status dela (volta pra COTADA

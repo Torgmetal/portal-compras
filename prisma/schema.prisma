@@ -4989,6 +4989,9 @@ enum CotacaoStatus {
   VENCIDA
   CANCELADA
   DECLINADA
+  /// A RM virou Pedido gerado e o fornecedor não tinha respondido: o link fecha e ele é avisado
+  /// (lib/cotacao-encerramento.js, 02/10/2026). ⚠ Entra no banco por scripts/ensure-mes-tables.mjs.
+  ENCERRADA
 }
 
 enum NotificacaoTipo {

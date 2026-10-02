@@ -107,7 +107,7 @@ export function ModalEnviarCotacao({ rm, outrasRMs = [], onClose, onSent, preSel
   const fornecedoresAnteriores = useMemo(() => {
     const seen = new Set(), out = [];
     for (const c of (rm.cotacoes || [])) {
-      if (["CANCELADA", "DECLINADA"].includes(c.status)) continue;
+      if (["CANCELADA", "DECLINADA", "ENCERRADA"].includes(c.status)) continue;
       const email = String(c.fornecedorEmail || "").trim().toLowerCase();
       if (!email || seen.has(email)) continue;
       seen.add(email);

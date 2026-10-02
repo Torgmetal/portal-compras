@@ -3,6 +3,9 @@ import { mockPrisma } from "@/testes/apoio/prisma";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma, prismaDirect: mockPrisma }));
 vi.mock("../../lib/prisma", () => ({ prisma: mockPrisma, prismaDirect: mockPrisma }));
+const encerrar = vi.hoisted(() => vi.fn(async () => []));
+vi.mock("@/lib/cotacao-encerramento", () => ({ encerrarCotacoesDaRM: encerrar }));
+vi.mock("../../lib/cotacao-encerramento", () => ({ encerrarCotacoesDaRM: encerrar }));
 const { statusAposFinalizar, reavaliarStatusRM } = await import("@/lib/rm-status");
 
 const it_ = (...st) => st.map((status) => ({ status }));
@@ -60,5 +63,34 @@ describe("reavaliarStatusRM", () => {
     mockPrisma.rMItem.findMany.mockResolvedValue(it_("PEDIDO_GERADO", "COTADO"));
     mockPrisma.rM.findUnique.mockResolvedValue({ status: "CANCELADA" });
     expect(await reavaliarStatusRM("rm1")).toBeNull();
+  });
+});
+
+// Matheus (02/10/2026): RM que vira Pedido gerado fecha as cotações sem resposta e avisa o fornecedor.
+describe("reavaliarStatusRM — encerra as cotações sem resposta", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it("virou PEDIDO_GERADO: chama o encerramento da RM", async () => {
+    mockPrisma.rMItem.findMany.mockResolvedValue(it_("PEDIDO_GERADO", "ATENDIDO_ESTOQUE"));
+    mockPrisma.rM.findUnique.mockResolvedValue({ status: "COTADA" });
+    mockPrisma.rM.updateMany.mockResolvedValue({ count: 1 });
+    expect(await reavaliarStatusRM("rm1")).toBe("PEDIDO_GERADO");
+    expect(encerrar).toHaveBeenCalledWith(mockPrisma, "rm1");
+  });
+
+  it("⚠ voltou para ABERTA (sobrou item): não encerra — o fornecedor ainda pode cotar", async () => {
+    mockPrisma.rMItem.findMany.mockResolvedValue(it_("PEDIDO_GERADO", "EM_COTACAO"));
+    mockPrisma.rM.findUnique.mockResolvedValue({ status: "COTADA" });
+    mockPrisma.rM.updateMany.mockResolvedValue({ count: 1 });
+    expect(await reavaliarStatusRM("rm1")).toBe("ABERTA");
+    expect(encerrar).not.toHaveBeenCalled();
+  });
+
+  it("outra chamada mudou a RM no meio (count 0): não encerra daqui", async () => {
+    mockPrisma.rMItem.findMany.mockResolvedValue(it_("PEDIDO_GERADO"));
+    mockPrisma.rM.findUnique.mockResolvedValue({ status: "COTADA" });
+    mockPrisma.rM.updateMany.mockResolvedValue({ count: 0 });
+    expect(await reavaliarStatusRM("rm1")).toBeNull();
+    expect(encerrar).not.toHaveBeenCalled();
   });
 });

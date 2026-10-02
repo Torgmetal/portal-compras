@@ -30,6 +30,10 @@ async function main() {
     `ALTER TYPE "NotificacaoTipo" ADD VALUE IF NOT EXISTS 'LE_DESATUALIZADA'`,
   ).catch(() => {});
 
+  // Cotação sem resposta em RM que virou Pedido gerado (lib/cotacao-encerramento.js). ⚠ O valor
+  // precisa existir ANTES de o código novo subir, pelo mesmo motivo do de cima. 02/10/2026.
+  await prisma.$executeRawUnsafe(`ALTER TYPE "CotacaoStatus" ADD VALUE IF NOT EXISTS 'ENCERRADA'`).catch(() => {});
+
   // Vinculo da OP com o orcamento do Comercial (proposta + estudo). Idempotente. 19/08/2026.
   for (const c of [
     // Escopo de qualidade da obra (quais relatórios ela exige). 22/08/2026.

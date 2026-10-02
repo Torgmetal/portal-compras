@@ -38,7 +38,7 @@ export async function POST(req, { params }) {
   if (!cotacao) return NextResponse.json({ error: "Cotacao nao encontrada." }, { status: 404 });
 
   // Cotacao ja faturada (gerou pedido) ou cancelada — bloqueia
-  if (cotacao.status === "PEDIDO_GERADO" || cotacao.status === "CANCELADA") {
+  if (cotacao.status === "PEDIDO_GERADO" || cotacao.status === "CANCELADA" || cotacao.status === "ENCERRADA") {
     return NextResponse.json(
       { error: "Cotacao ja foi finalizada (" + cotacao.status + "). Crie nova cotacao." },
       { status: 409 }

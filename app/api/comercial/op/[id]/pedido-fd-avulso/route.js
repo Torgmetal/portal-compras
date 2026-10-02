@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { encerrarCotacoesDaRM } from "@/lib/cotacao-encerramento";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -181,6 +182,7 @@ export async function POST(req, { params }) {
       data: { status: "PEDIDO_GERADO" },
       select: { id: true, numero: true, status: true },
     });
+    await encerrarCotacoesDaRM(prisma, rmAtendidaId, { userId: user.id });
   }
 
   await prisma.auditLog.create({

@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { encerrarCotacoesDaRM } from "@/lib/cotacao-encerramento";
 import { criarPedidoOmie } from "@/lib/omie-pedido-compra";
 import { resolverCodProjetoPorOp } from "@/lib/omie-pedidos-abertos";
 
@@ -167,6 +168,9 @@ export async function POST(req, { params }) {
       },
     });
   });
+
+  // ⚠ RM que acabou de fechar: as cotações sem resposta encerram e o fornecedor é avisado.
+  await encerrarCotacoesDaRM(prisma, rm.id, { userId: user.id });
 
   return NextResponse.json({
     success: true,

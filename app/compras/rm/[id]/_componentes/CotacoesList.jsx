@@ -41,7 +41,7 @@ export function CotacoesList({ rm, outrasRMs = [] }) {
   // Pre-fetch dos emails das cotacoes ativas. Cacheia no state pra que o
   // clipboard.write seja sincrono no clique (sem perder user gesture).
   useEffect(() => {
-    const ativas = (rm.cotacoes || []).filter((c) => c.status !== "CANCELADA" && c.status !== "DECLINADA");
+    const ativas = (rm.cotacoes || []).filter((c) => !["CANCELADA", "DECLINADA", "ENCERRADA"].includes(c.status));
     ativas.forEach((c) => {
       if (emailsCache[c.id]) return;
       fetch(`/api/cotacao/${c.id}/preview-email?format=json`)
@@ -85,6 +85,8 @@ export function CotacoesList({ rm, outrasRMs = [] }) {
     VENCIDA:  { label: "Vencida",    className: "bg-red-50 text-red-700" },
     CANCELADA:{ label: "Cancelada",  className: "bg-gray-100 text-gray-500" },
     DECLINADA:{ label: "Declinada",  className: "bg-gray-100 text-gray-500" },
+    // a RM virou Pedido gerado sem a resposta — o fornecedor foi avisado (lib/cotacao-encerramento)
+    ENCERRADA:{ label: "Encerrada",  className: "bg-gray-100 text-gray-500" },
   };
 
   return (
@@ -242,7 +244,7 @@ export function CotacoesList({ rm, outrasRMs = [] }) {
                 >
                   {copiado === c.id ? "✓ copiado" : "Copiar link"}
                 </button>
-                {outrasRMs.length > 0 && c.status !== "CANCELADA" && (
+                {outrasRMs.length > 0 && c.status !== "CANCELADA" && c.status !== "ENCERRADA" && (
                   <button
                     onClick={() => setModalVincular(c)}
                     className="px-3 py-1.5 text-xs bg-white border border-torg-blue-200 text-torg-blue rounded-lg hover:bg-torg-blue-50 font-medium inline-flex items-center gap-1"
@@ -251,7 +253,7 @@ export function CotacoesList({ rm, outrasRMs = [] }) {
                     <Plus size={12} /> Vincular RM
                   </button>
                 )}
-                {c.status !== "CANCELADA" && (
+                {c.status !== "CANCELADA" && c.status !== "ENCERRADA" && (
                   <>
                     {confirmCancelar === c.id ? (
                       <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
@@ -286,7 +288,8 @@ export function CotacoesList({ rm, outrasRMs = [] }) {
                     )}
                   </>
                 )}
-                <button
+                {/* ⚠ encerrada: o link só diria "encerrada" — reenviar seria mandar outro e-mail à toa */}
+                {c.status !== "ENCERRADA" && <button
                   onClick={() => handleEnviarEmail(c)}
                   disabled={enviandoEmail === c.id}
                   className="px-3 py-1.5 text-xs bg-torg-blue text-white rounded-lg hover:bg-torg-blue-700 font-medium inline-flex items-center gap-1 disabled:opacity-60"
@@ -294,7 +297,7 @@ export function CotacoesList({ rm, outrasRMs = [] }) {
                 >
                   {enviandoEmail === c.id ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
                   {enviandoEmail === c.id ? "Enviando…" : (c.recebidaEm ? "Reenviar email" : "Enviar email")}
-                </button>
+                </button>}
               </div>
               {emailToast?.id === c.id && (
                 <div className={`w-full mt-2 text-xs rounded px-3 py-2 ${

@@ -34,6 +34,10 @@ export async function POST(req, { params }) {
   if (cot.status === "CANCELADA") {
     return NextResponse.json({ error: "Cotacao cancelada." }, { status: 409 });
   }
+  // ⚠ A RM já virou Pedido gerado sem esta resposta (lib/cotacao-encerramento.js, 02/10/2026).
+  if (cot.status === "ENCERRADA") {
+    return NextResponse.json({ error: "Esta cotação foi encerrada: o processo de compra já foi concluído." }, { status: 409 });
+  }
 
   const vencedores = cot.itens.filter((i) => i.vencedor === true);
   if (vencedores.length === 0) {

@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { encerrarCotacoesDaRM } from "@/lib/cotacao-encerramento";
 
 export async function POST(req, { params }) {
   let user;
@@ -66,6 +67,9 @@ export async function POST(req, { params }) {
       },
     });
   });
+
+  // ⚠ RM fechada à mão também encerra as cotações sem resposta e avisa o fornecedor.
+  await encerrarCotacoesDaRM(prisma, params.id, { userId: user.id });
 
   return NextResponse.json({
     ok: true,

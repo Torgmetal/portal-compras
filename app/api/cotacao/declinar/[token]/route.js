@@ -57,6 +57,10 @@ export async function POST(req, { params }) {
   if (cotacao.status === "CANCELADA") {
     return NextResponse.json({ error: "Esta cotação foi cancelada pela Torg." }, { status: 409 });
   }
+  // ⚠ A RM já virou Pedido gerado sem esta resposta (lib/cotacao-encerramento.js, 02/10/2026).
+  if (cotacao.status === "ENCERRADA") {
+    return NextResponse.json({ error: "Esta cotação foi encerrada: o processo de compra já foi concluído." }, { status: 409 });
+  }
   if (cotacao.status === "RECEBIDA") {
     return NextResponse.json({ error: "Você já enviou uma proposta para esta cotação." }, { status: 409 });
   }

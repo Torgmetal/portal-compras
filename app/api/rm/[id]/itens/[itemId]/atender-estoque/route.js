@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { encerrarCotacoesDaRM } from "@/lib/cotacao-encerramento";
 
 const schema = z.object({
   quantidade: z.number().positive("Quantidade deve ser maior que zero"),
@@ -95,6 +96,7 @@ export async function POST(req, { params }) {
   );
   if (todosFinalizados && rmItens.length > 0) {
     await prisma.rM.update({ where: { id: rmId }, data: { status: "PEDIDO_GERADO" } });
+    await encerrarCotacoesDaRM(prisma, rmId, { userId: user.id });
   }
 
   return NextResponse.json({ ok: true });

@@ -105,6 +105,26 @@ export default async function CotacaoPorToken({ params }) {
     );
   }
 
+  // ⚠ A RM virou Pedido gerado e esta cotação não tinha resposta (lib/cotacao-encerramento.js). Texto
+  // NEUTRO, como o e-mail (Matheus, 02/10/2026): não diz que outro fornecedor ganhou.
+  if (cotacao.status === "ENCERRADA") {
+    return (
+      <MarketingShell
+        image="/obras/torre-escada.jpg"
+        kicker="Cotação encerrada"
+        title="Esta cotação foi encerrada"
+        lead="O processo de compra destes itens já foi concluído, e esta cotação não aceita mais propostas. Agradecemos a atenção — contamos com vocês nas próximas."
+      >
+        <div className="bg-white rounded-2xl border border-gray-200 p-7">
+          <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mb-4">
+            <Lock size={22} className="text-torg-gray" />
+          </div>
+          <p className="text-sm text-torg-gray">Token: {params.token.slice(0, 8)}...</p>
+        </div>
+      </MarketingShell>
+    );
+  }
+
   if (cotacao.status === "DECLINADA") {
     return (
       <MarketingShell
