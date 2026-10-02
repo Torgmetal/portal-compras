@@ -14,6 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { gerarTokenForte } from "@/lib/token";
 import { gerarPDFdoRelatorio } from "@/lib/relatorio-render";
+import { rncDoRelatorio } from "@/lib/relatorio-rnc";
 import { baixarDesenho } from "@/lib/relatorio-dimensional";
 import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
 import { TIPO_LABEL, pendenciasParaAssinatura } from "@/lib/qualidade-campo";
@@ -133,7 +134,7 @@ export async function POST(req, { params }) {
   });
   const pdfB64 = Buffer.from(
     await gerarPDFdoRelatorio({
-      rel: { ...rel, emitidoEm: rel.emitidoEm || new Date() },
+      rel: { ...rel, emitidoEm: rel.emitidoEm || new Date(), rnc: await rncDoRelatorio(rel) },
       fotos, assinaturas: null,
       cliente: opDados?.cliente || null, obra: opDados?.obra || null, refCliente: opDados?.refCliente || null,
       // ⚠⚠ SEM ISTO O ANEXO SAÍA SEM O DESENHO. O dimensional (e a pré-montagem, que sai dele) embute a

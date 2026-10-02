@@ -26,4 +26,38 @@ describe("RNC de sais e poeira diz o que reprovou", () => {
     expect(t).toContain("Teste B: quantidade 3, tamanho 4.");
     expect(t).not.toContain("Sem detalhamento");
   });
+
+  it("pull-off: a adesão média e cada dolly, com o rompimento e a falha", () => {
+    const t = descreverReprovacao({ tipo: "PULL_OFF", codigo: "RPO-112-001", revisao: 0, linhas: [], resultados: {
+      peca: "T112A1", dollies: [{ adesao: "3", rompimento: "A/B 100%", falha: "Adesão" }, { adesao: "4" }],
+    } });
+    expect(t).toContain("adesão média 3,5 MPa");
+    expect(t).toContain("Dolly 1: 3 MPa, rompimento A/B 100%, falha de adesão.");
+    expect(t).not.toContain("Sem detalhamento");
+  });
+
+  it("recebimento: o material, os lotes e os itens reprovados", () => {
+    const t = descreverReprovacao({ tipo: "RECEBIMENTO_TINTA", codigo: "RRT-112-001", revisao: 0, linhas: [], resultados: {
+      material: "Wegpoxi", fabricante: "WEG", lotes: [{ lote: "8912-1" }], checklist: { 3: "R", 4: "R", 1: "A" },
+    } });
+    expect(t).toContain("Wegpoxi (WEG), lotes A: 8912-1");
+    expect(t).toContain("Itens reprovados: 3. Vazamento ou Exsudação; 4. Amassamento.");
+  });
+
+  it("recebimento reprovado por validade: a RNC diz qual lote venceu e quando", () => {
+    const t = descreverReprovacao({ tipo: "RECEBIMENTO_TINTA", codigo: "RRT-112-002", revisao: 0, linhas: [], createdAt: "2026-10-01T12:00:00Z", resultados: {
+      material: "Wegpoxi", dataInspecao: "2026-10-01", lotes: [{ lote: "8912-1", validade: "2027-03-15" }, { lote: "8913-1", validade: "2026-09-30" }],
+      checklist: Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [n, "A"])),
+    } });
+    expect(t).toContain("Lote vencido na data do recebimento: componente B (validade 30/09/2026).");
+    expect(t).not.toContain("Itens reprovados");
+  });
+
+  it("pull-off com dolly sem ruptura: a RNC diz '> 20 MPa, sem ruptura' e a média como mínimo", () => {
+    const t = descreverReprovacao({ tipo: "PULL_OFF", codigo: "RPO-112-002", revisao: 0, linhas: [], resultados: {
+      dollies: [{ adesao: "20", falha: "Sem ruptura" }, { adesao: "3", rompimento: "A/B 100%", falha: "Adesão" }],
+    } });
+    expect(t).toContain("adesão média > 11,5 MPa");
+    expect(t).toContain("Dolly 1: > 20 MPa, sem ruptura.");
+  });
 });

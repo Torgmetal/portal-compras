@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { ClipboardCheck, Loader2 } from "lucide-react";
 import FichaPecaModal from "@/components/FichaPecaModal";
-const TIPOS = { DIMENSIONAL: "Dimensional", VISUAL_SOLDA: "Visual de solda", ULTRASSOM: "Ultrassom", LP: "Líquido penetrante", PINTURA: "Pintura", SAIS: "Sais (salinidade)", POEIRA: "Poeira", MONTAGEM: "Montagem", GERAL: "Geral" };
+const TIPOS = { DIMENSIONAL: "Dimensional", VISUAL_SOLDA: "Visual de solda", ULTRASSOM: "Ultrassom", LP: "Líquido penetrante", PINTURA: "Pintura", SAIS: "Sais (salinidade)", POEIRA: "Poeira", PULL_OFF: "Pull-off", RECEBIMENTO_TINTA: "Recebimento de tintas", MONTAGEM: "Montagem", GERAL: "Geral" };
 const RESULTADOS = { APROVADO: "Aprovado", REPROVADO: "Reprovado", REC: "REC", PENDENTE: "Sem resultado" };
 export default function QualidadeProducaoClient({ ops }) {
  const [opId, setOpId] = useState("");

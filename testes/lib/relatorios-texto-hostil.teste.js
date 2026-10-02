@@ -28,6 +28,8 @@ const CASOS = {
   LP: { linhas: [{ junta: "J1", numero: "1", local: "Alma", tamanho: "2", tipo: "Linear", laudo: "A", obs: "x" }], resultados: { procedimento: "PO-15", juntaSoldada: "Topo", penetrante: "Magnaflux" } },
   SAIS: { linhas: [], resultados: { documentoReferencia: "PO-05", ordemCompra: "PC 1", etapaPintura: "Após o jateamento", peca: "T112A1", requisito: "20", aparelho: "Condutivímetro", apModelo: "EC-33", apTag: "CD-01", amostras: [{ condAgua: "1", condAmostra: "11", hora: "09:10" }] } },
   POEIRA: { linhas: [], resultados: { documentoReferencia: "PO-05", ordemCompra: "PC 1", etapaPintura: "Após o jateamento", fitaAdesiva: "Fita 25 mm", ampliacao: "Lupa 10×", testes: [{ local: "Alma", quantidade: "1", tamanho: "2", obs: "x" }], classificacao: "2" } },
+  PULL_OFF: { linhas: [], resultados: { documentoReferencia: "PO-05", ordemCompra: "PC 1", normas: "ASTM D4541", adesivo: "Araldite", aparelho: "Elcometer", apModelo: "510", pistao: "20 mm", ura: "60", rncNumero: "RNC-1", esquema: ["120", "x"], dollies: [{ adesao: "8", rompimento: "B 100%", falha: "Coesão" }] } },
+  RECEBIMENTO_TINTA: { linhas: [], resultados: { contrato: "CT", localEquipamento: "Almoxarifado", material: "Tinta", norma: "N-2680", fabricante: "WEG", certificado: "CQ", tamanhoLote: "20", tamanhoAmostra: "2", lotes: [{ lote: "L1", quantidade: "10" }], checklist: { 1: "A" } } },
 };
 
 describe("nenhum relatório derruba com texto estranho em qualquer campo", () => {

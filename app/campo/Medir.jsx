@@ -8,7 +8,7 @@ import { Loader2, AlertCircle, Check, Save, Ruler, Plus, QrCode, Trash2, Camera,
 import LeitorQR from "./LeitorQR";
 import VistaCotas from "./VistaCotas";
 import { desenhoDaLinha } from "@/lib/cota-marcacao";
-import { marcaDoQR, TIPOS_RELATORIO, usaCotas, semJunta } from "@/lib/qualidade-campo";
+import { marcaDoQR, TIPOS_RELATORIO, usaCotas, semJunta, resultadosDaTela } from "@/lib/qualidade-campo";
 import {useStore} from "@/lib/store";
 import PecasInformadasEditor from "../qualidade/inspecoes/[id]/PecasInformadasEditor";
 import {usaQuantidadeInspecao, pecasDoRelatorio, pecasInformadasSchema} from "@/lib/inspecao-pecas";
@@ -23,6 +23,8 @@ import { evidenciasDoTipo } from "@/lib/fotos-evidencia";
 import FormularioUSCampo from "./FormularioUSCampo";
 import FormularioSaisCampo from "./FormularioSaisCampo";
 import FormularioPoeiraCampo from "./FormularioPoeiraCampo";
+import FormularioPullOffCampo from "./FormularioPullOffCampo";
+import FormularioRecebimentoTintaCampo from "./FormularioRecebimentoTintaCampo";
 import JuntaSoldada from "./JuntaSoldada";
 import { rotuloEps } from "@/lib/eps-casa";
 import { ANGULOS, FACES, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL } from "@/lib/us-campos";
@@ -373,6 +375,8 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   // sais e poeira (02/10/2026): ensaios da superfície, como a pintura — sem junta (ver `semJunta`)
   const ehSais = rel.tipo === "SAIS";
   const ehPoeira = rel.tipo === "POEIRA";
+  const ehPullOff = rel.tipo === "PULL_OFF";
+  const ehRecebimento = rel.tipo === "RECEBIMENTO_TINTA";
   const ehSemJunta = semJunta(rel.tipo);
   const set = (i, campo, v) => setLinhas((p) => p.map((l, k) => (k === i ? { ...l, [campo]: v } : l)));
 
@@ -586,6 +590,8 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       {ehPintura && <Pintura cond={cond} setCond={setCond} tintas={tintas} plp={plp} />}
       {ehSais && <FormularioSaisCampo rel={rel} cond={cond} setCond={setCond} resultado={resultado} />}
       {ehPoeira && <FormularioPoeiraCampo rel={rel} cond={cond} setCond={setCond} resultado={resultado} />}
+      {ehPullOff && <FormularioPullOffCampo rel={rel} cond={cond} setCond={setCond} resultado={resultado} />}
+      {ehRecebimento && <FormularioRecebimentoTintaCampo rel={rel} cond={cond} setCond={setCond} resultado={resultado} observacoes={observacoes} />}
 
       {ehLp && <ParametrosLP cond={cond} setCond={setCond} />}
       {/* ⚠ a junta soldada (EPS, RQS, processo, metal de adição, tipo de junta) — só existia no
@@ -928,10 +934,10 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
 
       <div className="mt-5">
         <p className="text-[12px] font-semibold text-torg-gray mb-1.5">Resultado da inspeção</p>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className={`grid ${resultadosDaTela(rel.tipo, resultado).length === 3 ? "grid-cols-3" : "grid-cols-2"} gap-1.5`}>
           {[["APROVADO", "A", "bg-emerald-600 border-emerald-600"],
             ["REPROVADO", "R", "bg-red-600 border-red-600"],
-            ["REC", "REC", "bg-amber-500 border-amber-500"]].map(([v, sigla, cor]) => {
+            ["REC", "REC", "bg-amber-500 border-amber-500"]].filter(([v]) => resultadosDaTela(rel.tipo, resultado).includes(v)).map(([v, sigla, cor]) => {
             const on = resultado === v;
             return (
               <button key={v} onClick={() => setResultado(on ? null : v)}

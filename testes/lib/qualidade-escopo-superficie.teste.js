@@ -42,3 +42,21 @@ describe("sais e poeira acompanham a pintura no escopo", () => {
     expect(secoesForaDoEscopo(op(["DIMENSIONAL"]))).toContain("14");
   });
 });
+
+// O pull-off e o recebimento de tintas (02/10/2026) seguem a mesma regra: acompanham a pintura.
+describe("pull-off e recebimento de tintas acompanham a pintura no escopo", () => {
+  it("obra com pintura (inclusive escopo salvo antes deles): os dois aparecem", () => {
+    for (const t of ["PULL_OFF", "RECEBIMENTO_TINTA"]) {
+      expect(tipoNoEscopo(op(COMPLETO_ANTIGO, "COMPLETO"), t)).toBe(true);
+      expect(tipoNoEscopo(op(["PINTURA"], "PINTURA"), t)).toBe(true);
+    }
+  });
+
+  it("obra sem pintura: não; e não viram caixa no escopo nem tiram o Completo do Completo", () => {
+    expect(tipoNoEscopo(op(["DIMENSIONAL"]), "PULL_OFF")).toBe(false);
+    expect(tipoNoEscopo(op(["DIMENSIONAL"]), "RECEBIMENTO_TINTA")).toBe(false);
+    expect(TIPOS_ESCOPAVEIS.map((t) => t.id)).not.toEqual(expect.arrayContaining(["PULL_OFF"]));
+    expect(TIPOS_ESCOPAVEIS.map((t) => t.id)).not.toEqual(expect.arrayContaining(["RECEBIMENTO_TINTA"]));
+    expect(normalizarEscopo({ tipos: COMPLETO_ANTIGO }).preset).toBe("COMPLETO");
+  });
+});

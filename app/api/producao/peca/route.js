@@ -43,6 +43,8 @@ const TIPO_RELATORIO = {
   PINTURA: "Pintura",
   SAIS: "Sais (salinidade)",
   POEIRA: "Poeira",
+  PULL_OFF: "Pull-off",
+  RECEBIMENTO_TINTA: "Recebimento de tintas",
   MONTAGEM: "Montagem",
   GERAL: "Geral",
 };

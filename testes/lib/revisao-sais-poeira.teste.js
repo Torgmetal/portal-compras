@@ -37,6 +37,18 @@ describe("revisão nova de sais e poeira", () => {
     expect(r.resultados).toMatchObject({ limpeza: "SA2.5", laudo: null, espessuras: {}, rugosidade: { leituras: ["60"] } });
   });
 
+  it("pull-off: os dollies e as datas são outro ensaio; o esquema e o aparelho ficam", () => {
+    const r = proximaRevisao({ tipo: "PULL_OFF", linhas: [], resultados: { aparelho: "Elcometer", esquema: ["120"], dataFixacao: "2026-10-01", dataArrancamento: "2026-10-02", dollies: [{ adesao: "3" }], ura: "62", ta: "24", ts: "27", po: "16", rncNumero: "RNC-015/26" } });
+    expect(r.resultados).toMatchObject({ aparelho: "Elcometer", esquema: ["120"], dollies: [], dataFixacao: null, dataArrancamento: null });
+    // ⚠ o clima é o da FIXAÇÃO refeita — herdado, o R01 sairia assinado com o URA do R00 (não é obrigatório)
+    expect(r.resultados).toMatchObject({ ura: null, ta: null, ts: null, po: null });
+  });
+
+  it("recebimento: os nove itens e a data voltam em branco; material e lotes ficam", () => {
+    const r = proximaRevisao({ tipo: "RECEBIMENTO_TINTA", linhas: [], resultados: { material: "Wegpoxi", lotes: [{ lote: "L1" }], checklist: { 4: "R" }, dataInspecao: "2026-10-01" } });
+    expect(r.resultados).toMatchObject({ material: "Wegpoxi", lotes: [{ lote: "L1" }], checklist: {}, dataInspecao: null });
+  });
+
   it("os outros tipos seguem como antes (não ganham `resultados` na revisão)", () => {
     expect(proximaRevisao({ tipo: "VISUAL_SOLDA", linhas: [], resultados: { eps: "EPS 01" } }).resultados).toBeUndefined();
   });

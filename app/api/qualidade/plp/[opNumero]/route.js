@@ -76,6 +76,8 @@ async function tintasDaOP(opNumero) {
       lote: d.numeroCorrida || null,
       validade: d.dataValidade || null,
       certificado: d.numeroDocumento || null,
+      // a norma da ficha preenche a NORMA do recebimento de tintas (lib/recebimento-tinta-campos)
+      norma: d.norma || null,
       r: d.indiceR || d.importRef || null,
     }))
     // pelo LOTE dentro de cada produto: quem procura no galpão procura pelo número da lata

@@ -38,3 +38,15 @@ it("o anexo é gerado com o desenho de fabricação, como na tela", async () => 
   await args.desenhoBytes({ caminho: "/OP-103/2.5.2/T103A1.pdf" });
   expect(baixarDesenho).toHaveBeenCalledWith("/OP-103/2.5.2/T103A1.pdf");
 });
+
+it("pull-off: o anexo leva o nº da RNC aberta pela reprovação (antes, só a tela o buscava)", async () => {
+  mockPrisma.relatorioInspecao.findUnique.mockResolvedValue({
+    id: "r1", codigo: "RPO-112-001", tipo: "PULL_OFF", opNumero: "112", envioAssinaturaId: "env1", rncId: "n1",
+    resultadoInspecao: "REPROVADO", emitidoEm: new Date(), marcas: ["T112A1"], linhas: [],
+    resultados: { adesivo: "Araldite", aparelho: "Elcometer 510", dataFixacao: "2026-10-01", dataArrancamento: "2026-10-02", dollies: [{ adesao: "3", falha: "Adesão" }] },
+  });
+  mockPrisma.naoConformidade.findUnique.mockResolvedValue({ numero: 15, ano: 2026 });
+  const r = await POST(new Request("http://localhost", { method: "POST", body: JSON.stringify({ destinatarios: [{ nome: "Davi Pinho", email: "pinho.davi@tmsa.ind.br", papel: "Cliente" }] }) }), { params: Promise.resolve({ id: "r1" }) });
+  expect(r.status).toBe(200);
+  expect(gerar.mock.calls[0][0].rel.rnc).toEqual({ numero: 15, ano: 2026 });
+});

@@ -13,6 +13,7 @@ vi.mock("@/lib/relatorio-inspecao", () => ({ vincularNoDataBook: vi.fn(), penden
 import { PATCH as patchPC } from "@/app/api/qualidade/inspecoes/[id]/route";
 import { PATCH as patchCampo } from "@/app/api/campo/relatorios/[id]/route";
 import { pendenciasParaAssinatura } from "@/lib/qualidade-campo";
+import { ITENS_RECEBIMENTO } from "@/lib/recebimento-tinta-campos";
 
 let rel;
 beforeEach(() => {
@@ -77,6 +78,16 @@ const CASOS = {
     nasce: {},
     pc: { resultados: { etapaPintura: "Antes da 1ª demão", fitaAdesiva: "Fita 25 mm", testes: [{ quantidade: "1", tamanho: "2" }] }, resultadoInspecao: "APROVADO" },
     campo: { condicoes: { etapaPintura: "Antes da 1ª demão", fitaAdesiva: "Fita 25 mm", testes: [{ quantidade: "1", tamanho: "2" }] }, resultadoInspecao: "APROVADO" },
+  },
+  PULL_OFF: {
+    nasce: {},
+    pc: { resultados: { adesivo: "Araldite", aparelho: "Elcometer 510", dataFixacao: "2026-10-01", dataArrancamento: "2026-10-02", dollies: [{ adesao: "8", falha: "Coesão" }] }, resultadoInspecao: "APROVADO" },
+    campo: { condicoes: { adesivo: "Araldite", aparelho: "Elcometer 510", dataFixacao: "2026-10-01", dataArrancamento: "2026-10-02", dollies: [{ adesao: "8", falha: "Coesão" }] }, resultadoInspecao: "APROVADO" },
+  },
+  RECEBIMENTO_TINTA: {
+    nasce: {},
+    pc: { resultados: { material: "Wegpoxi", fabricante: "WEG", dataInspecao: "2026-10-01", lotes: [{ lote: "L1", validade: "2027-03-15" }], checklist: Object.fromEntries(ITENS_RECEBIMENTO.map((_, i) => [i + 1, "A"])) }, resultadoInspecao: "APROVADO" },
+    campo: { condicoes: { material: "Wegpoxi", fabricante: "WEG", dataInspecao: "2026-10-01", lotes: [{ lote: "L1", validade: "2027-03-15" }], checklist: Object.fromEntries(ITENS_RECEBIMENTO.map((_, i) => [i + 1, "A"])) }, resultadoInspecao: "APROVADO" },
   },
 };
 

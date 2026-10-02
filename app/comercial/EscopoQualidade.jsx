@@ -47,7 +47,7 @@ export default function EscopoQualidade({ valor, onChange, compacto = false }) {
                 className="rounded border-gray-300 text-torg-blue focus:ring-torg-blue" />
               <span className="font-mono text-[11px] text-torg-gray">{t.sigla}</span> {t.label}
               {/* ⚠ sais e poeira acompanham a pintura (lib/qualidade-escopo) — dito aqui, onde se escolhe */}
-              {t.id === "PINTURA" && <span className="text-[10px] text-torg-gray">(inclui sais e poeira)</span>}
+              {t.id === "PINTURA" && <span className="text-[10px] text-torg-gray">(inclui recebimento de tintas, sais, poeira e pull-off)</span>}
             </label>
           ))}
         </div>

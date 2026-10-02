@@ -17,7 +17,7 @@ import { PERFIS_CAMPO, TIPO_LABEL } from "@/lib/qualidade-campo";
 import { RESULTADOS, proximaRevisao, rotuloRevisao } from "@/lib/revisao-inspecao";
 import { numeroBR } from "@/lib/numero-br";
 import { linhasDoCampo } from "@/lib/campo-linhas";
-import { limparResultadosSuperficie, CAMPOS_TEXTO_SUPERFICIE } from "@/lib/superficie-gravacao";
+import { limparResultadosSuperficie, CAMPOS_TEXTO_SUPERFICIE, TIPOS_GRAVACAO_PROPRIA } from "@/lib/superficie-gravacao";
 
 export const runtime = "nodejs";
 
@@ -232,7 +232,7 @@ export async function PATCH(req, { params }) {
       if (c[k] !== undefined) dados.resultados[k] = c[k] == null || c[k] === "" ? null : String(c[k]).slice(0, limiteDoCampo(k));
     }
     // ⚠ sais e poeira (02/10/2026): a mesma regra única da rota do computador (lib/superficie-gravacao)
-    if (rel.tipo === "SAIS" || rel.tipo === "POEIRA") Object.assign(dados.resultados, limparResultadosSuperficie(c));
+    if (TIPOS_GRAVACAO_PROPRIA.includes(rel.tipo)) Object.assign(dados.resultados, limparResultadosSuperficie(c, rel.tipo));
     // ⚠ as três verificações do dimensional (02/10/2026): só APROVADO/REPROVADO, como no computador, e só
     // nos dois tipos que as têm — nos outros a chave nem existe no modelo
     if (rel.tipo === "DIMENSIONAL" || rel.tipo === "PRE_MONTAGEM") {

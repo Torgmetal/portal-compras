@@ -1,7 +1,12 @@
 {
-  "build": 3576,
-  "gerado": "2026-10-02T21:18:13.717Z",
+  "build": 3577,
+  "gerado": "2026-10-02T22:03:31.437Z",
   "commits": [
+    {
+      "hash": "4878962c",
+      "data": "02/10/2026",
+      "titulo": "Nada travado: quantidade do dimensional, celular e soldador do EVS"
+    },
     {
       "hash": "c5fdda58",
       "data": "02/10/2026",
@@ -146,11 +151,6 @@
       "hash": "1c98a64c",
       "data": "30/09/2026",
       "titulo": "Etiquetas: importar as TAGs do cliente grava em lote — a OP-105 estourava o tempo (504)"
-    },
-    {
-      "hash": "82466563",
-      "data": "30/09/2026",
-      "titulo": "Prazos das RMs: data nova da remarcação destacada em azul, ao lado da anterior em âmbar"
     }
   ]
 }

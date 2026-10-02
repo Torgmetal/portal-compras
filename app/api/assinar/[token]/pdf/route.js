@@ -7,6 +7,7 @@ import { gerarPlanoTreinamentoPDF } from "@/lib/plano-treinamento-pdf";
 import { gerarCronogramaAuditoriaPDF } from "@/lib/cronograma-auditoria-pdf";
 import { baixarDesenho } from "@/lib/relatorio-dimensional";
 import { gerarPDFdoRelatorio } from "@/lib/relatorio-render";
+import { rncDoRelatorio } from "@/lib/relatorio-rnc";
 import { gerarPlanoClientePDF } from "@/lib/plano-cliente-pdf";
 import { comResponsaveis, docDoTipo } from "@/lib/planos-aceite";
 import { dispArquivo } from "@/lib/arquivo-http";
@@ -61,7 +62,7 @@ export async function GET(_req, { params }) {
       where: { numero: rel.opNumero }, select: { cliente: true, obra: true, refCliente: true },
     });
     bytes = await gerarPDFdoRelatorio({
-      rel, fotos, assinaturas,
+      rel: { ...rel, rnc: await rncDoRelatorio(rel) }, fotos, assinaturas,
       cliente: op?.cliente || null, obra: op?.obra || null, refCliente: op?.refCliente || null,
       desenhoBytes: (d) => baixarDesenho(d?.caminho || d?.url),
     });

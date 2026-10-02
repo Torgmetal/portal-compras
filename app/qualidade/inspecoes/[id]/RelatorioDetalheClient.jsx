@@ -19,11 +19,13 @@ import FormPintura from "./FormPintura";
 import FormLP from "./FormLP";
 import FormSais from "./FormSais";
 import FormPoeira from "./FormPoeira";
+import FormPullOff from "./FormPullOff";
+import FormRecebimentoTinta from "./FormRecebimentoTinta";
 import Equipamentos from "./Equipamentos";
 import AnexarProjeto from "./AnexarProjeto";
 import EscolherProjeto from "./EscolherProjeto";
 import Fotos from "./Fotos";
-import { usaCotas } from "@/lib/qualidade-campo";
+import { usaCotas, resultadosDaTela } from "@/lib/qualidade-campo";
 import CampoDecimal from "@/components/CampoDecimal";
 import { numeroBR } from "@/lib/numero-br";
 
@@ -368,6 +370,17 @@ export default function RelatorioDetalheClient({ id }) {
           <FormPoeira rel={rel} res={res} travado={travado} setResultado={setResultado} />
         </div>
       )}
+      {/* ── pull-off e recebimento de tintas (Vitor, 02/10/2026: "pode criar também") ── */}
+      {rel.tipo === "PULL_OFF" && (
+        <div className="mt-4">
+          <FormPullOff rel={rel} res={res} travado={travado} setResultado={setResultado} />
+        </div>
+      )}
+      {rel.tipo === "RECEBIMENTO_TINTA" && (
+        <div className="mt-4">
+          <FormRecebimentoTinta rel={rel} res={res} travado={travado} setResultado={setResultado} />
+        </div>
+      )}
 
       {/* ── preenchimento do ensaio visual de solda ──────────────────────────────────────── */}
       {rel.tipo === "VISUAL_SOLDA" && (
@@ -401,10 +414,10 @@ export default function RelatorioDetalheClient({ id }) {
                 ficava para sempre "aguardando aprovação". Aprovar guarda o PDF na pasta da obra. */}
             <label className="block">
               <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Resultado da inspeção</span>
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className={`grid ${resultadosDaTela(rel.tipo, rel.resultadoInspecao).length === 3 ? "grid-cols-3" : "grid-cols-2"} gap-1.5`}>
                 {[["APROVADO", "A", "aprovado", "bg-emerald-600 border-emerald-600"],
                   ["REPROVADO", "R", "reprovado", "bg-red-600 border-red-600"],
-                  ["REC", "REC", "exame compl.", "bg-amber-500 border-amber-500"]].map(([v, sig, rot, cor]) => {
+                  ["REC", "REC", "exame compl.", "bg-amber-500 border-amber-500"]].filter(([v]) => resultadosDaTela(rel.tipo, rel.resultadoInspecao).includes(v)).map(([v, sig, rot, cor]) => {
                   const on = rel.resultadoInspecao === v;
                   return (
                     <button key={v} disabled={travado} onClick={() => setCampo("resultadoInspecao", on ? null : v)}
@@ -423,7 +436,7 @@ export default function RelatorioDetalheClient({ id }) {
 
 
 
-          {linhas.length > 0 && !["VISUAL_SOLDA", "ULTRASSOM", "PINTURA", "LP", "SAIS", "POEIRA"].includes(rel.tipo) && (
+          {linhas.length > 0 && !["VISUAL_SOLDA", "ULTRASSOM", "PINTURA", "LP", "SAIS", "POEIRA", "PULL_OFF", "RECEBIMENTO_TINTA"].includes(rel.tipo) && (
             <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5"><Ruler size={13} className="text-torg-blue" /> Dimensões</p>
@@ -488,7 +501,9 @@ export default function RelatorioDetalheClient({ id }) {
           )}
 
           <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
-            <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Comentários</span>
+            {/* ⚠ "Observações", não "Comentários": é o OBSERVAÇÕES de todo PDF — e é onde o recebimento de tintas pede
+                o motivo de reprovar (verificação dos modelos, 02/10/2026) */}
+            <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Observações</span>
             <textarea rows={3} value={rel.observacoes || ""} disabled={travado} onChange={(e) => setCampo("observacoes", e.target.value)}
               className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue outline-none disabled:bg-gray-50" />
           </div>

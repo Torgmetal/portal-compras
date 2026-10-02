@@ -14,7 +14,7 @@ import { limiteDoCampo } from "@/lib/campo-condicoes";
 import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
 import { garantirDesenhos } from "@/lib/relatorio-dimensional";
 import { usaCotas } from "@/lib/qualidade-campo";
-import { limparResultadosSuperficie, CAMPOS_TEXTO_SUPERFICIE } from "@/lib/superficie-gravacao";
+import { limparResultadosSuperficie, CAMPOS_TEXTO_SUPERFICIE, TIPOS_GRAVACAO_PROPRIA } from "@/lib/superficie-gravacao";
 
 export const runtime = "nodejs";
 
@@ -283,7 +283,7 @@ export async function PATCH(req, { params }) {
     }
     // ⚠ sais e poeira (02/10/2026): cabeçalho, amostras e testes pela regra única das duas rotas —
     // fora dela, o que o inspetor digita seria descartado aqui (ver lib/superficie-gravacao)
-    if (rel.tipo === "SAIS" || rel.tipo === "POEIRA") Object.assign(dados.resultados, limparResultadosSuperficie(r));
+    if (TIPOS_GRAVACAO_PROPRIA.includes(rel.tipo)) Object.assign(dados.resultados, limparResultadosSuperficie(r, rel.tipo));
     // ⚠ as demãos e as leituras de espessura são ESTRUTURA, não texto: guardadas como estão, com
     // teto de tamanho. Sem isto o relatório de pintura salvaria vazio.
     if (r.demaos && typeof r.demaos === "object") {
