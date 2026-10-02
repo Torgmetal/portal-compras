@@ -70,10 +70,21 @@ export async function POST(req, { params }) {
 
   const motivo = body.motivo ? limparTextoCurto(body.motivo, 500) : null;
 
-  await prisma.cotacao.update({
-    where: { id: cotacao.id },
+  // ⚠⚠ CONDICIONADA AO STATUS DE AGORA (achado do Codex, 02/10/2026): entre a leitura e esta linha a
+  // RM pode ter virado Pedido gerado e a cotação ENCERRADA — ou o fornecedor ter enviado a proposta
+  // em outra aba. Gravar DECLINADA por cima apagaria qualquer uma das duas.
+  const gravada = await prisma.cotacao.updateMany({
+    where: { id: cotacao.id, status: { in: ["PENDENTE", "VENCIDA"] } },
     data: { status: "DECLINADA", declinadaEm: new Date(), motivoDeclinio: motivo },
   });
+  if (!gravada.count) {
+    const agora = await prisma.cotacao.findUnique({ where: { id: cotacao.id }, select: { status: true } });
+    if (agora?.status === "DECLINADA") return NextResponse.json({ ok: true, jaDeclinada: true });
+    const msg = agora?.status === "ENCERRADA" ? "Esta cotação foi encerrada: o processo de compra já foi concluído."
+      : agora?.status === "RECEBIDA" ? "Você já enviou uma proposta para esta cotação."
+      : "Esta cotação foi cancelada pela Torg.";
+    return NextResponse.json({ error: msg }, { status: 409 });
+  }
 
   await prisma.auditLog.create({
     data: {

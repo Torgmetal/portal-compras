@@ -41,7 +41,7 @@ beforeEach(() => {
   mockPrisma.cotacao.findUnique.mockResolvedValue({
     id: "cot1", token: "tk", status: "ENVIADA", nCodOmie: null, itens: [{ id: "ci1" }],
   });
-  mockPrisma.cotacao.update.mockResolvedValue({ id: "cot1" });
+  mockPrisma.cotacao.updateMany.mockResolvedValue({ count: 1 }); // a gravação condicionada (rota submeter)
   mockPrisma.cotacaoItem.update.mockResolvedValue({});
   mockPrisma.cotacaoItem.findMany.mockResolvedValue([]);
   mockPrisma.rMItem.updateMany.mockResolvedValue({ count: 0 });
@@ -67,7 +67,7 @@ describe("a rota pública exige o que a tela exige", () => {
       const { error } = await r.json();
       expect(error).toContain(trecho);
       // ⚠⚠ E NADA É GRAVADO. Recusar depois de escrever metade seria pior que aceitar.
-      expect(mockPrisma.cotacao.update).not.toHaveBeenCalled();
+      expect(mockPrisma.cotacao.updateMany).not.toHaveBeenCalled();
       expect(mockPrisma.cotacaoItem.update).not.toHaveBeenCalled();
     });
   }

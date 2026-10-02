@@ -45,7 +45,7 @@ describe("o fornecedor marca 'não tenho' e ainda assim digita preço", () => {
       id: "cot1", token: "tk", status: "ENVIADA", nCodOmie: null,
       itens: [{ id: "ci-sem" }, { id: "ci-com" }],
     });
-    mockPrisma.cotacao.update.mockResolvedValue({ id: "cot1" });
+    mockPrisma.cotacao.updateMany.mockResolvedValue({ count: 1 }); // a gravação condicionada (rota submeter)
     mockPrisma.cotacaoItem.update.mockResolvedValue({});
     mockPrisma.cotacaoItem.findMany.mockResolvedValue([]);
     mockPrisma.rMItem.updateMany.mockResolvedValue({ count: 0 });
@@ -136,7 +136,7 @@ describe("frete obrigatório na submissão", () => {
     mockPrisma.cotacao.findUnique.mockResolvedValue({
       id: "cot1", token: "tk", status: "ENVIADA", nCodOmie: null, itens: [{ id: "ci-com" }],
     });
-    mockPrisma.cotacao.update.mockResolvedValue({ id: "cot1" });
+    mockPrisma.cotacao.updateMany.mockResolvedValue({ count: 1 }); // a gravação condicionada (rota submeter)
     mockPrisma.cotacaoItem.update.mockResolvedValue({});
     mockPrisma.cotacaoItem.findMany.mockResolvedValue([]);
     mockPrisma.rMItem.updateMany.mockResolvedValue({ count: 0 });
@@ -158,21 +158,21 @@ describe("frete obrigatório na submissão", () => {
     expect(error).toContain("FOB");
     // ⚠ e não o despejo JSON do Zod, que era o que a rota devolvia antes
     expect(error).not.toContain('"code"');
-    expect(mockPrisma.cotacao.update).not.toHaveBeenCalled();
+    expect(mockPrisma.cotacao.updateMany).not.toHaveBeenCalled();
   });
 
   it("valor fora da lista também é recusado", async () => {
     const r = await submeter(req("http://localhost/api/cotacao/submeter/tk", corpo({ tipoFrete: "por conta deles" })), { params: { token: "tk" } });
     expect(r.status).toBe(400);
-    expect(mockPrisma.cotacao.update).not.toHaveBeenCalled();
+    expect(mockPrisma.cotacao.updateMany).not.toHaveBeenCalled();
   });
 
   it("com CIF ou FOB, grava o que o fornecedor escolheu", async () => {
     for (const v of ["CIF", "FOB"]) {
-      mockPrisma.cotacao.update.mockClear();
+      mockPrisma.cotacao.updateMany.mockClear();
       const r = await submeter(req("http://localhost/api/cotacao/submeter/tk", corpo({ tipoFrete: v })), { params: { token: "tk" } });
       expect(r.status, v).toBe(200);
-      expect(mockPrisma.cotacao.update.mock.calls[0][0].data).toMatchObject({ tipoFrete: v });
+      expect(mockPrisma.cotacao.updateMany.mock.calls[0][0].data).toMatchObject({ tipoFrete: v });
     }
   });
 });

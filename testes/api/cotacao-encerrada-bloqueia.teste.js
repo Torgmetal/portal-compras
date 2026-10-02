@@ -40,3 +40,37 @@ describe("cotação encerrada pelo pedido gerado", () => {
     expect(mockPrisma.cotacao.update).not.toHaveBeenCalled();
   });
 });
+
+// Achado do Codex (02/10/2026): a leitura viu PENDENTE, o encerramento gravou ENCERRADA e mandou o
+// aviso enquanto a proposta esperava o Omie — e a proposta gravava RECEBIDA por cima. A gravação
+// agora é CONDICIONADA ao status no instante dela: perdeu a corrida, desfaz tudo e responde 409.
+describe("⚠⚠ corrida: encerrada entre a leitura e a gravação", () => {
+  beforeEach(() => {
+    mockPrisma.cotacao.findUnique.mockResolvedValue({ id: "cot1", token: "tk", status: "PENDENTE", fornecedorNome: "GERDAU", itens: [{ id: "ci1" }], numeroRevisao: 0 });
+    mockPrisma.cotacao.updateMany.mockResolvedValue({ count: 0 }); // o encerramento venceu
+  });
+
+  it("a proposta não grava preço nem RECEBIDA — 409", async () => {
+    const r = await submeter(req("http://localhost/api/cotacao/submeter/tk", {
+      itens: [{ cotacaoItemId: "ci1", precoUnit: 6.41, qtdCotada: 10, icmsPct: 12, ipiPct: 0, semEstoque: false }],
+      tipoFrete: "CIF", cnpj: "45.987.062/0001-77", numeroProposta: "1", prazoEntrega: "3 dias úteis", condicaoPagamento: "28",
+    }), { params: { token: "tk" } });
+    expect(r.status).toBe(409);
+    expect((await r.json()).error).toMatch(/encerrada/i);
+    expect(mockPrisma.cotacaoItem.update).not.toHaveBeenCalled();
+    expect(mockPrisma.cotacao.update).not.toHaveBeenCalled();
+    // a gravação foi condicionada a um status ainda aberto
+    expect(mockPrisma.cotacao.updateMany.mock.calls[0][0].where).toMatchObject({ id: "cot1", status: { notIn: ["CANCELADA", "ENCERRADA"] } });
+  });
+
+  it("o declínio também não grava — 409", async () => {
+    mockPrisma.cotacao.findUnique
+      .mockResolvedValueOnce({ id: "cot1", status: "PENDENTE", fornecedorNome: "GERDAU" })
+      .mockResolvedValueOnce({ status: "ENCERRADA" });
+    const r = await declinar(req("http://localhost/api/cotacao/declinar/tk"), { params: { token: "tk" } });
+    expect(r.status).toBe(409);
+    expect((await r.json()).error).toMatch(/encerrada/i);
+    expect(mockPrisma.cotacao.update).not.toHaveBeenCalled();
+    expect(mockPrisma.cotacao.updateMany.mock.calls[0][0].where).toMatchObject({ id: "cot1", status: { in: ["PENDENTE", "VENCIDA"] } });
+  });
+});

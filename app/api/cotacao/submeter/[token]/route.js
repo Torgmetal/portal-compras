@@ -85,6 +85,9 @@ const schema = z.object({
     // mesmo desta cotação. Aqui só dá para ver o que o cliente mandou; lá se sabe o que vale.
   });
 
+/** A cotação fechou entre a leitura e a gravação — a transação desfaz e a rota responde 409. */
+class CotacaoFechada extends Error {}
+
 export async function POST(req, { params }) {
   const rl = postLimiter(req);
   if (!rl.success) {
@@ -176,7 +179,40 @@ export async function POST(req, { params }) {
   // propósito: quem falha primeiro tem de ser a transação, que desfaz tudo.
   const OPCOES_TX = { maxWait: 10_000, timeout: 45_000 };
 
+  // Combina observações em um único campo
+  const obsParts = [];
+  if (body.prazoEntrega) obsParts.push(`Prazo de entrega: ${body.prazoEntrega}`);
+  if (body.condicaoPagamento) obsParts.push(`Pagamento: ${body.condicaoPagamento}`);
+  if (body.observacao) obsParts.push(body.observacao);
+  const obsCombinada = obsParts.join(" | ") || null;
+
+  try {
   await prisma.$transaction(async (tx) => {
+    // ⚠⚠ A COTAÇÃO É GRAVADA PRIMEIRO, E CONDICIONADA AO STATUS DE AGORA (achado do Codex,
+    // 02/10/2026). A leitura lá em cima pode ter visto PENDENTE e, enquanto esta rota esperava o
+    // Omie, a RM virou Pedido gerado: `lib/cotacao-encerramento` gravou ENCERRADA e AVISOU o
+    // fornecedor. Gravar RECEBIDA por cima reabriria uma cotação que ele já foi avisado de que
+    // fechou. O UPDATE trava a linha: se o encerramento venceu, conta 0 e a transação desfaz tudo
+    // (nenhum preço gravado); se esta venceu, o encerramento acha RECEBIDA e não avisa ninguém.
+    const gravada = await tx.cotacao.updateMany({
+      where: { id: cotacao.id, status: { notIn: ["CANCELADA", "ENCERRADA"] } },
+      data: {
+        status: "RECEBIDA",
+        recebidaEm: new Date(),
+        total,
+        totalProposta: body.totalProposta ? round2(body.totalProposta) : null,
+        numeroProposta: body.numeroProposta?.trim() || null,
+        prazoPagamento: body.condicaoPagamento || null,
+        tipoFrete: body.tipoFrete || null,
+        observacao: obsCombinada,
+        cnpj: cnpjLimpo || cotacao.cnpj,
+        nCodOmie: nCodOmieResolvido || cotacao.nCodOmie,
+        fornecedorNome: body.razaoSocial ? limparTextoCurto(body.razaoSocial, 120).toUpperCase() : cotacao.fornecedorNome,
+        ...(eRevisao ? { numeroRevisao: { increment: 1 } } : {}),
+      },
+    });
+    if (!gravada.count) throw new CotacaoFechada();
+
     // Atualiza todos os itens em paralelo (independentes dentro da mesma transação)
     await Promise.all(itensValidos.map((it) =>
       tx.cotacaoItem.update({
@@ -202,30 +238,6 @@ export async function POST(req, { params }) {
       })
     ));
 
-    // Combina observações em um único campo
-    const obsParts = [];
-    if (body.prazoEntrega) obsParts.push(`Prazo de entrega: ${body.prazoEntrega}`);
-    if (body.condicaoPagamento) obsParts.push(`Pagamento: ${body.condicaoPagamento}`);
-    if (body.observacao) obsParts.push(body.observacao);
-    const obsCombinada = obsParts.join(" | ") || null;
-
-    await tx.cotacao.update({
-      where: { id: cotacao.id },
-      data: {
-        status: "RECEBIDA",
-        recebidaEm: new Date(),
-        total,
-        totalProposta: body.totalProposta ? round2(body.totalProposta) : null,
-        numeroProposta: body.numeroProposta?.trim() || null,
-        prazoPagamento: body.condicaoPagamento || null,
-        tipoFrete: body.tipoFrete || null,
-        observacao: obsCombinada,
-        cnpj: cnpjLimpo || cotacao.cnpj,
-        nCodOmie: nCodOmieResolvido || cotacao.nCodOmie,
-        fornecedorNome: body.razaoSocial ? limparTextoCurto(body.razaoSocial, 120).toUpperCase() : cotacao.fornecedorNome,
-        ...(eRevisao ? { numeroRevisao: { increment: 1 } } : {}),
-      },
-    });
 
     // Atualiza RMItens dessa cotação pra status COTADO — APENAS itens com preço.
     // Itens que fornecedor deixou em branco/0 nao foram "cotados", ficam em
@@ -267,6 +279,12 @@ export async function POST(req, { params }) {
       },
     });
   }, OPCOES_TX);
+  } catch (e) {
+    if (e instanceof CotacaoFechada) {
+      return NextResponse.json({ error: "Esta cotação foi encerrada: o processo de compra já foi concluído." }, { status: 409 });
+    }
+    throw e;
+  }
 
   // Invalida cache do Next.js pras paginas que mostram a cotacao — sem isso,
   // o mapa de cotacao pode continuar mostrando dados antigos mesmo apos
