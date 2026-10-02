@@ -2620,3 +2620,31 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   (e) pintura: mínimo por demão do PLP e "fabricante" vindo do fornecedor do CMR; (f) EVS e LP no celular
   continuam sem DESENHO CLIENTE/REV (o computador preenche); (g) legenda de foto com mais de 3 linhas ainda corta
   com "…" (`blocoFotos`).
+- **(02/10) Pull-off (RPO) e Recebimento de Tintas (RRT), e "nada travado" em todos os tipos.** Vitor: *"pode criar
+  também, vamos deixar tudo funcionando, faça o mesmo teste ok, garanta que nada fique travado"*. Três agentes de
+  verificação (um por modelo, um caçando trava sem saída tela × pendência × rota), PDFs nos limites. Quatro commits,
+  cada um testado na cópia limpa e com a Vercel verde antes do seguinte:
+  - **`4878962c` nada travado (1):** quantidade do dimensional editável (a trava cobrava o QUANT. sem tela); celular
+    não trava mais por quantidade em branco que ninguém tocou; soldador do EVS deixa de travar. Meta-teste
+    `testes/api/travas-resolviveis.teste.js` (cada tipo completo pelas duas rotas → zero pendência).
+  - **`577219fb` os dois relatórios:** RPO e RRT nas duas telas, PDF no desenho do modelo, §14. Da verificação:
+    lote vencido + 9 itens aprovados não tinha saída (agora reprovar vale, com motivo nas observações quando os itens
+    estão aprovados, e o resultado sai impresso); validade contra a data IMPRESSA, nunca hoje; dolly sem ruptura;
+    nº da RNC nos 4 caminhos do PDF (`lib/relatorio-rnc`) e só com laudo reprovado; REC fora dos ensaios de
+    superfície; data 30/02 recusada; reinspeção limpa o clima; identificação longa cresce; formatos da planilha.
+  - **`75c6cb1f` observações:** o celular cortava em 1000 e devolvia em toda gravação (perda de dado, todos os
+    tipos). Teto único de 20.000 nas duas rotas.
+  - **`0492787e` nada travado (2):** vírgula no valor de projeto da cota + valor editável + lista viva com o desenho
+    fora; pré-montagem não nasce no celular (nasce do projeto); lista de Inspeções traz a fila inteira, não só os
+    100 recentes; EVS sem peça; instrumento fora da lista desmarcável; LP aponta a linha certa; reinspeção pelo
+    celular zera o envio do R00 (como o "Abrir revisão").
+  - **Testes:** 4.943 passando na cópia limpa depois do último.
+
+  ⚠ **Para revisar:** (a) reprovar o recebimento com os 9 itens aprovados exige motivo nas observações — é trava nova,
+  resolvível; (b) validade em branco no recebimento avisa e não trava; (c) dolly sem ruptura entra na média pelo
+  limite e a média sai com ">" (a planilha ignoraria o texto); (d) RRT na §14, não na §15; (e) linha "RESULTADO DA
+  INSPEÇÃO" e "Data do recebimento" não existem no modelo; (f) a reinspeção pelo celular passou a abrir o R01 sem
+  envio — confira com o fluxo de assinatura em fila; (g) os campos de texto de outros modelos continuam chegando
+  nulos pelo laço genérico da rota do celular (já era assim para todo tipo; só as listas foram filtradas);
+  (h) teóricos, não corrigidos: lista de instrumentos calibrados vazia (D2) e escopo do PIT desligando aderência,
+  espessura ou iluminação (D3).

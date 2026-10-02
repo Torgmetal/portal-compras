@@ -12,7 +12,7 @@ para verificar todos os modelos e gerar relatórios de teste"*.
 - **Modelos:** SharePoint `Administrativo/Modelos de Documentos/Relatórios de Inspeção da Qualidade`.
   - São 10 ao todo: Dimensional, Ensaio US, LP, Pintura, **Poeira**, Pré-montagem, Pull-off, Recebimento de Tintas, **Sais**, Visual Solda.
   - ⚠ Fica em `Administrativo/Modelos de Documentos`, NÃO em `Administrativo/SGQ ISO 9001-2015`. A busca por "modelo" dentro do SGQ não acha.
-  - Pull-off e Recebimento de Tintas ainda não têm tipo próprio no portal.
+  - Pull-off e Recebimento de Tintas ganharam tipo no mesmo dia — ver [[torg_relatorios_pulloff_recebimento]].
 - **Tipos:** `SAIS` (sigla RCS) e `POEIRA` (RTP), na §14 do data book. Na lista, ficam antes da Pintura (ordem do processo).
 - **Código:**
   - regras: `lib/sais-campos.js`, `lib/poeira-campos.js`;
