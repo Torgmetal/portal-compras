@@ -19,7 +19,7 @@ afterEach(cleanup);
 
 describe("Aba Qualidade da OP — PLP para quem só consulta", () => {
   it("produção: vê o PLP em PDF, sem editar nem enviar para aprovação", async () => {
-    render(<AbaQualidade opNumero="124" soConsulta />);
+    render(<AbaQualidade opNumero="124" soConsulta verRelatorios={false} />);
     const link = await screen.findByRole("link", { name: /ver plp/i });
     expect(link.getAttribute("href")).toBe("/api/qualidade/planos/124/pdf?doc=PLP");
     expect(screen.queryByRole("button", { name: /editar plp/i })).toBeNull();
@@ -34,5 +34,18 @@ describe("Aba Qualidade da OP — PLP para quem só consulta", () => {
     await screen.findByText("Forbidden");
     expect(screen.getByRole("link", { name: /gerar plp/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /editar plp/i })).toBeTruthy();
+  });
+
+  // Achado do Codex (03/10/2026): Qualidade de campo consultava os relatórios e não pode perdê-los
+  // por não editar o PLP — são duas permissões, não uma.
+  it("qualidade de campo: vê os relatórios, mas não edita nem envia o PLP", async () => {
+    global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ relatorios: [
+      { id: "r1", codigo: "RIP-094-001", tipo: "PINTURA", resultadoInspecao: "APROVADO", marcas: [] },
+    ] }) }));
+    render(<AbaQualidade opNumero="094" soConsulta verRelatorios />);
+    expect(await screen.findByText("RIP-094-001")).toBeTruthy();
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/api/qualidade/inspecoes?opNumero=094"));
+    expect(screen.queryByRole("button", { name: /editar plp/i })).toBeNull();
+    expect(screen.queryByText("ACEITE DO PLANO")).toBeNull();
   });
 });

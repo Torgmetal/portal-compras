@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { temAcessoDiretoria } from "@/lib/diretoria";
 import { podeGerenciarComercialOP, protegerDadosObra } from "@/lib/op-obra-acesso";
-import { abasDaOP } from "@/lib/op-abas";
+import { abasDaOP, permissoesQualidadeOP } from "@/lib/op-abas";
 import { ArrowLeft, Clock } from "lucide-react";
 import OPDetailClient from "./OPDetailClient";
 import PedidosOmieSection from "@/components/PedidosOmieSection";
@@ -374,8 +374,8 @@ export async function carregarDetalheOP(id, user) {
   // (que é exclusivo da diretoria, mais restrito que o "pode ver financeiro").
   const isDiretoria = user.tipo === "ADMIN" || (await temAcessoDiretoria(user.email));
   const podeVerFinanceiro = isDiretoria || mods.includes("COMERCIAL") || mods.includes("FINANCEIRO");
-  // Na aba Qualidade, quem não é da Qualidade nem do Comercial só VÊ o PLP em PDF (Produção, PCP…).
-  const soConsultaQualidade = user.tipo !== "ADMIN" && !mods.includes("QUALIDADE") && !mods.includes("COMERCIAL");
+  // Na aba Qualidade: quem edita o PLP e quem vê os relatórios são permissões separadas.
+  const qualidade = permissoesQualidadeOP(user);
   if (!podeVerFinanceiro) {
     delete opData.kpisFinanceiros;
     delete opData.resumoMedicoes;
@@ -390,13 +390,13 @@ export async function carregarDetalheOP(id, user) {
 
   const abas = abasDaOP(user, { isDiretoria });
 
-  return { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro, podeGerenciarComercial, isDiretoria, abas, soConsultaQualidade };
+  return { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro, podeGerenciarComercial, isDiretoria, abas, qualidade };
 }
 
 // UI do detalhe (compartilhada). O destino do "Voltar" muda por portal via
 // `voltarHref` — assim a OP abre dentro do portal atual, sem migrar pro Comercial.
 export function DetalheOPUI({ data, user, voltarHref = "/comercial" }) {
-  const { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro, podeGerenciarComercial, isDiretoria, abas, soConsultaQualidade } = data;
+  const { opData, pecas, pedidos, propostaVinc, propostaPend, podeVerFinanceiro, podeGerenciarComercial, isDiretoria, abas, qualidade } = data;
   return (
     <div className="space-y-6 max-w-7xl">
       <Link href={voltarHref} className="text-sm text-torg-gray hover:text-torg-dark inline-flex items-center gap-1">
@@ -414,7 +414,7 @@ export function DetalheOPUI({ data, user, voltarHref = "/comercial" }) {
         </div>
       )}
 
-      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} podeVerFinanceiro={podeVerFinanceiro} podeGerenciarComercial={podeGerenciarComercial} isDiretoria={!!isDiretoria} abas={abas} soConsultaQualidade={soConsultaQualidade} proposta={propostaVinc} pecas={pecas} comprasSlot={<PedidosOmieSection pedidos={pedidos} />} />
+      <OPDetailClient op={opData} userRole={user.role} userId={user.id} podeAlterarVerba={!!user.podeAlterarVerba} podeVerFinanceiro={podeVerFinanceiro} podeGerenciarComercial={podeGerenciarComercial} isDiretoria={!!isDiretoria} abas={abas} qualidade={qualidade} proposta={propostaVinc} pecas={pecas} comprasSlot={<PedidosOmieSection pedidos={pedidos} />} />
     </div>
   );
 }

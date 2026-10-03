@@ -1,7 +1,12 @@
 {
-  "build": 3586,
-  "gerado": "2026-10-03T14:35:11.393Z",
+  "build": 3587,
+  "gerado": "2026-10-03T14:39:12.342Z",
   "commits": [
+    {
+      "hash": "e90c97186c",
+      "data": "03/10/2026",
+      "titulo": "OP › Qualidade: Produção e demais setores veem o PLP da obra em PDF"
+    },
     {
       "hash": "c5182a6277",
       "data": "03/10/2026",
@@ -146,11 +151,6 @@
       "hash": "dbc2454377",
       "data": "01/10/2026",
       "titulo": "Data book: volumes gerados um de cada vez, e a barra mostra o que está montando"
-    },
-    {
-      "hash": "cb0d7029a8",
-      "data": "01/10/2026",
-      "titulo": "Portal do cliente: \"Onde a obra está\" deixa de ler o Diagrama de Montagem como a montagem da fábrica"
     }
   ]
 }

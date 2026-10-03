@@ -20,17 +20,19 @@ import EditarPlp from "./EditarPlp";
 // "producao2 Diego precisa ter acesso aos PLP das obras". Ele VÊ o PLP em PDF; editar e mandar para
 // aprovação continuam com a Qualidade. A lista de relatórios é da Qualidade (a rota recusa os
 // demais), então nem é pedida — e a falha dela nunca mais esconde o PLP, que era o que acontecia.
-export default function AbaQualidade({ opNumero, soConsulta = false }) {
+// ⚠ `verRelatorios` é OUTRA permissão (achado do Codex): a Qualidade de campo não edita o PLP, mas
+// consulta os relatórios. Regra em `permissoesQualidadeOP` (lib/op-abas.js).
+export default function AbaQualidade({ opNumero, soConsulta = false, verRelatorios = true }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
 
   useEffect(() => {
-    if (soConsulta) return;
+    if (!verRelatorios) return;
     fetch(`/api/qualidade/inspecoes?opNumero=${encodeURIComponent(opNumero)}`)
       .then((r) => r.json())
       .then((j) => (j.error ? setErro(j.error) : setDados(j)))
       .catch(() => setErro("Não consegui carregar os relatórios."));
-  }, [opNumero, soConsulta]);
+  }, [opNumero, verRelatorios]);
 
   return (
     <div className="space-y-4">
@@ -63,7 +65,7 @@ export default function AbaQualidade({ opNumero, soConsulta = false }) {
         {!soConsulta && <AceitePlano opNumero={opNumero} doc="PLP" nome="o PLP" />}
       </div>
 
-      {!soConsulta && <Relatorios dados={dados} erro={erro} />}
+      {verRelatorios && <Relatorios dados={dados} erro={erro} />}
     </div>
   );
 }
