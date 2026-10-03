@@ -15,6 +15,8 @@ import SidebarUserFooter from "@/components/SidebarUserFooter";
 const menu = [
   { href: "/producao", label: "Meu trabalho", icon: Layers, exact: true },
   { href: "/producao/gestao", label: "Gestão das OPs", icon: Factory },
+  // consulta dos gerentes de setor, feita para o celular (Matheus, 03/10/2026)
+  { href: "/producao/corte-montagem", label: "Corte e montagem", icon: Wrench },
   { href: "/producao/materiais", label: "Materiais e rastreabilidade", icon: PackageSearch },
   { href: "/producao/qualidade", label: "Inspeções", icon: ClipboardCheck },
   { href: "/producao/romaneios", label: "Romaneios", icon: Truck },
@@ -27,7 +29,7 @@ export default function SidebarProducao() {
   const pathname = usePathname();
   const [busca, setBusca] = useState("");
   const norm = v => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const grupos = [{ nome: "Operação da fábrica", itens: menu.slice(0,7) }, { nome: "Consulta", itens: menu.slice(7) }];
+  const grupos = [{ nome: "Operação da fábrica", itens: menu.slice(0,8) }, { nome: "Consulta", itens: menu.slice(8) }];
 
   return (
     <aside className="w-64 bg-white border-r border-torg-blue-100 flex flex-col h-screen fixed left-0 top-0">

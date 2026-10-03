@@ -31,13 +31,14 @@ export function CroquisChip({ peca: p, aberto, onAlternar }) {
   );
 }
 
-export function CroquisFaltando({ faltam = [] }) {
+export function CroquisFaltando({ faltam = [], presa = true }) {
   // ⚠ NO CELULAR A TABELA ROLA DE LADO, E A LISTA NÃO PODE IR JUNTO. Ela ocupa a linha inteira (900 px)
   // e o chip que a abre fica à direita: rolada até ele, a marca e o perfil ficavam fora da tela e só
   // "faltam 195 de 246" aparecia (medido em 390 px, 03/10/2026). `sticky` a prende à borda esquerda
   // visível, com a largura da tela; do `md` para cima a tabela não rola e ela volta ao normal.
   return (
-    <div className="text-[11px] max-w-2xl sticky left-2 w-[calc(100vw-5rem)] md:static md:w-auto">
+    // `presa={false}` dentro de um cartão (Produção › Corte e montagem), que não rola de lado.
+    <div className={`text-[11px] max-w-2xl ${presa ? "sticky left-2 w-[calc(100vw-5rem)] md:static md:w-auto" : ""}`}>
       <div className="text-amber-700 font-semibold mb-1">Faltam cortar ({faltam.length}):</div>
       <div className="space-y-0.5">
         {faltam.map((c, i) => (

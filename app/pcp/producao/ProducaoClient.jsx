@@ -32,6 +32,7 @@ import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import { baixarZipLote } from "@/lib/desenhos-zip-cliente";
 import PainelBancadas from "@/app/producao/programacao/montagem/PainelBancadas";
 import { CroquisChip, CroquisFaltando } from "./CroquisConjunto";
+import { feitoDaPeca, situacaoDaPeca, SIT } from "@/lib/status-setor";
 
 const MAX_LOTE = 80; // teto do /api/producao/desenhos/lote
 
@@ -87,29 +88,7 @@ Object.fromEntries(FLUXO.map(([k], i) => [k, i]));
 // São dois registros da mesma coisa — a fábrica apontando e alguém dando baixa no que ela não
 // apontou —, então somar contaria duas vezes e ficar só com um deixaria peça pronta parecendo
 // pendente. Mesma regra da situação, para o número e a cor nunca contarem histórias diferentes.
-function feitoDaPeca(p) {
-  return Math.max(Number(p.produzidoSyneco) || 0, Number(p.baixadoQtd) || 0);
-}
-
-function situacaoDaPeca(p) {
-  if (p.expedida) return "EXPEDIDA";
-  const qtd = Number(p.qte) || 0;
-  const feito = feitoDaPeca(p);
-  if (p.baixadoPortal && (Number(p.baixadoQtd) || 0) >= qtd) return "FINALIZADO";
-  if (qtd > 0 && feito >= qtd) return "FINALIZADO";
-  if (feito > 0) return "PARCIAL";
-  if (p.programacao?.situacao === "INICIADA") return "PARCIAL";
-  return "NAO_INICIADO";
-}
-// ⚠ `barra` é a classe INTEIRA, escrita à mão. O Tailwind varre o código como TEXTO: classe montada
-// em tempo de execução (`"bg-" + cor`, ou um `.replace()`) não existe no CSS gerado e a faixa
-// simplesmente não aparece — sem erro nenhum, que é o pior jeito de descobrir.
-const SIT = {
-  NAO_INICIADO: { txt: "não iniciado", cls: "bg-gray-100 text-gray-600 border-gray-200", barra: "border-l-gray-200", dica: "Nada apontado no Syneco e sem baixa no portal." },
-  PARCIAL:      { txt: "em produção",  cls: "bg-sky-50 text-sky-700 border-sky-200",     barra: "border-l-sky-400",  dica: "A fábrica começou e ainda não fechou a quantidade." },
-  FINALIZADO:   { txt: "finalizado",   cls: "bg-emerald-50 text-emerald-700 border-emerald-200", barra: "border-l-emerald-500", dica: "Quantidade fechada no Syneco ou baixa dada no portal." },
-  EXPEDIDA:     { txt: "expedida",     cls: "bg-emerald-100 text-emerald-800 border-emerald-300", barra: "border-l-emerald-600", dica: "Já saiu em romaneio — a Expedição assumiu." },
-};
+// feitoDaPeca, situacaoDaPeca e SIT moram em lib/status-setor.js (compartilhados com Produção › Corte e montagem).
 
 // ⚠⚠ FILTRO POR COLUNA, COMO NO EXCEL. Vitor (24/08/2026): "nessa parte você poderia criar um
 // filtro igual no excel para facilitar o que eu quero filtrar de fato".

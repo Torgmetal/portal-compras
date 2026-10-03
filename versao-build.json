@@ -1,7 +1,12 @@
 {
-  "build": 3582,
-  "gerado": "2026-10-03T13:33:58.679Z",
+  "build": 3583,
+  "gerado": "2026-10-03T13:40:06.842Z",
   "commits": [
+    {
+      "hash": "c2c1340f26",
+      "data": "03/10/2026",
+      "titulo": "PCP Produção: tabela legível no celular e croquis que faltam abrem num clique"
+    },
     {
       "hash": "c8a46747a1",
       "data": "03/10/2026",
@@ -146,11 +151,6 @@
       "hash": "a2253a9782",
       "data": "01/10/2026",
       "titulo": "Data book: anexos baixam 8 por vez e o PDF grande vira aviso de volumes, não 504"
-    },
-    {
-      "hash": "6fd69c7c9b",
-      "data": "30/09/2026",
-      "titulo": "Docs: Outubro Rosa aprovado pelo Vitor — slogan deixa de ser proposta"
     }
   ]
 }
