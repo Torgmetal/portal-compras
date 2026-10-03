@@ -308,7 +308,8 @@ export async function GET(req) {
       for (const cm of croquis) {
         const cr = croquiMap.get(cm);
         // croquiCortado (critério ÚNICO, igual à TV): corte concluído / qtd produzida / baixa no corte.
-        if (!croquiCortado(cr)) faltam.push({ marca: cm, descricao: cr?.descricao || null, faltaQtd: faltaCortarQtd(cr) });
+        // `qtd` é o total do croqui: a tela escreve "faltam 2 de 4" (Matheus, 03/10/2026).
+        if (!croquiCortado(cr)) faltam.push({ marca: cm, descricao: cr?.descricao || null, faltaQtd: faltaCortarQtd(cr), qtd: Number(cr?.qte) || null });
       }
       prontoInfo.set(conj, { prontoMontar: faltam.length === 0, faltamCroquis: faltam, totalCroquis: croquis.length });
     }

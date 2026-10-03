@@ -14,7 +14,7 @@
 // própria GRD emitida, que já grava quem imprimiu, quando e quantas vezes. Por isso o botão diz
 // "Imprimir e liberar" — o ato é um só, e chamar de duas coisas faria alguém procurar um segundo
 // botão que não existe.
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import Link from "next/link";
 import { FILAS_DECISAO, pertenceFilaDecisao } from "@/lib/pcp-fila-decisao";
 import { Loader2, AlertCircle, RefreshCw, ChevronRight, ChevronDown, Printer, Factory, Monitor, CalendarClock, Clock, Package, CheckCircle2, FileText, FileSpreadsheet, Flag, X, Users, BellRing } from "lucide-react";
@@ -31,6 +31,7 @@ import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 // suporta a pasta por bancada, que a cópia local não tinha.
 import { baixarZipLote } from "@/lib/desenhos-zip-cliente";
 import PainelBancadas from "@/app/producao/programacao/montagem/PainelBancadas";
+import { CroquisChip, CroquisFaltando } from "./CroquisConjunto";
 
 const MAX_LOTE = 80; // teto do /api/producao/desenhos/lote
 
@@ -189,6 +190,13 @@ export default function ProducaoClient({ portalProducao = false, entradaDecisao 
   const [detalhe, setDetalhe] = useState(null);
   const [carregandoDet, setCarregandoDet] = useState(false);
   const [sel, setSel] = useState(() => new Set());
+  // as linhas com a lista de croquis que faltam aberta (coluna Croquis, aba Montagem)
+  const [croquisAbertos, setCroquisAbertos] = useState(() => new Set());
+  const alternarCroquis = (id) => setCroquisAbertos((antes) => {
+    const novo = new Set(antes);
+    if (novo.has(id)) novo.delete(id); else novo.add(id);
+    return novo;
+  });
   const [imprimindo, setImprimindo] = useState(false);
   const [aviso, setAviso] = useState(null);
   const [desenho, setDesenho] = useState(null);
@@ -880,7 +888,16 @@ export default function ProducaoClient({ portalProducao = false, entradaDecisao 
                             />
                           </div>
                         )}
-                        <table className="w-full table-fixed text-[12px]">
+                        {/* ⚠⚠ NO CELULAR A TABELA ROLA PARA O LADO; NO COMPUTADOR, NÃO. Matheus (03/10/2026):
+                            "está cortando as informações das colunas quando os gerentes dos setores
+                            tentam ver no celular, só fica bom quando deita a tela — precisa ficar bom
+                            com o celular de pé e poder arrastar pro lado". A regra do Vitor acima
+                            (24/08/2026, "sem andar para o lado") continua valendo a partir do `md`:
+                            lá a tabela cabe. Abaixo disso, as mesmas % sobre uma largura mínima — em
+                            390 px de tela, nove colunas viravam "ini…", "fin…", "1…". Os menus dos
+                            funis são `fixed` (FiltroColuna) e não ficam presos na rolagem. */}
+                        <div className="overflow-x-auto md:overflow-visible">
+                        <table className="w-full table-fixed text-[12px] min-w-[900px] md:min-w-0">
                             <thead className="bg-gray-50 text-torg-gray">
                               <tr>
                                 <th className="px-2 py-2 w-9">
@@ -919,7 +936,8 @@ export default function ProducaoClient({ portalProducao = false, entradaDecisao 
                                   /* ⚠ a faixa de cor na borda esquerda é o que se lê ROLANDO a lista: chip
                                      exige parar e ler, faixa não. Linha pronta fica esmaecida — o que
                                      interessa numa lista de trabalho é o que ainda falta. */
-                                  <tr key={p.id}
+                                  <Fragment key={p.id}>
+                                  <tr
                                     className={`border-l-4 ${sit.barra} ${sel.has(p.id) ? "bg-torg-blue-50/40" : pronto ? "bg-emerald-50/20 text-torg-gray" : "hover:bg-gray-50/60"}`}>
                                     <td className="px-2 py-1.5">
                                       <input type="checkbox" checked={sel.has(p.id)} onChange={() => alternar(p.id)} className="accent-torg-orange" />
@@ -1007,18 +1025,7 @@ export default function ProducaoClient({ portalProducao = false, entradaDecisao 
                                         se descobre qual dos dois casos é. */}
                                     {mostraCroquis && (
                                       <td className="px-2 py-1.5 truncate">
-                                        {p.totalCroquis ? (
-                                          <span
-                                            title={p.prontoMontar
-                                              ? `Os ${p.totalCroquis} croquis deste conjunto estão cortados — pode descer.`
-                                              : `Faltam cortar: ${(p.faltamCroquis || []).map((c) => `${c.marca} (${c.faltaQtd})`).join(", ") || "—"}`}
-                                            className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold whitespace-nowrap ${
-                                              p.prontoMontar
-                                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                                : "bg-amber-50 text-amber-700 border-amber-200"}`}>
-                                            {p.totalCroquis ? `${p.totalCroquis - (p.faltamCroquis?.length || 0)}/${p.totalCroquis}${p.prontoMontar ? ' pronto' : ` · faltam ${p.faltamCroquis?.length || 0}`}` : '! Sem croquis'}
-                                          </span>
-                                        ) : <span className="text-torg-gray-light">—</span>}
+                                        <CroquisChip peca={p} aberto={croquisAbertos.has(p.id)} onAlternar={() => alternarCroquis(p.id)} />
                                       </td>
                                     )}
                                     {mostraMaterial && (
@@ -1068,6 +1075,15 @@ export default function ProducaoClient({ portalProducao = false, entradaDecisao 
                                       ) : <span className="text-torg-gray-light">—</span>}
                                     </td>
                                   </tr>
+                                  {mostraCroquis && croquisAbertos.has(p.id) && p.faltamCroquis?.length > 0 && (
+                                    <tr className="bg-amber-50/40">
+                                      <td></td>
+                                      <td colSpan={8 - (mostraMaterial ? 0 : 1) + 1} className="px-2.5 pb-2 pt-1">
+                                        <CroquisFaltando faltam={p.faltamCroquis} />
+                                      </td>
+                                    </tr>
+                                  )}
+                                  </Fragment>
                                 );
                               })}
                               {!pecas.length && (
@@ -1075,6 +1091,7 @@ export default function ProducaoClient({ portalProducao = false, entradaDecisao 
                               )}
                             </tbody>
                         </table>
+                        </div>
                       </>
                     )}
                   </div>
