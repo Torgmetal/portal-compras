@@ -1,7 +1,12 @@
 {
-  "build": 3585,
-  "gerado": "2026-10-03T13:55:48.124Z",
+  "build": 3586,
+  "gerado": "2026-10-03T14:35:11.393Z",
   "commits": [
+    {
+      "hash": "c5182a6277",
+      "data": "03/10/2026",
+      "titulo": "Corte e montagem: na Montagem a marca abre o desenho da peça, só para ver"
+    },
     {
       "hash": "1bdc41badf",
       "data": "03/10/2026",
@@ -146,11 +151,6 @@
       "hash": "cb0d7029a8",
       "data": "01/10/2026",
       "titulo": "Portal do cliente: \"Onde a obra está\" deixa de ler o Diagrama de Montagem como a montagem da fábrica"
-    },
-    {
-      "hash": "d390d44417",
-      "data": "01/10/2026",
-      "titulo": "Docs: listas do template novo do Tekla 2025 — LE no padrão, LPC com peso inflado (OP-124)"
     }
   ]
 }

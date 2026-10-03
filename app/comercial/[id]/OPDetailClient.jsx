@@ -89,7 +89,7 @@ const VISTAS = [
   { key: "financeiro", label: "Financeiro", icon: DollarSign },
 ];
 
-export default function OPDetailClient({ op, userRole, userId: _userId, podeAlterarVerba = false, podeVerFinanceiro = false, podeGerenciarComercial = false, isDiretoria = false, proposta = null, comprasSlot = null, pecas = [], abas = null }) {
+export default function OPDetailClient({ op, userRole, userId: _userId, podeAlterarVerba = false, podeVerFinanceiro = false, podeGerenciarComercial = false, isDiretoria = false, proposta = null, comprasSlot = null, pecas = [], abas = null, soConsultaQualidade = false }) {
   const router = useRouter();
   const isMaster = userRole === "ADMIN";
   // As abas vêm do servidor, por módulo (lib/op-abas.js). Blindagem dupla: Resumo e Financeiro
@@ -1032,7 +1032,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
         </div>
       )}
 
-      {vista === "qualidade" && <AbaQualidade opNumero={op.numero} />}
+      {vista === "qualidade" && <AbaQualidade opNumero={op.numero} soConsulta={soConsultaQualidade} />}
 
       {vista === "portal" && <AbaPortalCliente opId={op.id} opNumero={op.numero} />}
 

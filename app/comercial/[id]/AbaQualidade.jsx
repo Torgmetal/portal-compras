@@ -15,75 +15,22 @@ import EditarPlp from "./EditarPlp";
 // Aqui é a outra pergunta, a que se faz meses depois: "o que essa obra tem de
 // inspeção?". Quem abre a OP quer ver o que já foi aprovado e o que falta, sem
 // atravessar a fila de todas as obras.
-export default function AbaQualidade({ opNumero }) {
+//
+// ⚠ `soConsulta` — quem não é da Qualidade nem do Comercial (Produção, PCP…). Matheus (03/10/2026):
+// "producao2 Diego precisa ter acesso aos PLP das obras". Ele VÊ o PLP em PDF; editar e mandar para
+// aprovação continuam com a Qualidade. A lista de relatórios é da Qualidade (a rota recusa os
+// demais), então nem é pedida — e a falha dela nunca mais esconde o PLP, que era o que acontecia.
+export default function AbaQualidade({ opNumero, soConsulta = false }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
 
   useEffect(() => {
+    if (soConsulta) return;
     fetch(`/api/qualidade/inspecoes?opNumero=${encodeURIComponent(opNumero)}`)
       .then((r) => r.json())
       .then((j) => (j.error ? setErro(j.error) : setDados(j)))
       .catch(() => setErro("Não consegui carregar os relatórios."));
-  }, [opNumero]);
-
-  if (erro) return <><PitCompacto opNumero={opNumero}/><p className="text-sm text-red-600">{erro}</p></>;
-  if (!dados) {
-    return <p className="text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> carregando…</p>;
-  }
-
-  const rels = dados.relatorios || [];
-  const aprovados = rels.filter((r) => r.resultadoInspecao === "APROVADO");
-  const pendentes = rels.filter((r) => r.resultadoInspecao !== "APROVADO");
-  const ordem = TIPOS_RELATORIO.map((t) => t.id);
-  const porTipo = (lista) => {
-    const m = new Map();
-    for (const r of lista) m.set(r.tipo, [...(m.get(r.tipo) || []), r]);
-    return [...m.entries()].sort((a, b) => ordem.indexOf(a[0]) - ordem.indexOf(b[0]));
-  };
-
-  const Linha = ({ r }) => (
-    <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-gray-50 last:border-0">
-      <div className="min-w-0">
-        <Link href={`/qualidade/inspecoes/${r.id}`} className="font-mono text-[12px] font-semibold text-torg-blue hover:text-torg-dark">
-          {r.codigo}
-        </Link>
-        {r.marcas?.length ? <span className="text-[12px] text-torg-dark"> · {r.marcas.slice(0, 3).join(", ")}{r.marcas.length > 3 ? ` +${r.marcas.length - 3}` : ""}</span> : null}
-        <p className="text-[10px] text-torg-gray">{r.inspetor || r.criadoPorNome || "—"}</p>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        {/* ⚠ o link do arquivo aponta para o PDF na PASTA DA OBRA, não para o gerado na hora:
-            é a cópia que sobrevive ao portal, e é ela que o auditor vai abrir. */}
-        {r.arquivoUrl && (
-          <a href={r.arquivoUrl} target="_blank" rel="noreferrer" title="PDF guardado na pasta da obra"
-            className="text-[11px] text-torg-gray hover:text-torg-blue inline-flex items-center gap-1">
-            <FolderOpen size={12} /> servidor
-          </a>
-        )}
-        <a href={`/api/qualidade/inspecoes/${r.id}/pdf`} target="_blank" rel="noreferrer"
-          className="text-[11px] text-torg-blue inline-flex items-center gap-1"><ExternalLink size={12} /> PDF</a>
-      </div>
-    </div>
-  );
-
-  const Bloco = ({ titulo, icone: Icone, cor, lista, vazio }) => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <h4 className={`text-sm font-semibold ${cor} flex items-center gap-2 mb-3`}>
-        <Icone size={15} /> {titulo} <span className="text-torg-gray font-normal">{lista.length}</span>
-      </h4>
-      {!lista.length ? (
-        <p className="text-[12px] text-torg-gray">{vazio}</p>
-      ) : (
-        porTipo(lista).map(([tipo, rs]) => (
-          <div key={tipo} className="mb-2 last:mb-0">
-            <p className="text-[11px] font-semibold text-torg-gray mb-0.5">{TIPO_LABEL[tipo] || tipo}</p>
-            <div className="border border-gray-100 rounded-lg">
-              {rs.map((r) => <Linha key={r.id} r={r} />)}
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
+  }, [opNumero, soConsulta]);
 
   return (
     <div className="space-y-4">
@@ -107,15 +54,82 @@ export default function AbaQualidade({ opNumero }) {
           <a href={`/api/qualidade/planos/${encodeURIComponent(opNumero)}/pdf?doc=PLP`} target="_blank" rel="noreferrer"
             title="Gera o PLP desta obra no padrão Torg, em PDF"
             className="text-[12px] font-semibold text-white bg-torg-blue rounded-lg px-3 py-1.5 hover:opacity-90 inline-flex items-center gap-1.5">
-            <FileText size={13} /> Gerar PLP (PDF)
+            <FileText size={13} /> {soConsulta ? "Ver PLP (PDF)" : "Gerar PLP (PDF)"}
           </a>
           {/* ⚠ EDITA AQUI MESMO. Era um link para a fila de inspeções — quem clicava caía numa
               lista de relatórios de todas as obras e voltava sem editar nada. (Vitor, 27/08/2026) */}
-          <EditarPlp opNumero={opNumero} />
+          {!soConsulta && <EditarPlp opNumero={opNumero} />}
         </div>
-        <AceitePlano opNumero={opNumero} doc="PLP" nome="o PLP" />
+        {!soConsulta && <AceitePlano opNumero={opNumero} doc="PLP" nome="o PLP" />}
       </div>
 
+      {!soConsulta && <Relatorios dados={dados} erro={erro} />}
+    </div>
+  );
+}
+
+// ─── os relatórios de inspeção da obra (só a Qualidade e o Comercial pedem) ───
+const ordem = TIPOS_RELATORIO.map((t) => t.id);
+const porTipo = (lista) => {
+  const m = new Map();
+  for (const r of lista) m.set(r.tipo, [...(m.get(r.tipo) || []), r]);
+  return [...m.entries()].sort((a, b) => ordem.indexOf(a[0]) - ordem.indexOf(b[0]));
+};
+
+const Linha = ({ r }) => (
+  <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-gray-50 last:border-0">
+    <div className="min-w-0">
+      <Link href={`/qualidade/inspecoes/${r.id}`} className="font-mono text-[12px] font-semibold text-torg-blue hover:text-torg-dark">
+        {r.codigo}
+      </Link>
+      {r.marcas?.length ? <span className="text-[12px] text-torg-dark"> · {r.marcas.slice(0, 3).join(", ")}{r.marcas.length > 3 ? ` +${r.marcas.length - 3}` : ""}</span> : null}
+      <p className="text-[10px] text-torg-gray">{r.inspetor || r.criadoPorNome || "—"}</p>
+    </div>
+    <div className="flex items-center gap-2 shrink-0">
+      {/* ⚠ o link do arquivo aponta para o PDF na PASTA DA OBRA, não para o gerado na hora:
+          é a cópia que sobrevive ao portal, e é ela que o auditor vai abrir. */}
+      {r.arquivoUrl && (
+        <a href={r.arquivoUrl} target="_blank" rel="noreferrer" title="PDF guardado na pasta da obra"
+          className="text-[11px] text-torg-gray hover:text-torg-blue inline-flex items-center gap-1">
+          <FolderOpen size={12} /> servidor
+        </a>
+      )}
+      <a href={`/api/qualidade/inspecoes/${r.id}/pdf`} target="_blank" rel="noreferrer"
+        className="text-[11px] text-torg-blue inline-flex items-center gap-1"><ExternalLink size={12} /> PDF</a>
+    </div>
+  </div>
+);
+
+const Bloco = ({ titulo, icone: Icone, cor, lista, vazio }) => (
+  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+    <h4 className={`text-sm font-semibold ${cor} flex items-center gap-2 mb-3`}>
+      <Icone size={15} /> {titulo} <span className="text-torg-gray font-normal">{lista.length}</span>
+    </h4>
+    {!lista.length ? (
+      <p className="text-[12px] text-torg-gray">{vazio}</p>
+    ) : (
+      porTipo(lista).map(([tipo, rs]) => (
+        <div key={tipo} className="mb-2 last:mb-0">
+          <p className="text-[11px] font-semibold text-torg-gray mb-0.5">{TIPO_LABEL[tipo] || tipo}</p>
+          <div className="border border-gray-100 rounded-lg">
+            {rs.map((r) => <Linha key={r.id} r={r} />)}
+          </div>
+        </div>
+      ))
+    )}
+  </div>
+);
+
+function Relatorios({ dados, erro }) {
+  if (erro) return <p className="text-sm text-red-600">{erro}</p>;
+  if (!dados) {
+    return <p className="text-sm text-torg-gray inline-flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> carregando os relatórios…</p>;
+  }
+  const rels = dados.relatorios || [];
+  const aprovados = rels.filter((r) => r.resultadoInspecao === "APROVADO");
+  const pendentes = rels.filter((r) => r.resultadoInspecao !== "APROVADO");
+  return (
+    <>
       <Bloco titulo="Relatórios aprovados" icone={ShieldCheck} cor="text-emerald-700" lista={aprovados}
         vazio="Nenhum relatório aprovado nesta obra ainda." />
       <Bloco titulo="Aguardando aprovação" icone={Clock} cor="text-torg-dark" lista={pendentes}
@@ -125,6 +139,6 @@ export default function AbaQualidade({ opNumero }) {
         <span className="font-mono">8. Qualidade / 3. Relatórios de Inspeção</span> — é a cópia de backup,
         fora do portal.
       </p>
-    </div>
+    </>
   );
 }
