@@ -8,7 +8,7 @@ import { render, screen, cleanup, fireEvent, waitFor, within } from "@testing-li
 import CorteMontagemClient from "@/app/producao/corte-montagem/CorteMontagemClient";
 
 const OPS = { ops: [{ opId: "op124", opNumero: "124", cliente: "MARKO", obra: "Center Norte" }, { opId: "op120", opNumero: "120", cliente: "TMSA", obra: "BIANCHINI" }] };
-const MONTAGEM = { pecas: [
+const MONTAGEM = { opNumero: "124", pecas: [
   { id: "a", marca: "T124A1", descricao: "PL2-1", qte: 1, totalCroquis: 6, prontoMontar: false,
     faltamCroquis: [{ marca: "T124A1-P1", descricao: "PL 12.5", faltaQtd: 2, qtd: 4 }] },
   { id: "b", marca: "T124A2", descricao: "CS2-4", qte: 2, produzidoSyneco: 2, totalCroquis: 2, prontoMontar: true, faltamCroquis: [] },
@@ -22,6 +22,9 @@ const CORTE = { pecas: [
 beforeEach(() => {
   global.fetch = vi.fn(async (url) => {
     const u = String(url);
+    if (u.includes("/api/producao/desenhos")) {
+      return { ok: true, status: 200, json: async () => ({ arquivos: [{ itemId: "it1", nome: "T124A1.pdf", formato: "A3", sizeKb: 120 }], liberacoes: [] }) };
+    }
     const corpo = u.includes("/api/pcp/producao") ? OPS : u.includes("setor=CORTE") ? CORTE : MONTAGEM;
     return { ok: true, status: 200, json: async () => corpo };
   });
@@ -130,5 +133,17 @@ describe("⚠ respostas fora de ordem e toque repetido", () => {
     fireEvent.click(screen.getByRole("button", { name: "Montagem" }));
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.getByText("T124A1")).toBeTruthy();
+  });
+
+  // Matheus (03/10/2026): "na montagem é preciso ser possível ver o desenho da peça conforme tem lá no PCP".
+  it("montagem: tocar na marca abre o desenho da peça — só para VER, sem emitir nem registrar GRD", async () => {
+    await escolherObra();
+    fireEvent.click(screen.getByRole("button", { name: "Montagem" }));
+    fireEvent.click(await screen.findByRole("button", { name: /desenho de T124A1$/i }));
+    await screen.findByText("T124A1.pdf");
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/api/producao/desenhos?opNumero=124&marca=T124A1"));
+    expect(screen.getByRole("button", { name: /ver desenho/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /emitir carimbado/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /imprimir \(grd\)/i })).toBeNull();
   });
 });

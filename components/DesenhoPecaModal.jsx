@@ -14,7 +14,9 @@ const fmtDataHora = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { day: "
 // na aba de GRD". Quem abre a peça PELA GRD já está no ato de liberar; "ver original" e "emitir
 // carimbado" ali são dois caminhos que NÃO registram liberação, ao lado do único que registra —
 // convite a clicar no errado e achar que liberou.
-export default function DesenhoPecaModal({ opNumero, opId, marca, setor, soImprimir = false, onClose }) {
+// ⚠ `soVer` — Produção › Corte e montagem (Matheus, 03/10/2026): o gerente de setor só CONSULTA o
+// desenho. Emitir carimbado e imprimir a GRD são atos do PCP; na tela de consulta, nenhum dos dois.
+export default function DesenhoPecaModal({ opNumero, opId, marca, setor, soImprimir = false, soVer = false, onClose }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState("");
   const [registrando, setRegistrando] = useState("");
@@ -101,6 +103,10 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, soImpri
                     </div>
                     {/* Botões numa linha própria: com três ações eles espremiam o nome do arquivo. */}
                     <div className="flex items-center gap-2 flex-wrap justify-end mt-2 pt-2 border-t border-gray-50">
+                      {soVer ? (
+                        <button onClick={() => abrir(a)} title="Abrir o PDF da Engenharia"
+                          className="text-sm font-semibold text-white bg-torg-blue hover:bg-torg-blue/90 rounded-lg px-3 py-2 inline-flex items-center gap-1"><ExternalLink size={14} /> Ver desenho</button>
+                      ) : <>
                       {!soImprimir && <>
                         <button onClick={() => abrir(a)} title="Abrir o PDF original da Engenharia, sem carimbo e sem registro"
                           className="text-[11px] font-semibold text-torg-gray border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 inline-flex items-center gap-1"><ExternalLink size={12} /> Ver original</button>
@@ -125,6 +131,7 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, soImpri
                         {ocupado(a, "IMPRIMIR") ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />}
                         {lib ? `Nova impressão (${(lib.impressoes || 1) + 1}ª)` : "Imprimir (GRD)"}
                       </button>
+                      </>}
                     </div>
                   </div>
                 );
@@ -168,7 +175,9 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, soImpri
         </div>
 
         <div className="px-5 py-3 border-t border-gray-100">
-          <p className="text-[11px] text-torg-gray">{soImprimir
+          <p className="text-[11px] text-torg-gray">{soVer
+            ? <>O formato (A1–A4) é o da pasta da Engenharia. Para imprimir e liberar o desenho, fale com o PCP.</>
+            : soImprimir
             ? <>Nesta aba só existe <b>"Imprimir (GRD)"</b>: ela é o registro da liberação. O PDF sai carimbado com o <b>R</b> do material (corrida, certificado e fornecedor) + quem imprimiu, com data e hora. Depois da primeira, o botão vira <b>"Nova impressão"</b>: sai outro PDF carimbado, com o R e a hora de agora, e a cópia é somada nesta mesma GRD — <b>não é revisão do projeto</b>, o desenho da Engenharia continua o mesmo.</>
             : <>O formato (A1–A4) vem da pasta da Engenharia — imprima no papel indicado. <b>"Emitir carimbado"</b> carimba no PDF o <b>R</b> do material (com corrida, certificado e fornecedor) + quem emitiu com data/hora, arquiva na pasta da OP e amarra o <b>mesmo arquivo</b> na Seção 02 do Data Book — <b>sem</b> registrar GRD, porque abrir o desenho não é liberação. <b>"Imprimir (GRD)"</b> faz isso e registra a liberação; reimprimir a mesma peça <b>soma no contador</b> em vez de criar outra GRD. Peça ainda não cortada sai com "R a definir no corte" e o campo pra anotar. "Ver original" mostra o PDF da Engenharia, sem carimbo e sem registro.</>}</p>
         </div>

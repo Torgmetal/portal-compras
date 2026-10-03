@@ -13,6 +13,8 @@ Matheus (03/10/2026): tela de consulta para os gerentes de Corte e Montagem, no 
 - `lib/status-setor.js` (feitoDaPeca, situacaoDaPeca, SIT, resumoDoSetor) é a regra ÚNICA; o
   ProducaoClient do PCP importa dali. Mudou o critério, muda nas duas telas.
 - Só consulta: liberar/baixar/programar continuam no PCP.
+- Desenho: na Montagem a marca abre o `DesenhoPecaModal` com `soVer` — só "Ver desenho"; emitir
+  carimbado e imprimir GRD ficam no PCP (pedido do Matheus, 03/10/2026).
 - Todos os módulos já viram gaveta no celular (`app/globals.css`, max-width 1023px) — não precisa
   layout próprio.
 - PCP › Produção: abaixo do `md` a tabela tem min-w 900 e rola só ela; acima, segue a regra do Vitor

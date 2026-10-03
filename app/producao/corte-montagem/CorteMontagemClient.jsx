@@ -13,9 +13,10 @@
 // ⚠ CARTÃO, NÃO TABELA: é lida no celular de pé, no pátio. Tabela de 9 colunas em 390 px vira
 // "ini…", "fin…" (foi o que motivou o pedido).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, AlertCircle, RefreshCw, Search, Scissors, Wrench, PackageOpen } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Search, Scissors, Wrench, PackageOpen, FileText } from "lucide-react";
 import { situacaoDaPeca, feitoDaPeca, resumoDoSetor, SIT } from "@/lib/status-setor";
 import { CroquisChip, CroquisFaltando } from "@/app/pcp/producao/CroquisConjunto";
+import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 
 const SETORES = [
   { id: "CORTE", rotulo: "Corte", Icone: Scissors },
@@ -47,6 +48,7 @@ export default function CorteMontagemClient() {
   const [busca, setBusca] = useState("");
   const [soFalta, setSoFalta] = useState(false);
   const [abertos, setAbertos] = useState(() => new Set());
+  const [desenho, setDesenho] = useState(null); // marca com o desenho aberto
 
   const carregarOps = useCallback(async () => {
     setErroOps(null);
@@ -163,11 +165,15 @@ export default function CorteMontagemClient() {
           ) : (
             <ul className="space-y-2">
               {pecas.map((p) => (
-                <Cartao key={p.id} p={p} setor={setor} aberto={abertos.has(p.id)} onAlternar={() => alternar(p.id)} />
+                <Cartao key={p.id} p={p} setor={setor} aberto={abertos.has(p.id)} onAlternar={() => alternar(p.id)}
+                  onDesenho={dados.opNumero ? () => setDesenho(p.marca) : null} />
               ))}
             </ul>
           )}
         </>
+      )}
+      {desenho && dados?.opNumero && (
+        <DesenhoPecaModal opNumero={dados.opNumero} marca={desenho} soVer onClose={() => setDesenho(null)} />
       )}
     </div>
   );
@@ -200,7 +206,7 @@ function Resumo({ resumo: r, setor }) {
   );
 }
 
-function Cartao({ p, setor, aberto, onAlternar }) {
+function Cartao({ p, setor, aberto, onAlternar, onDesenho }) {
   const s = SIT[situacaoDaPeca(p)];
   const feito = feitoDaPeca(p);
   const qtd = Number(p.qte) || 0;
@@ -209,7 +215,15 @@ function Cartao({ p, setor, aberto, onAlternar }) {
     <li className={`rounded-xl border border-gray-100 border-l-4 bg-white p-3 shadow-sm ${s.barra}`}>
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-base font-bold text-torg-dark">{p.marca}</p>
+          {/* Na montagem a marca abre o desenho do conjunto, como no PCP (Matheus, 03/10/2026). */}
+          {setor === "MONTAGEM" && onDesenho ? (
+            <button type="button" onClick={onDesenho} aria-label={`Ver o desenho de ${p.marca}`}
+              className="inline-flex items-center gap-1.5 font-mono text-base font-bold text-torg-blue underline decoration-dotted underline-offset-4">
+              {p.marca} <FileText size={15} className="shrink-0" />
+            </button>
+          ) : (
+            <p className="font-mono text-base font-bold text-torg-dark">{p.marca}</p>
+          )}
           {p.descricao && <p className="text-sm text-torg-gray">{p.descricao}</p>}
         </div>
         <span title={s.dica} className={`shrink-0 rounded border px-2 py-0.5 text-xs font-semibold ${s.cls}`}>{s.txt}</span>

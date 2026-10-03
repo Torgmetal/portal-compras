@@ -1,7 +1,12 @@
 {
-  "build": 3584,
-  "gerado": "2026-10-03T13:44:36.751Z",
+  "build": 3585,
+  "gerado": "2026-10-03T13:55:48.124Z",
   "commits": [
+    {
+      "hash": "1bdc41badf",
+      "data": "03/10/2026",
+      "titulo": "Corte e montagem: resposta atrasada não troca a tela; tocar no setor ativo não apaga a lista"
+    },
     {
       "hash": "f327c65656",
       "data": "03/10/2026",
@@ -146,11 +151,6 @@
       "hash": "d390d44417",
       "data": "01/10/2026",
       "titulo": "Docs: listas do template novo do Tekla 2025 — LE no padrão, LPC com peso inflado (OP-124)"
-    },
-    {
-      "hash": "2fb3e91402",
-      "data": "01/10/2026",
-      "titulo": "Docs: PDF do data book — anexos em paralelo, orçamento e streaming (memória e revisão)"
     }
   ]
 }
