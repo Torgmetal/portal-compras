@@ -12,7 +12,7 @@
 //
 // ⚠ CARTÃO, NÃO TABELA: é lida no celular de pé, no pátio. Tabela de 9 colunas em 390 px vira
 // "ini…", "fin…" (foi o que motivou o pedido).
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, AlertCircle, RefreshCw, Search, Scissors, Wrench, PackageOpen } from "lucide-react";
 import { situacaoDaPeca, feitoDaPeca, resumoDoSetor, SIT } from "@/lib/status-setor";
 import { CroquisChip, CroquisFaltando } from "@/app/pcp/producao/CroquisConjunto";
@@ -59,15 +59,23 @@ export default function CorteMontagemClient() {
   }, []);
   useEffect(() => { carregarOps(); }, [carregarOps]);
 
+  // ⚠ SÓ A CONSULTA MAIS RECENTE ESCREVE NA TELA (achado do Codex, 03/10/2026). O gerente troca de
+  // obra ou de setor enquanto a anterior ainda carrega; sem isto, a resposta atrasada da Montagem
+  // aparecia debaixo do botão Corte — números de um setor com o nome do outro.
+  const consulta = useRef(0);
   const carregar = useCallback(async () => {
-    if (!opId || !setor) return;
+    const minha = ++consulta.current;
+    if (!opId || !setor) { setCarregando(false); return; }
+    const vale = () => minha === consulta.current;
     setCarregando(true); setErro(null); setAbertos(new Set());
     try {
       const qs = new URLSearchParams({ opId, setor });
-      setDados(await lerJson(await fetch(`/api/pcp/despacho?${qs}`, { cache: "no-store" })));
+      const j = await lerJson(await fetch(`/api/pcp/despacho?${qs}`, { cache: "no-store" }));
+      if (!vale()) return;
+      setDados(j);
       lembrar({ opId, setor });
-    } catch (e) { setErro(e.message); setDados(null); }
-    finally { setCarregando(false); }
+    } catch (e) { if (vale()) { setErro(e.message); setDados(null); } }
+    finally { if (vale()) setCarregando(false); }
   }, [opId, setor]);
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -112,7 +120,8 @@ export default function CorteMontagemClient() {
           <div className="grid grid-cols-2 gap-2">
             {SETORES.map(({ id, rotulo, Icone }) => (
               <button key={id} type="button" aria-pressed={setor === id} disabled={!opId}
-                onClick={() => { setSetor(id); setDados(null); }}
+                // ⚠ o setor que já está aberto não apaga a lista (o efeito não roda de novo para ele)
+                onClick={() => { if (setor === id) return; setSetor(id); setDados(null); }}
                 className={`flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 text-base font-semibold disabled:opacity-40 ${
                   setor === id ? "border-torg-blue bg-torg-blue text-white" : "border-gray-200 bg-white text-torg-dark"}`}>
                 <Icone size={18} /> {rotulo}

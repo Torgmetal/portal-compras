@@ -1,7 +1,12 @@
 {
-  "build": 3583,
-  "gerado": "2026-10-03T13:40:06.842Z",
+  "build": 3584,
+  "gerado": "2026-10-03T13:44:36.751Z",
   "commits": [
+    {
+      "hash": "f327c65656",
+      "data": "03/10/2026",
+      "titulo": "Produção: aba Corte e montagem — a consulta dos gerentes de setor, no celular"
+    },
     {
       "hash": "c2c1340f26",
       "data": "03/10/2026",
@@ -146,11 +151,6 @@
       "hash": "2fb3e91402",
       "data": "01/10/2026",
       "titulo": "Docs: PDF do data book — anexos em paralelo, orçamento e streaming (memória e revisão)"
-    },
-    {
-      "hash": "a2253a9782",
-      "data": "01/10/2026",
-      "titulo": "Data book: anexos baixam 8 por vez e o PDF grande vira aviso de volumes, não 504"
     }
   ]
 }

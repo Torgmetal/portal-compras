@@ -98,3 +98,37 @@ describe("Produção › Corte e montagem", () => {
     expect(screen.getByRole("button", { name: /Tentar novamente/ })).toBeTruthy();
   });
 });
+
+// Achados do Codex (03/10/2026).
+describe("⚠ respostas fora de ordem e toque repetido", () => {
+  it("resposta atrasada da seleção anterior não aparece — nem a falha dela", async () => {
+    const pend = {};
+    global.fetch = vi.fn((url) => {
+      const u = String(url);
+      if (u.includes("/api/pcp/producao")) return Promise.resolve({ ok: true, status: 200, json: async () => OPS });
+      return new Promise((res) => { pend[u.includes("setor=CORTE") ? "corte" : "montagem"] = res; });
+    });
+    await escolherObra();
+    fireEvent.click(screen.getByRole("button", { name: "Montagem" }));
+    await waitFor(() => expect(pend.montagem).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Corte" }));
+    await waitFor(() => expect(pend.corte).toBeTruthy());
+    pend.corte({ ok: true, status: 200, json: async () => CORTE });
+    await screen.findByText("T124A1-P1");
+    // a de montagem chega depois — e falhando
+    pend.montagem({ ok: false, status: 500, json: async () => ({ error: "antiga" }) });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByText("T124A1-P1")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText("T124A1")).toBeNull();
+  });
+
+  it("tocar de novo no setor já escolhido mantém a lista", async () => {
+    await escolherObra();
+    fireEvent.click(screen.getByRole("button", { name: "Montagem" }));
+    await screen.findByText("T124A1");
+    fireEvent.click(screen.getByRole("button", { name: "Montagem" }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByText("T124A1")).toBeTruthy();
+  });
+});
