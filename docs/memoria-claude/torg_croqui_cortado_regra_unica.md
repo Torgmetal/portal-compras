@@ -27,3 +27,17 @@ cada uma numa tela, e o PCP travado sem saber em qual acreditar.
 - Se lista e ação discordarem sobre "pronto", a causa é quase sempre duas contas diferentes — procurar
   o select antes de procurar o dado.
 - Relacionado: [[torg_etapa_conjunto_croqui]], [[torg_liberar_montagem_pendente]], [[torg_baixa_etapa_anterior]].
+
+## "Cortado" não é "preparado" — a op. 20 fica de fora (03/10/2026)
+
+Vitor pediu "os croquis que falta preparar da OP-124". **`croquiCortado` só enxerga a op. 10 (Corte)**: o
+`qteProduzida` vem de `lib/reconciliar-syneco-corte.js`, que soma só `setor contains "Corte"`. A op. 20
+**Preparação** do Syneco (furação, rosca, plasma manual) não entra — croqui "cortado" no portal pode estar com
+a preparação aberta. Na OP-124 eram 5 (perfis W460 de 11 m, ~7,4 t) de 51 pendentes.
+- Para "o que falta preparar": não cortado (regra acima + conjunto-pai que já subiu) **OU** ordem de
+  Preparação com `produzidoUn < planejadoUn` (casando `MesOrdem.item` com a marca, por `opId`).
+- ⚠ `PecaConjunto.statusPrep` ("PENDENTE"/"PREPARADO") é **campo morto**: a importação grava "PENDENTE" e nada
+  o marca como preparado (só a tela da OP no Comercial o lê). Não usar como fonte.
+- ⚠ `normalizeSetorSyneco` devolve "PREPARACAO" para a op. 20 (não a junta ao CORTE), de propósito — ver
+  [[torg_programacao_syneco]].
+

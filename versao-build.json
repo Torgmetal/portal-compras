@@ -1,7 +1,12 @@
 {
-  "build": 3580,
-  "gerado": "2026-10-02T22:28:06.541Z",
+  "build": 3581,
+  "gerado": "2026-10-03T11:36:57.347Z",
   "commits": [
+    {
+      "hash": "34fa3c12",
+      "data": "02/10/2026",
+      "titulo": "Memória e revisão: pull-off, recebimento de tintas e nada travado"
+    },
     {
       "hash": "0492787e",
       "data": "02/10/2026",
@@ -146,11 +151,6 @@
       "hash": "35e58c86",
       "data": "30/09/2026",
       "titulo": "Docs: banner do Outubro Rosa — memória e registro de revisão"
-    },
-    {
-      "hash": "9b83f7f3",
-      "data": "30/09/2026",
-      "titulo": "Outubro Rosa: banner com a mensagem no primeiro acesso, para equipe e clientes"
     }
   ]
 }
