@@ -55,7 +55,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Módulo Relatórios](torg_relatorios.md) — /relatorios (hub); v1 status c/ fotos (layout Data-book); RelatorioStatus (SQL); envio+aceite por token; lista REL-001
 - [Preço de venda por kg (modelo + Galvani)](torg_preco_venda_kg.md) — custo por classe + aço 6,81 + parafusos + tinta ÷ (1−BDI−lucro−imposto do destino); Galvani BA 113,5 t 3 demãos chapa R$18 → R$ 27,62/kg
 - [⏳ Estudo de fabricação + Cenário Financeiro](torg_estudo_fabricacao.md) — /comercial/orcamentos/estudos; custo da casa medido, cadência, NF-e como medidor; PENDENTE alinhar material com a planilha (24/08)
-- [⏳ Escopo da proposta — lembrar](torg_escopo_proposta.md) — Vitor pediu para levantar isso sempre que o assunto voltar a ser Comercial
+- [Skill de proposta (escopo sem ponta solta)](torg_escopo_proposta.md) — 04/10: matriz de escopo + padrões Torg/linhas vermelhas + conformidade; esboço da revisão no portal; modelo visual novo (BV, sumário clicável, links dos projetos) em aprovação
 - [Orçamento de Serviço](torg_orcamento_servico.md) — aba na Central de Orçamentos (/comercial/orcamentos/servicos); OrcamentoServico (SQL); step 1 pronto, abas da proposta pendentes
 - [Peso real da OP](torg_peso_real_op.md) — somar PecaConjunto cru dobra; usar `pesoRealPecas` de lib/peso-op.js (canônico=LE, senão LPC) em toda soma por OP
 - [Marca = avulsa; entrega = conjunto + marca](torg_marca_conjunto_croqui.md) — croqui é componente: fica na GRD, NÃO no Data Book nem em contagem de "marcas da OP"
@@ -101,6 +101,8 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Previsão de faturamento](torg_financeiro_previsao.md) — /financeiro/previsao; carga = peso × R$/kg (OP.valorFaturarPorKg); data/peso da PlanejamentoCarga, NÃO do cronograma; sem R$/kg ou peso = "em aberto"
 
 ### Qualidade
+- [PIT no layout da Vale](torg_pit_layout_vale.md) — de agora em diante o PIT (e o Anexo I da proposta) segue o PIT da OP-122; o PDF atual do portal NÃO é esse layout; local de inspeção é derivado; PIT de cliente com reprodução proibida não se converte
+- [Selo Bureau Veritas (ISO 9001)](torg_marca_bv.md) — mín. 60 mm, ≤ 1/3 do logo Torg (área), zona 1 cm, só em proposta/material; PROIBIDO em data book/relatório/memorial; nunca criar public/bureau-veritas.png
 - [Não declarar furo nosso em doc do cliente](torg_nao_declarar_furo.md) — data book/carimbo/portal: falta dado = "—", nunca frase; motivo só em tela interna
 - [FORM do SGQ vai no documento](torg_sgq_form_identificacao.md) — carimbo no rodapé/célula G7, NÃO no nome do arquivo (ISO §7.5.2); índice mestre manda, 11 FORMs inativos
 - [Pintura e tinta](torg_pintura_tinta.md) — mede em m² (não kg); PLP dá demãos/cor/SV; caderno de 3 folhas com fórmulas vivas; FEFO; por que "quanto falta" ainda não é afirmável

@@ -2648,3 +2648,27 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   nulos pelo laço genérico da rota do celular (já era assim para todo tipo; só as listas foram filtradas);
   (h) teóricos, não corrigidos: lista de instrumentos calibrados vazia (D2) e escopo do PIT desligando aderência,
   espessura ou iluminação (D3).
+
+## 04/10/2026 — Novo modelo de proposta: prévia visual pelo Codex (Claude)
+
+- **Feito (fora do repositório):** a prévia da proposta foi DESENHADA PELO CODEX, a pedido do Vitor ("se precisar
+  traga o Codex para te ajudar"), pelo mesmo fluxo do data book: prévia → aprovação → o portal implementa. Rodou com
+  `codex exec`, numa pasta de rascunho, com briefing, conteúdo da PTC-328-26 R00, o PIT Torg convertido para o layout
+  da Vale e as regras do manual da BV. Uma rodada de correção minha. Resultado com 16 folhas:
+  - sumário com 24 entradas clicáveis + outline;
+  - n/N em todas as folhas;
+  - selo BV só na capa (60 mm, área 25% do logo Torg, zona de 1 cm);
+  - PIT em 5 folhas;
+  - Anexo II com 67 links.
+  Conferido também por script meu com pdf-lib: links, destinos, outline e imagens por página.
+- **Memória:** `torg_pit_layout_vale.md`, `torg_marca_bv.md`, `torg_escopo_proposta.md` (atualizada).
+- ⚠ **Para revisar (código existente, não alterado):** `lib/databook-pdf.js` (template LEGADO) carimba
+  `public/bureau-veritas.png` a 24 pt em toda folha se o arquivo existir. Isso fere o manual da BV: mínimo de 60 mm e
+  marca proibida em documento técnico. Hoje o arquivo não existe. O rodapé legado imprime
+  "ISO 9001 · Bureau Veritas Certification", que também não é a declaração do manual.
+- ⚠ **Pendências de decisão (Vitor):**
+  - aprovar o modelo;
+  - pedir à BV a arte oficial do selo;
+  - a Qualidade confirmar o "local de inspeção" derivado no PIT;
+  - links do Anexo II só com login ou também para o cliente (termo de confidencialidade);
+  - DWG precisa de conversão para a página de visualização.

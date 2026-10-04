@@ -1,156 +1,156 @@
 {
-  "build": 3587,
-  "gerado": "2026-10-03T14:39:12.342Z",
+  "build": 3588,
+  "gerado": "2026-10-04T09:34:46.083Z",
   "commits": [
     {
-      "hash": "e90c97186c",
+      "hash": "da30ce21",
+      "data": "03/10/2026",
+      "titulo": "OP › Qualidade: Qualidade de campo volta a ver os relatórios"
+    },
+    {
+      "hash": "e90c9718",
       "data": "03/10/2026",
       "titulo": "OP › Qualidade: Produção e demais setores veem o PLP da obra em PDF"
     },
     {
-      "hash": "c5182a6277",
+      "hash": "c5182a62",
       "data": "03/10/2026",
       "titulo": "Corte e montagem: na Montagem a marca abre o desenho da peça, só para ver"
     },
     {
-      "hash": "1bdc41badf",
+      "hash": "1bdc41ba",
       "data": "03/10/2026",
       "titulo": "Corte e montagem: resposta atrasada não troca a tela; tocar no setor ativo não apaga a lista"
     },
     {
-      "hash": "f327c65656",
+      "hash": "f327c656",
       "data": "03/10/2026",
       "titulo": "Produção: aba Corte e montagem — a consulta dos gerentes de setor, no celular"
     },
     {
-      "hash": "c2c1340f26",
+      "hash": "c2c1340f",
       "data": "03/10/2026",
       "titulo": "PCP Produção: tabela legível no celular e croquis que faltam abrem num clique"
     },
     {
-      "hash": "c8a46747a1",
+      "hash": "c8a46747",
       "data": "03/10/2026",
       "titulo": "Memória: \"cortado\" não é \"preparado\" (op. 20 do Syneco fica de fora)"
     },
     {
-      "hash": "34fa3c1283",
+      "hash": "34fa3c12",
       "data": "02/10/2026",
       "titulo": "Memória e revisão: pull-off, recebimento de tintas e nada travado"
     },
     {
-      "hash": "0492787e35",
+      "hash": "0492787e",
       "data": "02/10/2026",
       "titulo": "Nada travado (2): cota, pré-montagem, lista, EVS, instrumento e reinspeção"
     },
     {
-      "hash": "75c6cb1f51",
+      "hash": "75c6cb1f",
       "data": "02/10/2026",
       "titulo": "Observações: o celular não corta mais o texto do computador"
     },
     {
-      "hash": "577219fb76",
+      "hash": "577219fb",
       "data": "02/10/2026",
       "titulo": "Relatórios de pull-off e de recebimento de tintas"
     },
     {
-      "hash": "4878962cf1",
+      "hash": "4878962c",
       "data": "02/10/2026",
       "titulo": "Nada travado: quantidade do dimensional, celular e soldador do EVS"
     },
     {
-      "hash": "c5fdda58ae",
+      "hash": "c5fdda58",
       "data": "02/10/2026",
       "titulo": "Memória e revisão: LP, EVS, US e pintura (b2a2ccd1, 12dd2654, da26b921, 524205ee)"
     },
     {
-      "hash": "524205ee9f",
+      "hash": "524205ee",
       "data": "02/10/2026",
       "titulo": "Pintura: média sem a leitura em branco, laudo do resultado da inspeção, nada cortado nem fora da folha"
     },
     {
-      "hash": "da26b92167",
+      "hash": "da26b921",
       "data": "02/10/2026",
       "titulo": "Ultrassom: assinaturas nunca fora da folha, nada cortado, comprimento inspecionado e trava de assinatura"
     },
     {
-      "hash": "12dd26546f",
+      "hash": "12dd2654",
       "data": "02/10/2026",
       "titulo": "Visual de solda: rodapé sempre na folha, nada cortado, e trava de assinatura"
     },
     {
-      "hash": "b2a2ccd141",
+      "hash": "b2a2ccd1",
       "data": "02/10/2026",
       "titulo": "LP: nada sai do papel nem é cortado, o laudo volta a ser escolhido no computador, e trava de assinatura"
     },
     {
-      "hash": "de60f23a9d",
+      "hash": "de60f23a",
       "data": "02/10/2026",
       "titulo": "Cotação: o encerramento trava e relê a cotação antes de fechar"
     },
     {
-      "hash": "f258f5fe5f",
+      "hash": "f258f5fe",
       "data": "02/10/2026",
       "titulo": "Cotação: lançamento manual e 'adicionar RM' também não passam por cima do encerramento"
     },
     {
-      "hash": "35f47e5562",
+      "hash": "35f47e55",
       "data": "02/10/2026",
       "titulo": "Cotação: proposta e declínio não reabrem cotação encerrada no meio do envio"
     },
     {
-      "hash": "de1143fa20",
+      "hash": "de1143fa",
       "data": "02/10/2026",
       "titulo": "Memória e revisão: dimensional, reinspeção e rotas (8d6a3deb)"
     },
     {
-      "hash": "8d6a3deb3e",
+      "hash": "8d6a3deb",
       "data": "02/10/2026",
       "titulo": "Dimensional e pré-montagem: nada some do documento; reinspeção e rotas acertadas"
     },
     {
-      "hash": "952b92b485",
+      "hash": "952b92b4",
       "data": "02/10/2026",
       "titulo": "Memória e revisão: relatórios de sais e poeira, e o texto que derrubava os PDFs"
     },
     {
-      "hash": "9fa3355e1f",
+      "hash": "9fa3355e",
       "data": "02/10/2026",
       "titulo": "Relatórios de sais (RCS) e poeira (RTP) nas Inspeções e na Inspeção de campo"
     },
     {
-      "hash": "102a6e74c2",
+      "hash": "102a6e74",
       "data": "02/10/2026",
       "titulo": "Cotação: RM em Pedido gerado encerra as cotações sem resposta e avisa o fornecedor"
     },
     {
-      "hash": "030ab8cee2",
+      "hash": "030ab8ce",
       "data": "02/10/2026",
       "titulo": "Caractere de controle não derruba mais o PDF dos relatórios de inspeção"
     },
     {
-      "hash": "2836f3e0bc",
+      "hash": "2836f3e0",
       "data": "02/10/2026",
       "titulo": "OP: coluna Prazo de entrega na lista de pedidos de compra, igual a Prazos das RMs"
     },
     {
-      "hash": "14613a2d58",
+      "hash": "14613a2d",
       "data": "01/10/2026",
       "titulo": "Pedido de compra: ICMS da cotação vai destacado no item do Omie (nValorIcms)"
     },
     {
-      "hash": "3c117283f2",
+      "hash": "3c117283",
       "data": "01/10/2026",
       "titulo": "Docs: portal 'Onde a obra está', volumes em fila e peso conferido da LPC — memória e revisão"
     },
     {
-      "hash": "278d6731df",
+      "hash": "278d6731",
       "data": "01/10/2026",
       "titulo": "LPC: o importador confere o peso total (qtde × unitário) e avisa quando a planilha erra"
-    },
-    {
-      "hash": "dbc2454377",
-      "data": "01/10/2026",
-      "titulo": "Data book: volumes gerados um de cada vez, e a barra mostra o que está montando"
     }
   ]
 }
