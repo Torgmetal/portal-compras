@@ -85,5 +85,18 @@ abrir uma página para conseguir visualizar".
 - ⚠ Link no PDF que vai para o cliente cai no login do portal. Abrir para o cliente (página por token,
   só com os arquivos daquela revisão) esbarra no termo de confidencialidade da pasta 7: é decisão dele.
 
+**Capa (05/10/2026):**
+- Vitor não gostou da primeira capa, que tinha o logo gigante por causa da regra da BV.
+- Das três opções (A foto de obra, B faixa institucional, C editorial branco), escolheu a **A**, "porém não
+  com aquela foto" (a torre de escada).
+- Quis **fotos nossas, não de banco de imagens gratuito**.
+- E: "deixe com a opção do comercial conseguir adicionar novas fotos e alterar". No portal, a capa escolhe
+  a foto do banco (`lib/acervo-torg.json`, 41 fotos, + FotoObra) ou recebe upload, que entra no banco para
+  as próximas propostas. O portal avisa quando a resolução é baixa para impressão (as do banco têm ~1.200 px
+  de largura) e permite ajustar o enquadramento.
+- O **selo da BV foi para a contracapa** (logo de 110 mm + selo de 60 mm + declaração). A capa fica sem selo.
+- Na contracapa, a frase da Torg não pode citar "montagem" junto do selo, porque montagem está fora do
+  escopo do certificado (manual §2.4.3).
+
 **How to apply:** não refazer as perguntas já respondidas. Próximos passos: aprovar o modelo visual →
 as correções do rascunho R00 → a skill no skill-creator, testada refazendo uma proposta real.

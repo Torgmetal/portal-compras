@@ -1,7 +1,12 @@
 {
-  "build": 3588,
-  "gerado": "2026-10-04T09:34:46.083Z",
+  "build": 3589,
+  "gerado": "2026-10-05T16:25:31.531Z",
   "commits": [
+    {
+      "hash": "da8c93aa",
+      "data": "04/10/2026",
+      "titulo": "Memória: modelo novo de proposta, PIT no layout da Vale e selo BV"
+    },
     {
       "hash": "da30ce21",
       "data": "03/10/2026",
@@ -146,11 +151,6 @@
       "hash": "3c117283",
       "data": "01/10/2026",
       "titulo": "Docs: portal 'Onde a obra está', volumes em fila e peso conferido da LPC — memória e revisão"
-    },
-    {
-      "hash": "278d6731",
-      "data": "01/10/2026",
-      "titulo": "LPC: o importador confere o peso total (qtde × unitário) e avisa quando a planilha erra"
     }
   ]
 }
