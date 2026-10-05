@@ -71,11 +71,39 @@ it('reenvio do mesmo lote devolve os R já gravados, sem ir à planilha nem cria
  // os avisos são completados no reenvio — a tentativa interrompida pode ter parado no meio deles
  expect(notificarMateriaisRecebidos).toHaveBeenCalledWith([{id:'a',importRef:'261832'},{id:'b',importRef:'261833'}],'almox');
 });
-it('mesma chave com outro conteúdo: 409, nada criado',async()=>{
- mockPrisma.cmrLote.findUnique.mockResolvedValue({id:LOTE,userId:'almox',hash:'outro',indices:[],docIds:[]});
+it('mesma chave com outro conteúdo: 409 com os R que já existem, nada criado',async()=>{
+ mockPrisma.cmrLote.findUnique.mockResolvedValue({id:LOTE,userId:'almox',hash:'outro',indices:['261832','261833'],docIds:[]});
  const res=await POST(req());
  expect(res.status).toBe(409);
+ expect((await res.json()).indices).toEqual(['261832','261833']);
  expect(mockPrisma.documentoQualidade.createManyAndReturn).not.toHaveBeenCalled();
+});
+// ⚠⚠ Achado do Codex (05/10/2026): sem conseguir LER o lote, ninguém sabe se ele foi gravado.
+// Dizer "nada foi gravado" aqui é o convite exato a lançar de novo com outra chave.
+it('falha ao consultar o lote: resultado incerto, nunca "nada foi gravado"',async()=>{
+ mockPrisma.cmrLote.findUnique.mockRejectedValueOnce(new Error('conexão caiu'));
+ const res=await POST(req());
+ const j=await res.json();
+ expect(res.status).toBe(503);
+ expect(j.incerta).toBe(true);
+ expect(j.error).not.toMatch(/nada foi gravado/);
+ expect(mockPrisma.documentoQualidade.createManyAndReturn).not.toHaveBeenCalled();
+});
+it('a gravação acusou erro mas o lote está no banco (commit sem resposta): devolve o lote, não "nada gravado"',async()=>{
+ mockPrisma.documentoQualidade.createManyAndReturn.mockRejectedValueOnce(new Error('resposta do commit perdida'));
+ mockPrisma.cmrLote.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+  .mockResolvedValueOnce({id:LOTE,userId:'almox',hash:hashDoLote(LANC),indices:['261234','261235'],docIds:['a','b']});
+ mockPrisma.documentoQualidade.findMany.mockResolvedValue([{id:'a',importRef:'261234'},{id:'b',importRef:'261235'}]);
+ const res=await POST(req());
+ expect(res.status).toBe(200);
+ expect((await res.json())).toMatchObject({replay:true,indices:['261234','261235']});
+});
+it('a gravação falhou e a conferência também: incerto',async()=>{
+ mockPrisma.documentoQualidade.createManyAndReturn.mockRejectedValueOnce(new Error('x'));
+ mockPrisma.cmrLote.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('fora'));
+ const res=await POST(req());
+ expect(res.status).toBe(503);
+ expect((await res.json()).incerta).toBe(true);
 });
 it('sem a chave do lote: 400',async()=>{
  const res=await POST(req({loteId:undefined}));

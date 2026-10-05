@@ -251,10 +251,19 @@ export default function CmrLancarClient() {
     let j;
     try { j = await enviarLoteCmr({ ano, lancamentos, loteId: loteRef.current }); }
     catch (e) {
-      // Incerta: a lista é relida para mostrar o que já entrou; a chave fica, e repetir é seguro.
-      // Conflito: o lote anterior entrou com outro conteúdo — chave nova e lista relida para conferir.
-      if (e.conflito) loteRef.current = novoLote();
-      if (e.incerta || e.conflito) { carregar(); recarregarPedido(); }
+      // Incerta: a lista é relida para mostrar o que já entrou; a chave FICA, e repetir é seguro.
+      if (e.incerta) { carregar(); recarregarPedido(); }
+      // ⚠⚠ Conflito: o lote JÁ ESTÁ GRAVADO, com o conteúdo de antes da alteração (achado do Codex,
+      // 05/10/2026). Trocar a chave e deixar a prévia de pé fazia o clique seguinte gravar tudo de
+      // novo como lote novo. A prévia sai da tela — sem ela não há o que regravar — e a correção vai
+      // pela edição das linhas gravadas. Só então a chave muda: não sobra nada pendente.
+      if (e.conflito) {
+        setMassa([]); setModo(null); setOrigemMassa(null); setMarcados(new Set()); setForm(VAZIO);
+        loteRef.current = novoLote();
+        carregar(); recarregarPedido();
+        const rs = e.indices || [];
+        if (rs.length) e.message += ` Já gravados: R ${rs[0]}${rs.length > 1 ? `…${rs[rs.length - 1]}` : ""}.`;
+      }
       throw e;
     }
     loteRef.current = novoLote();

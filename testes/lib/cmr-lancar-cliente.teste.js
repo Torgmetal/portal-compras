@@ -35,6 +35,16 @@ describe("enviarLoteCmr", () => {
     expect(e.message).toMatch(/outro conteúdo/);
   });
 
+  it("servidor diz que o resultado é incerto: incerta", async () => {
+    fetch.mockResolvedValue(resp(503, JSON.stringify({ error: "Não consegui conferir", incerta: true })));
+    expect((await enviarLoteCmr({ ano: 2026, lancamentos: [], loteId: "L1" }).catch((x) => x)).incerta).toBe(true);
+  });
+
+  it("409 traz os R do lote que já existe", async () => {
+    fetch.mockResolvedValue(resp(409, JSON.stringify({ error: "outro conteúdo", indices: ["261832", "261874"] })));
+    expect((await enviarLoteCmr({ ano: 2026, lancamentos: [], loteId: "L1" }).catch((x) => x)).indices).toEqual(["261832", "261874"]);
+  });
+
   it("erro com JSON (ex.: 503 da planilha) é erro certo — nada gravado", async () => {
     fetch.mockResolvedValue(resp(503, JSON.stringify({ error: "Não consegui conferir a numeração na planilha" })));
     const e = await enviarLoteCmr({ ano: 2026, lancamentos: [], loteId: "L1" }).catch((x) => x);

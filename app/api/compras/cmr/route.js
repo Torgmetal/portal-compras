@@ -121,7 +121,7 @@ export async function POST(req) {
   // ⚠ O REENVIO RESPONDE ANTES DE IR AO SHAREPOINT: ele não emite R, só devolve os que já existem.
   let resultado;
   try { resultado = await loteJaGravado(prisma, lote); }
-  catch (e) { return erroDoLote(e); }
+  catch (e) { return e instanceof LoteConflito ? conflito(e) : incerto(e); }
 
   if (!resultado) {
     // ⚠⚠ O R É CONFERIDO NA PLANILHA ANTES DE SER EMITIDO (Matheus, 22/09/2026: "antes de mandar,
@@ -143,7 +143,16 @@ export async function POST(req) {
       }, { status: 503 });
     }
     try { resultado = await gravarLoteCmr(prisma, { ...lote, ano, lancamentos: body.lancamentos, ocupados }); }
-    catch (e) { return erroDoLote(e); }
+    catch (e) {
+      if (e instanceof LoteConflito) return conflito(e);
+      // ⚠⚠ ERRO NA GRAVAÇÃO NÃO PROVA QUE NADA FOI GRAVADO (achado do Codex, 05/10/2026): a resposta do
+      // commit pode se perder com o commit feito. Antes de dizer "nada foi gravado", confere.
+      try { resultado = await loteJaGravado(prisma, lote); }
+      catch (e2) { return e2 instanceof LoteConflito ? conflito(e2) : incerto(e2); }
+      if (!resultado) {
+        return NextResponse.json({ error: `Falha ao gravar o lote — nada foi gravado: ${e.message}` }, { status: 500 });
+      }
+    }
   }
 
   // Depois do commit, e idempotentes: num reenvio completam o que a tentativa interrompida deixou.
@@ -170,7 +179,12 @@ export async function POST(req) {
   });
 }
 
-function erroDoLote(e) {
-  if (e instanceof LoteConflito) return NextResponse.json({ error: e.message }, { status: 409 });
-  return NextResponse.json({ error: `Falha ao gravar o lote — nada foi gravado: ${e.message}` }, { status: 500 });
-}
+const conflito = (e) => NextResponse.json({ error: e.message, indices: e.indices || [] }, { status: 409 });
+
+// Sem conseguir LER o lote ninguém sabe se ele foi gravado — e dizer "nada foi gravado" aqui é o
+// convite exato a lançar de novo com outra chave. A tela repete com a MESMA chave, o que é seguro.
+const incerto = (e) => NextResponse.json({
+  incerta: true,
+  error: `Não consegui conferir se este lote já foi gravado (${e.message}). Clique em Gravar de novo: `
+    + "o portal reconhece o mesmo lote e não duplica os R.",
+}, { status: 503 });
