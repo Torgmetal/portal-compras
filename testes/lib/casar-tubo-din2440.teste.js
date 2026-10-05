@@ -41,4 +41,14 @@ describe("tubo DIN 2440 sem parede no perfil × CMR com diâmetro e parede", () 
     const d = 'TUBO REDONDO Ø1.1/2" (48,30) X 2,65MM';
     expect(casa('TB 1.1/2"X2.65 - DIN2440', d)).toBe(d);
   });
+
+  // ⚠⚠ Achado do Codex (05/10/2026): a confirmação pelo diâmetro valia para QUALQUER norma do perfil.
+  // `TB 1.1/4" - SCH40` passava a casar com um tubo de 42,4 sem norma declarada — material oferecido
+  // e validado na liberação sem prova da especificação. O diâmetro só prova a série do DIN 2440.
+  it("perfil SCH40 sem parede NÃO ganha a confirmação pelo diâmetro", () => {
+    expect(casa('TB 1.1/4" - SCH40', 'TUBO REDONDO Ø1.1/4" (42,40) X 2,65MM')).toBeNull();
+  });
+  it("perfil NBR sem parede também não", () => {
+    expect(casa('TB 1.1/4" - NBR5580', 'TUBO REDONDO Ø1.1/4" (42,40) X 2,65MM')).toBeNull();
+  });
 });

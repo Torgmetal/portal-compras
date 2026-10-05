@@ -1,7 +1,12 @@
 {
-  "build": 3594,
-  "gerado": "2026-10-05T17:43:22.841Z",
+  "build": 3595,
+  "gerado": "2026-10-05T17:55:33.876Z",
   "commits": [
+    {
+      "hash": "58b92a3bbb",
+      "data": "05/10/2026",
+      "titulo": "CMR: data vai à planilha em ISO — \"05/10\" em texto virava 10 de maio"
+    },
     {
       "hash": "da0c97ef57",
       "data": "05/10/2026",
@@ -146,11 +151,6 @@
       "hash": "952b92b485",
       "data": "02/10/2026",
       "titulo": "Memória e revisão: relatórios de sais e poeira, e o texto que derrubava os PDFs"
-    },
-    {
-      "hash": "9fa3355e1f",
-      "data": "02/10/2026",
-      "titulo": "Relatórios de sais (RCS) e poeira (RTP) nas Inspeções e na Inspeção de campo"
     }
   ]
 }
