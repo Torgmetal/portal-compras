@@ -1,7 +1,12 @@
 {
-  "build": 3600,
-  "gerado": "2026-10-06T13:49:07.199Z",
+  "build": 3601,
+  "gerado": "2026-10-06T13:49:07.345Z",
   "commits": [
+    {
+      "hash": "1b4bc35030",
+      "data": "06/10/2026",
+      "titulo": "Plano: CMR usar R em branco da planilha — com a revisão do Codex (revisar antes de implementar)"
+    },
     {
       "hash": "827403780f",
       "data": "06/10/2026",
@@ -146,11 +151,6 @@
       "hash": "b2a2ccd141",
       "data": "02/10/2026",
       "titulo": "LP: nada sai do papel nem é cortado, o laudo volta a ser escolhido no computador, e trava de assinatura"
-    },
-    {
-      "hash": "de60f23a9d",
-      "data": "02/10/2026",
-      "titulo": "Cotação: o encerramento trava e relê a cotação antes de fechar"
     }
   ]
 }

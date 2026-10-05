@@ -1,150 +1,189 @@
-# CMR: usar os R reservados em branco na planilha — plano
+# CMR: usar os R reservados em branco na planilha — plano (v2)
 
 > Para quem executar: um passo por vez, teste que falha antes do código (TDD). Nada de `prisma db push`;
-> tabela e índice só por `scripts/ensure-mes-tables.mjs`.
+> tabelas e índices só por `scripts/ensure-mes-tables.mjs`. A reutilização nasce DESLIGADA e só é
+> ligada depois das proteções verificadas em produção (passo 12).
 
 **Objetivo:** quando a planilha CMR tiver um R com todas as outras colunas vazias, o portal usa esse R
-no próximo lançamento, em vez de pular para o maior + 1. E faz isso sem reabrir o defeito do R 261547
-(dois materiais no mesmo R).
+no próximo lançamento — sem reabrir o defeito do R 261547 (dois materiais no mesmo R).
 
-**Pedido:** Matheus, 05/10/2026: *"o usuário costuma deixar alguns R já pré-preenchidos em branco… se
-você achar um R com todas as colunas vazias devemos usar esse R"*. Escopo completo aprovado por ele,
-com as ressalvas da consulta `database` do Codex (05/10/2026).
+**Pedido:** Matheus, 05/10/2026: *"se você achar um R com todas as colunas vazias devemos usar esse R"*.
+Escolheu a regra completa, com as ressalvas das consultas `database` e `architecture` do Codex.
+
+**v1 → v2:** a v1 foi revisada pelo Codex (architecture, 05/10/2026) com lacunas bloqueantes: titularidade
+condicional, exclusão futura, carga consolidada, max+1 sem memória, sobrescrita pela reconciliação antes
+de o conflito aparecer, escrita parcial sem prova de autoria, escritores do portal sem coordenação,
+resolução sem retomada e ativação sem verificação. Esta versão responde a cada uma (marcadas [C1]…[C9]).
 
 ## O que existe hoje
 
 - Planilha (Graph): A = R/RC, B = índice R, C..N = dados. `lerLinhasCmr` lê A5:N (só valores).
-  `appendLinhasCmr` escreve depois do fim; `atualizarLinhaCmr` acha a linha pelo B e reescreve A e
-  C..N (ou anexa); `limparLinhaCmr` esvazia A e C..N mantendo B (é o que a EXCLUSÃO faz).
-- Emissão (`lib/cmr-lote.js`, no ar desde 05/10): todos os índices da planilha contam como ocupados;
-  próximo = max(portal, planilha) + 1. Travas `cmr-lote:<id>` → `cmr-r:<ano>`.
-- Reconciliação (`lib/cmr-reconciliar.js`, cron 02h40/10h40 + botão): cria no portal os R da planilha
-  com descrição e sem par (`create` fora de qualquer trava); "a planilha manda" (sobrescreve o portal);
-  anexa à planilha os R do portal que ela não tem. Casca não vira registro.
-- R repetidos no banco hoje: 10 (11 registros a mais) — 8 de 2025 (a planilha de 2025 tinha o mesmo R
-  em materiais diferentes) e 2 de 2026 (261392 três vezes, com o mesmo nome; mais um).
+  Quem escreve: `POST /api/compras/cmr` (`appendLinhasCmr` quando `espelhar` ≠ false), `/espelhar`
+  (`appendLinhasCmr`), edição `PATCH [id]` (`atualizarLinhaCmr`), exclusão `DELETE [id]`
+  (`limparLinhaCmr`), reconciliação (`appendLinhasCmr`).
+- Emissão (`lib/cmr-lote.js`): todos os índices da planilha contam como ocupados; próximo = max + 1.
+- Reconciliação (`lib/cmr-reconciliar.js`, 350 linhas; cron 02h40/10h40 + botão): cria fora de trava,
+  "a planilha manda" com `updateMany` por `importRef` (atinge duplicados), anexa o que falta.
+- Exclusão (`DELETE [id]`): apaga o documento antes da auditoria, que é `.catch`.
+- R repetidos no banco: 10 (8 de 2025, 2 de 2026).
 
 ## Desenho
 
-### 1. Registro permanente dos R: tabela `CmrR`
-
-Um R livre não é "um R que não está no portal agora": renumeração e exclusão fazem o R sumir do portal
-sem ele ficar livre. Precisa de memória.
+### 1. Estado de cada R: tabela `CmrR` [C1][C3][C4]
 
 ```
-CmrR (r TEXT PK, ano INT, situacao TEXT, docId TEXT NULL, origem TEXT, motivo TEXT NULL,
-      atualizadoEm TIMESTAMP)
-situacao: USADO (emitido pelo portal ou importado da planilha) | EXCLUIDO | LIBERADO | CONFLITO
+CmrR (r TEXT PK, ano INT, situacao TEXT, docId TEXT NULL, versao INT DEFAULT 0,
+      motivo TEXT NULL, atualizadoEm TIMESTAMP)
 ```
 
-- **Carga inicial (no ensure, idempotente, `ON CONFLICT DO NOTHING`):**
-  - todo `importRef` de MATERIAL vira USADO;
-  - todo `diff.importRef` de AuditLog `CMR_EXCLUIR` vira EXCLUIDO;
-  - os 43 R antigos da renumeração (`CMR_RENUMERAR.diff.liberados`) viram LIBERADO.
-- **Regra do R livre:** a linha da planilha está 100% vazia (ver 3) **e** o R não está em `CmrR`, ou
-  está como LIBERADO.
-- A PK de `CmrR` é a garantia final: dois caminhos que tentem marcar o mesmo R como USADO, um deles cai.
+| situacao | significa | sincronização automática |
+|---|---|---|
+| RESERVADO | o portal emitiu, a escrita na planilha está pendente | só a escrita pendente mexe |
+| USADO | portal e planilha em dia, um titular (`docId`) | sim |
+| CONFLITO | a planilha diverge do que se esperava | parada nos dois sentidos |
+| EXCLUIDO | material excluído; o R nunca volta | nunca importa; limpeza pendente |
+| LIBERADO | liberado por ato explícito (renumeração autorizada) | pode ser emitido de novo |
+| DUPLICADO | mais de um documento com este R (histórico) | parada; fora deste plano |
 
-### 2. Emissão usa os R livres primeiro
+**Transições — todas em `lib/cmr-r/estado.js`, sob a trava `cmr-r:<ano>`, por `updateMany` com a
+situação (e o `docId`/`versao`) esperados e exigência de `count === 1`; nunca upsert que troque titular:**
 
-- `lerLinhasCmr` passa a devolver também as cascas, com `vazia: true` (ver 3), e as linhas com o R
-  repetido na própria planilha marcadas `repetido: true` (nunca livres).
-- `gravarLoteCmr` recebe `livres` (os R de cascas vazias, em ordem crescente). Dentro das travas:
-  1. relê `CmrR` para esses R e descarta os que não estão livres;
-  2. atribui os livres primeiro, depois max + 1 (o max continua considerando todos os índices da
-     planilha);
-  3. grava os documentos, **insere/atualiza `CmrR` como USADO** (o insert da PK é a última defesa),
-     o `CmrLote` e a auditoria, na mesma transação.
-- Uma casca usada é **preenchida** na planilha, em vez de receber uma linha nova no fim (ver 4).
+- (sem linha) ou LIBERADO → RESERVADO: emissão de lote, com `docId`, na transação dos documentos.
+- RESERVADO → USADO: escrita pendente confirmada por releitura. RESERVADO → CONFLITO: linha divergente.
+- (sem linha) → USADO: reconciliação criando a partir da planilha, na transação do documento.
+- USADO → USADO (`versao + 1`): edição no portal.
+- USADO → CONFLITO: escrita de edição achou a planilha diferente do esperado.
+- USADO → EXCLUIDO: exclusão, na mesma transação que apaga o documento e grava a auditoria [C2].
+- CONFLITO → USADO: resolução confirmada.
+- USADO/EXCLUIDO → LIBERADO: só por ato administrativo explícito (renumeração), com auditoria.
 
-### 3. O que é "100% vazia"
+**Carga inicial (`lib/cmr-r/carga.js`, rodada pelo ensure) [C3]:** consolida por R antes de inserir —
+1 documento → USADO com `docId`; mais de 1 → DUPLICADO; sem documento e com `CMR_EXCLUIR` → EXCLUIDO;
+sem documento e em `CMR_RENUMERAR.liberados` → LIBERADO. Insere com `ON CONFLICT DO NOTHING`: reexecutar
+não muda um R que já tem estado (nunca reabre um R consumido). Documento sem linha em `CmrR` (criado entre
+a carga e o deploy) é tratado como USADO por todas as regras e ganha linha na primeira passagem.
 
-- Ler `values` **e** `formulas` de A5:N. Uma linha é casca vazia quando B tem o R e, em A e C..N, o
-  valor é `""` **e** a fórmula também é `""` (fórmula que mostra vazio não conta como vazia). `0` e
-  `false` não são vazios.
-- R repetido na planilha (duas linhas com o mesmo B) nunca é livre, mesmo que uma delas esteja vazia.
+**max + 1 considera portal, planilha E `CmrR`** [C4]. R e ano normalizados antes de comparar.
 
-### 4. Escrita na planilha: `gravarLinhasCmr(ano, linhas, { esperado })`
+### 2. Escritas na planilha como operações pendentes: tabela `CmrEscrita` [C5][C6][C7][C8]
 
-Uma sessão só. Lê A..N (valores e fórmulas) das linhas dos R pedidos e decide caso a caso:
+```
+CmrEscrita (id TEXT PK, r TEXT, ano INT, tipo TEXT /* PREENCHER | EDITAR | LIMPAR | RESOLVER */,
+            esperado JSONB /* conteúdo A,C..N que a linha deve ter ANTES */, desejado JSONB,
+            versao INT /* CmrR.versao quando a operação nasceu */, situacao TEXT /* PENDENTE |
+            CONCLUIDA | SUPERADA | CONFLITO */, tentativas INT, criadoEm, concluidoEm)
+```
 
-| Estado da linha do R na planilha | Ação |
-|---|---|
-| já igual ao que o portal quer escrever | nada (sucesso idempotente — reenvio e retry) |
-| casca 100% vazia | preenche A e C..N |
-| igual ao `esperado` (o conteúdo antes da edição no portal) | reescreve A e C..N (edição legítima) |
-| sem linha para o R | anexa no fim |
-| qualquer outra coisa | **não escreve**; devolve conflito |
+- Toda escrita nasce **na transação do banco** que a motivou (emissão, edição, exclusão, resolução).
+  Assim, uma resposta perdida não perde a escrita: ela fica PENDENTE e é retomada.
+- Uma operação nova para o mesmo R marca as PENDENTES anteriores como SUPERADA: um reenvio antigo nunca
+  desfaz uma edição recente [C7].
+- **Processador (`lib/cmr-r/escritas.js`)**, chamado logo após a gravação (o `/espelhar` passa a ser
+  "processar as pendentes destes R") e no começo da reconciliação. Ele adquire a **trava de lease**
+  `CmrTrava('planilha:<ano>')` (linha com dono e validade, por update condicional; sem trava de sessão com
+  pooler), lê A..N **com valores e fórmulas** e decide por segmento (A e C..N separados):
 
-- Conflito → `CmrR.situacao = CONFLITO` + AuditLog `CMR_CONFLITO_PLANILHA` (conteúdo dos dois lados)
-  + aviso ao Almoxarifado e à Qualidade no sino.
-- Escrita parcial (A gravado, C..N não): a mesma função reconhece a própria escrita incompleta (A igual
-  ao desejado e C..N vazio ou igual) e completa, em vez de chamar de conflito.
-- Quem passa a usar: `/espelhar` (sem `esperado`), a edição `PATCH /api/compras/cmr/[id]` (com
-  `esperado` = linha antes da edição) e a reconciliação portal→planilha.
-  `appendLinhasCmr` e `atualizarLinhaCmr` deixam de ser chamados de fora do módulo.
+  | Cada segmento está… | Ação |
+  |---|---|
+  | igual ao `desejado` | nada |
+  | igual ao `esperado` (casca vazia, conteúdo anterior) | escreve o `desejado` |
+  | outra coisa | CONFLITO |
 
-### 5. Reconciliação
+  Como a operação guarda `esperado` e `desejado`, uma escrita interrompida (A já gravado, C..N não)
+  é reconhecida pela própria operação — não por adivinhação [C6]. Depois de escrever, relê e só então
+  conclui e passa o R para USADO.
+- R repetido na planilha (duas linhas com o mesmo B) é CONFLITO em qualquer escrita.
+- O próprio Graph não tem transação: entre a releitura e a escrita, uma digitação humana pode ser
+  sobrescrita sem gerar conflito. **Limitação documentada**, não resolvida [C7].
 
-- **Criação planilha→portal sob a mesma trava `cmr-r:<ano>`**, numa transação por R: confere `CmrR`;
-  se o R está USADO por outro documento, é conflito (não cria). Se cria, marca USADO na mesma
-  transação.
-- **R em CONFLITO fica parado nos dois sentidos:** a planilha não sobrescreve o portal e o portal não
-  escreve na planilha até a resolução.
-- portal→planilha passa a incluir os R do portal cuja linha na planilha é casca vazia (o espelhamento
-  falhou ou foi interrompido): preenche via `gravarLinhasCmr`.
+### 3. "100% vazia"
 
-### 6. Resolver conflito
+Valores **e** fórmulas de A e C..N vazios (`""`). Fórmula que mostra vazio, `0` e `false` não contam.
+Classificação e comparação canônica (datas como ISO, números normalizados) em funções puras
+(`lib/cmr-r/comparar.js`), fora do transporte Graph (`lib/cmr-sharepoint.js` fica só com HTTP).
 
-- Lista "R em conflito" na tela do CMR (aba Conciliar), com os dois conteúdos lado a lado.
-- Ação (ADMIN, QUALIDADE, COMPRAS): **"Vale a planilha"** (o portal recebe o conteúdo dela) ou **"Vale o
-  portal"** (a planilha é reescrita). Volta a USADO; AuditLog `CMR_CONFLITO_RESOLVIDO`.
+### 4. Emissão
 
-### 7. R único no banco
+- `livresDaPlanilha(linhas, estados)` (pura): casca 100% vazia, R não repetido na planilha, e sem linha
+  em `CmrR` ou LIBERADO. Ordem crescente.
+- `gravarLoteCmr`, sob as travas atuais: relê os estados dos livres, atribui livres e depois max + 1,
+  cria os documentos, faz as transições → RESERVADO e cria as `CmrEscrita` PREENCHER (`esperado` =
+  vazio) ou, para R novos, PREENCHER com "sem linha → anexar". Tudo numa transação com o `CmrLote` e a
+  auditoria. O replay do `CmrLote` continua devolvendo os mesmos R.
+- **Chave `CMR_REUSAR_CASCAS`** (variável de ambiente, desligada): com ela desligada a emissão continua
+  max + 1, mas TODO o resto (estados, escritas pendentes) já roda [C9].
 
-- Índice único parcial:
-  `CREATE UNIQUE INDEX IF NOT EXISTS "DocQualidade_material_R_unico" ON "DocumentoQualidade"
-   ("importRef") WHERE "categoria" = 'MATERIAL' AND "importRef" IS NOT NULL AND "importRef" NOT IN
-   (<os 10 R repetidos de hoje>)`.
-- No ensure, dentro de try/catch: se falhar (apareceu outra duplicata), **loga e segue** — o build não
-  pode cair por isso; a `CmrR` continua protegendo.
-- Os 2 R repetidos de 2026 (261392 e o outro) são decisão do Matheus (excluir as cópias?), fora deste
-  plano. Os de 2025 ficam como estão.
+### 5. Reconciliação (extraída para `lib/cmr-r/sincronizar.js`)
 
-## Ordem de implementação (cada passo com teste que falha antes)
+1. Processa as escritas pendentes primeiro.
+2. planilha→portal **só para R em USADO e sem escrita pendente** [C5]; atualização pelo `docId` (nunca
+   por `importRef`), conferindo `versao` dentro da transação; R RESERVADO, CONFLITO, EXCLUIDO ou
+   DUPLICADO não são tocados.
+3. Criação a partir da planilha: só para R sem linha em `CmrR`, sob `cmr-r:<ano>`, com a transição para
+   USADO na mesma transação.
+4. EXCLUIDO nunca é importado, mesmo com a linha ainda preenchida (a LIMPAR pendente cuida dela) [C2].
 
-1. `CmrR` no schema + ensure + carga inicial. Teste: a carga marca USADO, EXCLUIDO e LIBERADO.
-2. Leitura: `lerLinhasCmr` com `formulas`, `vazia` e `repetido`. Teste com linhas: vazia, fórmula que
-   mostra vazio, `0`, A preenchido, R repetido.
-3. `livresDaPlanilha(linhas, cmrR)` (função pura). Testes da regra do R livre.
-4. `gravarLoteCmr` usa os livres + marca `CmrR`. Testes: usa 261816 antes de 261875; descarta livre que
-   virou USADO entre a leitura e a trava; PK duplicada derruba o lote inteiro.
-5. `gravarLinhasCmr` com os cinco estados + escrita parcial. Testes por estado.
-6. `/espelhar`, edição e reconciliação passam a usá-la. Testes de que nenhuma rota chama
-   `appendLinhasCmr` direto.
-7. Reconciliação: criação sob trava + `CmrR`; CONFLITO parado nos dois sentidos; preencher casca.
-8. Tela de conflitos + rota de resolução (Zod, requireRole, AuditLog).
-9. Índice único parcial no ensure (try/catch).
-10. Validação: `npm test`, `npm run checar`, `validar-tela` no CMR. O SharePoint não é acessível do
-    ambiente local; a primeira emissão real com uma casca é conferida em produção junto com o Matheus.
+### 6. Conflitos
+
+- Lista na aba Conciliar com os dois conteúdos. Notificação no sino com `chaveEvento`
+  `CMR_CONFLITO:<R>:<versao>` (sem repetir), fora da transação e não fatal.
+- Resolução (ADMIN, QUALIDADE, COMPRAS), guardada antes de agir para poder retomar [C8]:
+  - **Vale a planilha:** confere que a planilha ainda tem o conteúdo mostrado (hash); atualiza o
+    documento pelo `docId`; → USADO.
+  - **Vale o portal:** cria `CmrEscrita` RESOLVER com `esperado` = conteúdo mostrado; o R fica em
+    CONFLITO até a escrita concluir; → USADO.
+- DUPLICADO não tem resolução nesta tela (escolher conteúdo não escolhe documento). Fica listado.
+
+### 7. R único no banco [C9]
+
+Índice único parcial em `DocumentoQualidade("importRef")` para MATERIAL, exceto os 10 R repetidos de
+hoje (que ficam DUPLICADO e bloqueados pelos serviços). No ensure com try/catch (o build não cai), mas a
+verificação de ativação (passo 12) exige o índice presente.
+
+## Ordem (desenvolvimento e ativação)
+
+1. Tabelas `CmrR`, `CmrEscrita`, `CmrTrava` + carga consolidada. Testes: sobreposição de eventos,
+   duplicados, reexecução sem reabrir.
+2. `comparar.js` e `livresDaPlanilha` (puras). Testes: vazia, fórmula vazia, `0`, A preenchido,
+   R repetido, datas.
+3. `estado.js`. Testes de cada transição permitida e de que as proibidas falham (`count !== 1`),
+   inclusive disputa por um LIBERADO.
+4. Leitura com fórmulas em `cmr-sharepoint.js`.
+5. `escritas.js` + lease. Testes: os três estados por segmento, escrita interrompida retomada,
+   superada não escreve, R repetido.
+6. Exclusão atômica + LIMPAR pendente. Teste: falha no Excel não ressuscita o material.
+7. Emissão com estados e escritas (chave desligada). Testes: replay, max+1 com `CmrR`.
+8. Edição com `EDITAR` (`esperado` = linha antes). Teste: reenvio antigo após edição não desfaz.
+9. Reconciliação extraída. Testes: não importa sobre RESERVADO; não toca CONFLITO/EXCLUIDO/DUPLICADO;
+   atualiza por `docId` com versão.
+10. Conflitos: tela + rota (Zod, requireRole, AuditLog). Testes de resolução interrompida.
+11. Índice único parcial.
+12. **Ativação:** deploy com a chave desligada; conferir em produção (sem pendências presas, índice
+    presente, nenhum conflito novo) por uns dias; ligar `CMR_REUSAR_CASCAS`; acompanhar o primeiro
+    lançamento que use uma casca junto com o Matheus.
+
+Validação de cada passo: `npm test`, `npm run checar`, e `validar-tela` para as telas. Os testes usam
+Prisma mockado: não provam a exclusividade real do banco nem o Graph — limitação registrada.
 
 ## Riscos que continuam
 
-- Alguém digitando na planilha no mesmo minuto em que o portal grava: nenhuma transação tranca um
-  editor de Excel. O desenho **detecta** (CONFLITO) e **para** os dois lados; não evita.
-- O índice único não cobre os 10 R antigos repetidos.
+- Digitação humana entre a releitura e a escrita do Graph pode ser sobrescrita sem conflito.
+- Os 10 R DUPLICADO ficam fora da sincronização automática até alguém decidir o que fazer com eles.
 
-## Revisão do Codex (consulta `architecture`, 05/10/2026): revisar antes de implementar
+## Revisão do Codex da v2 (architecture, 05/10/2026): direção aprovada, implementação NÃO aprovada
 
-Lacunas bloqueantes apontadas — o plano NÃO deve ser executado como está:
-1. Titularidade condicional em `CmrR` (LIBERADO→USADO por update condicional, um titular por R; nada de upsert).
-2. Exclusão futura no protocolo, atômica com documento e auditoria; reconciliação respeitando EXCLUIDO.
-3. Carga inicial consolidada por R (sobreposições, duplicados, reexecução sem reabrir R consumido).
-4. "max + 1" consultando também `CmrR`.
-5. Estado pendente de sincronização: a reconciliação não pode importar sobre um R recém-reservado.
-6. Escrita parcial só reconhecida com operação pendente persistida (conteúdo esperado e desejado).
-7. Coordenação/versionamento entre edição, espelhamento e reconciliação; reenvio antigo não desfaz edição.
-8. Resolução de conflito com retomada (banco e Excel sem transação comum).
-9. Ativação da reutilização só depois das proteções verificadas; falha do índice não pode ficar silenciosa.
-Arquivos a mais: `app/api/compras/cmr/route.js` (espelha direto), exclusão em `[id]/route.js`,
-`lib/cmr-reconciliar.js` (350 linhas — extrair a coordenação), `lib/cmr-sharepoint.js` (separar regra pura).
+Bloqueios que restam (2º ciclo — parado para decisão do Matheus):
+- [C2/C8] LIMPAR concluída não pode levar o R a USADO; conflito de limpeza mantém EXCLUIDO, com
+  resolução própria; LIBERADO proibido com limpeza pendente ou em execução.
+- [C5] Reconciliação: capturar a versão ANTES de ler a planilha e validar versão + estado + ausência de
+  operação ativa atomicamente ao aplicar; toda importação incrementa a versão.
+- [C7] Lease não dá exclusividade sobre o Graph (chamada em andamento após a lease expirar; SUPERADA
+  marcada durante a escrita): definir renovação, perda e recuperação.
+- [C6/C7] Cadeia de operações: de onde vem `esperado`; encadear/consolidar edições pendentes; separar
+  "versão desejada" de "último conteúdo confirmado na planilha".
+- [C8] "Vale a planilha": decisão persistida (hash, versão), conclusão idempotente, invalidar pendências.
+- [C9] Barreira também para a primeira ativação (chave desligada já troca os fluxos): verificar tabelas,
+  índice, carga e drenagem dos escritores antigos antes de ligar os caminhos novos.
+Também: precedência cronológica exclusão × liberação na carga; criação de estado por INSERT protegido;
+regras para editar/excluir R em RESERVADO/CONFLITO; semântica de `espelhar=false`; R repetido na
+planilha bloqueia importação e atualização; resolução de conflitos separada do processador.
