@@ -1,8 +1,9 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useStore } from "@/lib/store";
 import { Loader2, Plus, ClipboardPaste, Save, Trash2, Search, Check, X, PackagePlus, Filter, ArrowUp, ArrowDown, FileDown, RefreshCw, AlertCircle, Pencil } from "lucide-react";
 import { avisosDeTinta } from "@/lib/material-tinta";
+import { enviarLoteCmr, novoLote } from "@/lib/cmr-lancar-cliente";
 import CmrCampos, { VAZIO } from "./CmrCampos";
 import CmrEditarModal from "./CmrEditarModal";
 import CmrColarMassa from "./CmrColarMassa";
@@ -42,6 +43,12 @@ const COLUNAS = [
 ];
 const valorCol = (col, l) => { const v = col.get(l); return v == null || v === "" ? VAZIA : String(v); };
 
+/** Os itens do pedido que ainda têm saldo a receber; se nenhum tiver, todos (o operador decide). */
+export function itensAReceber(itens = []) {
+  const comSaldo = itens.filter((it) => (Number(it.qtd) || 0) - (Number(it.qtdRecebida) || 0) > 0);
+  return comSaldo.length ? comSaldo : itens;
+}
+
 export default function CmrLancarClient() {
   const { showToast } = useStore();
   const [ano, setAno] = useState(anoAtual);
@@ -66,6 +73,11 @@ export default function CmrLancarClient() {
   const [confExcl, setConfExcl] = useState(false);   // checkbox de confirmação
   const [excluindo, setExcluindo] = useState(false);
   const [editar, setEditar] = useState(null);        // linha aberta para edição
+  // ⚠⚠ A CHAVE DO LOTE SÓ MUDA DEPOIS DE UM SUCESSO (ou de um conflito que prova que o anterior entrou).
+  // Pedido 2054 (05/10/2026): resposta perdida com os 43 R já gravados. Repetindo a mesma chave, o
+  // servidor devolve o que gravou em vez de emitir outros — trocar a chave a cada clique desfaria isso.
+  const loteRef = useRef(null);
+  if (!loteRef.current) loteRef.current = novoLote();
 
   // Normaliza cada item p/ o filtro/ordenação (rc derivado, cert, data formatada).
   const linhas = useMemo(() => (dados?.itens || []).map((it) => {
@@ -236,14 +248,26 @@ export default function CmrLancarClient() {
   }
 
   async function lancar(lancamentos) {
-    const r = await fetch("/api/compras/cmr", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ano, lancamentos, espelhar: false }),
+    let j;
+    try { j = await enviarLoteCmr({ ano, lancamentos, loteId: loteRef.current }); }
+    catch (e) {
+      // Incerta: a lista é relida para mostrar o que já entrou; a chave fica, e repetir é seguro.
+      // Conflito: o lote anterior entrou com outro conteúdo — chave nova e lista relida para conferir.
+      if (e.conflito) loteRef.current = novoLote();
+      if (e.incerta || e.conflito) { carregar(); recarregarPedido(); }
+      throw e;
+    }
+    loteRef.current = novoLote();
+    // ⚠ Num reenvio as linhas podem já estar na lista (relida depois da resposta perdida): sem
+    // duplicar na tela o que não está duplicado no banco.
+    if (j.itens?.length) setDados((d) => {
+      if (!d) return d;
+      const novos = j.itens.filter((it) => !d.itens.some((x) => x.id === it.id));
+      return { ...d, itens: [...novos, ...d.itens], total: (d.total || 0) + novos.length };
     });
-    const j = await r.json();
-    if (!j.success) throw new Error(j.error || "Erro");
-    if (j.itens?.length) setDados((d) => (d ? { ...d, itens: [...j.itens, ...d.itens], total: (d.total || 0) + j.itens.length } : d));
-    espelhar(j.indices || []);
+    // ⚠ Reenvio NÃO espelha: `/espelhar` anexa sem conferir, e a reconciliação já envia à planilha
+    // os R que o portal tem e ela não.
+    if (!j.replay) espelhar(j.indices || []);
     return j;
   }
 
@@ -276,7 +300,10 @@ export default function CmrLancarClient() {
     setSalvando(true);
     try {
       const j = await lancar(validos);
-      showToast(`${j.criados} lançamento(s) gravados (${j.indices?.[0]}…${j.indices?.[j.indices.length - 1]}) · enviando para a planilha…`, "success");
+      const faixa = `${j.indices?.[0]}…${j.indices?.[j.indices.length - 1]}`;
+      showToast(j.replay
+        ? `Este lote já estava gravado (${faixa}) — nada foi duplicado. A planilha recebe pelo "Sincronizar planilha".`
+        : `${j.criados} lançamento(s) gravados (${faixa}) · enviando para a planilha…`, "success");
       setMassa([]); setModo(null); setOrigemMassa(null); setMarcados(new Set());
       await recarregarPedido();
     } catch (e) { showToast(e.message, "erro"); } finally { setSalvando(false); }
@@ -374,7 +401,17 @@ export default function CmrLancarClient() {
             <div className="border border-torg-blue-100 bg-torg-blue-50/40 rounded-lg overflow-hidden">
               <div className="px-3 py-2 flex items-center justify-between">
                 <p className="text-[12px] font-semibold text-torg-dark">Pedido {pedido.pedido} · {pedido.fornecedor || "—"}{pedido.obra ? ` · ${pedido.obra}` : ""} <span className="font-normal text-torg-gray">— toque no item que chegou</span></p>
-                <button onClick={() => setPedido(null)} className="text-torg-gray hover:text-red-600"><X size={15} /></button>
+                <div className="flex items-center gap-3 shrink-0">
+                  {/* Matheus (05/10/2026): "um botão para selecionar todos os itens do pedido". Marca
+                      os que ainda têm saldo — o que já foi entregue inteiro lançaria R em dobro. */}
+                  {pedido.itens.length > 0 && (
+                    <button type="button" onClick={() => setMarcados(new Set(itensAReceber(pedido.itens).map((it) => it.idx)))}
+                      className="text-[11px] font-semibold text-torg-blue hover:underline">
+                      Marcar todos ({itensAReceber(pedido.itens).length})
+                    </button>
+                  )}
+                  <button onClick={() => setPedido(null)} className="text-torg-gray hover:text-red-600"><X size={15} /></button>
+                </div>
               </div>
               {/* ⚠⚠ UMA LINHA DO PEDIDO NÃO É UMA DESCRIÇÃO. Matheus (11/09/2026): "quando digita
                   um número de pedido e aparecem itens repetidos, precisa conseguir selecionar

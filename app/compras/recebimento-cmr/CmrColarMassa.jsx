@@ -1,5 +1,6 @@
 "use client";
-import { Loader2, Check, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Check, Trash2, CalendarCheck } from "lucide-react";
 import CampoData from "@/components/CampoData";
 
 // VÁRIAS LINHAS DE UMA VEZ — o painel inteiro, em arquivo próprio.
@@ -34,6 +35,10 @@ export default function CmrColarMassa({ massa, setMassa, colar, salvarMassa, sal
   // ⚠ Vindo do pedido não faz sentido oferecer a caixa de colar: as linhas já estão montadas, e
   // colar por cima apagaria a seleção sem avisar.
   const doPedido = origem === "pedido";
+  // Matheus (05/10/2026): "alterar a data de recebimento de todos de uma vez". Uma nota chega num dia
+  // só; digitar a mesma data em 43 linhas foi o que deixou 42 delas sem data no pedido 2054.
+  const [dataTodas, setDataTodas] = useState("");
+  const aplicarData = () => { if (dataTodas) setMassa((a) => a.map((m) => ({ ...m, dataRecebimento: dataTodas }))); };
 
   return (
     <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 space-y-3">
@@ -52,6 +57,18 @@ export default function CmrColarMassa({ massa, setMassa, colar, salvarMassa, sal
 
       {massa.length > 0 && (
         <>
+          <div className="flex items-center gap-2 flex-wrap text-[12px]">
+            <span className="text-torg-dark font-medium">Data de recebimento para todas as linhas:</span>
+            {/* o CampoData ocupa a largura do pai (w-full): sem esta caixa ele estica a linha inteira */}
+            <span className="w-36 inline-block">
+              <CampoData value={dataTodas} onChange={setDataTodas} aria-label="Data de recebimento para todas"
+                className="w-full text-xs border border-gray-300 rounded-lg px-2 py-1 outline-none focus:border-torg-blue" />
+            </span>
+            <button type="button" onClick={aplicarData} disabled={!dataTodas}
+              className="px-3 py-1 text-xs font-medium border border-torg-blue text-torg-blue rounded-lg hover:bg-blue-50 disabled:opacity-40 inline-flex items-center gap-1">
+              <CalendarCheck size={13} /> Aplicar em {massa.length}
+            </button>
+          </div>
           <div className="overflow-x-auto border border-gray-100 rounded-lg max-h-72 overflow-y-auto">
             <table className="w-full text-xs whitespace-nowrap">
               <thead className="bg-gray-50/60 sticky top-0 z-10"><tr className="text-[10px] text-gray-500 uppercase">

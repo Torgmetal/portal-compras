@@ -7,14 +7,17 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
-import { CMR_CAT, prefixoAno, proximoIndiceR, mapearLancamento, aprenderReferencias } from "@/lib/cmr";
+import { CMR_CAT, prefixoAno, aprenderReferencias } from "@/lib/cmr";
+import { gravarLoteCmr, loteJaGravado, hashDoLote, LoteConflito } from "@/lib/cmr-lote";
 import { lerLinhasCmr } from "@/lib/cmr-sharepoint";
 import { appendLinhasCmr } from "@/lib/cmr-sharepoint";
 import { ehCascaVazia } from "@/lib/cmr-reconciliar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// ⚠ 300, não 60: os 60 s foram o teto em que o lote do pedido 2054 (43 R) morreu no meio dos avisos.
+// O conserto de verdade é o lote atômico e os avisos em massa; o teto maior é só margem.
+export const maxDuration = 300;
 const ROLES = ["ADMIN", "ALMOXARIFADO", "COMPRAS", "PCP", "PLANEJAMENTO", "QUALIDADE"];
 
 export async function GET(req) {
@@ -93,6 +96,9 @@ const schema = z.object({
   // ⚠ NÃO ABRE BURACO: o que não for espelhado é reenviado pela reconciliação (diária, e no botão
   // "Sincronizar planilha"), que justamente anexa à planilha os R que o portal tem e ela não.
   espelhar: z.boolean().optional(),
+  // ⚠⚠ A CHAVE DO LOTE, gerada no navegador e repetida a cada tentativa (lib/cmr-lote.js). Sem ela,
+  // uma resposta perdida deixava o botão "Gravar" pronto para emitir os mesmos R de novo.
+  loteId: z.string().uuid("Lote sem identificação — recarregue a tela e tente de novo."),
 });
 
 // Os campos que a tela mostra na listagem — a resposta do lançamento devolve a linha pronta para
@@ -110,67 +116,61 @@ export async function POST(req) {
   try { body = schema.parse(await req.json()); } catch (e) { return NextResponse.json({ error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 }); }
 
   const ano = body.ano || new Date().getFullYear();
-  const pre = prefixoAno(ano);
+  const lote = { loteId: body.loteId, hash: hashDoLote(body.lancamentos), userId: user.id, select: SELECT_LISTA };
 
-  // ⚠⚠ O R É CONFERIDO NA PLANILHA ANTES DE SER EMITIDO (Matheus, 22/09/2026: "antes de mandar,
-  // verifica se o R está disponível na planilha"). Emitir olhando só o portal foi metade do defeito
-  // do R 261547: a planilha tem linhas que o portal não importa — a "casca", o R reservado sem
-  // descrição —, então o próximo número daqui já estava ocupado lá, e dois materiais diferentes
-  // passaram a dividir um índice.
-  //
-  // ⚠⚠ SEM CONSEGUIR LER A PLANILHA, NÃO SE EMITE R. É recusa deliberada: o lançamento fica para
-  // daqui a pouco, enquanto um número duplicado contamina o certificado que vai ao cliente e só
-  // aparece semanas depois. Quem lê a mensagem sabe o que houve e tenta de novo.
-  let ocupados;
-  try {
-    ocupados = (await lerLinhasCmr(ano)).map((l) => String(l.indiceR || "").trim()).filter(Boolean);
-  } catch (e) {
-    return NextResponse.json({
-      error: "Não consegui conferir a numeração na planilha do SharePoint, e sem isso o R pode sair "
-        + `repetido. Tente de novo em instantes. (${e.message})`,
-    }, { status: 503 });
-  }
+  // ⚠ O REENVIO RESPONDE ANTES DE IR AO SHAREPOINT: ele não emite R, só devolve os que já existem.
+  let resultado;
+  try { resultado = await loteJaGravado(prisma, lote); }
+  catch (e) { return erroDoLote(e); }
 
-  // Sequencial inicial do ano; incrementa em memória (evita corrida entre as linhas do lote).
-  const base = await proximoIndiceR(ano, ocupados); // ex.: 261206
-  let seq = Number(String(base).slice(2));
-  const usados = new Set(ocupados);
-
-  const criados = [];
-  const linhasSP = []; // p/ espelhar na planilha do SharePoint (mesma ordem/índice R)
-  for (const l of body.lancamentos) {
-    // ⚠ Cada linha do lote confere de novo: o próximo número pode cair num buraco que a planilha
-    // já ocupa mais adiante.
-    while (usados.has(`${pre}${String(seq).padStart(4, "0")}`)) seq++;
-    const indiceR = `${pre}${String(seq).padStart(4, "0")}`;
-    usados.add(indiceR);
-    seq++;
-    const data = mapearLancamento(l, indiceR, user.id);
+  if (!resultado) {
+    // ⚠⚠ O R É CONFERIDO NA PLANILHA ANTES DE SER EMITIDO (Matheus, 22/09/2026: "antes de mandar,
+    // verifica se o R está disponível na planilha"). Emitir olhando só o portal foi metade do defeito
+    // do R 261547: a planilha tem linhas que o portal não importa — a "casca", o R reservado sem
+    // descrição —, então o próximo número daqui já estava ocupado lá, e dois materiais diferentes
+    // passaram a dividir um índice.
+    //
+    // ⚠⚠ SEM CONSEGUIR LER A PLANILHA, NÃO SE EMITE R. É recusa deliberada: o lançamento fica para
+    // daqui a pouco, enquanto um número duplicado contamina o certificado que vai ao cliente e só
+    // aparece semanas depois. Quem lê a mensagem sabe o que houve e tenta de novo.
+    let ocupados;
     try {
-      const doc = await prisma.documentoQualidade.create({ data, select: SELECT_LISTA });
-      criados.push(doc);
-      linhasSP.push({
-        rc: l.rc, indiceR, descricao: l.descricao, certificado: l.certificado, loteCorrida: l.loteCorrida,
-        especificacao: l.especificacao, pedidoCompra: l.pedidoCompra, dataRecebimento: l.dataRecebimento,
-        nf: l.nf, fornecedor: l.fornecedor, obra: l.obra, qtd: l.qtd, pesoLitro: l.pesoLitro,
-        validade: l.validade, observacao: l.observacao,
-      });
-    } catch (e) { await notificarMateriaisRecebidos(criados, user.id); return NextResponse.json({ error: `Falha ao gravar (${indiceR}): ${e.message}`, criados: criados.length }, { status: 500 }); }
+      ocupados = (await lerLinhasCmr(ano)).map((l) => String(l.indiceR || "").trim()).filter(Boolean);
+    } catch (e) {
+      return NextResponse.json({
+        error: "Não consegui conferir a numeração na planilha do SharePoint, e sem isso o R pode sair "
+          + `repetido. Tente de novo em instantes. (${e.message})`,
+      }, { status: 503 });
+    }
+    try { resultado = await gravarLoteCmr(prisma, { ...lote, ano, lancamentos: body.lancamentos, ocupados }); }
+    catch (e) { return erroDoLote(e); }
   }
-  await notificarMateriaisRecebidos(criados, user.id);
-  await aprenderReferencias(body.lancamentos).catch(() => {});
-  await prisma.auditLog.create({ data: { userId: user.id, action: "CMR_LANCAR", entity: "DocumentoQualidade", entityId: String(criados.length), diff: { ano, qtd: criados.length, de: criados[0]?.importRef, ate: criados[criados.length - 1]?.importRef } } }).catch(() => {});
+
+  // Depois do commit, e idempotentes: num reenvio completam o que a tentativa interrompida deixou.
+  await notificarMateriaisRecebidos(resultado.docs, user.id);
+  if (!resultado.replay) await aprenderReferencias(body.lancamentos).catch(() => {});
 
   // Espelha na planilha do SharePoint (best-effort — NUNCA trava o lançamento no portal).
   // Com `espelhar: false` a tela faz isso depois, por /api/compras/cmr/espelhar, e não espera.
   let planilha = null;
-  if (body.espelhar !== false) {
+  if (body.espelhar !== false && !resultado.replay) {
+    const linhasSP = body.lancamentos.map((l, i) => ({
+      rc: l.rc, indiceR: resultado.indices[i], descricao: l.descricao, certificado: l.certificado, loteCorrida: l.loteCorrida,
+      especificacao: l.especificacao, pedidoCompra: l.pedidoCompra, dataRecebimento: l.dataRecebimento,
+      nf: l.nf, fornecedor: l.fornecedor, obra: l.obra, qtd: l.qtd, pesoLitro: l.pesoLitro,
+      validade: l.validade, observacao: l.observacao,
+    }));
     try { planilha = await appendLinhasCmr(ano, linhasSP); }
     catch (e) { planilha = { ok: false, erro: e.message }; }
   }
 
   return NextResponse.json({
-    success: true, ano, criados: criados.length,
-    indices: criados.map((c) => c.importRef), itens: criados, planilha,
+    success: true, ano, criados: resultado.docs.length, replay: resultado.replay,
+    indices: resultado.indices, itens: resultado.docs, planilha,
   });
+}
+
+function erroDoLote(e) {
+  if (e instanceof LoteConflito) return NextResponse.json({ error: e.message }, { status: 409 });
+  return NextResponse.json({ error: `Falha ao gravar o lote — nada foi gravado: ${e.message}` }, { status: 500 });
 }

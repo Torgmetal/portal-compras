@@ -243,3 +243,4 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Inteligência Fiscal enxuta](torg_fiscal_simples.md) — imposto da obra = OPReceita; IBS/CBS do ListarNF por NCM×CFOP (sem UF); cron e botão RECONSTROEM o ano (nunca somam); ipiDaTipi não tem .aliquota
 - [Cotação encerrada no Pedido gerado](torg_cotacao_encerrada.md) — RM vira PEDIDO_GERADO → cotações sem resposta ENCERRADA + e-mail neutro; 236 antigas encerradas sem e-mail
 - [Corte e montagem (gerentes, celular)](torg_corte_montagem_gerentes.md) — consulta obra→setor em cartões; mesma rota do PCP; lib/status-setor é a regra única de situação
+- [CMR: lote atômico com chave](torg_cmr_lote.md) — "Gravar N" grava tudo ou nada; reenvio com o mesmo loteId devolve os R (CmrLote); avisos em lote; reenvio não espelha

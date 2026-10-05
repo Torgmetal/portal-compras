@@ -252,6 +252,19 @@ async function main() {
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RastreioTratativa_opNumero_idx" ON "RastreioTratativa" ("opNumero")`);
   await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "RastreioTratativa_situacao_idx" ON "RastreioTratativa" ("situacao")`);
 
+  // Lote do CMR (lib/cmr-lote.js): o resultado EXATO de cada "Gravar N" — os R e os ids —, para um
+  // reenvio depois de resposta perdida devolver o que já foi gravado em vez de criar R de novo
+  // (pedido 2054, 05/10/2026). `id` é a chave que o navegador gera e repete a cada tentativa.
+  await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "CmrLote" (
+    "id" TEXT PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "hash" TEXT NOT NULL,
+    "ano" INTEGER NOT NULL,
+    "indices" TEXT[] NOT NULL DEFAULT '{}',
+    "docIds" TEXT[] NOT NULL DEFAULT '{}',
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   // Estudo de fabricacao (a LQC dentro do portal).
   await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "EstudoFabricacao" (
     "id" TEXT PRIMARY KEY,

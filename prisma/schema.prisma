@@ -2707,6 +2707,18 @@ model DocumentoInstitucional {
 // que auditor e cliente podem ler, que a Torg recebeu material sabendo que o certificado nao
 // viria. As situacoes possiveis descrevem ONDE o certificado esta (estoque, arquivo fisico) ou
 // que ele ainda nao chegou — nunca uma decisao de dispensar certificado. Ver lib/rastreio-tratativa.
+// O resultado de cada "Gravar N" do CMR (lib/cmr-lote.js). Criada por scripts/ensure-mes-tables.mjs.
+// Reenvio com o mesmo `id` devolve estes R em vez de emitir outros (pedido 2054, 05/10/2026).
+model CmrLote {
+  id       String   @id // chave gerada no navegador e repetida a cada tentativa do mesmo lote
+  userId   String
+  hash     String // impressão digital do conteúdo: mesma chave com outro conteúdo é conflito
+  ano      Int
+  indices  String[] // os R exatos, na ordem dos lançamentos
+  docIds   String[]
+  criadoEm DateTime @default(now())
+}
+
 model RastreioTratativa {
   id              String   @id @default(cuid())
   importRef       String   @unique // o R do material no CMR
