@@ -2672,3 +2672,20 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - a Qualidade confirmar o "local de inspeção" derivado no PIT;
   - links do Anexo II só com login ou também para o cliente (termo de confidencialidade);
   - DWG precisa de conversão para a página de visualização.
+
+## 05/10/2026 — Tubo DIN 2440 sem parede no perfil volta a casar com o CMR (Claude)
+
+- **Feito (`3d354876`):** ramo TUBO de `lib/casar-omie.js`. Perfil com norma e sem parede ganha +1 quando o
+  diâmetro externo da descrição bate com o da série; não vale se a descrição declara outra norma. Teste
+  novo: `testes/lib/casar-tubo-din2440.teste.js` (6 casos, vermelho→verde). Suíte com 4.982 passando;
+  `npm run checar` sem erro.
+- **Origem:** OP-118, Gabriel (Engenharia): 616 peças "não comprado" na Liberação de frentes, com os
+  tubos no CMR e na RM.
+- **Efeito medido no banco:** mudam 6 de 40 pares obra×perfil de tubo, todos este caso (OP-118, 107, 064 e
+  067). Na janela "escolher R", o 1.1/4" passa de 1 para 7 descrições compatíveis e o 3/4" de 1 para 3.
+- ⚠ **Para revisar:**
+  - (a) com perfil sem parede, a escolha entre paredes diferentes da mesma bitola fica para quem confirma
+    o R; o automático pega o melhor escore, que empata;
+  - (b) a OP-067 ganha R em 391 peças de tubo, com reflexo no data book em rascunho;
+  - (c) a validação na tela exige login, e não foi feita no navegador; a conferência foi pela mesma função,
+    com os dados reais.

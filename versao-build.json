@@ -1,7 +1,12 @@
 {
-  "build": 3590,
-  "gerado": "2026-10-05T16:34:15.843Z",
+  "build": 3591,
+  "gerado": "2026-10-05T16:39:44.198Z",
   "commits": [
+    {
+      "hash": "3d354876",
+      "data": "05/10/2026",
+      "titulo": "Tubo DIN 2440 sem parede no perfil volta a casar com o CMR"
+    },
     {
       "hash": "fcc7e3d7",
       "data": "05/10/2026",
@@ -146,11 +151,6 @@
       "hash": "2836f3e0",
       "data": "02/10/2026",
       "titulo": "OP: coluna Prazo de entrega na lista de pedidos de compra, igual a Prazos das RMs"
-    },
-    {
-      "hash": "14613a2d",
-      "data": "01/10/2026",
-      "titulo": "Pedido de compra: ICMS da cotação vai destacado no item do Omie (nValorIcms)"
     }
   ]
 }

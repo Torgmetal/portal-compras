@@ -42,3 +42,25 @@ checagem, então nem o R da própria obra (261547) passava.
     linhas, e 8 das 377 trocas registradas, decididas pelo Vitor, a regra não reconhece (xadrez para
     CH3,00, barra quadrada, BRØM16 × 5/8", U de "perfil IND", tubo IND, Z com lábio 32, W310 × HP310).
     A troca já registrada com o mesmo R passa.
+
+**05/10/2026: tubo DIN 2440 sem parede no perfil × CMR sem norma** (`3d354876`). Gabriel (Engenharia) não
+conseguia programar a OP-118: 616 peças de `TB 1.1/4" - DIN2440` e `TB 3/4" - DIN2440` apareciam "não
+comprado · escolher R" na Liberação de frentes. Os tubos estavam no CMR (R 261701, 42,40×2,65; R 261750,
+26,90×2,25), e a RM T118-001-R00 pedia exatamente essas descrições, com material DIN-2440. *"o Eduardo
+recebeu sim, só tá com outro nome parece."*
+- Causa: o perfil traz bitola + norma e nenhuma parede; o CMR traz bitola + diâmetro + parede e nenhuma
+  norma. Sobrava só a bitola (2 pontos, corte em 3), e nem a janela "escolher R" oferecia o tubo, porque
+  ela usa o mesmo casamento.
+- Regra nova, no ramo TUBO de `lib/casar-omie.js`: perfil com norma e sem parede ganha +1 quando o diâmetro
+  externo da descrição bate com o da série (`POL_MM`: 1.1/4" = 42,4; o estrutural de 1.1/4" tem 31,75 e não
+  ganha). ⚠ Não vale se a descrição declara OUTRA norma: o SCH 40 tem o mesmo diâmetro. Perfil COM parede
+  segue a regra antiga.
+- Medido, regra antiga × nova: mudam 6 de 40 pares obra×perfil de tubo, todos este caso:
+  - OP-118: as 616 peças;
+  - OP-107: 29 peças;
+  - OP-064: 198 + 134 peças;
+  - ⚠ OP-067: 391 peças de "DIN2440 LEVE". Isso muda a rastreabilidade em rascunho de data book; a
+    Qualidade confere.
+- ⚠ Observação técnica, não bloqueia: as paredes compradas na 118 (3/4" × 2,25; 1.1/4" × 2,65) são as da
+  NBR 5580 **leve**. Pela DIN 2440 seriam 2,65 e 3,25. É a convenção da casa: o catálogo do Tekla já
+  chamava 1.1/2" × 2,65 de DIN2440. Se o projeto exigir a parede da DIN, a decisão é da Engenharia.
