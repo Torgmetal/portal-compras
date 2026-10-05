@@ -1,7 +1,12 @@
 {
-  "build": 3593,
-  "gerado": "2026-10-05T17:43:22.667Z",
+  "build": 3594,
+  "gerado": "2026-10-05T17:43:22.841Z",
   "commits": [
+    {
+      "hash": "da0c97ef57",
+      "data": "05/10/2026",
+      "titulo": "CMR: conflito tira a prévia da tela; falha ao conferir o lote é resultado incerto"
+    },
     {
       "hash": "d2b03d4e29",
       "data": "05/10/2026",
@@ -146,11 +151,6 @@
       "hash": "9fa3355e1f",
       "data": "02/10/2026",
       "titulo": "Relatórios de sais (RCS) e poeira (RTP) nas Inspeções e na Inspeção de campo"
-    },
-    {
-      "hash": "102a6e74c2",
-      "data": "02/10/2026",
-      "titulo": "Cotação: RM em Pedido gerado encerra as cotações sem resposta e avisa o fornecedor"
     }
   ]
 }
