@@ -1,7 +1,12 @@
 {
-  "build": 3589,
-  "gerado": "2026-10-05T16:25:31.531Z",
+  "build": 3590,
+  "gerado": "2026-10-05T16:34:15.843Z",
   "commits": [
+    {
+      "hash": "fcc7e3d7",
+      "data": "05/10/2026",
+      "titulo": "Memória: capa da proposta com foto nossa, trocável pelo Comercial"
+    },
     {
       "hash": "da8c93aa",
       "data": "04/10/2026",
@@ -146,11 +151,6 @@
       "hash": "14613a2d",
       "data": "01/10/2026",
       "titulo": "Pedido de compra: ICMS da cotação vai destacado no item do Omie (nValorIcms)"
-    },
-    {
-      "hash": "3c117283",
-      "data": "01/10/2026",
-      "titulo": "Docs: portal 'Onde a obra está', volumes em fila e peso conferido da LPC — memória e revisão"
     }
   ]
 }
