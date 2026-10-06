@@ -2689,3 +2689,16 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (b) a OP-067 ganha R em 391 peças de tubo, com reflexo no data book em rascunho;
   - (c) a validação na tela exige login, e não foi feita no navegador; a conferência foi pela mesma função,
     com os dados reais.
+
+## 06/10/2026 — Selecionar R oferece o recebimento lançado pela tela do CMR (Claude)
+
+- **Feito (`dc2aea12`):** `DO_CMR_COM_LANCAMENTO` em `lib/cmr-origens.js` (planilha + `registro_manual`),
+  usado só em `lib/fardos-compativeis.js` (leitura de fardos, que já exige `categoria: "MATERIAL"`).
+  Teste novo: `testes/lib/fardos-compativeis-lancamento.teste.js` (vermelho→verde). Suíte com 5.023
+  passando; `npm run checar` sem erro.
+- **Origem:** OP-120, Gabriel: R 261773/261774 lançados pelo Eduardo na tela não apareciam na janela.
+  Medido com dados reais: a janela passa a listar os dois, sem R repetido.
+- ⚠ **Para revisar / pendente:** data book (`databook-ficha-r`), casamento de certificados
+  (`casar-pdfs`, `match-certificados`), rastreabilidade/status e pintura-lote ainda usam `DO_CMR` sem o
+  lançamento do portal. Os importadores criam duplicata ativa quando o mesmo R entra pelo portal e
+  depois pela planilha (R 261401). Ver `docs/memoria-claude/torg_cmr_lancamento_portal.md`.

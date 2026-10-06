@@ -1,7 +1,12 @@
 {
-  "build": 3596,
-  "gerado": "2026-10-06T13:13:11.353Z",
+  "build": 3597,
+  "gerado": "2026-10-06T13:19:36.581Z",
   "commits": [
+    {
+      "hash": "dc2aea12",
+      "data": "06/10/2026",
+      "titulo": "Selecionar R: oferece o recebimento lançado pela tela do CMR"
+    },
     {
       "hash": "34975dec",
       "data": "05/10/2026",
@@ -146,11 +151,6 @@
       "hash": "de1143fa",
       "data": "02/10/2026",
       "titulo": "Memória e revisão: dimensional, reinspeção e rotas (8d6a3deb)"
-    },
-    {
-      "hash": "8d6a3deb",
-      "data": "02/10/2026",
-      "titulo": "Dimensional e pré-montagem: nada some do documento; reinspeção e rotas acertadas"
     }
   ]
 }
