@@ -65,6 +65,8 @@ export default async function PainelOPDetalhe({ params }) {
           cotacoes: {
             include: {
               itens: {
+                // a ordem da RM, nunca a do banco (marcar vencedor reordenava — Matheus, 06/10/2026)
+                orderBy: { rmItem: { ordem: "asc" } },
                 select: {
                   id: true, rmItemId: true, precoUnit: true, qtdCotada: true,
                   icmsPct: true, ipiPct: true, vencedor: true, observacao: true,

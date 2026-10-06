@@ -1,7 +1,12 @@
 {
-  "build": 3601,
-  "gerado": "2026-10-06T13:49:07.345Z",
+  "build": 3602,
+  "gerado": "2026-10-06T13:49:07.479Z",
   "commits": [
+    {
+      "hash": "a253e0b6bb",
+      "data": "06/10/2026",
+      "titulo": "Plano CMR R em branco v2 + revisão do Codex (direção aprovada, implementação não)"
+    },
     {
       "hash": "1b4bc35030",
       "data": "06/10/2026",
@@ -146,11 +151,6 @@
       "hash": "12dd26546f",
       "data": "02/10/2026",
       "titulo": "Visual de solda: rodapé sempre na folha, nada cortado, e trava de assinatura"
-    },
-    {
-      "hash": "b2a2ccd141",
-      "data": "02/10/2026",
-      "titulo": "LP: nada sai do papel nem é cortado, o laudo volta a ser escolhido no computador, e trava de assinatura"
     }
   ]
 }

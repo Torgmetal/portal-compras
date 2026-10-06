@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { itensDoPedido, totalDosItens, divergenciaProposta } from "@/lib/pedido-itens";
+import { itensDoPedido, totalDosItens, divergenciaProposta, ordenarPelaRM } from "@/lib/pedido-itens";
 
 // ⚠⚠ Matheus (16/09/2026): "no Omie eu preciso que seja preenchido certo no pedido de compra o
 // campo IPI do valor unitário, está entrando o preço unitário cheio com IPI sem entrar no campo de
@@ -159,5 +159,24 @@ describe("o ICMS da cotação vai destacado no item", () => {
   it("sem ICMS informado, não inventa imposto", () => {
     const { itens } = itensDoPedido([linha({ cotItem: { precoUnit: 10, qtdCotada: 2, ipiPct: 0, icmsPct: null } })]);
     expect(itens[0].valorIcms).toBe(0);
+  });
+});
+
+// ⚠⚠ Matheus (06/10/2026), pedido 2056 (RM T107-006-R00): os 23 itens chegaram ao Omie fora da ordem da
+// RM — a cola química, item 23, entrou como item 1. Conferir o recebimento contra a RM virou caça ao
+// item. A ordem vinha de `cotacao.itens` sem orderBy: a do banco, não a da RM.
+describe("ordenarPelaRM", () => {
+  const l = (rm, ordem, d) => ({ rm: rm ? { numero: rm } : undefined, rmItem: { ordem, descricao: d } });
+  it("segue a ordem dos itens na RM", () => {
+    const linhas = [l(null, 22, "COLA"), l(null, 18, "PORCA 3/4"), l(null, 0, "BARRA M12 150"), l(null, 3, "BARRA M20 200")];
+    expect(ordenarPelaRM(linhas).map((x) => x.rmItem.descricao)).toEqual(["BARRA M12 150", "BARRA M20 200", "PORCA 3/4", "COLA"]);
+  });
+  it("pedido que junta várias RMs da OP: primeiro pela RM, depois pela ordem dentro dela", () => {
+    const linhas = [l("T107-007-R00", 0, "B0"), l("T107-006-R00", 5, "A5"), l("T107-006-R00", 1, "A1")];
+    expect(ordenarPelaRM(linhas).map((x) => x.rmItem.descricao)).toEqual(["A1", "A5", "B0"]);
+  });
+  it("empate mantém a ordem de chegada", () => {
+    const linhas = [l(null, 1, "X"), l(null, 1, "Y")];
+    expect(ordenarPelaRM(linhas).map((x) => x.rmItem.descricao)).toEqual(["X", "Y"]);
   });
 });

@@ -10,7 +10,7 @@ import { previsaoEntregaDDMMYYYY, calcularDataEntrega, extrairPrazoEntrega } fro
 import { TEXTO_CERTIFICADO_QUALIDADE } from "@/lib/certificado-qualidade";
 import { fdPorCategoriaDaOP, rmEhFD, itemEhFD } from "@/lib/faturamento-direto";
 import { reavaliarStatusRM } from "@/lib/rm-status";
-import { itensDoPedido, divergenciaProposta, totalDosItens } from "@/lib/pedido-itens";
+import { itensDoPedido, divergenciaProposta, totalDosItens, ordenarPelaRM } from "@/lib/pedido-itens";
 import { log } from "@/lib/log";
 import { bloqueioPorIndisponibilidade } from "@/lib/cotacao-indisponibilidade";
 
@@ -177,6 +177,7 @@ export async function POST(req, { params }) {
     // ⚠ a regra dos itens mora em lib/pedido-itens: as duas rotas que geram pedido (por RM e por
     // OP) precisam da MESMA conta, senão o mesmo fornecedor recebe dois números conforme a tela de
     // onde o comprador clicou.
+    ordenarPelaRM(linhas); // ⚠ a ordem da RM, não a do banco (pedido 2056, 06/10/2026)
     const { itens: itensPayload, alertas } = itensDoPedido(linhas);
     // ⚠⚠ O TOTAL SOMA BASE + IPI. Desde 16/09/2026 o item leva o preço LÍQUIDO e o imposto
     // separado (`lib/pedido-itens`); somar só `qtd × precoUnit` aqui faria o total registrado no

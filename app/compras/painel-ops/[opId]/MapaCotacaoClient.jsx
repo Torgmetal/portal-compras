@@ -1466,7 +1466,7 @@ export function buildMatriz(op) {
         it.aditivoItem?.faturamentoDireto ||
         it._fdDerivado
       );
-      itemPorId.set(it.id, { rmItem: it, rmNumero: rm.numero, categoria: cat, faturamentoDireto: fatDireto });
+      itemPorId.set(it.id, { rmItem: it, rmNumero: rm.numero, categoria: cat, faturamentoDireto: fatDireto, posicao: itemPorId.size });
     }
   }
 
@@ -1593,6 +1593,11 @@ export function buildMatriz(op) {
   }
 
   const fornecedores = Array.from(fornMap.values());
-  const itens = Array.from(itensMap.values());
+  // ⚠⚠ A LINHA FICA NA POSIÇÃO DA RM (Matheus, 06/10/2026: "o item vai lá pro fim da lista — precisa
+  // ficar fixo"). As linhas nascem na ordem dos itens DAS COTAÇÕES, que vêm do banco sem ORDER BY:
+  // marcar o vencedor atualiza a linha, o Postgres passa a devolvê-la por último, e a linha do mapa
+  // ia junto. A posição vem de `op.rms[].itens`, que as páginas já entregam por `ordem`.
+  const posicao = (rmItemId) => itemPorId.get(rmItemId)?.posicao ?? Number.MAX_SAFE_INTEGER;
+  const itens = Array.from(itensMap.values()).sort((a, b) => posicao(a.rmItemId) - posicao(b.rmItemId));
   return { fornecedores, itens };
 }

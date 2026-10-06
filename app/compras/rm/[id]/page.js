@@ -80,6 +80,8 @@ export default async function RMComprasDetail({ params }) {
       // Itens completos com rmItem details — pra mostrar todos os itens
       // (incluindo de outras RMs) no modal de lancamento manual
       itens: {
+        // a ordem da RM, nunca a do banco (marcar vencedor reordenava — Matheus, 06/10/2026)
+        orderBy: { rmItem: { ordem: "asc" } },
         select: {
           id: true, rmItemId: true, precoUnit: true, qtdCotada: true,
           icmsPct: true, ipiPct: true, observacao: true, vencedor: true,
