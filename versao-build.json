@@ -1,7 +1,12 @@
 {
-  "build": 3597,
-  "gerado": "2026-10-06T13:19:36.581Z",
+  "build": 3598,
+  "gerado": "2026-10-06T13:39:40.860Z",
   "commits": [
+    {
+      "hash": "82305e6c",
+      "data": "06/10/2026",
+      "titulo": "Memória e revisão: CMR tem três caminhos de escrita (OP-120)"
+    },
     {
       "hash": "dc2aea12",
       "data": "06/10/2026",
@@ -146,11 +151,6 @@
       "hash": "35f47e55",
       "data": "02/10/2026",
       "titulo": "Cotação: proposta e declínio não reabrem cotação encerrada no meio do envio"
-    },
-    {
-      "hash": "de1143fa",
-      "data": "02/10/2026",
-      "titulo": "Memória e revisão: dimensional, reinspeção e rotas (8d6a3deb)"
     }
   ]
 }
