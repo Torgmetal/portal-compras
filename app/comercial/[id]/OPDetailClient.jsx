@@ -38,6 +38,7 @@ import { fmtOP } from "@/lib/utils";
 import OrcamentoComercial from "@/components/OrcamentoComercial";
 import { itensDaPlanilhaComercial } from "@/lib/op-categorias";
 import { numeroBR } from "@/lib/numero-br";
+import { calcularReceita, aliquotasParaGravar } from "@/lib/receita-calculo";
 import { omiePedidoCompraUrl } from "@/lib/omie-urls";
 import CampoDecimal from "@/components/CampoDecimal";
 
@@ -2413,16 +2414,10 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  // Calculos em tempo real
-  const qtdNum = Number(form.quantidade) || 0;
-  const unitNum = Number(form.valorUnitario) || 0;
-  const porUnidade = form.tipoPreco === "POR_UNIDADE";
+  // Calculos em tempo real — os campos são CampoDecimal e entregam texto em português ("519539,62"):
+  // a conta mora em lib/receita-calculo.js, que lê com numeroBR (com Number() o valor virava zero).
+  const { qtdNum, unitNum, porUnidade, valorNum, aliqTotal, impostosVal, liquido } = calcularReceita(form);
   const un = (form.unidade || "un").trim() || "un";
-  const valorNum = porUnidade ? qtdNum * unitNum : (Number(form.valor) || 0);
-  const aliquotas = ["icmsPct","ipiPct","pisPct","cofinsPct","issPct","irrfPct","csllPct"];
-  const aliqTotal = aliquotas.reduce((s, k) => s + (Number(form[k]) || 0), 0);
-  const impostosVal = valorNum * (aliqTotal / 100);
-  const liquido = valorNum - impostosVal;
 
   const submit = async () => {
     setErro("");
@@ -2446,13 +2441,7 @@ function ModalReceita({ opId, receita, onClose, onSaved, enderecosSugeridos = []
         valor: valorNum,
         cfop: form.cfop || null,
         codigoServico: form.codigoServico || null,
-        icmsPct: form.icmsPct === "" ? null : Number(form.icmsPct),
-        ipiPct: form.ipiPct === "" ? null : Number(form.ipiPct),
-        pisPct: form.pisPct === "" ? null : Number(form.pisPct),
-        cofinsPct: form.cofinsPct === "" ? null : Number(form.cofinsPct),
-        issPct: form.issPct === "" ? null : Number(form.issPct),
-        irrfPct: form.irrfPct === "" ? null : Number(form.irrfPct),
-        csllPct: form.csllPct === "" ? null : Number(form.csllPct),
+        ...aliquotasParaGravar(form),
         observacao: form.observacao || null,
         enderecoFaturamento: form.enderecoFaturamento || null,
       };
@@ -3060,6 +3049,9 @@ function ModalSolicitarVerba({ tipo, itemId, atual, descricao, podeAlterarVerbaD
   const [salvando, setSalvando] = useState(false);
 
   const submit = async () => {
+    // CampoDecimal entrega texto em português: Number("1500,50") seria NaN e a API recusaria
+    const proposto = numeroBR(valorProposto, NaN);
+    if (!Number.isFinite(proposto) || proposto < 0) return setErro("Informe o valor proposto.");
     if (!justificativa.trim()) return setErro("Descreva a justificativa.");
     setSalvando(true);
     try {
@@ -3070,7 +3062,7 @@ function ModalSolicitarVerba({ tipo, itemId, atual, descricao, podeAlterarVerbaD
           tipoItem: tipo,
           itemId,
           valorAtual: atual,
-          valorProposto: Number(valorProposto),
+          valorProposto: proposto,
           justificativa: justificativa.trim(),
         }),
       });
