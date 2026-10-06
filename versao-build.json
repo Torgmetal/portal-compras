@@ -1,7 +1,12 @@
 {
-  "build": 3598,
-  "gerado": "2026-10-06T13:39:40.860Z",
+  "build": 3599,
+  "gerado": "2026-10-06T13:44:36.775Z",
   "commits": [
+    {
+      "hash": "56a9a688",
+      "data": "06/10/2026",
+      "titulo": "CMR: as três origens em todo o portal, sempre restritas a material"
+    },
     {
       "hash": "82305e6c",
       "data": "06/10/2026",
@@ -146,11 +151,6 @@
       "hash": "f258f5fe",
       "data": "02/10/2026",
       "titulo": "Cotação: lançamento manual e 'adicionar RM' também não passam por cima do encerramento"
-    },
-    {
-      "hash": "35f47e55",
-      "data": "02/10/2026",
-      "titulo": "Cotação: proposta e declínio não reabrem cotação encerrada no meio do envio"
     }
   ]
 }

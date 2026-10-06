@@ -2702,3 +2702,17 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   (`casar-pdfs`, `match-certificados`), rastreabilidade/status e pintura-lote ainda usam `DO_CMR` sem o
   lançamento do portal. Os importadores criam duplicata ativa quando o mesmo R entra pelo portal e
   depois pela planilha (R 261401). Ver `docs/memoria-claude/torg_cmr_lancamento_portal.md`.
+
+## 06/10/2026 — CMR: as três origens em todo o portal (Claude)
+
+- **Feito (`56a9a688`):** `ORIGENS_CMR` com `registro_manual` e `DO_CMR` com `categoria: "MATERIAL"`. O UPDATE
+  de `lib/match-certificados.js` ganhou `d."categoria" = 'MATERIAL'`. A constante paralela de `dc2aea12` saiu.
+  Teste: `testes/lib/cmr-tres-origens.teste.js` (filtro, ficha do data book, SQL do certificado). Suíte com
+  5.026 passando; `npm run checar` sem erro.
+- **Efeito medido:** 46 lançamentos do portal passam a contar. 45 deles estão sem corrida/certificado, e o
+  data book mostra "sem corrida no CMR". 1 certificado (R 261392) passa a casar na próxima rodada.
+- ⚠ **Para revisar:**
+  - (a) todos os leitores de `DO_CMR` passam a exigir MATERIAL; antes não exigiam, mas as origens da
+    planilha só têm MATERIAL (medido);
+  - (b) os importadores agora reconhecem o R lançado pelo portal e não o recriam; nada é atualizado;
+  - (c) não rodei o casamento de certificados à mão: ele roda no import e na manutenção.

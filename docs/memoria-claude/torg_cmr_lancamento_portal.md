@@ -1,6 +1,6 @@
 ---
 name: torg_cmr_lancamento_portal
-description: O CMR tem TRÊS caminhos de escrita — planilha (2) e a tela de lançamento do portal (`registro_manual`); quem lê fardo tem de incluir o terceiro, e data book/certificados ainda não incluem
+description: O CMR tem TRÊS caminhos de escrita — planilha (2) e a tela de lançamento do portal (`registro_manual`); DO_CMR cobre os três SEMPRE com categoria MATERIAL (06/10)
 metadata:
   type: project
 ---
@@ -19,15 +19,28 @@ e a janela "Selecionar R" dizia "0 de 77 recebimentos compatíveis" na busca pel
     entraria lixo.
   - O Liberar frentes (`material-liberacao`) e a gravação do R já enxergavam, porque não filtram origem.
 
-⚠⚠ **AINDA NÃO INCLUEM O LANÇAMENTO DO PORTAL (pendente, pede decisão):**
-- `lib/databook-ficha-r.js`: a ficha do R no data book pode sair `R xxxx | — | —`, sem corrida nem
-  certificado. A OP-118 tem 42 assim.
-- `documentos/casar-pdfs` e `lib/match-certificados.js`: o certificado escaneado não cola sozinho na
-  entrada lançada pelo portal. Atenção: este caminho GRAVA o vínculo do PDF.
-- `qualidade/rastreabilidade/status` e `lib/pintura-lote.js`: leitura, mesma classe.
-- Importadores (`documentos/importar`, `cmr/sincronizar`, manutenção): procuram a linha da planilha por
-  R entre as origens da planilha. A linha lançada no portal e depois escrita na planilha vira
-  **duplicata ativa** (o R 261401 da OP-118 já está assim). Tratar a linha do portal como linha da
-  planilha muda o que eles atualizam: exige teste próprio.
+**Resolvido em todo o portal (`56a9a688`, mesmo dia, Vitor: "pode corrigir"):** `ORIGENS_CMR` tem as três
+origens e `DO_CMR` leva `categoria: "MATERIAL"`. A constante paralela do primeiro commit saiu. Passam a contar:
+- a ficha do R no data book;
+- o vínculo do certificado escaneado (`casar-pdfs`, o UPDATE de `match-certificados`, que ganhou o mesmo
+  filtro de categoria, e a manutenção);
+- a rastreabilidade/status e o lote de pintura;
+- a checagem de existência dos botões de importar/atualizar a planilha, que deixam de criar outra linha
+  para o mesmo R.
+
+Teste: `testes/lib/cmr-tres-origens.teste.js`.
+
+⚠ **Correção do que eu tinha dito:** não havia duplicata ATIVA.
+- O R 261401 tem a entrada da planilha ativa, com corrida, certificado e PDF; a manual está desativada.
+- O R 261392 tem a manual ativa e duas cópias da planilha, criadas pelo botão de importar 4 dias depois
+  do lançamento e desativadas à mão. É a prova do defeito.
+
+⚠⚠ **45 de 46 lançamentos do portal não têm corrida nem certificado** (medido em 06/10). Agora que contam,
+o data book mostra "sem corrida no CMR" nessas linhas, o que é o certo: o Almoxarifado lançou com a nota
+na mão, e o certificado completa depois, pela edição da tela (`camposEditaveisCmr`). Só 1 certificado
+escaneado (R 261392) estava na pasta para casar.
+
+⚠ Ao medir, não espalhe `...DO_CMR` e depois sobrescreva `categoria`: a chave de depois vence, e a
+consulta passa a incluir o que o filtro existe para excluir. Caí nisso na medição.
 
 Ver [[torg_rastreio_corrida]] e [[torg_qualidade_import_cmr]].
