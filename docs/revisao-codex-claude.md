@@ -2716,3 +2716,28 @@ aparece desligado. O caminho inteiro até a chamada está testado.
     planilha só têm MATERIAL (medido);
   - (b) os importadores agora reconhecem o R lançado pelo portal e não o recriam; nada é atualizado;
   - (c) não rodei o casamento de certificados à mão: ele roda no import e na manutenção.
+
+## 06/10/2026 — Campo decimal: texto com vírgula lido como número (Claude)
+
+- **Feito:**
+  - `56edf507`: modal "Adicionar receita" da OP e pedido de mudança de verba. A conta foi para
+    `lib/receita-calculo.js`, lida com `numeroBR`. Teste: `testes/lib/receita-calculo.teste.js`, que
+    reproduziu o print do Matheus no vermelho (Bruto 0, Impostos 15%).
+  - `8950b3da`: varredura das 26 telas que guardam o texto do CampoDecimal e o liam com
+    `Number`, `parseFloat` ou `parseInt`. A semântica de `|| 0`, `|| null` e do trunc dos inteiros foi
+    mantida. Guarda novo: `testes/campo-decimal-leitura.teste.js`. No código de antes ele acusa 95
+    leituras em 25 arquivos; hoje, zero (4 exceções documentadas, todas de dado do banco).
+  - Suíte com 5.041 passando; `npm run checar` sem erro; eslint sem erro nos arquivos tocados.
+- **Origem:** Matheus, no modal de receita: R$ 519.539,62 → "Valor da receita deve ser maior que zero".
+- **Medido no banco (só leitura):** nada a reparar. Não houve gravação desde 16/09 em frete, estudo,
+  calibração, cargos, férias nem treinamentos; orçamentos e liberações do período têm valor plausível;
+  nenhuma receita foi salva pelo modal. Ver `docs/memoria-claude/torg_campo_decimal_texto.md`.
+- ⚠ **Para revisar:**
+  - (a) `numeroBR` lê ponto seguido de exatamente 3 dígitos como milhar: quem digitar "2.025" querendo
+    2,025 recebe 2025. É a regra do portal inteiro, mas é comportamento novo nessas 26 telas (antes,
+    `Number("2.025")` dava 2,025);
+  - (b) o guarda não segue função auxiliar (`num()`, `onQtd`). Custo-hora, orçamento de serviço, cargos,
+    planejamento de carga e produtividade foram achados lendo o código;
+  - (c) nenhuma das telas foi aberta no navegador: todas exigem login, e as públicas exigem token real;
+  - (d) pendente fora do escopo: `numeroDecimal` em `lib/lqc-itens-comerciais.js` não lê milhar
+    ("15.000,00" vira 0). O LQC tem testes de caracterização e valores legados com ponto.

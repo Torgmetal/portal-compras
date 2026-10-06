@@ -1,7 +1,12 @@
 {
-  "build": 3604,
-  "gerado": "2026-10-06T14:10:51.547Z",
+  "build": 3605,
+  "gerado": "2026-10-06T14:13:55.918Z",
   "commits": [
+    {
+      "hash": "8950b3da",
+      "data": "06/10/2026",
+      "titulo": "Campo decimal: 26 telas liam o texto com vírgula como número e erravam o valor"
+    },
     {
       "hash": "56edf507",
       "data": "06/10/2026",
@@ -146,11 +151,6 @@
       "hash": "c5fdda58",
       "data": "02/10/2026",
       "titulo": "Memória e revisão: LP, EVS, US e pintura (b2a2ccd1, 12dd2654, da26b921, 524205ee)"
-    },
-    {
-      "hash": "524205ee",
-      "data": "02/10/2026",
-      "titulo": "Pintura: média sem a leitura em branco, laudo do resultado da inspeção, nada cortado nem fora da folha"
     }
   ]
 }
