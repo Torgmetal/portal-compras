@@ -2,8 +2,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { upload } from "@vercel/blob/client";
 import Link from "next/link";
-import { Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X, FileText, CheckCircle2, Lock, BookCheck, FileDown, Upload, Send, Users, FolderOpen, RotateCcw, History, Download, Eye, ListChecks } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, Weight, ShieldAlert, Plus, X, FileText, CheckCircle2, Lock, BookCheck, FileDown, Upload, Send, Users, FolderOpen, RotateCcw, History, Download, Eye, ListChecks, Pencil } from "lucide-react";
 import NavegadorServidor from "./NavegadorServidor";
+import TrocarEmailEtapa, { mensagemDaTroca } from "./TrocarEmailEtapa";
 import Volumes from "./Volumes";
 import { FONTE_LABEL, ESTADO_DATABOOK, secaoUsaEmpresa, secaoUsaProcedimentos, secaoUsaRelatoriosServidor, GRUPO_MATERIAL_LABEL, gruposDaSecao, SECAO_RELATORIOS_SERVIDOR, PIT_COLUNAS, PIT_PADRAO, numeroExibido } from "@/lib/databook-secoes";
 import { secaoNavega } from "@/lib/databook-pastas-web";
@@ -571,6 +572,7 @@ function FluxoAssinaturas({ id, cliente, clienteEmail, avaliacaoPendente = false
   const [form, setForm] = useState({ elaboradorNome: "", elaboradorEmail: "", inspetorNome: "", inspetorEmail: "", rtEmail: "", clienteNome: cliente || "", clienteEmail: clienteEmail || "" });
   const [iniciando, setIniciando] = useState(false);
   const [reenviando, setReenviando] = useState(0);
+  const [editando, setEditando] = useState(0); // ordem da etapa com o e-mail em edição
 
   const carregarChain = useCallback(async () => {
     try {
@@ -636,17 +638,29 @@ function FluxoAssinaturas({ id, cliente, clienteEmail, avaliacaoPendente = false
             const assinado = a.status === "ASSINADO";
             const atual = a.ordem === atualOrdem;
             return (
-              <div key={a.ordem} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] border ${atual ? "border-torg-blue bg-torg-blue-50/40" : "border-gray-100"}`}>
-                {assinado ? <CheckCircle2 size={15} className="text-emerald-600 shrink-0" /> : <span className="w-[15px] text-center text-torg-gray shrink-0 font-mono">{a.ordem}</span>}
-                <div className="min-w-0 flex-1">
-                  <span className="font-medium text-torg-dark">{PAPEL_LABEL_UI[a.papel] || a.papel}</span>
-                  <span className="text-torg-gray"> · {assinado ? a.assinadoNome : (a.email || a.nome || "—")}</span>
+              <div key={a.ordem} className={`rounded-lg px-3 py-2 text-[12px] border ${atual ? "border-torg-blue bg-torg-blue-50/40" : "border-gray-100"}`}>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  {assinado ? <CheckCircle2 size={15} className="text-emerald-600 shrink-0" /> : <span className="w-[15px] text-center text-torg-gray shrink-0 font-mono">{a.ordem}</span>}
+                  <div className="min-w-0 flex-1">
+                    <span className="font-medium text-torg-dark">{PAPEL_LABEL_UI[a.papel] || a.papel}</span>
+                    {/* ⚠ nome E e-mail: só o nome escondia para qual caixa o convite foi (o inspetor estava num e-mail que não é o login dele) */}
+                    <span className="text-torg-gray"> · {assinado ? a.assinadoNome : (a.nome && a.email ? `${a.nome} (${a.email})` : (a.email || a.nome || "—"))}</span>
+                  </div>
+                  <span className="text-[11px] text-torg-gray whitespace-nowrap">{assinado ? `assinou ${fmtDH(a.assinadoEm)}` : atual ? (a.status === "ENVIADO" ? "enviado · aguardando" : "a enviar") : "aguardando"}</span>
+                  {!assinado && atual && (
+                    <button onClick={() => reenviar(a.ordem)} disabled={reenviando === a.ordem} className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1 disabled:opacity-50">
+                      {reenviando === a.ordem ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />} reenviar
+                    </button>
+                  )}
+                  {!assinado && editando !== a.ordem && (
+                    <button onClick={() => setEditando(a.ordem)} className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1">
+                      <Pencil size={11} /> alterar e-mail
+                    </button>
+                  )}
                 </div>
-                <span className="text-[11px] text-torg-gray whitespace-nowrap">{assinado ? `assinou ${fmtDH(a.assinadoEm)}` : atual ? (a.status === "ENVIADO" ? "enviado · aguardando" : "a enviar") : "aguardando"}</span>
-                {!assinado && atual && (
-                  <button onClick={() => reenviar(a.ordem)} disabled={reenviando === a.ordem} className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1 disabled:opacity-50">
-                    {reenviando === a.ordem ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />} reenviar
-                  </button>
+                {editando === a.ordem && (
+                  <TrocarEmailEtapa dataBookId={id} etapa={a} onCancelar={() => setEditando(0)}
+                    onTrocado={async (j, email) => { setEditando(0); alert(mensagemDaTroca(j, email)); await carregarChain(); }} />
                 )}
               </div>
             );

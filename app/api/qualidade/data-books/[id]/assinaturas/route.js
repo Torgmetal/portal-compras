@@ -118,6 +118,13 @@ export async function POST(req, { params }) {
 
 // PATCH { ordem } — reenvia o e-mail da etapa (só a etapa "da vez": anteriores assinadas
 // e ela ainda não assinada).
+// PATCH { ordem, email, nome? } — troca o destinatário de uma etapa que ainda não foi assinada.
+const schemaPatch = z.object({
+  ordem: z.number().int().min(1).max(4),
+  email: z.string().trim().toLowerCase().email("E-mail inválido").optional(),
+  nome: z.string().trim().max(120).optional().nullable(),
+});
+
 export async function PATCH(req, { params }) {
   let user;
   try {
@@ -125,17 +132,21 @@ export async function PATCH(req, { params }) {
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 });
   }
-  let ordem;
+  let body;
   try {
-    ordem = z.object({ ordem: z.number().int().min(1).max(4) }).parse(await req.json()).ordem;
+    body = schemaPatch.parse(await req.json());
   } catch (e) {
     return NextResponse.json({ success: false, error: e.issues?.[0]?.message || "Dados inválidos" }, { status: 400 });
   }
+  const { ordem } = body;
   const book = await prisma.dataBookQualidade.findUnique({ where: { id: params.id }, select: { opNumero: true, obra: true } });
   const etapas = await prisma.dataBookAssinatura.findMany({ where: { dataBookId: params.id }, orderBy: { ordem: "asc" } });
   const etapa = etapas.find((e) => e.ordem === ordem);
   if (!book || !etapa) return NextResponse.json({ success: false, error: "Etapa não encontrada" }, { status: 404 });
-  if (etapa.status === "ASSINADO") return NextResponse.json({ success: false, error: "Etapa já assinada." }, { status: 400 });
+  if (etapa.status === "ASSINADO") {
+    return NextResponse.json({ success: false, error: body.email ? "Etapa já assinada — o e-mail não muda depois da assinatura." : "Etapa já assinada." }, { status: 400 });
+  }
+  if (body.email) return trocarEmail({ req, user, book, etapa, email: body.email, nome: body.nome });
   if (!etapas.filter((e) => e.ordem < ordem).every((e) => e.status === "ASSINADO")) {
     return NextResponse.json({ success: false, error: "Ainda não é a vez desta etapa (etapa anterior pendente)." }, { status: 400 });
   }
@@ -145,4 +156,40 @@ export async function PATCH(req, { params }) {
   await prisma.dataBookAssinatura.update({ where: { id: etapa.id }, data: { status: "ENVIADO", enviadoEm: new Date() } });
   await prisma.auditLog.create({ data: { userId: user.id, action: "REENVIAR_ASSINATURA_DATABOOK", entity: "DataBookAssinatura", entityId: etapa.id, diff: { ordem, enviado } } }).catch(() => {});
   return NextResponse.json({ success: true, enviado });
+}
+
+// ⚠⚠ DEPOIS DE CRIADO, O FLUXO NÃO DEIXAVA TROCAR E-MAIL NENHUM. Vitor (06/10/2026): "preciso alterar
+// o e-mail do inspetor que está com o e-mail do Alexandre Stival e deveria ser outro e-mail". A tela
+// só oferecia "reenviar", e a revisão do data book zera as assinaturas mas MANTÉM os e-mails — o
+// endereço errado voltava a cada revisão (OP-102, 103 e 112 tinham o inspetor num e-mail que não é o
+// login de ninguém, e por isso a assinatura dele sairia sem o carimbo cadastrado).
+//
+// ⚠⚠ E-MAIL NOVO, LINK NOVO. O token sobrevive à revisão; se a etapa já tinha sido convidada, o link
+// está na caixa do endereço antigo — e quem o abrisse assinaria como inspetor. Trocar o e-mail sem
+// trocar o token deixaria a assinatura com quem não devia.
+async function trocarEmail({ req, user, book, etapa, email, nome }) {
+  // o nome do RT é fixo no fluxo (RT_NOME); nome vazio volta a ser "sem nome"
+  const nomeNovo = etapa.papel === "RESP_TECNICO" ? RT_NOME : (nome === undefined ? etapa.nome : (nome || null));
+  const emailMudou = email !== String(etapa.email || "").toLowerCase();
+  if (!emailMudou && nomeNovo === etapa.nome) return NextResponse.json({ success: true, mudou: false, reenviado: false });
+
+  const token = emailMudou ? gerarTokenForte(32) : etapa.token;
+  await prisma.dataBookAssinatura.update({ where: { id: etapa.id }, data: { email, nome: nomeNovo, ...(emailMudou ? { token } : {}) } });
+
+  // já convidada: o convite vai de novo, agora para o endereço certo e com o link que vale
+  const reenviado = emailMudou && etapa.status === "ENVIADO";
+  let enviado = null;
+  if (reenviado) {
+    enviado = true;
+    const link = `${baseUrlDe(req)}/data-book/assinar/${token}`;
+    try { await enviarEmailEtapa({ email, papel: etapa.papel, nomeDest: nomeNovo, op: fmtOPdb(book.opNumero), obra: book.obra, link }); } catch { enviado = false; }
+    await prisma.dataBookAssinatura.update({ where: { id: etapa.id }, data: { enviadoEm: new Date() } });
+  }
+  await prisma.auditLog.create({
+    data: {
+      userId: user.id, action: "TROCAR_EMAIL_ASSINATURA_DATABOOK", entity: "DataBookAssinatura", entityId: etapa.id,
+      diff: { ordem: etapa.ordem, papel: etapa.papel, antes: { email: etapa.email, nome: etapa.nome }, depois: { email, nome: nomeNovo }, linkRenovado: emailMudou, reenviado, enviado },
+    },
+  }).catch(() => {});
+  return NextResponse.json({ success: true, mudou: true, reenviado, enviado });
 }

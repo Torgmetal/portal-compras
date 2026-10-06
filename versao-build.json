@@ -1,7 +1,12 @@
 {
-  "build": 3605,
-  "gerado": "2026-10-06T14:13:55.918Z",
+  "build": 3606,
+  "gerado": "2026-10-06T20:14:28.071Z",
   "commits": [
+    {
+      "hash": "eafb5b86",
+      "data": "06/10/2026",
+      "titulo": "Memória e revisão: campo decimal lido com numeroBR (receita da OP + varredura de 26 telas)"
+    },
     {
       "hash": "8950b3da",
       "data": "06/10/2026",
@@ -146,11 +151,6 @@
       "hash": "4878962c",
       "data": "02/10/2026",
       "titulo": "Nada travado: quantidade do dimensional, celular e soldador do EVS"
-    },
-    {
-      "hash": "c5fdda58",
-      "data": "02/10/2026",
-      "titulo": "Memória e revisão: LP, EVS, US e pintura (b2a2ccd1, 12dd2654, da26b921, 524205ee)"
     }
   ]
 }
