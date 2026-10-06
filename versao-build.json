@@ -1,7 +1,12 @@
 {
-  "build": 3606,
-  "gerado": "2026-10-06T20:14:28.071Z",
+  "build": 3607,
+  "gerado": "2026-10-06T20:15:15.563Z",
   "commits": [
+    {
+      "hash": "5e743f93",
+      "data": "06/10/2026",
+      "titulo": "Data Book: trocar o e-mail de uma etapa do fluxo de assinaturas ainda não assinada"
+    },
     {
       "hash": "eafb5b86",
       "data": "06/10/2026",
@@ -146,11 +151,6 @@
       "hash": "577219fb",
       "data": "02/10/2026",
       "titulo": "Relatórios de pull-off e de recebimento de tintas"
-    },
-    {
-      "hash": "4878962c",
-      "data": "02/10/2026",
-      "titulo": "Nada travado: quantidade do dimensional, celular e soldador do EVS"
     }
   ]
 }

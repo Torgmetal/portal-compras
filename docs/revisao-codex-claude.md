@@ -2741,3 +2741,22 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (c) nenhuma das telas foi aberta no navegador: todas exigem login, e as públicas exigem token real;
   - (d) pendente fora do escopo: `numeroDecimal` em `lib/lqc-itens-comerciais.js` não lê milhar
     ("15.000,00" vira 0). O LQC tem testes de caracterização e valores legados com ponto.
+
+## 06/10/2026 — Data Book: trocar o e-mail de uma etapa não assinada (Claude)
+
+- **Feito (`5e743f93`):** `PATCH /api/qualidade/data-books/[id]/assinaturas` aceita `{ ordem, email, nome? }`. Troca
+  e-mail e nome (o do RT é fixo) de uma etapa não assinada, gera token novo quando o e-mail muda e, se a etapa
+  estava ENVIADO, manda o convite ao e-mail novo. AuditLog `TROCAR_EMAIL_ASSINATURA_DATABOOK` com antes/depois,
+  sem o token. Sem `email`, o PATCH segue reenviando como antes. Tela: "alterar e-mail" em cada etapa não assinada
+  (`app/qualidade/data-books/[id]/TrocarEmailEtapa.jsx`), e a lista mostra nome e e-mail.
+  Testes: `testes/api/databook-assinaturas-trocar-email.teste.js` (8) e `testes/databook-trocar-email-etapa.teste.jsx`
+  (8), vermelho→verde. Suíte com 5.057 passando; `npm run checar` sem erro.
+- **Origem:** Vitor, inspetor com o e-mail do Alexandre Stival. Medido (só leitura): OP-102, 103 e 112 têm a etapa
+  INSPETOR pendente com Alexandre Stival, duas em `alexandre_stival@yahoo.com.br` (não é login de ninguém) e uma
+  em `stival2112@gmail.com` (o login dele). Nenhum dado foi alterado por mim: a troca fica para quem sabe o e-mail
+  certo.
+- ⚠ **Para revisar:**
+  - (a) a troca não verifica se a etapa é "da vez": trocar uma etapa futura só muda para onde o convite vai;
+  - (b) o reenvio do PATCH antigo não checa `estaFechado` (data book em montagem pode reenviar) — já era assim;
+  - (c) os relatórios de inspeção (`AssinaturaDocumento`) seguem sem troca de destinatário pela tela;
+  - (d) não validei no navegador: a tela exige login de Qualidade/ADMIN.

@@ -76,3 +76,15 @@ do 1 ao 19"*.
 - O PDF do modelo novo (TORG_2026) numera pela taxonomia do dossiê (I-1, II-1…) e o cabeçalho de seção NÃO imprime o
   número — onde o número aparece é na TELA, nos VOLUMES ("Seção 18 · …") e nas mensagens de emissão/pendências.
 
+
+### Fluxo de assinaturas: a revisão mantém e-mail e link (06/10/2026)
+- ⚠⚠ **A REVISÃO ZERA O STATUS DAS 4 ETAPAS, MAS MANTÉM E-MAIL, NOME E TOKEN** (`lib/databook-revisao.js`,
+  `updateMany`). E-mail errado volta a cada revisão, e o link antigo continua valendo. Caso real: OP-102, 103
+  e 112 com o inspetor em `alexandre_stival@yahoo.com.br`, que não é o login dele; assinado dali, sairia sem
+  o carimbo cadastrado (a imagem é buscada pelo e-mail da etapa).
+- Desde `5e743f93`, cada etapa não assinada tem **"alterar e-mail"** na tela (`TrocarEmailEtapa.jsx`). A rota
+  (`PATCH /api/qualidade/data-books/[id]/assinaturas` com `email`) troca também o **token**, e reenvia na
+  hora se a etapa já tinha sido convidada. O nome do RT é fixo; etapa assinada não muda. AuditLog
+  `TROCAR_EMAIL_ASSINATURA_DATABOOK`, sem o token.
+- ⚠ Os relatórios de inspeção (`AssinaturaDocumento`) NÃO têm essa troca: lá o desvio de 24/09 foi por
+  script (`REDIRECIONAR_CONVITE_ASSINATURA`, que mantém o carimbo do TITULAR — semântica diferente).
