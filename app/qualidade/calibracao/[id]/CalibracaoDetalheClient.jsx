@@ -6,6 +6,7 @@ import Link from "next/link";
 import { upload } from "@vercel/blob/client";
 import { ArrowLeft, Loader2, Save, CheckCircle2, XCircle, RotateCcw, FileDown, AlertCircle, Upload, Paperclip, X, Plus, Trash2, Eye, ShieldCheck, ScanSearch, AlertTriangle } from "lucide-react";
 import { numRAC, SITUACOES, CONCLUSAO, conclusaoLabel, criteriosPadrao, sugerirConclusao, fmtPercent } from "@/lib/calibracao";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtNum = (v) => (v == null || v === "" ? "—" : Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 4 }));
 
@@ -43,7 +44,7 @@ export default function CalibracaoDetalheClient({ id }) {
     identificacao: av.identificacao, faixaUso: av.faixaUso, laboratorio: av.laboratorio,
     criterios: av.criterios.filter((c) => (c.criterio || "").trim()),
     criterioAceitacao: av.criterioAceitacao, parecer: av.parecer,
-    erroMaxPercent: av.erroMaxPercent === "" || av.erroMaxPercent == null ? null : Number(av.erroMaxPercent),
+    erroMaxPercent: av.erroMaxPercent === "" || av.erroMaxPercent == null ? null : numeroBR(av.erroMaxPercent, null), // CampoDecimal: "0,5"
     ...extra,
   });
 

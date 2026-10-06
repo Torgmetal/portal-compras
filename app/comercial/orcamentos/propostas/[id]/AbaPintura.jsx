@@ -193,8 +193,8 @@ function CamadaModal({ onClose, onSalvar, catalogo, loadingCatalogo, camada, are
   // Calculo em tempo real
   const calc = useMemo(() => {
     return calcularQuantidadeTinta({
-      svPct: parseFloat(svPct) || 0,
-      espessuraMicra: parseFloat(espessuraMicra) || 0,
+      svPct: numeroBR(svPct),
+      espessuraMicra: numeroBR(espessuraMicra),
       areaM2: areaTotal || 0,
       demaos,
       percPerdas: parseFloat(percPerdas) || 0,
@@ -224,17 +224,17 @@ function CamadaModal({ onClose, onSalvar, catalogo, loadingCatalogo, camada, are
 
   const handleSalvar = async () => {
     if (!descricao.trim()) return setErro("Descricao obrigatoria");
-    if (!espessuraMicra || parseFloat(espessuraMicra) <= 0) return setErro("Espessura obrigatoria");
+    if (!espessuraMicra || numeroBR(espessuraMicra, NaN) <= 0) return setErro("Espessura obrigatoria");
     setSalvando(true);
     setErro("");
     try {
       await onSalvar({
         etapa,
         tintaProdutoId: tintaProdutoId || null,
-        svPct: parseFloat(svPct) || null,
+        svPct: numeroBR(svPct) || null,
         resinaTipo: resinaTipo || null,
         descricao: descricao.trim(),
-        espessuraMicra: parseFloat(espessuraMicra) || null,
+        espessuraMicra: numeroBR(espessuraMicra) || null,
         demaos,
         metodoAplicacao,
         percPerdas: parseFloat(percPerdas) || 0,
@@ -339,7 +339,7 @@ function CamadaModal({ onClose, onSalvar, catalogo, loadingCatalogo, camada, are
           </div>
 
           {/* Card de cálculo em tempo real */}
-          {parseFloat(svPct) > 0 && parseFloat(espessuraMicra) > 0 && areaTotal > 0 && (
+          {numeroBR(svPct, NaN) > 0 && numeroBR(espessuraMicra, NaN) > 0 && areaTotal > 0 && (
             <div className="bg-gradient-to-r from-torg-blue/5 to-emerald-50 border border-torg-blue/20 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Calculator size={16} className="text-torg-blue" />

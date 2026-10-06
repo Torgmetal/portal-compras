@@ -57,12 +57,12 @@ function NovoFreteModal({ onClose, onSalvar, obraDefault }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
 
-  const pesoTotalNum = parseFloat(pesoTon) || 0;
-  const pesoCargaNum = parseFloat(pesoPorCarga) || 0;
+  const pesoTotalNum = numeroBR(pesoTon);
+  const pesoCargaNum = numeroBR(pesoPorCarga);
   const viagensAuto = pesoCargaNum > 0 && pesoTotalNum > 0
     ? Math.ceil(pesoTotalNum / pesoCargaNum) : null;
-  const viagensEfetivas = viagensAuto ?? (parseInt(quantidadeViagens) || 1);
-  const custoTotal = viagensEfetivas * (parseFloat(custoPorViagem) || 0);
+  const viagensEfetivas = viagensAuto ?? (Math.trunc(numeroBR(quantidadeViagens)) || 1);
+  const custoTotal = viagensEfetivas * numeroBR(custoPorViagem);
 
   const handleSalvar = async () => {
     if (!descricao.trim()) return setErro("Descricao e obrigatoria");
@@ -78,7 +78,7 @@ function NovoFreteModal({ onClose, onSalvar, obraDefault }) {
         pesoPorCarga: pesoCargaNum || undefined,
         tipoVeiculo: tipoVeiculo || undefined,
         quantidadeViagens: viagensEfetivas,
-        custoPorViagem: custoPorViagem ? parseFloat(custoPorViagem) : 0,
+        custoPorViagem: custoPorViagem ? numeroBR(custoPorViagem, NaN) : 0,
         custoTotal,
         observacao: observacao.trim() || undefined,
       });
@@ -400,7 +400,7 @@ export default function AbaFretes({ estudo, estudoId }) {
   const cancelEdit = () => { setEditandoId(null); setEditValores({}); };
   const saveEdit = async () => {
     const pesoT = editValores.pesoTon || 0;
-    const pesoC = parseFloat(editValores.pesoPorCarga) || 0;
+    const pesoC = numeroBR(editValores.pesoPorCarga);
     const viagensCalc = pesoC > 0 && pesoT > 0 ? Math.ceil(pesoT / pesoC) : (editValores.quantidadeViagens || 1);
     const custoTotal = viagensCalc * (editValores.custoPorViagem || 0);
     try {
@@ -610,7 +610,7 @@ export default function AbaFretes({ estudo, estudoId }) {
                         <td className="py-1.5 px-2"><input type="number" value={editValores.quantidadeViagens} onChange={(e) => setEditValores((v) => ({ ...v, quantidadeViagens: parseInt(e.target.value) || 1 }))} min="1" className="w-16 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none" /></td>
                         <td className="py-1.5 px-2"><CampoDecimal value={editValores.custoPorViagem} onChange={(txt) => setEditValores((v) => ({ ...v, custoPorViagem: numeroBR(txt) }))} className="w-24 px-2 py-1 border border-gray-200 rounded text-xs text-right focus:ring-1 focus:ring-torg-blue/30 outline-none" /></td>
                         <td className="py-1.5 px-2 text-right text-xs font-medium tabular-nums text-torg-dark">
-                          {(() => { const pc = parseFloat(editValores.pesoPorCarga) || 0; const pt = editValores.pesoTon || 0; const v = pc > 0 && pt > 0 ? Math.ceil(pt / pc) : (editValores.quantidadeViagens || 1); return fmtMoeda(v * (editValores.custoPorViagem || 0)); })()}
+                          {(() => { const pc = numeroBR(editValores.pesoPorCarga); const pt = editValores.pesoTon || 0; const v = pc > 0 && pt > 0 ? Math.ceil(pt / pc) : (editValores.quantidadeViagens || 1); return fmtMoeda(v * (editValores.custoPorViagem || 0)); })()}
                         </td>
                         <td className="py-1.5 px-2">
                           <div className="flex items-center gap-1">
@@ -713,7 +713,7 @@ export default function AbaFretes({ estudo, estudoId }) {
                           <button
                             onClick={() => {
                               handleAtualizarCotacao(cot.id, {
-                                valorCotado: cotacaoEditValor ? parseFloat(cotacaoEditValor) : undefined,
+                                valorCotado: cotacaoEditValor ? numeroBR(cotacaoEditValor, NaN) : undefined,
                                 prazoEntrega: cotacaoEditPrazo || undefined,
                                 status: "RECEBIDA",
                               });

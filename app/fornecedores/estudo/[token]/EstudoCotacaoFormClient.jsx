@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import {
   Package, Loader2, CheckCircle2, AlertCircle, Send,
 } from "lucide-react";
+import { numeroBR } from "@/lib/numero-br";
 
 function fmtNum(v, dec = 2) {
   if (!v && v !== 0) return "—";
@@ -65,7 +66,8 @@ export default function EstudoCotacaoFormClient() {
     // Verificar se ao menos um preco foi informado
     const itensComPreco = dados.itens.map((item) => ({
       id: item.id,
-      precoUnitario: precos[item.id] ? parseFloat(precos[item.id]) : null,
+      // CampoDecimal entrega texto em português: parseFloat("1.234,56") dava 1,234
+      precoUnitario: precos[item.id] ? numeroBR(precos[item.id], null) : null,
       observacao: obsItens[item.id]?.trim() || undefined,
     }));
     const algumPreco = itensComPreco.some((i) => i.precoUnitario != null && i.precoUnitario > 0);
@@ -119,7 +121,7 @@ export default function EstudoCotacaoFormClient() {
 
   if (sucesso) {
     const totalCotado = dados.itens.reduce((s, item) => {
-      const p = parseFloat(precos[item.id]) || item.precoUnitario || 0;
+      const p = numeroBR(precos[item.id]) || item.precoUnitario || 0;
       return s + p * (item.quantidade || 0);
     }, 0);
 
@@ -149,7 +151,7 @@ export default function EstudoCotacaoFormClient() {
 
   // Calcular total parcial
   const totalParcial = dados.itens.reduce((s, item) => {
-    const p = parseFloat(precos[item.id]) || 0;
+    const p = numeroBR(precos[item.id]);
     return s + p * (item.quantidade || 0);
   }, 0);
 
@@ -200,7 +202,7 @@ export default function EstudoCotacaoFormClient() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {dados.itens.map((item, idx) => {
-                    const preco = parseFloat(precos[item.id]) || 0;
+                    const preco = numeroBR(precos[item.id]);
                     const subtotal = preco * (item.quantidade || 0);
                     return (
                       <tr key={item.id}>

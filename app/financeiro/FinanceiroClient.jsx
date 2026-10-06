@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Loader2, AlertCircle, X, TrendingUp, TrendingDown, Pencil, Trash2, Activity, Download } from "lucide-react";
 import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—";
@@ -579,7 +580,9 @@ function ModalFluxo({ ops, item, onClose, onSaved }) {
   const submit = async () => {
     setErro("");
     if (!form.descricao.trim()) return setErro("Descrição é obrigatória.");
-    if (!Number(form.valor) || Number(form.valor) <= 0) return setErro("Valor deve ser maior que zero.");
+    // CampoDecimal entrega texto em português ("1500,50"): Number() leria NaN e recusaria o valor
+    const valorNum = numeroBR(form.valor, NaN);
+    if (!valorNum || valorNum <= 0) return setErro("Valor deve ser maior que zero.");
     setSalvando(true);
     try {
       const payload = {
@@ -587,7 +590,7 @@ function ModalFluxo({ ops, item, onClose, onSaved }) {
         tipo: form.tipo,
         categoria: form.categoria,
         descricao: form.descricao.trim(),
-        valor: Number(form.valor),
+        valor: valorNum,
         realizado: !!form.realizado,
         dataRealizado: form.dataRealizado || null,
         opId: form.opId || null,

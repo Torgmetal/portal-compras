@@ -9,6 +9,7 @@ import { fmtOP, fmtMoedaCompacta, fmtMoedaInteira } from "@/lib/utils";
 import { conversaoComercial, META_CONVERSAO } from "@/lib/conversao-comercial";
 import OrcamentosTabs from "@/components/OrcamentosTabs";
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
+import { numeroBR } from "@/lib/numero-br";
 
 // ─── CONSTANTES ─────────────────────────────────────────────────
 
@@ -771,7 +772,8 @@ function FormOrcamentoModal({ orcamento, onSalvar, onClose }) {
     try {
       const dados = {
         ...form,
-        valor: form.valor !== "" ? parseFloat(form.valor) : null,
+        // CampoDecimal entrega texto em português: parseFloat("1.500.000,00") dava 1,5
+        valor: form.valor !== "" ? numeroBR(form.valor, null) : null,
         tipoVenda: form.tipoVenda || null,
         porte: form.porte || null,
         dataSolicitada: form.dataSolicitada || null,

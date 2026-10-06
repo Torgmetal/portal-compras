@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Truck, Loader2, CheckCircle2, AlertCircle, Send } from "lucide-react";
 import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 function fmtNum(v, dec = 0) {
   if (!v && v !== 0) return "—";
@@ -56,7 +57,8 @@ export default function FreteFormClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          valorCotado: parseFloat(valorCotado),
+          // CampoDecimal entrega texto em português: parseFloat("1.500,00") dava 1,5
+          valorCotado: numeroBR(valorCotado, NaN),
           prazoEntrega: prazoEntrega.trim(),
           observacao: observacao.trim() || undefined,
         }),
@@ -103,7 +105,7 @@ export default function FreteFormClient() {
           {dados.valorCotado || valorCotado ? (
             <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
               <p className="text-sm text-emerald-600 font-medium">Valor cotado</p>
-              <p className="text-2xl font-bold text-emerald-800">{fmtMoeda(parseFloat(valorCotado) || dados.valorCotado)}</p>
+              <p className="text-2xl font-bold text-emerald-800">{fmtMoeda(numeroBR(valorCotado) || dados.valorCotado)}</p>
               {(prazoEntrega || dados.prazoEntrega) && (
                 <p className="text-sm text-emerald-600 mt-1">Dias de viagem: {prazoEntrega || dados.prazoEntrega}</p>
               )}

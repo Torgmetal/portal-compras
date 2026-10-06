@@ -20,6 +20,7 @@ import { Loader2, AlertCircle, Send, Check, X, CalendarClock, Wand2, Star, Refre
 import { useFiltroColunas, ThFiltro } from "@/components/FiltroColuna";
 import SeletorRMaterial from "./SeletorRMaterial";
 import { estimarPrazo, classeDaPeca, kgPorMetro } from "@/lib/prazo-preparacao";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR");
 const fmtKg = (n) => `${Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -196,7 +197,8 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
   const escopo = selecionadas.length ? selecionadas : f.filtradas;
   const travadasNoEscopo = useMemo(() => escopo.reduce((n, p) => n + (liberavel(p) ? 0 : (Number(p.qte) || 1)), 0), [escopo]); // eslint-disable-line react-hooks/exhaustive-deps
   const prazo = useMemo(
-    () => estimarPrazo(escopo, { metaKg: Number(metaKg) || 12000, pools: d?.pools }),
+    // metaKg vem do CampoDecimal como texto em português: "12.000" é doze mil (Number dava 12)
+    () => estimarPrazo(escopo, { metaKg: numeroBR(metaKg) || 12000, pools: d?.pools }),
     [escopo, metaKg, d]);
 
   // ⚠ O MARCO VEM DO CRONOGRAMA. Vitor (26/08/2026): "a partir da OP que eu selecionar vc já traz a
@@ -212,7 +214,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
     const { sugerirDoDia } = await import("@/lib/liberacao-sugestao");
     // ⚠ a sugestão do dia respeita o portão: sugerir peça que o POST vai barrar é fazer a pessoa
     // montar a carga do dia duas vezes.
-    const s = sugerirDoDia(selecionaveis, { metaKg: Number(metaKg) || 12000, pools: d.pools });
+    const s = sugerirDoDia(selecionaveis, { metaKg: numeroBR(metaKg) || 12000, pools: d.pools });
     setSel(new Set(s.ids)); setSugestao(s);
   }
 
@@ -302,7 +304,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
           daSelecao ? `Seleção: ${fmtN(somaSel.n)} peça(s)` : "Lista completa",
           f.ativos ? `Filtro: ${f.rotulosAtivos.join(", ")}` : soAFazer ? "Só as a fazer" : "Todas",
           "Datas definidas pelo PCP",
-          prazo.diasCheios ? `Previsão ${fmtN(prazo.diasCheios)} dia(s) na meta de ${fmtN(Number(metaKg) || 0)} kg/dia` : "",
+          prazo.diasCheios ? `Previsão ${fmtN(prazo.diasCheios)} dia(s) na meta de ${fmtN(numeroBR(metaKg))} kg/dia` : "",
         ].filter(Boolean).join(" · "),
         kpis: [`${fmtN(prazo.un)} peça(s)`, fmtKg(prazo.kg), `${fmtN(prazo.diasCheios)} dia(s)`],
         totalColunas: COLS.length, nomePlanilha: daSelecao ? "Selecao" : "Preparacao", codigoDoc: "REL-PLN-003",
@@ -359,7 +361,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
           // ⚠ MANDA O QUE A TELA MOSTRA. `sel` guarda tudo que já foi marcado, inclusive o que
           // saiu de vista quando o filtro mudou — e os totais ao lado do botão saem de
           // `selecionadas`. Mandar `sel` liberava mais peças do que o número no botão dizia.
-          pecaIds: selecionadas.map((p) => p.id), metaKg: Number(metaKg) || null,
+          pecaIds: selecionadas.map((p) => p.id), metaKg: numeroBR(metaKg) || null,
           totalKg: Math.round(somaSel.kg), totalPecas: somaSel.n,
         }),
       });
@@ -509,7 +511,7 @@ export default function LiberarFrentes({ opId, opNumero, onMudou }) {
               {fmtN(prazo.diasCheios)} dia(s) de preparação
             </p>
             <span className="text-[12px] text-torg-gray">
-              {selecionadas.length ? "para a seleção" : "para a lista inteira"} · {fmtN(prazo.un)} peça(s) · {fmtKg(prazo.kg)} · meta {fmtN(Number(metaKg) || 0)} kg/dia
+              {selecionadas.length ? "para a seleção" : "para a lista inteira"} · {fmtN(prazo.un)} peça(s) · {fmtKg(prazo.kg)} · meta {fmtN(numeroBR(metaKg))} kg/dia
             </span>
           </div>
 

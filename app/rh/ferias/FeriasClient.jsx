@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { valorFerias, fimGozo, periodoIndiceDe, periodoAtual } from "@/lib/ferias-calc";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmt = (v) => (Number(v) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -56,7 +57,7 @@ export default function FeriasClient() {
     try {
       const r = await fetch("/api/rh/ferias", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ funcionarioId: modal.funcionario.id, dataInicio: form.dataInicio, diasGozo: Number(form.diasGozo), diasVendidos: Number(form.diasVendidos), descontos: Number(form.descontos) || 0, salarioBase: form.salarioBase !== "" ? Number(form.salarioBase) : null, status: form.status, observacao: form.observacao || null }),
+        body: JSON.stringify({ funcionarioId: modal.funcionario.id, dataInicio: form.dataInicio, diasGozo: Number(form.diasGozo), diasVendidos: Number(form.diasVendidos), descontos: numeroBR(form.descontos), salarioBase: form.salarioBase !== "" ? numeroBR(form.salarioBase, NaN) : null, status: form.status, observacao: form.observacao || null }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Falha ao programar");
@@ -90,8 +91,9 @@ export default function FeriasClient() {
     </button>
   );
 
-  const baseCalc = form.salarioBase !== "" ? Number(form.salarioBase) : modal?.funcionario?.salario;
-  const val = modal ? valorFerias(baseCalc, Number(form.diasGozo) || 0, Number(form.diasVendidos) || 0, Number(form.descontos) || 0) : null;
+  // salário e descontos vêm do CampoDecimal como texto em português: numeroBR, não Number
+  const baseCalc = form.salarioBase !== "" ? numeroBR(form.salarioBase, NaN) : modal?.funcionario?.salario;
+  const val = modal ? valorFerias(baseCalc, Number(form.diasGozo) || 0, Number(form.diasVendidos) || 0, numeroBR(form.descontos)) : null;
   // Período aquisitivo em que a data de início cai + se é retroativa (avança o
   // período: as anteriores contam como já gozadas).
   const idxLanc = modal && form.dataInicio && modal.funcionario?.dataAdmissao
@@ -271,7 +273,7 @@ export default function FeriasClient() {
                 {Number(form.diasVendidos) > 0 && <div className="flex justify-between text-torg-gray"><span>Abono ({form.diasVendidos}d)</span><span className="tabular-nums">R$ {fmt(val?.abono)}</span></div>}
                 <div className="flex justify-between text-torg-gray"><span>1/3 constitucional</span><span className="tabular-nums">R$ {fmt(val?.terco)}</span></div>
                 <div className="flex justify-between text-torg-gray border-t border-torg-blue-100 mt-1 pt-1"><span>Subtotal (bruto)</span><span className="tabular-nums">R$ {fmt(val?.bruto)}</span></div>
-                {Number(form.descontos) > 0 && <div className="flex justify-between text-red-600"><span>− Descontos</span><span className="tabular-nums">R$ {fmt(val?.descontos)}</span></div>}
+                {numeroBR(form.descontos) > 0 && <div className="flex justify-between text-red-600"><span>− Descontos</span><span className="tabular-nums">R$ {fmt(val?.descontos)}</span></div>}
                 <div className="flex justify-between font-bold text-torg-dark border-t border-torg-blue-100 mt-1 pt-1"><span>Total líquido estimado</span><span className="tabular-nums">R$ {fmt(val?.total)}</span></div>
               </div>
               <p className="text-[11px] text-torg-gray flex items-center gap-1"><Clock size={12} /> Estimativa (salário + 1/3 + abono − descontos) — não substitui o cálculo da folha.</p>

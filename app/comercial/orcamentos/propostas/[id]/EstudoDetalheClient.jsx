@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { log } from "@/lib/log";
 import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 const registro = log("EstudoDetalheClient");
 
@@ -961,16 +962,16 @@ function NovoItemModal({ onClose, onSalvar }) {
   }, [descricao]);
 
   const pesoTotal = (() => {
-    const pu = parseFloat(pesoUnitario) || 0;
-    const comp = parseFloat(comprimento) || 0;
-    const qtd = parseInt(quantidade) || 1;
+    const pu = numeroBR(pesoUnitario);
+    const comp = numeroBR(comprimento);
+    const qtd = Math.trunc(numeroBR(quantidade)) || 1;
     if (comp > 0) return pu * comp * qtd;
     return pu * qtd;
   })();
 
   const handleSalvar = async () => {
     if (!descricao.trim()) return setErro("Descricao e obrigatoria");
-    if (!pesoUnitario || parseFloat(pesoUnitario) <= 0) return setErro("Peso unitario e obrigatorio");
+    if (!pesoUnitario || numeroBR(pesoUnitario, NaN) <= 0) return setErro("Peso unitario e obrigatorio");
 
     setSalvando(true);
     setErro("");
@@ -980,9 +981,9 @@ function NovoItemModal({ onClose, onSalvar }) {
         setor: setor.trim() || undefined,
         tipoMaterial,
         norma: norma.trim() || undefined,
-        comprimento: comprimento ? parseFloat(comprimento) : undefined,
-        pesoUnitario: parseFloat(pesoUnitario),
-        quantidade: parseInt(quantidade) || 1,
+        comprimento: comprimento ? numeroBR(comprimento, NaN) : undefined,
+        pesoUnitario: numeroBR(pesoUnitario, NaN),
+        quantidade: Math.trunc(numeroBR(quantidade)) || 1,
         pesoTotal,
       });
       onClose();
@@ -1507,12 +1508,12 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
 
   const salvarEdicao = async () => {
     try {
-      const pu = parseFloat(editValores.pesoUnitario) || 0;
-      const comp = parseFloat(editValores.comprimento) || 0;
-      const qtd = parseInt(editValores.quantidade) || 1;
+      const pu = numeroBR(editValores.pesoUnitario);
+      const comp = numeroBR(editValores.comprimento);
+      const qtd = Math.trunc(numeroBR(editValores.quantidade)) || 1;
       const pesoTotal = comp > 0 ? pu * comp * qtd : pu * qtd;
 
-      const custoUnit = parseFloat(editValores.custoUnitario) || null;
+      const custoUnit = numeroBR(editValores.custoUnitario) || null;
       const res = await fetch(`/api/comercial/estudo/${estudoId}/itens`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1549,7 +1550,7 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
   const salvarCustoRapido = async (itemId) => {
     if (salvandoCustoRef.current) return;
     salvandoCustoRef.current = true;
-    const custo = parseFloat(editCustoValor) || null;
+    const custo = numeroBR(editCustoValor) || null;
     try {
       const res = await fetch(`/api/comercial/estudo/${estudoId}/itens`, {
         method: "PATCH",
@@ -1570,7 +1571,7 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
   };
 
   const salvarPerda = async () => {
-    const valor = parseFloat(editPerdaValor);
+    const valor = numeroBR(editPerdaValor, NaN);
     const perda = isNaN(valor) ? 0 : Math.max(0, Math.min(100, valor));
     try {
       const res = await fetch(`/api/comercial/estudo/${estudoId}`, {
@@ -1967,9 +1968,9 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                           </td>
                           <td className="px-2 py-2.5 text-right font-semibold text-torg-dark text-xs">
                             {(() => {
-                              const pu = parseFloat(editValores.pesoUnitario) || 0;
-                              const c = parseFloat(editValores.comprimento) || 0;
-                              const q = parseInt(editValores.quantidade) || 1;
+                              const pu = numeroBR(editValores.pesoUnitario);
+                              const c = numeroBR(editValores.comprimento);
+                              const q = Math.trunc(numeroBR(editValores.quantidade)) || 1;
                               return fmtNum(c > 0 ? pu * c * q : pu * q, 1);
                             })()}
                           </td>
@@ -1983,11 +1984,11 @@ function AbaPesoProjeto({ estudo, estudoId, onEstudoUpdate }) {
                           </td>
                           <td className="px-2 py-2.5 text-right text-xs text-torg-dark whitespace-nowrap">
                             {(() => {
-                              const pu = parseFloat(editValores.pesoUnitario) || 0;
-                              const c = parseFloat(editValores.comprimento) || 0;
-                              const q = parseInt(editValores.quantidade) || 1;
+                              const pu = numeroBR(editValores.pesoUnitario);
+                              const c = numeroBR(editValores.comprimento);
+                              const q = Math.trunc(numeroBR(editValores.quantidade)) || 1;
                               const peso = c > 0 ? pu * c * q : pu * q;
-                              const custo = parseFloat(editValores.custoUnitario) || 0;
+                              const custo = numeroBR(editValores.custoUnitario);
                               return custo > 0 ? fmtMoeda(custo * peso) : "—";
                             })()}
                           </td>

@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { fmtOP } from "@/lib/utils";
 import { Loader2, AlertCircle, RefreshCw, Truck, MapPin, Package, ChevronRight, CheckCircle2, FileText, X, ArrowLeft, Weight, Clock, AlertTriangle, Printer } from "lucide-react";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtKg = (v) => (!v ? "0 kg" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`);
 const fmtData = (d) =>
@@ -260,20 +261,21 @@ function ModalRomaneio({ pedido, destino, onClose, onCreated }) {
   const [erro, setErro] = useState("");
 
   const setQtd = (i, v) => setLinhas((prev) => prev.map((l, idx) => (idx === i ? { ...l, qtd: v } : l)));
-  const pesoTotal = linhas.reduce((s, l) => s + (parseFloat(l.qtd) || 0) * (l.pesoUnit || 0), 0);
-  const totalUn = linhas.reduce((s, l) => s + (parseInt(l.qtd, 10) || 0), 0);
+  // qtd vem do CampoDecimal como texto em português: numeroBR, não parseFloat ("1.000" é mil)
+  const pesoTotal = linhas.reduce((s, l) => s + numeroBR(l.qtd) * (l.pesoUnit || 0), 0);
+  const totalUn = linhas.reduce((s, l) => s + Math.trunc(numeroBR(l.qtd)), 0);
 
   async function salvar() {
     setErro("");
     if (!numero.trim()) { setErro("Informe o número do romaneio."); return; }
     const itens = linhas
-      .filter((l) => (parseFloat(l.qtd) || 0) > 0)
+      .filter((l) => numeroBR(l.qtd) > 0)
       .map((l) => ({
         tipo: "PECA",
         descricao: `${l.marca}${l.descricao ? " — " + l.descricao : ""}`,
         pecaConjuntoId: l.pecaConjuntoId,
-        qtd: parseFloat(l.qtd) || 0,
-        pesoKg: (parseFloat(l.qtd) || 0) * (l.pesoUnit || 0),
+        qtd: numeroBR(l.qtd),
+        pesoKg: numeroBR(l.qtd) * (l.pesoUnit || 0),
       }));
     if (itens.length === 0) { setErro("Inclua ao menos um item com quantidade."); return; }
 
@@ -388,7 +390,7 @@ function ModalRomaneio({ pedido, destino, onClose, onCreated }) {
                           className="w-16 px-1.5 py-0.5 text-right text-[11px] tabular-nums border border-gray-200 rounded focus:border-torg-blue focus:ring-1 focus:ring-torg-blue/30" />
                       </td>
                       <td className="px-2 py-1 text-right tabular-nums whitespace-nowrap text-torg-gray">
-                        {fmtKg((parseFloat(l.qtd) || 0) * (l.pesoUnit || 0))}
+                        {fmtKg(numeroBR(l.qtd) * (l.pesoUnit || 0))}
                       </td>
                     </tr>
                   ))}

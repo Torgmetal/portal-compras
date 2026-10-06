@@ -10,6 +10,7 @@ import {
   CalendarRange, ListOrdered, Scale, Link2, Plus, Trash2, Wand2, ChevronDown,
 } from "lucide-react";
 import { fmtOP } from "@/lib/utils";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const toInputDate = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
@@ -103,11 +104,11 @@ export default function KickoffClient({ opId }) {
         frete: form.frete || null,
         cronograma: form.cronograma.filter((c) => c.fase?.trim()),
         prioridades: form.temPrioridades ? form.prioridades.filter((p) => p.descricao?.trim()).map((p, i) => ({ ...p, ordem: i + 1 })) : [],
-        pesoResumo: form.pesoResumo.filter((p) => p.descricao?.trim()).map((p) => ({ descricao: p.descricao, qtd: p.qtd === "" || p.qtd == null ? null : Number(p.qtd), pesoKg: p.pesoKg === "" || p.pesoKg == null ? null : Number(p.pesoKg) })),
+        pesoResumo: form.pesoResumo.filter((p) => p.descricao?.trim()).map((p) => ({ descricao: p.descricao, qtd: p.qtd === "" || p.qtd == null ? null : numeroBR(p.qtd, null), pesoKg: p.pesoKg === "" || p.pesoKg == null ? null : numeroBR(p.pesoKg, null) })), // CampoDecimal: texto em português
         faturamentoEventos: (form.faturamentoEventos || []).filter((ev) => ev.descricao?.trim()).map((ev) => ({
           descricao: ev.descricao,
-          percentual: ev.percentual === "" || ev.percentual == null ? null : Number(ev.percentual),
-          valor: ev.valor === "" || ev.valor == null ? null : Number(ev.valor),
+          percentual: ev.percentual === "" || ev.percentual == null ? null : numeroBR(ev.percentual, null),
+          valor: ev.valor === "" || ev.valor == null ? null : numeroBR(ev.valor, null),
           prazoPagamento: ev.prazoPagamento || null,
           medicao: ev.medicao || null,
           obsNF: ev.obsNF || null,
@@ -170,7 +171,7 @@ export default function KickoffClient({ opId }) {
   // Geral"...) no somatório — evita duplicar o peso orçado
   const pesoTotal = (form?.pesoResumo || [])
     .filter((p) => !/\btotal\b/i.test(String(p.descricao || "")))
-    .reduce((s, p) => s + (Number(p.pesoKg) || 0), 0);
+    .reduce((s, p) => s + numeroBR(p.pesoKg), 0);
 
   // ── Vincular orçamento (habilita pintura + pesos do estudo) ──────────────
   const vincularOrcamento = async () => {

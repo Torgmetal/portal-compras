@@ -20,6 +20,7 @@ import {
   AlertCircle, AlertTriangle, Building2, CheckCircle2, ChevronDown, ChevronRight, Clock,
   Download, Filter, GanttChart, Loader2, Lock, Mail, Pencil, Plus, RefreshCw, Send, User, X, ListFilter,
 } from "lucide-react";
+import { numeroBR } from "@/lib/numero-br";
 
 // ─── Aba Cronograma ──────────────────────────────────────
 
@@ -468,7 +469,7 @@ function ModalPreencher({ atividade, onClose, onSalvo, onErro }) {
     setSalvando(true);
     try {
       const body = {
-        percentualRealizado: Math.max(0, Math.min(100, Number(pct) || 0)),
+        percentualRealizado: Math.max(0, Math.min(100, numeroBR(pct))), // CampoDecimal: "50,5"
         observacao: obs.trim() || null,
         // Hold/Bloqueio: motivo preenchido = bloqueada (não conta atrasada + trava no cronograma); vazio = libera.
         motivoBloqueio: hold ? (motivoBloq.trim() || "Em hold — aguardando liberação") : null,

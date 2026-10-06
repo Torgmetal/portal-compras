@@ -4,8 +4,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Calculator, Loader2, AlertCircle, RefreshCw, Save, Plus, Trash2, Info, Upload } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { ABSENTEISMO_MAX } from "@/lib/custo-hora-calc";
+import { numeroBR } from "@/lib/numero-br";
 
-const num = (v) => { const n = Number(v); return isFinite(n) ? n : 0; };
+// fator, impostos, horas/dia e ocupação vêm do CampoDecimal como texto em português ("2,02"):
+// com Number() eles viravam 0 — e o fator de encargos caía no padrão 1 sem ninguém ver.
+const num = (v) => numeroBR(v);
 const fmtBRL = (v) => num(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtBRL0 = (v) => num(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));

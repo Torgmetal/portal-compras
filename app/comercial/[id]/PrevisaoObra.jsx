@@ -2,6 +2,7 @@
 import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Loader2, AlertCircle, Target, Truck, Calendar, Info, Gauge } from "lucide-react";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtR$ = (v) => (v == null ? "—" : Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }));
 const fmtKg = (v) => `${Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg`;
@@ -33,7 +34,7 @@ export default function PrevisaoObra({ opId }) {
 
   const calc = useMemo(() => {
     if (!data) return null;
-    const planejado = Number(peso) || data.planejadoKg || 0;
+    const planejado = numeroBR(peso) || data.planejadoKg || 0; // CampoDecimal: "12.500" é doze mil e quinhentos
     const exp = data.expedidoKg || 0;
     const kgRestante = Math.max(0, planejado - exp);
     const avanco = planejado > 0 ? Math.min(exp / planejado, 1) : null;

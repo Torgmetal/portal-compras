@@ -54,7 +54,7 @@ function NovoParafusoModal({ onClose, onSalvar }) {
         diametro: diametro.trim() || undefined,
         comprimento: comprimento.trim() || undefined,
         unidade: "un",
-        quantidade: quantidade ? parseFloat(quantidade) : 0,
+        quantidade: quantidade ? numeroBR(quantidade, NaN) : 0,
         estimativa: false,
         observacao: observacao.trim() || undefined,
       });

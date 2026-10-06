@@ -14,7 +14,8 @@ const uid = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.r
 const CAT_LABEL = { VIGAS_W: "Vigas W", PERFIS_HP: "Perfis HP" };
 const MSG_PADRAO = "Agradecemos a oportunidade de apresentar nossa proposta. A Torg Metal une precisão, prazo e qualidade certificada para entregar o melhor resultado ao seu projeto — e teremos muita satisfação em avançar com você. Ficamos à disposição para alinhar os detalhes e seguir juntos.";
 const rNum = (n) => "R" + String(n || 0).padStart(2, "0");
-const num = (v) => Number(v) || 0;
+// comprimento e tempo por barra vêm do CampoDecimal como texto em português ("6,5"): numeroBR, não Number
+const num = (v) => numeroBR(v);
 const fmtKg = (v) => num(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " kg";
 const fmtH = (min) => { const m = Math.round(num(min)); return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`; };
 const fmtBRL = (v) => num(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });

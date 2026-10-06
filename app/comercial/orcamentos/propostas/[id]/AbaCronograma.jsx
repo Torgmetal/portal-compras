@@ -5,6 +5,7 @@ import {
   Plus, Trash2, Loader2, X, Edit3, Check, Sparkles, RefreshCw,
   Calendar, Users,
 } from "lucide-react";
+import { numeroBR } from "@/lib/numero-br";
 
 // ── Cores padrao para as barras ──
 const CORES_PADRAO = [
@@ -209,10 +210,10 @@ export default function AbaCronograma({ estudo, estudoId }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           grupo: novoItem.grupo.trim(),
-          pesoKg: parseFloat(novoItem.pesoKg) || 0,
-          diasFabricacao: parseInt(novoItem.diasFabricacao) || 0,
-          diasMontagem: novoItem.diasMontagem ? parseInt(novoItem.diasMontagem) : null,
-          semanaInicio: parseInt(novoItem.semanaInicio) || 1,
+          pesoKg: numeroBR(novoItem.pesoKg),
+          diasFabricacao: Math.trunc(numeroBR(novoItem.diasFabricacao)) || 0,
+          diasMontagem: novoItem.diasMontagem ? Math.trunc(numeroBR(novoItem.diasMontagem, NaN)) : null,
+          semanaInicio: Math.trunc(numeroBR(novoItem.semanaInicio)) || 1,
           cor: novoItem.cor || CORES_PADRAO[itens.length % CORES_PADRAO.length],
         }),
       });
@@ -252,10 +253,10 @@ export default function AbaCronograma({ estudo, estudoId }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itemId: editandoId, grupo: editValores.grupo,
-          pesoKg: parseFloat(editValores.pesoKg) || 0,
-          diasFabricacao: parseInt(editValores.diasFabricacao) || 0,
-          diasMontagem: editValores.diasMontagem !== "" ? parseInt(editValores.diasMontagem) : null,
-          semanaInicio: parseInt(editValores.semanaInicio) || 1,
+          pesoKg: numeroBR(editValores.pesoKg),
+          diasFabricacao: Math.trunc(numeroBR(editValores.diasFabricacao)) || 0,
+          diasMontagem: editValores.diasMontagem !== "" ? Math.trunc(numeroBR(editValores.diasMontagem, NaN)) : null,
+          semanaInicio: Math.trunc(numeroBR(editValores.semanaInicio)) || 1,
           cor: editValores.cor,
         }),
       });
@@ -556,8 +557,8 @@ export default function AbaCronograma({ estudo, estudoId }) {
           </div>
           {hhPorTon > 0 && novoItem.pesoKg > 0 && (
             <p className="text-xs text-torg-gray mt-2">
-              Estimativa com {equipe} pessoas: <strong className="text-torg-dark">{calcDias(parseFloat(novoItem.pesoKg), hhPorTon, equipe)} dias</strong> de fabricacao
-              ({fmtNum((parseFloat(novoItem.pesoKg) / 1000) * hhPorTon, 0)} Hh)
+              Estimativa com {equipe} pessoas: <strong className="text-torg-dark">{calcDias(numeroBR(novoItem.pesoKg, NaN), hhPorTon, equipe)} dias</strong> de fabricacao
+              ({fmtNum((numeroBR(novoItem.pesoKg, NaN) / 1000) * hhPorTon, 0)} Hh)
             </p>
           )}
         </div>

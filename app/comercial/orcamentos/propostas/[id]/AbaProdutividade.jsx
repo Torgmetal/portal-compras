@@ -2,6 +2,7 @@
 import { useState, useMemo, useRef } from "react";
 import { Save, Loader2, Info, ChevronDown, Upload, Sparkles, Trash2, FileText, X, AlertCircle } from "lucide-react";
 import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 // ── Tipos de obra com Hh/ton padrão (fonte: TORG_Modelo_Completo.xlsx — aba Manual) ──
 const TIPOS_OBRA = [
@@ -127,7 +128,7 @@ export default function AbaProdutividade({ estudo, estudoId, onEstudoUpdate }) {
   }, [estudo.itensPerso]);
 
   // ── Calculos modo MANUAL ──
-  const hhTonManual = parseFloat(hhPorTon) || 0;
+  const hhTonManual = numeroBR(hhPorTon);
   const custoHh = PREMISSAS.custoHh;
 
   // ── Calculos modo MIX ──
@@ -227,7 +228,7 @@ export default function AbaProdutividade({ estudo, estudoId, onEstudoUpdate }) {
 
   // ── Editar mix manualmente ──
   const handleMixPesoChange = (idx, novoValor) => {
-    setMix((prev) => prev.map((m, i) => i === idx ? { ...m, pesoKg: Math.max(0, Number(novoValor) || 0) } : m));
+    setMix((prev) => prev.map((m, i) => i === idx ? { ...m, pesoKg: Math.max(0, numeroBR(novoValor)) } : m));
   };
 
   const handleMixTipoChange = (idx, novoTipoId) => {

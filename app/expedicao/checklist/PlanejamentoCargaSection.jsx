@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Truck, Plus, Calendar, Package, Wrench, CheckCircle2, Clock, AlertTriangle, ChevronDown, ChevronRight, Loader2, X, Search, ClipboardList, AlertCircle, ShieldAlert, Ban, Pencil, Save, History } from "lucide-react";
 import { validarProntidaoExpedicao } from "@/lib/expedicao";
 import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 const fmtData = (d) => (d ? new Date(d).toLocaleDateString("pt-BR") : "—");
 const fmtKg = (v) =>
@@ -219,8 +220,9 @@ function PlanCard({ plan, aberto, onToggle, onChanged }) {
       const dataOrig = new Date(plan.dataPrevista).toISOString().slice(0, 10);
       if (data && data !== dataOrig) body.dataPrevista = data;
       const itensAlt = (plan.itens || [])
-        .filter((it) => qtds[it.id] !== "" && Number(qtds[it.id]) >= 0 && Number(qtds[it.id]) !== Number(it.qtdPlanejada))
-        .map((it) => ({ id: it.id, qtdPlanejada: Number(qtds[it.id]) }));
+        // qtds vem do CampoDecimal como texto em português ("2,5"): numeroBR, não Number
+        .filter((it) => qtds[it.id] !== "" && numeroBR(qtds[it.id], NaN) >= 0 && numeroBR(qtds[it.id], NaN) !== Number(it.qtdPlanejada))
+        .map((it) => ({ id: it.id, qtdPlanejada: numeroBR(qtds[it.id], NaN) }));
       if (itensAlt.length) body.itens = itensAlt;
       if (Object.keys(body).length === 0) { setEditando(false); return; }
       const r = await fetch(`/api/expedicao/planejamento/${plan.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -398,7 +400,7 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
   const [erro, setErro] = useState("");
 
   // Quantidade escolhida por item (default = qtd disponível) + peso proporcional.
-  const qtdEscolhida = (i) => { const v = qtds[i.key]; return Number(v ?? i.qtd) || 0; };
+  const qtdEscolhida = (i) => { const v = qtds[i.key]; return numeroBR(v ?? i.qtd); };
   const pesoEscolhido = (i) => (i.qtd > 0 ? (i.pesoKg / i.qtd) * qtdEscolhida(i) : i.pesoKg);
 
   // Monta lista de itens selecionaveis (nao expedidos)
@@ -650,7 +652,7 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
                     checked={selecionados.has(item.key)}
                     onToggle={() => toggleItem(item.key)}
                     qtd={qtds[item.key] ?? item.qtd}
-                    onQtd={(v) => setQtds((m) => ({ ...m, [item.key]: v === "" ? "" : Number(v) }))}
+                    onQtd={(v) => setQtds((m) => ({ ...m, [item.key]: v === "" ? "" : numeroBR(v) }))}
                     pesoEscolhido={pesoEscolhido(item)}
                   />
                 ))}
@@ -673,7 +675,7 @@ function NovaCargaModal({ opId, pecas, acessorios, onClose, onCriado }) {
                     checked={selecionados.has(item.key)}
                     onToggle={() => toggleItem(item.key)}
                     qtd={qtds[item.key] ?? item.qtd}
-                    onQtd={(v) => setQtds((m) => ({ ...m, [item.key]: v === "" ? "" : Number(v) }))}
+                    onQtd={(v) => setQtds((m) => ({ ...m, [item.key]: v === "" ? "" : numeroBR(v) }))}
                     pesoEscolhido={pesoEscolhido(item)}
                   />
                 ))}

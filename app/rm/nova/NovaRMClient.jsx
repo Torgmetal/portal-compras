@@ -231,7 +231,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
     if (ehMontagem) {
       for (let i = 0; i < itensValidos.length; i++) {
         const it = itensValidos[i];
-        if (!it.valorTotal || Number(it.valorTotal) <= 0) return setErro(`Item ${i + 1}: informe o valor da medição.`);
+        if (!it.valorTotal || numeroBR(it.valorTotal) <= 0) return setErro(`Item ${i + 1}: informe o valor da medição.`);
       }
     }
     // Validação específica de Aluguel: diária e dias obrigatórios
@@ -264,7 +264,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
       pesoLinear: Number(it.pesoLinear) || null,
       valorDiaria: Number(it.valorDiaria) || null,
       qtdDias: Number(it.qtdDias) || null,
-      valorTotal: Number(it.valorTotal) || null,
+      valorTotal: numeroBR(it.valorTotal) || null, // CampoDecimal: "1500,50"
     }));
 
     setSalvando(true);
@@ -726,7 +726,7 @@ export default function NovaRMClient({ ops, userSetor, userModulos = [], userTip
             <div className="bg-torg-blue-50 border border-torg-blue-100 rounded-lg px-4 py-3 flex items-center justify-between">
               <span className="text-sm font-medium text-torg-dark">{itensImportados.length} {itensImportados.length === 1 ? "medição" : "medições"}</span>
               <span className="text-sm font-bold text-torg-dark">
-                Total: {fmtMoeda(itensImportados.reduce((s, it) => s + (Number(it.valorTotal) || 0), 0))}
+                Total: {fmtMoeda(itensImportados.reduce((s, it) => s + numeroBR(it.valorTotal), 0))}
               </span>
             </div>
           </div>

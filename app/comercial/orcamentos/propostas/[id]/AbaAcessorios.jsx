@@ -191,8 +191,8 @@ function NovoAcessorioModal({ onClose, onSalvar }) {
         descricao: descricao.trim(),
         especificacao: especificacao.trim() || undefined,
         unidade: unidade.trim() || "un",
-        quantidade: quantidade ? parseFloat(quantidade) : 0,
-        custoUnitario: custoUnitario ? parseFloat(custoUnitario) : undefined,
+        quantidade: quantidade ? numeroBR(quantidade, NaN) : 0,
+        custoUnitario: custoUnitario ? numeroBR(custoUnitario, NaN) : undefined,
         observacao: observacao.trim() || undefined,
       });
       onClose();

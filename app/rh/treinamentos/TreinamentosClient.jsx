@@ -3,6 +3,7 @@ import CampoData from "@/components/CampoData";
 import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useMemo } from "react";
 import { GraduationCap, Search, PlusCircle, Loader2, AlertCircle, X, ChevronDown, FileDown, Send, PenLine, CheckCircle2, Clock, Trash2, Plus } from "lucide-react";
+import { numeroBR } from "@/lib/numero-br";
 
 const TIPOS = [
   { value: "NR_OBRIGATORIO", label: "NR Obrigatório", cor: "bg-red-100 text-red-800" },
@@ -164,9 +165,9 @@ export default function TreinamentosClient() {
         local: form.local.trim() || null,
         dataInicio: form.dataInicio,
         dataFim: form.dataFim || null,
-        cargaHoraria: Number(form.cargaHoraria),
+        cargaHoraria: numeroBR(form.cargaHoraria), // CampoDecimal: "1,5" h (vazio segue 0, como antes)
         validadeMeses: form.validadeMeses ? Number(form.validadeMeses) : null,
-        custo: form.custo ? Number(form.custo) : null,
+        custo: form.custo ? numeroBR(form.custo, NaN) : null,
         participantesIds: form.participantesIds.length > 0 ? form.participantesIds : undefined,
       };
 

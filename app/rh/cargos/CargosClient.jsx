@@ -3,6 +3,7 @@ import CampoDecimal from "@/components/CampoDecimal";
 import { useState, useEffect, useRef } from "react";
 import { faixaForaDeOrdem } from "@/lib/cargo-faixa";
 import { Briefcase, Search, PlusCircle, Loader2, AlertCircle, X, ChevronDown, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Pencil } from "lucide-react";
+import { numeroBR } from "@/lib/numero-br";
 
 const NIVEIS = [
   { value: "OPERACIONAL", label: "Operacional", cor: "bg-gray-100 text-gray-700" },
@@ -69,7 +70,8 @@ export default function CargosClient() {
   };
 
   // mesma regra do servidor (lib/cargo-faixa.js): avisa aqui, mas quem decide é a rota
-  const num = (v) => (v === "" || v == null ? null : Number(v));
+  // os salários vêm do CampoDecimal como texto em português ("3500,50"): numeroBR, não Number
+  const num = (v) => (v === "" || v == null ? null : numeroBR(v, NaN));
   const faixaInvalida = faixaForaDeOrdem({
     salarioBase: num(form.salarioBase), salarioMedio: num(form.salarioMedio), salarioMaximo: num(form.salarioMaximo),
   });
@@ -81,9 +83,9 @@ export default function CargosClient() {
     try {
       const body = {
         ...form,
-        salarioBase: form.salarioBase ? Number(form.salarioBase) : null,
-        salarioMedio: form.salarioMedio ? Number(form.salarioMedio) : null,
-        salarioMaximo: form.salarioMaximo ? Number(form.salarioMaximo) : null,
+        salarioBase: form.salarioBase ? numeroBR(form.salarioBase, NaN) : null,
+        salarioMedio: form.salarioMedio ? numeroBR(form.salarioMedio, NaN) : null,
+        salarioMaximo: form.salarioMaximo ? numeroBR(form.salarioMaximo, NaN) : null,
         categoria: form.categoria || null,
         cbo: form.cbo || null,
         nivel: form.nivel || null,

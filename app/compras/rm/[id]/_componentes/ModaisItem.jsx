@@ -4,6 +4,7 @@ import { Loader2, AlertCircle } from "lucide-react";
 import { Modal } from "./Modal";
 import { fmtMoeda } from "../_lib/formatos";
 import CampoDecimal from "@/components/CampoDecimal";
+import { numeroBR } from "@/lib/numero-br";
 
 export function ModalCancelarItem({ item, rmId, onClose, onSaved }) {
   const [motivo, setMotivo] = useState("");
@@ -96,10 +97,11 @@ export function ModalAtenderEstoque({ item, rmId, onClose, onSaved }) {
       .finally(() => setBuscandoPreco(false));
   }, [item.codigo]);
 
-  const totalEstimado = Number(precoUnit || 0) * Number(quantidade || 0);
+  // quantidade e preço vêm do CampoDecimal como texto em português ("2,5"): numeroBR, não Number
+  const totalEstimado = numeroBR(precoUnit) * numeroBR(quantidade);
 
   const submit = async () => {
-    const qtd = Number(quantidade);
+    const qtd = numeroBR(quantidade, NaN);
     if (!qtd || qtd <= 0) return setErro("Informe a quantidade atendida.");
     setSalvando(true);
     try {
@@ -108,7 +110,7 @@ export function ModalAtenderEstoque({ item, rmId, onClose, onSaved }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           quantidade: qtd,
-          precoUnitario: Number(precoUnit) || undefined,
+          precoUnitario: numeroBR(precoUnit) || undefined,
           observacao: observacao.trim() || undefined,
         }),
       });

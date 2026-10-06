@@ -15,6 +15,7 @@ import CampoDecimal from "@/components/CampoDecimal";
 // (quando há uma), clara são as outras, e o traço é a meta.
 import { useEffect, useState, Fragment } from "react";
 import { Loader2 } from "lucide-react";
+import { numeroBR } from "@/lib/numero-br";
 
 // ⚠⚠ SÓ OS DOIS QUE SE PROGRAMAM AQUI. Vitor (03/09/2026): "esses setores pode tirar" (solda,
 // acabamento, jato e pintura) — nenhum deles recebe liberação por esta tela, então cada botão era
@@ -150,7 +151,7 @@ export default function CargaDosDias({ opId, recarga }) {
   // ⚠ `pecas > 0` com `kg === 0` FICA: é peça sem peso cadastrado, que é problema de cadastro, não
   // linha fantasma — e escondê-la sumiria com trabalho que existe de verdade.
   const dias = todosDias.filter((x) => (x.kg || 0) > 0 || (x.pecas || 0) > 0);
-  const meta = Number(metaKg) || 0;
+  const meta = numeroBR(metaKg); // CampoDecimal: "12.000" é doze mil, não doze
   const teto = Math.max(meta, ...dias.map((x) => x.kg || 0)) || 1;
   const larg = (v) => `${Math.min(100, Math.round((v / teto) * 100))}%`;
   const totalKg = dias.reduce((a, x) => a + (x.kg || 0), 0);

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Loader2, Check, X, Plus, Trash2, AlertCircle, Pencil, Upload, Sparkles } from "lucide-react";
 import { METODOS_PREPARO, PLP_PADRAO, descreverSistema } from "@/lib/plp";
 import { GRAUS_LIMPEZA, METODOS_APLICACAO, grauNaNorma } from "@/lib/pintura-campos";
+import { numeroBR } from "@/lib/numero-br";
 
 // ─── CORRIGIR O PLANO DE PINTURA DA OBRA ──────────────────────────────────────
 // Vitor (27/08/2026): "na parte do plano de pintura preciso que no botão de editar você me permita
@@ -449,7 +450,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
               <CampoDecimal value={so(f.espessuraTotal)}
                 onChange={(txt) => { set("espessuraTotal", txt); set("totalManual", true); }}
                 placeholder={String(somaDemaos || "")} className={cls} />
-              {f.totalManual && somaDemaos > 0 && Number(f.espessuraTotal) !== somaDemaos && (
+              {f.totalManual && somaDemaos > 0 && numeroBR(f.espessuraTotal, NaN) !== somaDemaos && (
                 <button onClick={() => setF((x) => ({ ...x, espessuraTotal: String(somaDemaos), totalManual: false }))}
                   title={`Soma das demãos: ${somaDemaos} µm`}
                   className="text-[10px] text-torg-blue hover:underline shrink-0 whitespace-nowrap">= {somaDemaos}</button>
