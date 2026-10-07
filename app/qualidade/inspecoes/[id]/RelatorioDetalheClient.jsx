@@ -21,6 +21,7 @@ import FormSais from "./FormSais";
 import FormPoeira from "./FormPoeira";
 import FormPullOff from "./FormPullOff";
 import FormRecebimentoTinta from "./FormRecebimentoTinta";
+import FormRecebimentoRir from "./FormRecebimentoRir";
 import Equipamentos from "./Equipamentos";
 import AnexarProjeto from "./AnexarProjeto";
 import EscolherProjeto from "./EscolherProjeto";
@@ -381,6 +382,12 @@ export default function RelatorioDetalheClient({ id }) {
           <FormRecebimentoTinta rel={rel} res={res} travado={travado} setResultado={setResultado} />
         </div>
       )}
+      {/* ── recebimentos por certificado (07/10/2026): penetrante/revelador e arame de solda ── */}
+      {(rel.tipo === "RECEBIMENTO_PENETRANTE" || rel.tipo === "RECEBIMENTO_ARAME") && (
+        <div className="mt-4">
+          <FormRecebimentoRir rel={rel} res={res} travado={travado} setResultado={setResultado} />
+        </div>
+      )}
 
       {/* ── preenchimento do ensaio visual de solda ──────────────────────────────────────── */}
       {rel.tipo === "VISUAL_SOLDA" && (
@@ -436,7 +443,7 @@ export default function RelatorioDetalheClient({ id }) {
 
 
 
-          {linhas.length > 0 && !["VISUAL_SOLDA", "ULTRASSOM", "PINTURA", "LP", "SAIS", "POEIRA", "PULL_OFF", "RECEBIMENTO_TINTA"].includes(rel.tipo) && (
+          {linhas.length > 0 && !["VISUAL_SOLDA", "ULTRASSOM", "PINTURA", "LP", "SAIS", "POEIRA", "PULL_OFF", "RECEBIMENTO_TINTA", "RECEBIMENTO_PENETRANTE", "RECEBIMENTO_ARAME"].includes(rel.tipo) && (
             <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5"><Ruler size={13} className="text-torg-blue" /> Dimensões</p>

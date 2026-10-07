@@ -89,6 +89,17 @@ const CASOS = {
     pc: { resultados: { material: "Wegpoxi", fabricante: "WEG", dataInspecao: "2026-10-01", lotes: [{ lote: "L1", validade: "2027-03-15" }], checklist: Object.fromEntries(ITENS_RECEBIMENTO.map((_, i) => [i + 1, "A"])) }, resultadoInspecao: "APROVADO" },
     campo: { condicoes: { material: "Wegpoxi", fabricante: "WEG", dataInspecao: "2026-10-01", lotes: [{ lote: "L1", validade: "2027-03-15" }], checklist: Object.fromEntries(ITENS_RECEBIMENTO.map((_, i) => [i + 1, "A"])) }, resultadoInspecao: "APROVADO" },
   },
+  // os recebimentos por certificado (07/10/2026): nascem com os certificados do CMR, sem as três marcas
+  RECEBIMENTO_PENETRANTE: {
+    nasce: { resultados: { itens: [{ docId: "d1", r: "261266", descricao: "REVELADOR METALCHECK D-70", certificado: "202600149" }] } },
+    pc: { resultados: { itens: [{ docId: "d1", r: "261266", descricao: "REVELADOR METALCHECK D-70", certificado: "202600149", visual: "A", dimensional: "NA", documentos: "A" }] }, resultadoInspecao: "APROVADO" },
+    campo: { condicoes: { itens: [{ docId: "d1", r: "261266", descricao: "REVELADOR METALCHECK D-70", certificado: "202600149", visual: "A", dimensional: "NA", documentos: "A" }] }, resultadoInspecao: "APROVADO" },
+  },
+  RECEBIMENTO_ARAME: {
+    nasce: { resultados: { itens: [{ docId: "d2", r: "260005", descricao: "ARAME TUBULAR METAL CORE 71C", certificado: "149793" }] } },
+    pc: { resultados: { itens: [{ docId: "d2", r: "260005", descricao: "ARAME TUBULAR METAL CORE 71C", certificado: "149793", visual: "A", dimensional: "A", documentos: "A" }] }, resultadoInspecao: "APROVADO" },
+    campo: { condicoes: { itens: [{ docId: "d2", r: "260005", descricao: "ARAME TUBULAR METAL CORE 71C", certificado: "149793", visual: "A", dimensional: "A", documentos: "A" }] }, resultadoInspecao: "APROVADO" },
+  },
 };
 
 describe.each(Object.entries(CASOS))("%s: toda trava tem como ser resolvida", (tipo, caso) => {

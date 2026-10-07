@@ -6,6 +6,8 @@ import {usaQuantidadeInspecao, pecasInformadasSchema} from "@/lib/inspecao-pecas
 import { TIPOS_RELATORIO, usaCotas } from "@/lib/qualidade-campo";
 import { rotuloFase } from "@/lib/fase-peca";
 import FiltroFase from "@/components/qualidade/FiltroFase";
+import EscolherCertificados from "@/components/qualidade/EscolherCertificados";
+import { ehRecebimento } from "@/lib/recebimento-certificados";
 
 // ─── CRIAR O RELATÓRIO PELO CELULAR ───────────────────────────────────────────
 // Vitor (22/08/2026): "podemos deixar ele criar relatórios do celular dele, sem a
@@ -28,6 +30,9 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
   const [tentativa, setTentativa] = useState(0);
   const [temMais, setTemMais] = useState(false);
   const [sel, setSel] = useState([]);
+  // os recebimentos nascem dos certificados do CMR, não de peças (Vitor, 07/10/2026)
+  const [certs, setCerts] = useState([]);
+  const recebimento = ehRecebimento(tipo);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   // ⚠ POR FASE. Vitor (14/09/2026): "precisamos que separe por fases (…) isso deve ter em todos os
@@ -49,7 +54,7 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
   // relatório de pintura e também acessórios, isso não pode aparecer na tela do inspetor". A API
   // já tira acessório e croqui; croqui só volta no dimensional, que mede o que saiu do corte.
   useEffect(() => {
-    if (!tipo) { setPecas(null); setFases([]); return; }
+    if (!tipo || recebimento) { setPecas(null); setFases([]); return; }
     let vivo = true;
     setPecas(null); setErroBusca("");
     const t = setTimeout(() => {
@@ -65,13 +70,13 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
         .catch(e => {if(vivo){setPecas([]);setErroBusca(e.message);}});
     }, 250);
     return () => { vivo = false; clearTimeout(t); };
-  }, [tipo, op.id, q, tentativa, fase]);
+  }, [tipo, op.id, q, tentativa, fase, recebimento]);
 
   const comQuantidade = usaQuantidadeInspecao(tipo);
   const selecionadas = sel.map(marca => ({marca, quantidade: quantidades[marca] ?? ""}));
 
   async function criar() {
-    if (!sel.length) { setErro("Escolha ao menos uma peça."); return; }
+    if (!recebimento && !sel.length) { setErro("Escolha ao menos uma peça."); return; }
     let pecasInformadas;
     if (comQuantidade) {
       const v = pecasInformadasSchema.safeParse(selecionadas.map(p=>({...p,quantidade:Number(p.quantidade)})));
@@ -82,7 +87,9 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
     try {
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opNumero: op.numero, tipo, escopo: "AVULSAS", marcas: sel, pecasInformadas }),
+        body: JSON.stringify(recebimento
+          ? { opNumero: op.numero, tipo, certificados: certs.map((c) => c.docId) }
+          : { opNumero: op.numero, tipo, escopo: "AVULSAS", marcas: sel, pecasInformadas }),
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro ao criar.");
@@ -97,7 +104,7 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
         <p className="text-sm text-torg-gray mb-3">Que inspeção você vai fazer?</p>
         <div className="space-y-2">
           {tipos.map((t) => (
-            <button key={t.id} onClick={() => { setTipo(t.id); setSel([]); setQuantidades({}); setFase(null); faseDefinida.current = false; }}
+            <button key={t.id} onClick={() => { setTipo(t.id); setSel([]); setCerts([]); setQuantidades({}); setFase(null); faseDefinida.current = false; }}
               className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-4 active:bg-gray-50">
               <span className="block text-base font-semibold text-torg-dark">{t.label}</span>
               <span className="block text-[12px] text-torg-gray font-mono">{t.sigla}</span>
@@ -121,6 +128,21 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
 
   // ── passo 2: a peça ──
   const rotulo = TIPOS_RELATORIO.find((t) => t.id === tipo)?.label || tipo;
+  // ── passo 2 do recebimento: os certificados do CMR, sem peça ──
+  if (recebimento) {
+    return (
+      <Tela titulo={rotulo} sub={`OP-${op.numero}`} voltar={() => setTipo(null)}>
+        <p className="text-sm text-torg-gray mb-2">Escolha os certificados do CMR — recebimento não tem peça.</p>
+        <EscolherCertificados tipo={tipo} opNumero={op.numero} selecionados={certs} onChange={setCerts} />
+        {erro && <p className="text-[13px] text-red-600 my-2">{erro}</p>}
+        <button onClick={criar} disabled={salvando}
+          className="mt-3 w-full bg-torg-blue text-white active:bg-torg-dark rounded-xl py-4 text-[16px] font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-2">
+          {salvando ? <Loader2 size={17} className="animate-spin" /> : <Plus size={17} />}
+          {certs.length ? `Criar com ${certs.length} certificado(s)` : "Criar sem certificado"}
+        </button>
+      </Tela>
+    );
+  }
   return (
     <Tela titulo={rotulo} sub={`OP-${op.numero}`} voltar={() => setTipo(null)}>
       {/* ⚠ o dimensional nasce com as cotas do desenho; os demais, com a peça. Em todos, a

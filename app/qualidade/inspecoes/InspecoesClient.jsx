@@ -6,6 +6,8 @@ import { TIPO_LABEL, TIPOS_RELATORIO, usaCotas, pendenciasParaAssinatura, faltam
 import { textoDoVinculo } from "@/lib/relatorio-vinculo-texto";
 import { rotuloFase } from "@/lib/fase-peca";
 import FiltroFase from "@/components/qualidade/FiltroFase";
+import EscolherCertificados from "@/components/qualidade/EscolherCertificados";
+import { ehRecebimento } from "@/lib/recebimento-certificados";
 
 /**
  * INSPEÇÕES — as fotos do celular viram relatório aqui, no computador.
@@ -416,6 +418,10 @@ function Montar({ grupo, onFechar, onPronto }) {
  */
 function NovoRelatorio({ tipo, onFechar, onPronto }) {
   const ehDimensional = usaCotas(tipo);
+  // ⚠⚠ OS RECEBIMENTOS NASCEM DOS CERTIFICADOS DO CMR, NÃO DE PEÇAS. Vitor (07/10/2026): "está para
+  // selecionar as peças, mas nesse eu preciso apenas selecionar os certificados das tintas e diluentes".
+  const recebimento = ehRecebimento(tipo);
+  const [certs, setCerts] = useState([]);
   const [ops, setOps] = useState(null);
   const [op, setOp] = useState(null);
   // ⚠ NA PRÉ-MONTAGEM NÃO SE ESCOLHE PEÇA, SE ESCOLHE PROJETO. Vitor (22/08/2026): "não trouxe os
@@ -459,7 +465,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
 
   // quais peças desta OP têm NC1
   useEffect(() => {
-    if (!op) { setComNc1(null); return; }
+    if (!op || recebimento) { setComNc1(null); return; }
     let vivo = true;
     setComNc1(null);
     fetch(`/api/qualidade/inspecoes/nc1?opNumero=${encodeURIComponent(op.numero)}`)
@@ -475,7 +481,8 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
   // acessório. Vitor (14/09/2026): "isso não pode aparecer na tela do inspetor".
   const modo = !ehDimensional || ehPreMontagem ? "&todas=1" : escopo === "AVULSAS" ? "&todas=1&croquis=1" : "";
   useEffect(() => {
-    if (!op) { setPecas(null); setFases([]); return; }
+    // recebimento não lista peça: a busca é de certificado (EscolherCertificados)
+    if (!op || recebimento) { setPecas(null); setFases([]); return; }
     let vivo = true;
     setPecas(null);
     const t = setTimeout(() => {
@@ -489,7 +496,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
         }).catch(() => vivo && setPecas([]));
     }, 250);
     return () => { vivo = false; clearTimeout(t); };
-  }, [op, q, modo, fase]);
+  }, [op, q, modo, fase, recebimento]);
 
   // os projetos da obra (pré-montagem): as duas famílias juntas — ver nota do famFiltro acima.
   useEffect(() => {
@@ -504,7 +511,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
   }, [ehPreMontagem, op]);
 
   // trocar de escopo/OP invalida a seleção e a prévia — e a fase volta a ser decidida pela obra
-  useEffect(() => { setSel([]); setListaAberta(true); setFase(null); faseDefinida.current = false; }, [op, escopo]);
+  useEffect(() => { setSel([]); setCerts([]); setListaAberta(true); setFase(null); faseDefinida.current = false; }, [op, escopo]);
   const escolherFase = (f) => { faseDefinida.current = true; setFase(f); };
 
   // ⚠ SÓ O DIMENSIONAL DE CONJUNTO É UMA PEÇA SÓ. Vitor (21/08/2026): "precisa me dar opção de
@@ -527,7 +534,8 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          opNumero: op.numero, tipo, escopo, marcas: sel, inspetor,
+          opNumero: op.numero, tipo, escopo, marcas: recebimento ? [] : sel, inspetor,
+          certificados: recebimento ? certs.map((c) => c.docId) : undefined,
           // ⚠ o CAMINHO vai junto: assim o relatório de pré-montagem nasce com o desenho
           // vinculado, em vez de depender de uma varredura por marca que nunca acharia o
           // diagrama de montagem (ele não é uma peça da LPC).
@@ -539,9 +547,9 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Erro");
       alert(
-        `Relatório ${j.relatorio.codigo} criado.\n\n` +
+        `Relatório ${j.relatorio.codigo} criado${recebimento && certs.length ? ` com ${certs.length} certificado(s) do CMR` : ""}.\n\n` +
         `${textoDoVinculo(j.vinculo)}\n\n` +
-        "Abra o relatório para marcar as cotas A, B e C sobre o desenho."
+        (recebimento ? "Abra o relatório para conferir os itens e marcar a inspeção." : "Abra o relatório para marcar as cotas A, B e C sobre o desenho.")
       );
       onPronto();
     } catch (e) { alert(e.message); } finally { setSalvando(false); }
@@ -559,7 +567,9 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
             <p className="text-[11px] text-torg-gray">
               {ehDimensional
                 ? "As dimensões de projeto vêm do desenho; as encontradas ficam para o elaborador."
-                : "Escolha a OP. As peças podem ser informadas agora ou depois, no próprio relatório."}
+                : recebimento
+                  ? "Escolha a OP e os certificados do CMR — recebimento não tem peça."
+                  : "Escolha a OP. As peças podem ser informadas agora ou depois, no próprio relatório."}
             </p>
           </div>
           <button onClick={onFechar} className="text-torg-gray hover:text-torg-dark"><X size={18} /></button>
@@ -594,7 +604,14 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
 
             )}
 
-            {op && (
+            {op && recebimento && (
+              <div>
+                <span className="block text-[10px] font-semibold text-torg-gray mb-1">Certificados {certs.length ? `· ${certs.length} escolhido(s)` : ""}</span>
+                <EscolherCertificados tipo={tipo} opNumero={op.numero} selecionados={certs} onChange={setCerts} />
+              </div>
+            )}
+
+            {op && !recebimento && (
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] font-semibold text-torg-gray">

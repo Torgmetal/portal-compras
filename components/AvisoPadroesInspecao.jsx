@@ -9,6 +9,8 @@ const CAMPOS = {
   POEIRA: 'documentos de referência, ordem de compra, fita adesiva e ampliação',
   PULL_OFF: 'documento de referência, ordem de compra, normas, adesivo e o aparelho (modelo e pistão)',
   RECEBIMENTO_TINTA: 'contrato, local e norma',
+  RECEBIMENTO_PENETRANTE: 'contrato e local de aplicação',
+  RECEBIMENTO_ARAME: 'contrato e local de aplicação',
 };
 export default function AvisoPadroesInspecao({ tipo, resultados = {} }) {
   if (!CAMPOS[tipo]) return null;

@@ -22,6 +22,9 @@ import { requireRole } from "@/lib/session";
 import { procedimentoTolerancia } from "@/lib/relatorio-dimensional";
 import { CRITERIO_PADRAO } from "@/lib/evs-campos";
 import { vincularNoDataBook } from "@/lib/relatorio-inspecao";
+import { DO_CMR } from "@/lib/cmr-origens";
+import { ehRecebimento, MAX_CERTIFICADOS, linhaDoCertificado, resultadosDaTinta } from "@/lib/recebimento-certificados";
+import { limparItensRir } from "@/lib/recebimento-rir-campos";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -63,9 +66,21 @@ export async function POST(req) {
         escolhido: true,
       })).filter((d) => d.marca && d.caminho)
     : [];
-  const marcas = [...new Set((Array.isArray(body?.marcas) ? body.marcas : []).map((m) => String(m || "").trim().toUpperCase()).filter(Boolean))];
+  // ⚠⚠ OS RECEBIMENTOS NASCEM DOS CERTIFICADOS DO CMR, NÃO DE PEÇAS. Vitor (07/10/2026): "está para
+  // selecionar as peças, mas nesse eu preciso apenas selecionar os certificados das tintas e diluentes". Peça
+  // que chegue no corpo (tela antiga aberta) é ignorada: recebimento não inspeciona peça.
+  const recebimento = ehRecebimento(tipo);
+  const marcas = recebimento ? [] : [...new Set((Array.isArray(body?.marcas) ? body.marcas : []).map((m) => String(m || "").trim().toUpperCase()).filter(Boolean))];
+  const certIds = recebimento ? [...new Set((Array.isArray(body?.certificados) ? body.certificados : []).map((c) => String(c || "").trim()).filter(Boolean))] : [];
 
   if (!opNumero) return NextResponse.json({ error: "Informe a OP." }, { status: 400 });
+  if (certIds.length > (MAX_CERTIFICADOS[tipo] || 0)) {
+    return NextResponse.json({
+      error: tipo === "RECEBIMENTO_TINTA"
+        ? "O recebimento de tintas tem três componentes (A, B e C) — escolha até 3 certificados por relatório."
+        : `Escolha até ${MAX_CERTIFICADOS[tipo]} certificados por relatório.`,
+    }, { status: 400 });
+  }
   // ⚠ só o dimensional exige peça: o relatório é de UM conjunto e é dele que sai o desenho das
   // cotas. Um EVS pode cobrir várias peças, e quais foram fica na tabela do próprio relatório.
   if (ehPreMontagem && !projetos.length) return NextResponse.json({ error: "Escolha ao menos um projeto (conjunto ou diagrama de montagem) — a pré-montagem nasce do projeto." }, { status: 400 });
@@ -116,6 +131,27 @@ export async function POST(req) {
       error: `A OP-${opNumero} não prevê ${TIPO[tipo]?.label || tipo}. Ajuste o escopo de qualidade na OP se isso mudou.`,
     }, { status: 409 });
   }
+  // ── OS CERTIFICADOS ESCOLHIDOS (recebimentos) ──────────────────────────────────────────────
+  // ⚠ CÓPIA, não referência: o relatório registra o que foi conferido no dia, e uma correção posterior no
+  // CMR não reescreve documento assinado (mesma razão do tipo da peça, logo abaixo).
+  let doCmr = [];
+  if (certIds.length) {
+    const docs = await prisma.documentoQualidade.findMany({
+      where: { id: { in: certIds }, ativo: true, ...DO_CMR },
+      select: {
+        id: true, nome: true, importRef: true, indiceR: true, fornecedor: true, nfNumero: true, pedidoCompra: true,
+        numeroDocumento: true, numeroCorrida: true, quantidade: true, pesoKg: true, dataValidade: true,
+        dataRecebimento: true, opNumero: true, arquivoUrl: true, sharepointUrl: true, norma: true,
+      },
+    });
+    const porId = new Map(docs.map((d) => [d.id, d]));
+    if (certIds.some((id) => !porId.has(id))) {
+      return NextResponse.json({ error: "Certificado não encontrado no CMR (ou desativado) — atualize a lista e escolha de novo." }, { status: 400 });
+    }
+    // na ordem em que foram escolhidos: é a ordem das linhas do documento
+    doCmr = certIds.map((id) => linhaDoCertificado(porId.get(id)));
+  }
+
   // ── O TIPO DA PEÇA ──────────────────────────────────────────────────────────────────────────
   //
   // Vitor (21/08/2026): "aqui trazer o tipo da peça — coluna, viga, tesoura, etc — conforme
@@ -175,7 +211,10 @@ export async function POST(req) {
   // relatório antigo — mesma razão do tipo da peça ser gravado aqui e não lido no PDF.
 
   try {
-    const semente = await valoresIniciaisInspecao(opNumero, tipo);
+    const padrao = await valoresIniciaisInspecao(opNumero, tipo);
+    // o recebimento de tintas preenche cabeçalho e lotes A/B/C pelos certificados; os outros, uma linha por certificado
+    const semente = tipo === "RECEBIMENTO_TINTA" ? resultadosDaTinta(doCmr, padrao)
+      : recebimento ? { ...padrao, itens: limparItensRir(doCmr) } : padrao;
     // dimensional não usa fotos (Vitor: "não vamos usar fotos"), então nasce sem elas —
     // `criarRelatorio` exige foto, por isso o dimensional cria direto.
     const { proximoNumero } = await import("@/lib/relatorio-inspecao");
@@ -226,7 +265,7 @@ export async function POST(req) {
     await prisma.auditLog.create({
       data: {
         userId: user.id, action: "CRIAR_RELATORIO_DIMENSIONAL", entity: "RelatorioInspecao", entityId: rel.id,
-        diff: { codigo, opNumero, escopo, marcas, linhas: rel.linhas.length, vinculo },
+        diff: { codigo, opNumero, escopo, marcas, linhas: rel.linhas.length, vinculo, ...(recebimento ? { certificados: doCmr.map((l) => l.r || l.docId) } : {}) },
       },
     }).catch(() => {});
 

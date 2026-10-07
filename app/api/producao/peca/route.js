@@ -45,6 +45,8 @@ const TIPO_RELATORIO = {
   POEIRA: "Poeira",
   PULL_OFF: "Pull-off",
   RECEBIMENTO_TINTA: "Recebimento de tintas",
+  RECEBIMENTO_PENETRANTE: "Recebimento de penetrante e revelador",
+  RECEBIMENTO_ARAME: "Recebimento de arame de solda",
   MONTAGEM: "Montagem",
   GERAL: "Geral",
 };

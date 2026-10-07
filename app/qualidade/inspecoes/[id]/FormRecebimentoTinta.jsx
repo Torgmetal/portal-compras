@@ -6,6 +6,7 @@ import {
   COMPONENTES, CAMPOS_CABECALHO_RECEBIMENTO, GRUPOS_CABECALHO_RECEBIMENTO, camposCabecalhoRecebimento,
   avisosRecebimento, checklistRecebimento, lotesRecebimento, pendenciasRecebimento, preencherDoCmr, resultadoExigidoRecebimento,
 } from "@/lib/recebimento-tinta-campos";
+import { componentesDosCertificados } from "@/lib/recebimento-certificados";
 
 /**
  * O PREENCHIMENTO DO RECEBIMENTO DE TINTAS, no computador.
@@ -59,8 +60,25 @@ export default function FormRecebimentoTinta({ rel, res, travado, setResultado }
 
   const celula = "w-full text-[12px] border border-gray-200 rounded px-1.5 py-1 disabled:bg-gray-50";
 
+  // os certificados escolhidos na criação (07/10/2026) — e a posição de cada um, pela mesma regra da criação
+  const certificados = Array.isArray(res.certificados) ? res.certificados : [];
+  const posicoes = componentesDosCertificados(certificados);
+
   return (
     <div className="space-y-3">
+      {certificados.length > 0 && (
+        <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
+          <p className="text-[12px] font-bold text-torg-dark mb-1.5">Certificados do CMR escolhidos na criação</p>
+          <ul className="space-y-1">
+            {certificados.map((c, i) => (
+              <li key={c.docId || i} className="text-[12px]">
+                <span className="font-semibold text-torg-dark">{`${posicoes[i] || "—"} · ${c.descricao || "—"}`}</span>
+                <span className="block text-[11px] text-torg-gray">{[c.r && `R ${c.r}`, c.certificado && `cert. ${c.certificado}`, c.lote && `lote ${c.lote}`, c.nf && `NF ${c.nf}`].filter(Boolean).join(" · ")}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {!travado && (
         <div className="bg-sky-50 border border-sky-100 rounded-xl p-3">
           <p className="text-[12px] font-bold text-torg-dark flex items-center gap-1.5"><PackageCheck size={14} /> Preencher com os lotes do CMR desta obra</p>

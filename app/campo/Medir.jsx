@@ -25,6 +25,7 @@ import FormularioSaisCampo from "./FormularioSaisCampo";
 import FormularioPoeiraCampo from "./FormularioPoeiraCampo";
 import FormularioPullOffCampo from "./FormularioPullOffCampo";
 import FormularioRecebimentoTintaCampo from "./FormularioRecebimentoTintaCampo";
+import FormularioRecebimentoRirCampo from "./FormularioRecebimentoRirCampo";
 import JuntaSoldada from "./JuntaSoldada";
 import { rotuloEps } from "@/lib/eps-casa";
 import { ANGULOS, FACES, classificacaoIndicacao, TABELA_ACEITACAO_DISPONIVEL } from "@/lib/us-campos";
@@ -377,6 +378,8 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   const ehPoeira = rel.tipo === "POEIRA";
   const ehPullOff = rel.tipo === "PULL_OFF";
   const ehRecebimento = rel.tipo === "RECEBIMENTO_TINTA";
+  // os recebimentos por certificado (07/10/2026): penetrante/revelador e arame de solda
+  const ehRecebimentoRir = rel.tipo === "RECEBIMENTO_PENETRANTE" || rel.tipo === "RECEBIMENTO_ARAME";
   const ehSemJunta = semJunta(rel.tipo);
   const set = (i, campo, v) => setLinhas((p) => p.map((l, k) => (k === i ? { ...l, [campo]: v } : l)));
 
@@ -592,6 +595,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
       {ehPoeira && <FormularioPoeiraCampo rel={rel} cond={cond} setCond={setCond} resultado={resultado} />}
       {ehPullOff && <FormularioPullOffCampo rel={rel} cond={cond} setCond={setCond} resultado={resultado} />}
       {ehRecebimento && <FormularioRecebimentoTintaCampo rel={rel} cond={cond} setCond={setCond} resultado={resultado} observacoes={observacoes} />}
+      {ehRecebimentoRir && <FormularioRecebimentoRirCampo rel={rel} cond={cond} setCond={setCond} resultado={resultado} observacoes={observacoes} />}
 
       {ehLp && <ParametrosLP cond={cond} setCond={setCond} />}
       {/* ⚠ a junta soldada (EPS, RQS, processo, metal de adição, tipo de junta) — só existia no
