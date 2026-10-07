@@ -1,156 +1,156 @@
 {
-  "build": 3607,
-  "gerado": "2026-10-06T20:15:15.563Z",
+  "build": 3608,
+  "gerado": "2026-10-07T13:34:43.597Z",
   "commits": [
     {
-      "hash": "5e743f93",
+      "hash": "08dce6d64a",
+      "data": "06/10/2026",
+      "titulo": "Memória e revisão: troca de e-mail das etapas do fluxo de assinaturas do Data Book"
+    },
+    {
+      "hash": "5e743f93c4",
       "data": "06/10/2026",
       "titulo": "Data Book: trocar o e-mail de uma etapa do fluxo de assinaturas ainda não assinada"
     },
     {
-      "hash": "eafb5b86",
+      "hash": "eafb5b866b",
       "data": "06/10/2026",
       "titulo": "Memória e revisão: campo decimal lido com numeroBR (receita da OP + varredura de 26 telas)"
     },
     {
-      "hash": "8950b3da",
+      "hash": "8950b3dae4",
       "data": "06/10/2026",
       "titulo": "Campo decimal: 26 telas liam o texto com vírgula como número e erravam o valor"
     },
     {
-      "hash": "56edf507",
+      "hash": "56edf507f5",
       "data": "06/10/2026",
       "titulo": "Receita da OP: o valor com vírgula voltava zero e as alíquotas com vírgula sumiam"
     },
     {
-      "hash": "08819461",
+      "hash": "08819461ee",
       "data": "06/10/2026",
       "titulo": "Pedido no Omie e mapa de cotação seguem a ordem da RM"
     },
     {
-      "hash": "a253e0b6",
+      "hash": "a253e0b6bb",
       "data": "06/10/2026",
       "titulo": "Plano CMR R em branco v2 + revisão do Codex (direção aprovada, implementação não)"
     },
     {
-      "hash": "1b4bc350",
+      "hash": "1b4bc35030",
       "data": "06/10/2026",
       "titulo": "Plano: CMR usar R em branco da planilha — com a revisão do Codex (revisar antes de implementar)"
     },
     {
-      "hash": "82740378",
+      "hash": "827403780f",
       "data": "06/10/2026",
       "titulo": "Memória e revisão: CMR com as três origens resolvido"
     },
     {
-      "hash": "56a9a688",
+      "hash": "56a9a68881",
       "data": "06/10/2026",
       "titulo": "CMR: as três origens em todo o portal, sempre restritas a material"
     },
     {
-      "hash": "82305e6c",
+      "hash": "82305e6c7b",
       "data": "06/10/2026",
       "titulo": "Memória e revisão: CMR tem três caminhos de escrita (OP-120)"
     },
     {
-      "hash": "dc2aea12",
+      "hash": "dc2aea12b7",
       "data": "06/10/2026",
       "titulo": "Selecionar R: oferece o recebimento lançado pela tela do CMR"
     },
     {
-      "hash": "34975dec",
+      "hash": "34975deccb",
       "data": "05/10/2026",
       "titulo": "Casamento de tubo: confirmação pelo diâmetro só vale para DIN 2440"
     },
     {
-      "hash": "58b92a3b",
+      "hash": "58b92a3bbb",
       "data": "05/10/2026",
       "titulo": "CMR: data vai à planilha em ISO — \"05/10\" em texto virava 10 de maio"
     },
     {
-      "hash": "da0c97ef",
+      "hash": "da0c97ef57",
       "data": "05/10/2026",
       "titulo": "CMR: conflito tira a prévia da tela; falha ao conferir o lote é resultado incerto"
     },
     {
-      "hash": "d2b03d4e",
+      "hash": "d2b03d4e29",
       "data": "05/10/2026",
       "titulo": "CMR: \"Gravar N\" é lote atômico com chave — resposta perdida não duplica R"
     },
     {
-      "hash": "b6c239dc",
+      "hash": "b6c239dc28",
       "data": "05/10/2026",
       "titulo": "Memória e revisão: tubo DIN 2440 sem parede (OP-118)"
     },
     {
-      "hash": "3d354876",
+      "hash": "3d354876cb",
       "data": "05/10/2026",
       "titulo": "Tubo DIN 2440 sem parede no perfil volta a casar com o CMR"
     },
     {
-      "hash": "fcc7e3d7",
+      "hash": "fcc7e3d779",
       "data": "05/10/2026",
       "titulo": "Memória: capa da proposta com foto nossa, trocável pelo Comercial"
     },
     {
-      "hash": "da8c93aa",
+      "hash": "da8c93aab3",
       "data": "04/10/2026",
       "titulo": "Memória: modelo novo de proposta, PIT no layout da Vale e selo BV"
     },
     {
-      "hash": "da30ce21",
+      "hash": "da30ce21db",
       "data": "03/10/2026",
       "titulo": "OP › Qualidade: Qualidade de campo volta a ver os relatórios"
     },
     {
-      "hash": "e90c9718",
+      "hash": "e90c97186c",
       "data": "03/10/2026",
       "titulo": "OP › Qualidade: Produção e demais setores veem o PLP da obra em PDF"
     },
     {
-      "hash": "c5182a62",
+      "hash": "c5182a6277",
       "data": "03/10/2026",
       "titulo": "Corte e montagem: na Montagem a marca abre o desenho da peça, só para ver"
     },
     {
-      "hash": "1bdc41ba",
+      "hash": "1bdc41badf",
       "data": "03/10/2026",
       "titulo": "Corte e montagem: resposta atrasada não troca a tela; tocar no setor ativo não apaga a lista"
     },
     {
-      "hash": "f327c656",
+      "hash": "f327c65656",
       "data": "03/10/2026",
       "titulo": "Produção: aba Corte e montagem — a consulta dos gerentes de setor, no celular"
     },
     {
-      "hash": "c2c1340f",
+      "hash": "c2c1340f26",
       "data": "03/10/2026",
       "titulo": "PCP Produção: tabela legível no celular e croquis que faltam abrem num clique"
     },
     {
-      "hash": "c8a46747",
+      "hash": "c8a46747a1",
       "data": "03/10/2026",
       "titulo": "Memória: \"cortado\" não é \"preparado\" (op. 20 do Syneco fica de fora)"
     },
     {
-      "hash": "34fa3c12",
+      "hash": "34fa3c1283",
       "data": "02/10/2026",
       "titulo": "Memória e revisão: pull-off, recebimento de tintas e nada travado"
     },
     {
-      "hash": "0492787e",
+      "hash": "0492787e35",
       "data": "02/10/2026",
       "titulo": "Nada travado (2): cota, pré-montagem, lista, EVS, instrumento e reinspeção"
     },
     {
-      "hash": "75c6cb1f",
+      "hash": "75c6cb1f51",
       "data": "02/10/2026",
       "titulo": "Observações: o celular não corta mais o texto do computador"
-    },
-    {
-      "hash": "577219fb",
-      "data": "02/10/2026",
-      "titulo": "Relatórios de pull-off e de recebimento de tintas"
     }
   ]
 }

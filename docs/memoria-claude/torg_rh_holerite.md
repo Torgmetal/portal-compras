@@ -7,7 +7,7 @@ metadata:
   originSessionId: d9c0cffd-a288-4e74-b94d-9b9291161750
 ---
 
-**Holerite (RH):** importar (upload PDF do lote → `preparar` extrai texto/página e sugere funcionário → tela de revisão → `confirmarImportacao` POST `/api/rh/holerite`) → `disparar` (e-mail via Resend, anexa a **página** do PDF completo via pdf-lib, `Holerite.pagina`) → funcionário confirma em `/meu-rh` (`POST /api/meu-rh/holerite/[id]/confirmar` grava `visualizadoEm`/`confirmadoEm`/`confirmadoIp`). Modelo `Holerite`: status PENDENTE/ENVIADO/VISUALIZADO/CONFIRMADO. Matheus refez o import (não sobe página por página; guarda o PDF completo no Blob + nº da página) em 10/07.
+**Holerite (RH):** importar (upload PDF do lote → `preparar` extrai texto/página e sugere funcionário → tela de revisão → `confirmarImportacao` POST `/api/rh/holerite`) → `disparar` (e-mail via Resend **SEM anexo** — só avisa que está no Portal do Colaborador; Matheus tirou o PDF em 07/10/2026 para obrigar a abrir no portal e confirmar, senão a ciência não fica registrada) → funcionário confirma em `/meu-rh` (`POST /api/meu-rh/holerite/[id]/confirmar` grava `visualizadoEm`/`confirmadoEm`/`confirmadoIp`). Modelo `Holerite`: status PENDENTE/ENVIADO/VISUALIZADO/CONFIRMADO. Matheus refez o import (não sobe página por página; guarda o PDF completo no Blob + nº da página) em 10/07.
 
 **Comprovante de ciência (feito 10/07):** botão **"Comprovante"** na aba Holerites → `GET /api/rh/holerite/comprovante?competencia=AAAA-MM` → PDF (`lib/holerite-comprovante-pdf.js`, pdf-lib A4 paisagem) com 1 linha por funcionário: status + **visualizado em + confirmado em + IP**. Serve como prova da assinatura/ciência eletrônica. Campos já existiam.
 

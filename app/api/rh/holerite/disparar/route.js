@@ -1,6 +1,8 @@
 // POST /api/rh/holerite/disparar  { competencia, soParaMim?, somentePendentes? }
 // Notifica os funcionários por e-mail que há holerite novo disponível no portal
-// (/meu-rh). NÃO anexa o PDF — o funcionário abre logado e dá ciência.
+// (/colaborador). NÃO anexa o PDF — de propósito: Matheus (07/10/2026) tirou o anexo para que o
+// colaborador TENHA de abrir o holerite no portal, onde a leitura e a confirmação ficam gravadas
+// (visualizadoEm/confirmadoEm/IP — base do Comprovante de ciência). Com o PDF no e-mail, ninguém entrava.
 //   soParaMim=true → manda 1 e-mail de amostra pro próprio RH e não altera nada
 //                    (validação segura antes do disparo em massa).
 // Só ADMIN/RH.
@@ -18,7 +20,6 @@ const schema = z.object({
   competencia: z.string().regex(/^\d{4}-\d{2}$/),
   soParaMim: z.boolean().default(false),
   somentePendentes: z.boolean().default(true),
-  anexarPdf: z.boolean().default(true), // anexa o PDF do holerite no e-mail
 });
 
 function competenciaExtenso(c) {
@@ -27,23 +28,18 @@ function competenciaExtenso(c) {
   return `${nomes[Number(mes)] || mes}/${ano}`;
 }
 
-function montarEmail({ nome, competencia, link, comAnexo }) {
+function montarEmail({ nome, competencia, link }) {
   const ref = competenciaExtenso(competencia);
-  const subject = `Seu holerite de ${ref} está disponível`;
-  const linhaAnexo = comAnexo
-    ? `<p>Seu holerite segue <strong>em anexo (PDF)</strong> e também está disponível no portal.</p>`
-    : `<p>Seu holerite referente a <strong>${escapeHtml(ref)}</strong> já está disponível no portal.</p>`;
+  const subject = `Seu holerite de ${ref} está disponível no portal`;
   const html = `
     <div style="font-family:Arial,sans-serif;color:#002945">
       <p>Olá, ${escapeHtml(nome)}.</p>
-      ${linhaAnexo}
+      <p>Seu holerite referente a <strong>${escapeHtml(ref)}</strong> já está disponível no <strong>Portal do Colaborador</strong>.</p>
       <p><a href="${link}" style="display:inline-block;background:#006EAB;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Acessar meu holerite</a></p>
-      <p style="color:#576D7E;font-size:13px">Entre com seu <strong>CPF</strong> e senha. Após visualizar, confirme o recebimento na própria página.</p>
+      <p style="color:#576D7E;font-size:13px">Entre com seu <strong>CPF</strong> e senha. Após visualizar, <strong>confirme o recebimento</strong> na própria página.</p>
       <p style="color:#576D7E;font-size:12px">Workspace Torg — uso interno / confidencial.</p>
     </div>`;
-  const text = comAnexo
-    ? `Seu holerite de ${ref} segue em anexo (PDF) e está no portal. Entre com seu CPF e senha: ${link}`
-    : `Seu holerite de ${ref} está disponível. Entre com seu CPF e senha: ${link}`;
+  const text = `Seu holerite de ${ref} está disponível no Portal do Colaborador. Entre com seu CPF e senha e confirme o recebimento: ${link}`;
   return { subject, html, text };
 }
 
@@ -59,7 +55,7 @@ export async function POST(req) {
   try { body = await req.json(); } catch { return NextResponse.json({ success: false, error: "Body inválido" }, { status: 400 }); }
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ success: false, error: parsed.error.issues[0]?.message }, { status: 400 });
-  const { competencia, soParaMim, somentePendentes, anexarPdf } = parsed.data;
+  const { competencia, soParaMim, somentePendentes } = parsed.data;
 
   const origin = process.env.NEXTAUTH_URL || new URL(req.url).origin;
   const link = `${origin}/colaborador`;
@@ -75,59 +71,16 @@ export async function POST(req) {
 
   const holerites = await prisma.holerite.findMany({
     where: { competencia, ...(somentePendentes ? { status: "PENDENTE" } : {}) },
-    select: { id: true, arquivoUrl: true, arquivoNome: true, pagina: true, funcionario: { select: { nome: true, email: true } } },
+    select: { id: true, funcionario: { select: { nome: true, email: true } } },
   });
-
-  // Cache do PDF completo do lote: com a extração preguiçosa, TODOS os holerites
-  // da competência apontam pra MESMA arquivoUrl (o PDF inteiro) e diferem só pela
-  // `pagina`. Baixar + carregar no pdf-lib UMA vez por URL (e não por funcionário)
-  // evita dezenas de downloads do mesmo PDF grande (VMI) que estouravam os 60s.
-  const { PDFDocument } = await import("pdf-lib");
-  const fontes = new Map(); // arquivoUrl -> { doc, total } | null (falhou)
-  async function fonteDoc(url) {
-    if (fontes.has(url)) return fontes.get(url);
-    let entrada = null;
-    try {
-      const pdf = await fetch(url);
-      if (pdf.ok) {
-        const doc = await PDFDocument.load(Buffer.from(await pdf.arrayBuffer()));
-        entrada = { doc, total: doc.getPageCount() };
-      }
-    } catch { /* fica null → segue sem anexo */ }
-    fontes.set(url, entrada);
-    return entrada;
-  }
 
   let enviados = 0; const semEmail = []; const falhas = [];
   for (const h of holerites) {
     const email = h.funcionario?.email;
     if (!email) { semEmail.push(h.funcionario?.nome || h.id); continue; }
 
-    // Anexa o PDF do holerite (best-effort — se o download falhar, envia só o aviso).
-    // Se `pagina` está setada, arquivoUrl é o PDF COMPLETO → extrai só a página do
-    // documento já carregado no cache; senão anexa o arquivo inteiro (legado).
-    let attachments;
-    if (anexarPdf && h.arquivoUrl) {
-      try {
-        const fonte = await fonteDoc(h.arquivoUrl);
-        if (fonte) {
-          let buf;
-          if (h.pagina) {
-            const out = await PDFDocument.create();
-            const idx = Math.min(Math.max(h.pagina - 1, 0), fonte.total - 1);
-            const [pg] = await out.copyPages(fonte.doc, [idx]);
-            out.addPage(pg);
-            buf = Buffer.from(await out.save());
-          } else {
-            buf = Buffer.from(await fonte.doc.save());
-          }
-          attachments = [{ filename: (h.arquivoNome || `holerite-${competencia}.pdf`).replace(/["\r\n]/g, ""), content: buf.toString("base64") }];
-        }
-      } catch { /* segue sem anexo */ }
-    }
-
-    const msg = montarEmail({ nome: h.funcionario.nome, competencia, link, comAnexo: !!attachments });
-    const res = await sendEmail({ to: email, ...msg, ...(attachments ? { attachments } : {}) });
+    const msg = montarEmail({ nome: h.funcionario.nome, competencia, link });
+    const res = await sendEmail({ to: email, ...msg });
     if (res.ok) {
       await prisma.holerite.update({ where: { id: h.id }, data: { status: "ENVIADO", enviadoEm: new Date() } });
       enviados++;
