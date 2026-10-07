@@ -2760,3 +2760,25 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (b) o reenvio do PATCH antigo não checa `estaFechado` (data book em montagem pode reenviar) — já era assim;
   - (c) os relatórios de inspeção (`AssinaturaDocumento`) seguem sem troca de destinatário pela tela;
   - (d) não validei no navegador: a tela exige login de Qualidade/ADMIN.
+
+## 07/10/2026 — Recebimentos pelos certificados do CMR: RRT sem peças, RRP e RRA novos (Claude)
+
+- **Feito (`046a4954`):**
+  - Os três recebimentos nascem dos certificados do CMR, escolhidos na criação (computador e celular), sem peças.
+  - O RRT preenche A/B/C (até 3) e lista os certificados na tela e no PDF.
+  - RRP (penetrante/revelador) e RRA (arame de solda) são tipos novos, na §12. Têm modelo próprio da Torg, com
+    uma linha por certificado (visual/dimensional/documentação A, R ou N.A., quantidade e RNC), inclusão de
+    certificado ou de item à mão, PDF, trava de assinatura, revisão, RNC, escopo e padrões da obra.
+  - Testes: 13 arquivos novos, e os guardas `travas-resolviveis` e `relatorios-texto-hostil` cobrem os dois
+    tipos. Suíte com 5.138 passando; `npm run checar` sem erro; eslint sem erro.
+- **Origem:** Vitor, para a QWS (OP-102), com um RIR de concorrente como lista de informações ("criar o nosso modelo").
+- **Medido (só leitura):** do líquido penetrante só o revelador D-70 (R 261266) está no CMR. Arame, eletrodo,
+  tinta e diluente estão.
+- ⚠ **Para revisar:**
+  - (a) RRA na §12, junto do EVS, e não na §06 (seção de certificado);
+  - (b) escopo: RRP acompanha o LP e RRA acompanha o EVS (`ACOMPANHA`), sem caixa própria;
+  - (c) a busca sem texto filtra a classe em JS sobre os 2.000 lançamentos mais recentes, e com texto busca
+    300 no CMR inteiro;
+  - (d) o relatório guarda cópia do certificado: correção no CMR depois não chega ao relatório;
+  - (e) não validei no navegador, porque as telas exigem login. O PDF foi conferido em imagem (`sips`);
+  - (f) `classificarMaterial` continua sem grupo para penetrante, que cairia na §04 se fosse vinculado ao data book.

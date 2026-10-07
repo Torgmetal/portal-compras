@@ -1,7 +1,12 @@
 {
-  "build": 3609,
-  "gerado": "2026-10-07T14:55:24.795Z",
+  "build": 3610,
+  "gerado": "2026-10-07T14:56:16.644Z",
   "commits": [
+    {
+      "hash": "046a4954",
+      "data": "07/10/2026",
+      "titulo": "Recebimentos pelos certificados do CMR: tintas sem peças, e os novos de penetrante (RRP) e de arame de solda (RRA)"
+    },
     {
       "hash": "771f9486",
       "data": "07/10/2026",
@@ -146,11 +151,6 @@
       "hash": "34fa3c12",
       "data": "02/10/2026",
       "titulo": "Memória e revisão: pull-off, recebimento de tintas e nada travado"
-    },
-    {
-      "hash": "0492787e",
-      "data": "02/10/2026",
-      "titulo": "Nada travado (2): cota, pré-montagem, lista, EVS, instrumento e reinspeção"
     }
   ]
 }
