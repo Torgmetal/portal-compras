@@ -12,7 +12,10 @@ export async function GET(req, { params }) {
   try {
     // ⚠ O Almoxarifado lê os materiais da obra pelo Painel de OPs (Matheus, 17/09/2026) — é a
     // leitura operacional de quem recebe: o que foi pedido, quanto chegou, de quem e quando.
-    const user = await requireRole(["ADMIN", "COMPRAS", "COMERCIAL", "ALMOXARIFADO"]);
+    // ⚠ E a Qualidade também (Matheus, 08/10/2026): o Geraldo (qualidade@) via a aba Compras da OP e
+    // tomava "Erro ao carregar materiais — Forbidden"; precisa ver o que foi comprado para a obra.
+    // Mesma leitura do Almoxarifado — sem os valores de estoque logo abaixo.
+    const user = await requireRole(["ADMIN", "COMPRAS", "COMERCIAL", "ALMOXARIFADO", "QUALIDADE"]);
     // ⚠⚠ MAS SEM OS VALORES DE ESTOQUE. `estoquePreco`/`estoqueTotal` são o custo da alocação —
     // número de gestão, e fora do que foi liberado ("operacional + preço dos pedidos"). Cortado
     // AQUI, na resposta, e não escondido na tela: campo que sai da API já vazou.
