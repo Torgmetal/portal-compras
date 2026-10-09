@@ -1,7 +1,7 @@
 "use client";
 import CampoData from "@/components/CampoData";
 import { corDaArea } from "@/lib/cronograma-area-cor";
-import { Check, ChevronDown, ChevronRight, Layers, Loader2, Pencil, Plus } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Copy, Layers, Loader2, Pencil, Plus } from "lucide-react";
 import { AntecessorasPicker } from "./AntecessorasPicker";
 import { ReorderTarefas } from "./ReorderTarefas";
 
@@ -14,6 +14,7 @@ export function ListaTarefasDoSetor({
   areas,
   areasCollapsed,
   areasExistentes,
+  copiarArea,
   dept,
   gruposArea,
   linhaTarefa,
@@ -85,6 +86,8 @@ export function ListaTarefasDoSetor({
                     <>
                       <button onClick={() => renomearArea(area)} title="Renomear área (renomeia em todas as tarefas)" className="text-torg-gray hover:text-torg-blue p-0.5"><Pencil size={11} /></button>
                       <button onClick={() => addNaArea(area)} title="Adicionar tarefa nesta área" className="text-torg-gray hover:text-torg-blue p-0.5"><Plus size={12} /></button>
+                      {/* copiar a área inteira (tarefas, datas e encadeamento) para outras áreas vazias — OP-118, 09/10/2026 */}
+                      {copiarArea && <button onClick={() => copiarArea(area)} title="Copiar esta área (tarefas e datas) para outras áreas" aria-label={`Copiar a área ${area}`} className="text-torg-gray hover:text-torg-blue p-0.5"><Copy size={11} /></button>}
                     </>
                   )}
                 </div>

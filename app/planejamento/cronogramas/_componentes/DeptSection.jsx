@@ -7,6 +7,7 @@ import { fmtData } from "../_lib/formatos";
 import { DEPT_COLORS, DEPT_ICONS, DEPT_LABEL } from "../_lib/rotulos";
 import { ModalCobranca } from "./ModalCobranca";
 import { ListaTarefasDoSetor } from "./ListaTarefasDoSetor";
+import { ModalCopiarArea } from "./ModalCopiarArea";
 
 export function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId, allTarefas, dataBase, tipoDias, areas, readOnly }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -32,6 +33,7 @@ export function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId
   const [ordemLocal, setOrdemLocal] = useState([]);
   const [salvandoOrdem, setSalvandoOrdem] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
+  const [copiandoArea, setCopiandoArea] = useState(null); // área de origem da cópia (janela aberta)
   const Icon = DEPT_ICONS[dept] || Factory;
   const colors = DEPT_COLORS[dept] || "text-gray-600 bg-gray-50 border-gray-200";
   const atrasadas = tasks.filter((t) => !t.isSummary && tarefaAtrasada(t, diaDeHoje(now)));
@@ -217,6 +219,7 @@ export function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId
           areas={areas}
           areasCollapsed={areasCollapsed}
           areasExistentes={areasExistentes}
+          copiarArea={readOnly ? null : setCopiandoArea}
           dept={dept}
           gruposArea={gruposArea}
           linhaTarefa={linhaTarefa}
@@ -269,6 +272,16 @@ export function DeptSection({ dept, summary, tasks, now, onRefresh, cronogramaId
         setShowCobrModal={setShowCobrModal}
         toggleEmail={toggleEmail}
       />
+    )}
+
+    {/* Copiar área — também fora do div com overflow-hidden */}
+    {copiandoArea && (
+      <ModalCopiarArea cronogramaId={cronogramaId} dept={dept} origem={copiandoArea} areas={areas} tarefasDoSetor={tasks}
+        onFechar={() => setCopiandoArea(null)}
+        onCopiado={(j) => {
+          onRefresh();
+          alert(`Área ${copiandoArea} copiada para ${Object.keys(j.porDestino || {}).join(", ")} (${j.criadas} tarefas). Agora faça as vinculações entre as áreas.`);
+        }} />
     )}
     </>
   );
