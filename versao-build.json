@@ -1,7 +1,12 @@
 {
-  "build": 3612,
-  "gerado": "2026-10-09T17:00:22.011Z",
+  "build": 3613,
+  "gerado": "2026-10-09T17:00:48.889Z",
   "commits": [
+    {
+      "hash": "d897aef6",
+      "data": "09/10/2026",
+      "titulo": "Cronograma: copiar uma área (tarefas, datas e encadeamento) para outras áreas"
+    },
     {
       "hash": "307131d5",
       "data": "08/10/2026",
@@ -146,11 +151,6 @@
       "hash": "f327c656",
       "data": "03/10/2026",
       "titulo": "Produção: aba Corte e montagem — a consulta dos gerentes de setor, no celular"
-    },
-    {
-      "hash": "c2c1340f",
-      "data": "03/10/2026",
-      "titulo": "PCP Produção: tabela legível no celular e croquis que faltam abrem num clique"
     }
   ]
 }

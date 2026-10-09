@@ -2782,3 +2782,16 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (d) o relatório guarda cópia do certificado: correção no CMR depois não chega ao relatório;
   - (e) não validei no navegador, porque as telas exigem login. O PDF foi conferido em imagem (`sips`);
   - (f) `classificarMaterial` continua sem grupo para penetrante, que cairia na §04 se fosse vinculado ao data book.
+
+## 09/10/2026 — Cronograma: copiar uma área para outras (Claude)
+
+- **Feito (`d897aef6`):** "Copiar área" no cabeçalho de cada área do setor. A janela lista as áreas cadastradas
+  e bloqueia as que já têm tarefa no setor. A rota `POST /[id]/areas {acao:"copiar"}` cria as cópias com
+  `createMany` (ids pré-gerados, como no duplicar), refaz o encadeamento interno e mantém os vínculos externos
+  (opcional). Não copia avanço nem quantidade planejada. AuditLog `COPIAR_AREA_CRONOGRAMA`. Testes: regra (11),
+  rota (6) e janela (5). Suíte com 5.161 passando.
+- **Origem:** Vitor, OP-118. A área A da Fabricação tem 4 tarefas, e B, C, D, F e Romaneio 01 estavam vazias.
+- ⚠ **Para revisar:**
+  - (a) a cópia não roda o recálculo: as datas são as da origem, que já respeitam os vínculos;
+  - (b) a ordem das cópias segue o cadastro das áreas, não a ordem do clique;
+  - (c) não validei no navegador, porque a tela exige login. Não copiei nada na OP-118 sem pedido.
