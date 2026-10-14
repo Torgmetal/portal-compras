@@ -2835,3 +2835,8 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ Para revisar: (a) `norma` passou a aparecer no formulário do arame e do penetrante também (o campo é comum);
   (b) `tirar()` do estoque remove o documento do livro inteiro, o que vale porque cada tipo vai para uma seção só;
   (c) não validei no navegador.
+- **`03e476d7` — visibilidade do estoque:** o app de campo lista, em toda OP, também os relatórios com `opNumero "EST"`
+  (`estoque:true`). A busca do computador passa a olhar o título. Criados na produção a pedido do Vitor, pela rota
+  real e com AuditLog: RRM-EST-001 (35 itens, aço da OP-102 de agosto, data 26/08) e RRM-EST-002 (11 itens,
+  fev–mar sem NF, data 19/03). Inspetor Geraldo, inspeções em branco: ninguém marcou inspeção por ele.
+  ⚠ Para revisar: a lista do celular de toda OP agora inclui todos os de estoque, sem filtro de uso.
