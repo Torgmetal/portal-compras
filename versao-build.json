@@ -1,7 +1,12 @@
 {
-  "build": 3619,
-  "gerado": "2026-10-14T14:20:42.823Z",
+  "build": 3620,
+  "gerado": "2026-10-14T14:20:56.653Z",
   "commits": [
+    {
+      "hash": "d3d6f6e4",
+      "data": "14/10/2026",
+      "titulo": "feat: data do recebimento escolhida na criação (retroativa)"
+    },
     {
       "hash": "37967b17",
       "data": "14/10/2026",
@@ -146,11 +151,6 @@
       "hash": "3d354876",
       "data": "05/10/2026",
       "titulo": "Tubo DIN 2440 sem parede no perfil volta a casar com o CMR"
-    },
-    {
-      "hash": "fcc7e3d7",
-      "data": "05/10/2026",
-      "titulo": "Memória: capa da proposta com foto nossa, trocável pelo Comercial"
     }
   ]
 }

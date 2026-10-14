@@ -2817,3 +2817,6 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (c) a remoção manual de um RRA de um livro é desfeita no próximo ciclo (os relatórios comuns já se comportam assim);
   - (d) o documento do RRA tem `opNumero: null`, então não aparece na lista de candidatos por OP para anexar à mão;
   - (e) não validei no navegador, porque as telas exigem login.
+- **`d3d6f6e4` — data do recebimento na criação:** o campo de data no modal de recebimento (computador e
+  celular) vem com hoje e aceita data passada. Grava `resultados.dataInspecao`; data futura ou inexistente é
+  recusada com 400. Testes de rota +2. ⚠ Para revisar: "hoje" é `hojeBRT()` tanto no cliente quanto no servidor.

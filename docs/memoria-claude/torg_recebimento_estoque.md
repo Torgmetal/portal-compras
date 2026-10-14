@@ -30,3 +30,8 @@ também na criação do recebimento e na rota do PLP. Prisma mockado não pega c
 conferem o select contra o schema (`testes/lib/campo-indice-r-inexistente.teste.js`).
 
 Relacionado: [[torg_recebimentos_certificado]], [[torg_databook_relatorio_assinado]].
+
+**Data do recebimento na criação (14/10/2026, `d3d6f6e4`):** Vitor — *"pode ser um recebimento retroativo"*. O modal
+(computador e celular) pede a data, hoje por padrão; vai para `resultados.dataInspecao` (o mesmo campo do
+cabeçalho e do PDF, que também confere a validade contra ela). `validarDataRecebimento`: futura ou inexistente é 400.
+Vale para os três recebimentos (tinta também).
