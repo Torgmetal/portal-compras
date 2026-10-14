@@ -1,7 +1,12 @@
 {
-  "build": 3613,
-  "gerado": "2026-10-09T17:00:48.889Z",
+  "build": 3614,
+  "gerado": "2026-10-14T11:31:18.472Z",
   "commits": [
+    {
+      "hash": "52c4aa79",
+      "data": "09/10/2026",
+      "titulo": "Memória e revisão: copiar área no cronograma"
+    },
     {
       "hash": "d897aef6",
       "data": "09/10/2026",
@@ -146,11 +151,6 @@
       "hash": "1bdc41ba",
       "data": "03/10/2026",
       "titulo": "Corte e montagem: resposta atrasada não troca a tela; tocar no setor ativo não apaga a lista"
-    },
-    {
-      "hash": "f327c656",
-      "data": "03/10/2026",
-      "titulo": "Produção: aba Corte e montagem — a consulta dos gerentes de setor, no celular"
     }
   ]
 }

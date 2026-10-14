@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcularItensComerciais, migrarItensComerciais } from '@/lib/lqc-itens-comerciais';
+import { calcularItensComerciais, migrarItensComerciais, numeroCompra } from '@/lib/lqc-itens-comerciais';
 const catalogo = [
  {key:'TELHA_TERMO',rotulo:'Telha térmica',un:'m²',preco:125},
  {key:'TELHA_SIMPLES',rotulo:'Telha simples',un:'m²',preco:0},
@@ -52,5 +52,42 @@ describe('itens comerciais de compra',()=>{
   compra.modelos.Telhas[0].porArea={};
   compra.modelos.Telhas[0].quantidade='1.234';
   expect(soma(calcularItensComerciais({...c,comerciaisCompra:compra},catalogo,new Set()))).toBe(3.09);
+ });
+ // ⚠⚠ Desde 16/09/2026 estes campos são CampoDecimal, que entrega o texto em português. A leitura
+ // antiga trocava só a primeira vírgula: "15.000,00" virava "15.000.00", NaN, e o item zerava calado.
+ it('texto do CampoDecimal com milhar não vira zero: "15.000,00" e "1.234,5"',()=>{
+  expect(numeroCompra('15.000,00')).toBe(15000);
+  expect(numeroCompra('1.234,5')).toBe(1234.5);
+ });
+ it('quantidade, custo, complemento, frete e montagem digitados com milhar entram na conta',()=>{
+  const c={comerciaisCompra:{versao:1,
+   modelos:{Telhas:[{id:'t1',quantidade:'1.234,5',custoUnitario:'2'}],Lanternim:[{id:'l1',quantidade:'2',custoUnitario:'1.505,64'}]},
+   complementos:{Telhas:{laRocha:{quantidade:'1.000,5',custoUnitario:'2'},frete:'15.000,00'},Lanternim:{montagem:'1.200,00'}}}};
+  const linha=key=>calcularItensComerciais(c,catalogo,new Set()).find(l=>l.key===key);
+  expect(linha('TELHA_SIMPLES')).toMatchObject({qtd:1234.5,preco:2,subtotal:2469});
+  expect(linha('LANTERNIM')).toMatchObject({qtd:2,preco:1505.64,subtotal:3011.28});
+  expect(linha('COMP:TELHA_SIMPLES:laRocha')).toMatchObject({qtd:1000.5,preco:2,subtotal:2001});
+  expect(linha('COMP:TELHA_SIMPLES:frete')).toMatchObject({qtd:1,subtotal:15000});
+  expect(linha('COMP:LANTERNIM:montagem')).toMatchObject({qtd:1,subtotal:1200});
+ });
+ it('quantidade por área digitada com milhar acompanha as áreas ativas',()=>{
+  const c={comerciaisCompra:{versao:1,modelos:{Telhas:[{id:'t1',porArea:{A:'1.234,5',B:'2.000,25'},custoUnitario:'2'}]}}};
+  expect(soma(calcularItensComerciais(c,catalogo,new Set(['A'])))).toBe(2469);
+ });
+ it('item migrado do legado e editado com milhar também é lido',()=>{
+  const c={itensComerciais:{TELHA_TERMO:{qtd:2,preco:'2,50'}}};
+  const compra=migrarItensComerciais(c,catalogo);
+  compra.modelos.Telhas[0].quantidade='1.234,5';
+  compra.modelos.Telhas[0].custoUnitario='1.000,00';
+  expect(soma(calcularItensComerciais({...c,comerciaisCompra:compra},catalogo,new Set()))).toBe(1234500);
+ });
+ // ⚠ Caracterização, não correção: o que a leitura antiga já entendia segue igual. É o ponto decimal
+ // do input numérico de antes de 16/09/2026 — o numeroBR leria "0.125" como 125.
+ it('ponto sem vírgula continua decimal, como gravava o input numérico',()=>{
+  expect(numeroCompra('0.125')).toBe(0.125);
+  expect(numeroCompra('1.234')).toBe(1.234);
+  expect(numeroCompra('2,5')).toBe(2.5);
+  const c={comerciaisCompra:{versao:1,modelos:{Telhas:[{id:'t1',quantidade:'0.125',custoUnitario:'8'}]}}};
+  expect(soma(calcularItensComerciais(c,catalogo,new Set()))).toBe(1);
  });
 });
