@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { Plus, ChevronRight, X } from 'lucide-react';
-import { FAMILIAS, UNIDADE_FAMILIA as PADRAO, configFamilia, quantidadeModelo, migrarItensComerciais, calcularItensComerciais, numeroCompra as numero } from '@/lib/lqc-itens-comerciais';
+import { FAMILIAS, UNIDADE_FAMILIA as PADRAO, configFamilia, quantidadeModelo, temQuantidadePorArea, migrarItensComerciais, calcularItensComerciais, numeroCompra as numero } from '@/lib/lqc-itens-comerciais';
 import { ITENS_COMERCIAIS, FATURAMENTO, FATURAMENTO_ROTULO } from '@/lib/lqc';
 import { Sel } from './campos';
 import { QuantidadePorArea } from './QuantidadeComercialPorArea';
@@ -42,7 +42,7 @@ export function ItensComerciais({c,res,setComp,estudoId}){
      <p className={s.ajuda}>Informe quantidade e custo diretamente. O nome do modelo pode ser preenchido depois.</p>
      <div className={s.principais}>{linhasDe(familia).map((m,index)=><div key={m.id||index} className={s.modelo}>
       <div className={s.linhaPrincipal}>
-       <label>Quantidade<CampoDecimal aria-label={`Quantidade do item ${index+1} de ${familia}`} placeholder="0" disabled={Object.values(m.porArea||{}).some(v=>Number(String(v).replace(',','.'))>0)} value={Object.values(m.porArea||{}).some(v=>Number(String(v).replace(',','.'))>0)?quantidadeModelo(m,areasAtivas):(m.quantidade??'')} onChange={(txt) =>atualizar(index,'quantidade',txt)}/></label>
+       <label>Quantidade<CampoDecimal aria-label={`Quantidade do item ${index+1} de ${familia}`} placeholder="0" disabled={temQuantidadePorArea(m)} value={temQuantidadePorArea(m)?quantidadeModelo(m,areasAtivas):(m.quantidade??'')} onChange={(txt) =>atualizar(index,'quantidade',txt)}/></label>
        <label>Custo unit. (R$)<CampoDecimal aria-label={`Custo unitário do item ${index+1} de ${familia}`} placeholder="0,00" value={m.custoUnitario??''} onChange={(txt) => atualizar(index,'custoUnitario',txt)}/></label>
        <label>Unidade<select aria-label={`Unidade do item ${index+1} de ${familia}`} value={m.unidade||PADRAO[familia]} onChange={e=>atualizar(index,'unidade',e.target.value)}>{UNIDADES.map(u=><option key={u}>{u}</option>)}</select></label>
        <label>Item / modelo<input aria-label={`Modelo ${index+1} de ${familia}`} placeholder={`${familia} — informar modelo`} value={m.nome??''} onChange={e=>atualizar(index,'nome',e.target.value)}/></label>
@@ -77,7 +77,7 @@ export function ItensComerciais({c,res,setComp,estudoId}){
   </div>
   {!!compra.legados?.length && <section className={s.legados} aria-label="Itens anteriores preservados"><h3>Itens anteriores preservados</h3><p>Os itens já lançados continuam no orçamento.</p>{compra.legados.map((m,index)=>{
    const atualizarLegado=patch=>salvar({legados:compra.legados.map((v,i)=>i===index?{...v,...patch}:v)});
-   const porArea=Object.values(m.porArea||{}).some(v=>Number(String(v).replace(',','.'))>0);
+   const porArea=temQuantidadePorArea(m);
    return <div className={s.modelo} key={m.id}><strong>{m.nome}</strong><div className={s.servicos}>
     <label>Quantidade ({m.unidade})<CampoDecimal aria-label={`Quantidade de ${m.nome}`} disabled={porArea} value={quantidadeModelo(m,areasAtivas)} onChange={(txt) =>atualizarLegado({quantidade:txt})}/></label>
     <label>Custo unitário (R$)<CampoDecimal aria-label={`Custo unitário de ${m.nome}`} value={m.custoUnitario??''} onChange={(txt) =>atualizarLegado({custoUnitario:txt})}/></label>
