@@ -21,7 +21,7 @@ describe("relatórios visíveis no portal de campo", () => {
     mocks.envios.mockResolvedValue([{ id: "envio-1", status: "CONCLUIDO" }]);
     const res = await GET(new Request("http://localhost/api/campo/relatorios?opNumero=113"));
     const body = await res.json();
-    expect(mocks.findMany.mock.calls[0][0].where).toEqual({ opNumero: "113" });
+    expect(mocks.findMany.mock.calls[0][0].where).toEqual({ OR: [{ opNumero: "113" }, { opNumero: "EST" }] });
     expect(body.relatorios[0]).toMatchObject({ id: "r1", assinado: true, somenteLeitura: true, status: "EMITIDO" });
   });
 
@@ -38,5 +38,16 @@ describe("relatórios visíveis no portal de campo", () => {
     const body = await (await GET(new Request("http://localhost/api/campo/relatorios?opNumero=102"))).json();
     expect(mocks.envios).not.toHaveBeenCalled();
     expect(body.relatorios[0]).toMatchObject({ assinado: false, somenteLeitura: false });
+  });
+
+  // ⚠ recebimento de ESTOQUE (arame, penetrante, aço — 14/10/2026) não tem OP: sem isto o inspetor abria a OP-102
+  // no celular e não achava o RRM que foi criado para ela
+  it("os recebimentos de estoque aparecem em toda OP, marcados como estoque", async () => {
+    mocks.envios.mockResolvedValue([]);
+    mocks.findMany.mockResolvedValue([{ id: "m1", codigo: "RRM-EST-001", tipo: "RECEBIMENTO_ACO", opNumero: "EST",
+      titulo: "Aço da OP-102", marcas: [], linhas: [], inspetor: "Geraldo", createdAt: new Date(), revisao: 0,
+      resultadoInspecao: null, envioAssinaturaId: null, status: "RASCUNHO" }]);
+    const body = await (await GET(new Request("http://localhost/api/campo/relatorios?opNumero=102"))).json();
+    expect(body.relatorios[0]).toMatchObject({ codigo: "RRM-EST-001", estoque: true });
   });
 });

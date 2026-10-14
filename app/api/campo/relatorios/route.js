@@ -19,6 +19,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { PERFIS_CAMPO, TIPO_LABEL } from "@/lib/qualidade-campo";
+import { OP_ESTOQUE } from "@/lib/recebimento-certificados";
 
 export const runtime = "nodejs";
 
@@ -31,10 +32,12 @@ export async function GET(req) {
 
   // ⚠ RELATÓRIO REPROVADO CONTINUA NA LISTA. Vitor: "no caso de reprova o relatório deve ficar
   // aberto". Os emitidos também aparecem, mas sinalizados como somente leitura.
+  // ⚠ e os recebimentos de ESTOQUE (arame, penetrante, aço — 14/10/2026), que não têm OP e servem a todas:
+  // sem eles na lista, quem abre a OP no celular não acha o recebimento criado para o material dela
   const rs = await prisma.relatorioInspecao.findMany({
-    where: { opNumero },
+    where: { OR: [{ opNumero }, { opNumero: OP_ESTOQUE }] },
     select: {
-      id: true, codigo: true, tipo: true, titulo: true, marcas: true, linhas: true,
+      id: true, codigo: true, opNumero: true, tipo: true, titulo: true, marcas: true, linhas: true,
       inspetor: true, createdAt: true, revisao: true, resultadoInspecao: true,
       envioAssinaturaId: true, status: true,
     },
@@ -57,6 +60,7 @@ export async function GET(req) {
     const medidas = linhas.filter((l) => l.encontradoMm != null || l.laudo).length;
     return {
       id: r.id, codigo: r.codigo, tipo: r.tipo, tipoLabel: TIPO_LABEL[r.tipo] || r.tipo,
+      estoque: r.opNumero === OP_ESTOQUE,
       titulo: r.titulo, marcas: r.marcas || [], inspetor: r.inspetor,
       aMedir, medidas, completo: aMedir > 0 && medidas >= aMedir,
       revisao: r.revisao ?? 0,

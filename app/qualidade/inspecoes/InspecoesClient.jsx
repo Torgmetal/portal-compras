@@ -88,7 +88,7 @@ export default function InspecoesClient({ podeFechar = true }) {
   const visiveis = dados.relatorios
     .filter((r) => !opFiltro || String(r.opNumero) === opFiltro)
     .filter((r) => !tipoFiltro || r.tipo === tipoFiltro)
-    .filter((r) => !busca.trim() || [r.codigo, r.opNumero, r.inspetor, r.criadoPorNome, ...(r.marcas || [])].join(" ").toLocaleLowerCase("pt-BR").includes(busca.trim().toLocaleLowerCase("pt-BR")))
+    .filter((r) => !busca.trim() || [r.codigo, r.opNumero, r.titulo, r.inspetor, r.criadoPorNome, ...(r.marcas || [])].join(" ").toLocaleLowerCase("pt-BR").includes(busca.trim().toLocaleLowerCase("pt-BR")))
     .filter((r) => (aba === "APROVADOS" ? ehConcluido(r) : !ehConcluido(r)));
 
 
