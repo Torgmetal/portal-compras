@@ -95,10 +95,24 @@ describe("criar o recebimento pelos certificados", () => {
     expect(r.status).toBe(200);
     const { relatorio } = await r.json();
     expect(relatorio.marcas).toEqual([]);
-    expect(relatorio.codigo).toBe("RRA-102-001");
+    expect(relatorio.codigo).toBe("RRA-EST-001");
     expect(relatorio.resultados.itens.map((i) => i.r)).toEqual(["R3", "R2"]);
     expect(relatorio.resultados.itens[0]).toMatchObject({ docId: "3", certificado: "C-3", visual: null, dimensional: null, documentos: null });
-    expect(relatorio.resultados.contrato).toBe("4600123456");
+    // de estoque: sem obra, sem contrato
+    expect(relatorio.resultados.contrato).toBeUndefined();
+  });
+
+  it("arame e penetrante nascem de ESTOQUE, sem OP — mesmo que a tela mande uma (Vitor, 14/10/2026)", async () => {
+    const a = await (await post({ tipo: "RECEBIMENTO_ARAME", certificados: ["2"] })).json();
+    expect(a.relatorio).toMatchObject({ opNumero: "EST", codigo: "RRA-EST-001", opId: null });
+    const p = await (await post({ opNumero: "102", tipo: "RECEBIMENTO_PENETRANTE", certificados: ["4"] })).json();
+    expect(p.relatorio).toMatchObject({ opNumero: "EST", codigo: "RRP-EST-001", opId: null });
+    expect(mockPrisma.oP.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("tinta continua exigindo a OP", async () => {
+    const r = await post({ tipo: "RECEBIMENTO_TINTA", certificados: ["5"] });
+    expect(r.status).toBe(400);
   });
 
   it("só seleciona do CMR campos que existem em DocumentoQualidade", async () => {

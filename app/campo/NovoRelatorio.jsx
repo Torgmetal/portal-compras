@@ -7,7 +7,7 @@ import { TIPOS_RELATORIO, usaCotas } from "@/lib/qualidade-campo";
 import { rotuloFase } from "@/lib/fase-peca";
 import FiltroFase from "@/components/qualidade/FiltroFase";
 import EscolherCertificados from "@/components/qualidade/EscolherCertificados";
-import { ehRecebimento } from "@/lib/recebimento-certificados";
+import { ehRecebimento, ehDeEstoque } from "@/lib/recebimento-certificados";
 
 // ─── CRIAR O RELATÓRIO PELO CELULAR ───────────────────────────────────────────
 // Vitor (22/08/2026): "podemos deixar ele criar relatórios do celular dele, sem a
@@ -33,6 +33,8 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
   // os recebimentos nascem dos certificados do CMR, não de peças (Vitor, 07/10/2026)
   const [certs, setCerts] = useState([]);
   const recebimento = ehRecebimento(tipo);
+  // ⚠ arame e penetrante são de ESTOQUE (Vitor, 14/10/2026): a OP escolhida antes não vai ao relatório
+  const estoque = ehDeEstoque(tipo);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   // ⚠ POR FASE. Vitor (14/09/2026): "precisamos que separe por fases (…) isso deve ter em todos os
@@ -47,7 +49,8 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
   // ⚠⚠ A PRÉ-MONTAGEM NÃO NASCE AQUI (verificação das travas, 02/10/2026): ela nasce do PROJETO — o diagrama de
   // montagem escolhido na pasta da obra —, e o celular não tem onde escolhê-lo; a criação voltava sempre 400.
   // Nasce no computador; o celular a encontra na lista e mede.
-  const noEscopo = (id) => !op.tipos || op.tipos.includes(id);
+  // o recebimento de estoque não depende do escopo desta obra: ele serve a todas
+  const noEscopo = (id) => ehDeEstoque(id) || !op.tipos || op.tipos.includes(id);
   const tipos = TIPOS_RELATORIO.filter((t) => noEscopo(t.id) && t.id !== "PRE_MONTAGEM");
 
   // ⚠ PRODUTO FINAL, NÃO COMPONENTE. Vitor (14/09/2026): "está aparecendo peças de croqui no
@@ -88,7 +91,7 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(recebimento
-          ? { opNumero: op.numero, tipo, certificados: certs.map((c) => c.docId) }
+          ? { opNumero: estoque ? undefined : op.numero, tipo, certificados: certs.map((c) => c.docId) }
           : { opNumero: op.numero, tipo, escopo: "AVULSAS", marcas: sel, pecasInformadas }),
       });
       const j = await r.json();
@@ -131,8 +134,12 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
   // ── passo 2 do recebimento: os certificados do CMR, sem peça ──
   if (recebimento) {
     return (
-      <Tela titulo={rotulo} sub={`OP-${op.numero}`} voltar={() => setTipo(null)}>
-        <p className="text-sm text-torg-gray mb-2">Escolha os certificados do CMR — recebimento não tem peça.</p>
+      <Tela titulo={rotulo} sub={estoque ? "Estoque — todas as obras" : `OP-${op.numero}`} voltar={() => setTipo(null)}>
+        <p className="text-sm text-torg-gray mb-2">
+          {estoque
+            ? "Recebimento de estoque, vale para todas as obras: escolha os certificados do CMR. Assinado, entra no data book de cada obra que usar o R ou o lote."
+            : "Escolha os certificados do CMR — recebimento não tem peça."}
+        </p>
         <EscolherCertificados tipo={tipo} opNumero={op.numero} selecionados={certs} onChange={setCerts} />
         {erro && <p className="text-[13px] text-red-600 my-2">{erro}</p>}
         <button onClick={criar} disabled={salvando}

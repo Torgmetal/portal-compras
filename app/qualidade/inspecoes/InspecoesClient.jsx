@@ -7,7 +7,9 @@ import { textoDoVinculo } from "@/lib/relatorio-vinculo-texto";
 import { rotuloFase } from "@/lib/fase-peca";
 import FiltroFase from "@/components/qualidade/FiltroFase";
 import EscolherCertificados from "@/components/qualidade/EscolherCertificados";
-import { ehRecebimento } from "@/lib/recebimento-certificados";
+import { ehRecebimento, ehDeEstoque, OP_ESTOQUE } from "@/lib/recebimento-certificados";
+// recebimento de estoque (arame, penetrante) não tem obra — "OP-EST" não diria nada
+const rotuloOp = (n) => (n === OP_ESTOQUE ? "Estoque" : `OP-${n}`);
 
 /**
  * INSPEÇÕES — as fotos do celular viram relatório aqui, no computador.
@@ -141,7 +143,7 @@ export default function InspecoesClient({ podeFechar = true }) {
                 <div className="relative mt-1"><Search size={16} className="absolute left-3 top-3 text-torg-gray"/><input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Código, marca ou inspetor" className="w-full min-h-[44px] rounded-lg border border-gray-200 pl-9 pr-3 text-sm font-normal"/></div>
               </label>
               <label className="block text-xs font-semibold text-torg-gray">Obra
-                <select value={opFiltro} onChange={e=>setOpFiltro(e.target.value)} className="mt-1 w-full min-h-[44px] border border-gray-200 rounded-lg px-3 bg-white text-sm font-normal"><option value="">Todas as obras</option>{opsComRelatorio.map(n=><option key={n} value={n}>OP-{n}</option>)}</select>
+                <select value={opFiltro} onChange={e=>setOpFiltro(e.target.value)} className="mt-1 w-full min-h-[44px] border border-gray-200 rounded-lg px-3 bg-white text-sm font-normal"><option value="">Todas as obras</option>{opsComRelatorio.map(n=><option key={n} value={n}>{rotuloOp(n)}</option>)}</select>
               </label>
               <label className="block text-xs font-semibold text-torg-gray">Tipo de inspeção
                 <select value={tipoFiltro} onChange={e=>setTipoFiltro(e.target.value)} className="mt-1 w-full min-h-[44px] border border-gray-200 rounded-lg px-3 bg-white text-sm font-normal"><option value="">Todos os tipos</option>{TIPOS_RELATORIO.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</select>
@@ -255,7 +257,7 @@ function Relatorio({ r, onMudou, podeFechar = true }) {
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
-            <span className="text-xs font-bold text-torg-gray">OP-{r.opNumero}</span>
+            <span className="text-xs font-bold text-torg-gray">{rotuloOp(r.opNumero)}</span>
             <Link href={`/qualidade/inspecoes/${r.id}`} className="font-semibold font-mono text-sm text-torg-blue hover:underline">{r.codigo}</Link>
             <span className={`text-[11px] rounded px-2 py-0.5 ${faltam.length ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-torg-gray"}`}>{situacao}</span>
             {resultado&&<span className={`text-[11px] ${r.resultadoInspecao==="APROVADO"?"text-emerald-700":"text-orange-700"}`}>{resultado}</span>}
@@ -421,6 +423,8 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
   // ⚠⚠ OS RECEBIMENTOS NASCEM DOS CERTIFICADOS DO CMR, NÃO DE PEÇAS. Vitor (07/10/2026): "está para
   // selecionar as peças, mas nesse eu preciso apenas selecionar os certificados das tintas e diluentes".
   const recebimento = ehRecebimento(tipo);
+  // ⚠ arame e penetrante são de ESTOQUE: sem OP (Vitor, 14/10/2026 — "o Arame será usado para várias obras")
+  const estoque = ehDeEstoque(tipo);
   const [certs, setCerts] = useState([]);
   const [ops, setOps] = useState(null);
   const [op, setOp] = useState(null);
@@ -534,7 +538,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          opNumero: op.numero, tipo, escopo, marcas: recebimento ? [] : sel, inspetor,
+          opNumero: estoque ? undefined : op.numero, tipo, escopo, marcas: recebimento ? [] : sel, inspetor,
           certificados: recebimento ? certs.map((c) => c.docId) : undefined,
           // ⚠ o CAMINHO vai junto: assim o relatório de pré-montagem nasce com o desenho
           // vinculado, em vez de depender de uma varredura por marca que nunca acharia o
@@ -567,6 +571,8 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
             <p className="text-[11px] text-torg-gray">
               {ehDimensional
                 ? "As dimensões de projeto vêm do desenho; as encontradas ficam para o elaborador."
+                : estoque
+                  ? "Recebimento de estoque, vale para todas as obras: escolha só os certificados do CMR. Assinado, ele entra no data book de cada obra que usar o R ou o lote."
                 : recebimento
                   ? "Escolha a OP e os certificados do CMR — recebimento não tem peça."
                   : "Escolha a OP. As peças podem ser informadas agora ou depois, no próprio relatório."}
@@ -577,7 +583,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
 
         <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="p-4 space-y-3">
-            <label className="block">
+            {!estoque && <label className="block">
               <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">OP</span>
               <select value={op?.id || ""} onChange={(e) => setOp((ops || []).find((o) => o.id === e.target.value) || null)}
                 className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue">
@@ -586,7 +592,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
                   <option key={o.id} value={o.id}>OP-{o.numero} — {o.cliente}{o.obra ? ` · ${o.obra}` : ""}</option>
                 ))}
               </select>
-            </label>
+            </label>}
 
             {ehDimensional && !ehPreMontagem && (
             <div>
@@ -604,10 +610,10 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
 
             )}
 
-            {op && recebimento && (
+            {(op || estoque) && recebimento && (
               <div>
                 <span className="block text-[10px] font-semibold text-torg-gray mb-1">Certificados {certs.length ? `· ${certs.length} escolhido(s)` : ""}</span>
-                <EscolherCertificados tipo={tipo} opNumero={op.numero} selecionados={certs} onChange={setCerts} />
+                <EscolherCertificados tipo={tipo} opNumero={op?.numero} selecionados={certs} onChange={setCerts} />
               </div>
             )}
 
@@ -743,7 +749,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
 
         <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
           <button onClick={onFechar} className="text-[12px] text-torg-gray px-3 py-1.5">Cancelar</button>
-          <button onClick={gravar} disabled={!op || (ehDimensional && !sel.length) || salvando}
+          <button onClick={gravar} disabled={(!op && !estoque) || (ehDimensional && !sel.length) || salvando}
             className="text-[12px] font-semibold text-white bg-torg-blue hover:bg-torg-dark rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 disabled:opacity-40">
             {salvando ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} Criar relatório
           </button>

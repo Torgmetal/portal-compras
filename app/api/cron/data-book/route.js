@@ -24,6 +24,7 @@ import { aquecerBanco } from "@/lib/db-retry";
 import { registrarExecucao } from "@/lib/cron-monitor";
 import { processarGeracao } from "@/lib/databook-volumes";
 import { vincularCertificadosNovos } from "@/lib/databook-certificados-novos";
+import { sincronizarRecebimentosDeEstoque } from "@/lib/recebimento-estoque";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -35,6 +36,13 @@ const ORCAMENTO_MS = 240_000;
 // uma falha aqui não segura as gerações — mas vai para o monitor
 async function vincularCertificados() {
   try { return await vincularCertificadosNovos(prisma); }
+  catch (e) { return { erro: String(e?.message || e).slice(0, 300) }; }
+}
+
+// ⚠ RRA/RRP de estoque (14/10/2026): a obra que soldar com o R, ou usar o lote no LP, DEPOIS da
+// assinatura passa a recebê-lo aqui — a assinatura só distribui para quem já tinha usado.
+async function recebimentosDeEstoque() {
+  try { return await sincronizarRecebimentosDeEstoque(); }
   catch (e) { return { erro: String(e?.message || e).slice(0, 300) }; }
 }
 
@@ -74,13 +82,14 @@ export async function GET(req) {
     // sem passar pelo registrarExecucao (achado do Codex, 17/09/2026 — testes/api/cron-aquecimento).
     await aquecerBanco(prisma);
     const certificados = await vincularCertificados();
+    const estoque = await recebimentosDeEstoque();
     const feitos = await terminarGeracoes(t0);
     await registrarExecucao("data-book", {
-      ok: !certificados.erro,
-      mensagem: certificados.erro ? `certificados: ${certificados.erro}` : null,
+      ok: !certificados.erro && !estoque.erro,
+      mensagem: [certificados.erro && `certificados: ${certificados.erro}`, estoque.erro && `estoque: ${estoque.erro}`].filter(Boolean).join(" · ") || null,
       duracaoMs: Date.now() - t0,
     });
-    return NextResponse.json({ ok: true, certificados, volumes: feitos.length, feitos });
+    return NextResponse.json({ ok: true, certificados, estoque, volumes: feitos.length, feitos });
   } catch (e) {
     await registrarExecucao("data-book", { ok: false, mensagem: e.message, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ error: e.message }, { status: 500 });

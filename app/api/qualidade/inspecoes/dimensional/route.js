@@ -13,6 +13,7 @@ import { pecasReais } from "@/lib/peso-op";
 //
 // O caminho do desenho é resolvido na primeira vez que a marcação ou o PDF precisam dele
 // (`garantirDesenhos`) e fica gravado a partir dali.
+import { ehDeEstoque, OP_ESTOQUE } from "@/lib/recebimento-certificados";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { tipoNoEscopo } from "@/lib/qualidade-escopo";
@@ -44,7 +45,7 @@ export async function POST(req) {
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
   const body = await req.json().catch(() => ({}));
-  const opNumero = String(body?.opNumero || "").trim();
+  let opNumero = String(body?.opNumero || "").trim();
   const escopo = body?.escopo === "AVULSAS" ? "AVULSAS" : "CONJUNTO";
   // ⚠ a rota deixou de ser só do dimensional: qualquer tipo nasce por aqui. O que muda por tipo é a
   // exigência da peça e o que se resolve depois (o desenho, só o dimensional usa).
@@ -73,6 +74,10 @@ export async function POST(req) {
   const marcas = recebimento ? [] : [...new Set((Array.isArray(body?.marcas) ? body.marcas : []).map((m) => String(m || "").trim().toUpperCase()).filter(Boolean))];
   const certIds = recebimento ? [...new Set((Array.isArray(body?.certificados) ? body.certificados : []).map((c) => String(c || "").trim()).filter(Boolean))] : [];
 
+  // ⚠⚠ ARAME E PENETRANTE SÃO DE ESTOQUE, NÃO DE OBRA (Vitor, 14/10/2026): "o Arame será usado para
+  // várias obras". A OP que chegue do corpo (tela antiga) é ignorada; o relatório vai aos data books
+  // pelas obras que usaram o R/lote — lib/recebimento-estoque.js.
+  if (ehDeEstoque(tipo)) opNumero = OP_ESTOQUE;
   if (!opNumero) return NextResponse.json({ error: "Informe a OP." }, { status: 400 });
   if (certIds.length > (MAX_CERTIFICADOS[tipo] || 0)) {
     return NextResponse.json({
@@ -121,7 +126,7 @@ export async function POST(req) {
   const proc = await procedimentoDoTipo(tipo).catch(() => null);
   const erros = [];
 
-  const op = await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true, escopoQualidade: true } });
+  const op = ehDeEstoque(tipo) ? null : await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true, escopoQualidade: true } });
   // ⚠ O ESCOPO DA OBRA MANDA, e a checagem tem que ser AQUI. Vitor (22/08/2026): "pode ser
   // que em alguns casos não vamos fazer nada além de certificado de qualidade e relatório
   // de pintura". A tela do celular já filtra os tipos, mas o relatório também nasce pelo
