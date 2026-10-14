@@ -203,3 +203,30 @@ describe("dimensoesDoItem / itensDoPedido — as medidas vão para o pedido", ()
     expect(itensDoPedido([linha({ rmItem: { comprimento: "6" } })]).itens[0].observacao).toBe("COMP. 6,000 M");
   });
 });
+
+// Matheus (14/10/2026): "no pedido só sai KG (…) é interessante entrar junto a quantidade UN de
+// chapas e perfil". Quando o pedido sai em KG, a quantidade em peças/barras vai na observação.
+describe("itensDoPedido — a quantidade em peças acompanha o KG", () => {
+  const chapa = { descricao: "CHAPA 2,25MM", unidade: "PEÇA", qtd: 4, peso: 324, largura: "1.5", comprimento: "3" };
+
+  it("chapa em KG: peças antes das medidas", () => {
+    const { itens } = itensDoPedido([linha({ cotItem: { qtdCotada: 324, precoUnit: 6.88, ipiPct: 0 }, rmItem: chapa })]);
+    expect(itens[0].unidade).toBe("KG");
+    expect(itens[0].observacao).toBe("4 PEÇA - LARG. 1,500 M x COMP. 3,000 M");
+  });
+
+  it("⚠ com abatimento de estoque, vale o nº de peças pedido ao fornecedor, não o da RM", () => {
+    const { itens } = itensDoPedido([linha({ cotItem: { qtdCotada: 243, qtdPecasCotada: 3, precoUnit: 6.88, ipiPct: 0 }, rmItem: chapa })]);
+    expect(itens[0].observacao).toBe("3 PEÇA - LARG. 1,500 M x COMP. 3,000 M");
+  });
+
+  it("perfil em barras, com a observação da engenharia no fim", () => {
+    const { itens } = itensDoPedido([linha({ cotItem: { qtdCotada: 300, precoUnit: 8, ipiPct: 0 },
+      rmItem: { descricao: "PERFIL W 150", unidade: "barra(s)", qtd: 2.5, peso: 300, comprimento: "12", observacao: "Galvanizado" } })]);
+    expect(itens[0].observacao).toBe("2,5 BARRA(S) - COMP. 12,000 M - Galvanizado");
+  });
+
+  it("item que já sai na própria unidade (sem peso) não repete a quantidade", () => {
+    expect(itensDoPedido([linha()]).itens[0].observacao).toBe(null);
+  });
+});
