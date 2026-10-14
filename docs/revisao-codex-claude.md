@@ -2847,3 +2847,9 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   penetrante continuam com 40. Depois do deploy e a pedido do Vitor, juntei o RRM-EST-002 no 001 (46 itens, título
   "Aço da OP-102", data 26/08) e apaguei o 002 pelos mesmos passos do DELETE da rota. AuditLog: EDITAR + EXCLUIR.
   ⚠ Para revisar: o 002 tinha itens de fev–mar; o relatório único ficou com uma só data de recebimento (26/08).
+- **`4c2cd991` — certificados de LP na §06:** `sincronizarConsumiveisLp` usa os lotes dos LP com assinatura completa,
+  busca os produtos de LP no CMR (`DO_CMR`, `certificadoDaClasse(PENETRANTE)`) e faz o diff só nos de LP da §06,
+  respeitando a remoção manual. O título da §06 é dinâmico. Disparo na última assinatura do LP e no cron. Testes:
+  6 + gatilho + cron. ⚠ Para revisar: (a) o título da §06 só se acerta quando a sincronização roda; tirar à mão o
+  último certificado de LP deixa o título com "…líquido penetrante" até o próximo cron; (b) `relatorio-inspecao.js`
+  está no teto de 350 linhas.

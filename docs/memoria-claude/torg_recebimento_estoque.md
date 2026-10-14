@@ -48,3 +48,11 @@ Aço — mesma linha dos demais no layout, porém informações compatíveis com
   `relatorio-secao-databook`). O aço é exceção deliberada, com dois ajustes: o cron ignora `categoria RELATORIO` ao
   medir a "montagem" da seção (`livro.relatorios` em `certificadosQueEntram`), e o PDF lista os relatórios numa
   tabela própria ("Relatórios de recebimento"), fora da rastreabilidade.
+
+**Certificados de penetrante/revelador na §06 (14/10/2026, `4c2cd991`, `lib/databook-consumiveis-lp.js`):** Vitor — *"puxar a
+informação de cada relatório emitido e já puxar os certificados scaneados sozinho"*. Lotes dos LP **assinados** da obra →
+lançamento de produto de LP no CMR com aquele lote (`numeroCorrida`) → vínculo na **§06** (escolha dele). Roda na última
+assinatura do LP (`aoConcluirAssinaturas`) e no cron do data book. Recalcula só os de LP (arame nunca), respeita
+REMOVER_DOC_SECAO_DATABOOK, e o nome da §06 vira "…de solda e de líquido penetrante" com certificado de LP.
+⚠ O CMR escreve "METAL-CHEK VP 30" — o filtro de LP aceita hífen/espaço/"CHEK" (`f56fbc5b`). R 261928/261929 (OP-102)
+foram lançados SEM o PDF escaneado: entram na lista, as folhas só quando o Almoxarifado digitalizar.

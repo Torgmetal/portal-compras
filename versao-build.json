@@ -1,7 +1,12 @@
 {
-  "build": 3631,
-  "gerado": "2026-10-14T18:28:22.022Z",
+  "build": 3632,
+  "gerado": "2026-10-14T18:28:40.326Z",
   "commits": [
+    {
+      "hash": "4c2cd991",
+      "data": "14/10/2026",
+      "titulo": "feat: certificados do penetrante/revelador entram sozinhos na §06"
+    },
     {
       "hash": "66e82376",
       "data": "14/10/2026",
@@ -146,11 +151,6 @@
       "hash": "08819461",
       "data": "06/10/2026",
       "titulo": "Pedido no Omie e mapa de cotação seguem a ordem da RM"
-    },
-    {
-      "hash": "a253e0b6",
-      "data": "06/10/2026",
-      "titulo": "Plano CMR R em branco v2 + revisão do Codex (direção aprovada, implementação não)"
     }
   ]
 }
