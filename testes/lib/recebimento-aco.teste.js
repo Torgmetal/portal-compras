@@ -23,7 +23,9 @@ describe("o tipo", () => {
     expect(TIPO[ACO]).toMatchObject({ sigla: "RRM", secao: "04" });
     expect(codigoRelatorio(ACO, "EST", 3)).toBe("RRM-EST-003");
     expect(tituloDocumento(ACO)).toMatch(/RECEBIMENTO DE (AÇO|MATÉRIA-PRIMA)/);
-    expect(MAX_CERTIFICADOS[ACO]).toBe(40);
+    // ⚠ 60, não 40 (14/10/2026): o aço de uma obra passa de 40 certificados — a OP-102 tem 46 — e o Vitor quer UM relatório
+    expect(MAX_CERTIFICADOS[ACO]).toBe(60);
+    expect(limparItensRir(Array.from({ length: 46 }, (_, n) => item({ r: String(n) })))).toHaveLength(46);
     expect(secaoDoRecebimento(ACO)).toBe("04");
     expect(secaoDoRecebimento("RECEBIMENTO_ARAME")).toBe("12");
   });

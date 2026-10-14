@@ -1,7 +1,12 @@
 {
-  "build": 3628,
-  "gerado": "2026-10-14T17:33:06.989Z",
+  "build": 3629,
+  "gerado": "2026-10-14T17:37:42.399Z",
   "commits": [
+    {
+      "hash": "f56fbc5b",
+      "data": "14/10/2026",
+      "titulo": "fix: penetrante do CMR não aparecia no recebimento (METAL-CHEK VP 30)"
+    },
     {
       "hash": "008352b6",
       "data": "14/10/2026",
@@ -146,11 +151,6 @@
       "hash": "82740378",
       "data": "06/10/2026",
       "titulo": "Memória e revisão: CMR com as três origens resolvido"
-    },
-    {
-      "hash": "56a9a688",
-      "data": "06/10/2026",
-      "titulo": "CMR: as três origens em todo o portal, sempre restritas a material"
     }
   ]
 }
