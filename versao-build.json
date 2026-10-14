@@ -1,7 +1,12 @@
 {
-  "build": 3621,
-  "gerado": "2026-10-14T14:32:05.274Z",
+  "build": 3622,
+  "gerado": "2026-10-14T14:32:27.095Z",
   "commits": [
+    {
+      "hash": "b9b413b3",
+      "data": "14/10/2026",
+      "titulo": "feat: memorial de cálculo na §03 do data book, com nome que acompanha"
+    },
     {
       "hash": "23fb6706",
       "data": "14/10/2026",
@@ -146,11 +151,6 @@
       "hash": "d2b03d4e",
       "data": "05/10/2026",
       "titulo": "CMR: \"Gravar N\" é lote atômico com chave — resposta perdida não duplica R"
-    },
-    {
-      "hash": "b6c239dc",
-      "data": "05/10/2026",
-      "titulo": "Memória e revisão: tubo DIN 2440 sem parede (OP-118)"
     }
   ]
 }

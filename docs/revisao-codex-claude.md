@@ -2820,3 +2820,9 @@ aparece desligado. O caminho inteiro até a chamada está testado.
 - **`d3d6f6e4` — data do recebimento na criação:** o campo de data no modal de recebimento (computador e
   celular) vem com hoje e aceita data passada. Grava `resultados.dataInspecao`; data futura ou inexistente é
   recusada com 400. Testes de rota +2. ⚠ Para revisar: "hoje" é `hojeBRT()` tanto no cliente quanto no servidor.
+- **`b9b413b3` — memorial de cálculo na §03:** novas fontes da §03: `2.2 Memória de Cálculo` e a 2.5.5 (opcional).
+  O nome da seção vira "ARTs e memorial de cálculo" quando há memorial anexado (`sincronizarTitulo03`, chamado
+  no GET do livro e no POST de gerar). Testes: 6. Pastas conferidas só lendo o SharePoint (OP-112/102/105).
+  ⚠ Para revisar: (a) o memorial é reconhecido pelo NOME do arquivo; um PDF sem "memorial" no nome não muda o
+  título; (b) o PDF de aceite/assinatura de um livro já gerado lê o título gravado na última abertura ou geração.
+  Mapa de juntas (§09): pendente, aguarda a lista da API do Tekla.
