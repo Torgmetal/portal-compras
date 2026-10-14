@@ -5,6 +5,7 @@
 // termina dentro de uma função serverless. Aqui só se cria o job; quem trabalha é
 // /gerar/continuar (chamado pela própria tela, um volume por vez) e o cron, que
 // recolhe job abandonado quando alguém fecha o navegador no meio.
+import { sincronizarTitulo03 } from "@/lib/databook-memorial";
 import { NextResponse } from "next/server";
 import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
@@ -21,8 +22,10 @@ export async function POST(_req, { params }) {
   try { user = await requireRole(["ADMIN", "QUALIDADE"]); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 403 }); }
 
-  const book = await prisma.dataBookQualidade.findUnique({ where: { id: params.id }, select: { id: true, revisao: true } });
+  const book = await prisma.dataBookQualidade.findUnique({ where: { id: params.id }, select: { id: true, revisao: true, status: true, emitidoEm: true } });
   if (!book) return NextResponse.json({ error: "Data book não encontrado" }, { status: 404 });
+  // o nome da §03 acompanha o memorial anexado — o PDF lê o título gravado (lib/databook-memorial.js)
+  await sincronizarTitulo03(prisma, book).catch(() => null);
 
   // Job aberto para esta revisão? Devolve o mesmo — clicar duas vezes não pode gerar
   // dois conjuntos de volumes concorrentes gravando no mesmo lugar.

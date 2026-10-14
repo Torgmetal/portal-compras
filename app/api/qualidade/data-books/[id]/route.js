@@ -1,5 +1,6 @@
 // GET   /api/qualidade/data-books/[id]  — detalhe (seções + docs vinculados + travas)
 // PATCH /api/qualidade/data-books/[id]  — edita cabeçalho / emite (com trava)
+import { sincronizarTitulo03 } from "@/lib/databook-memorial";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -38,6 +39,9 @@ async function montarDetalhe(id) {
     },
   });
   if (!book) return null;
+  // o nome da §03 acompanha o memorial anexado (lib/databook-memorial.js) — acertado ao abrir o livro
+  const titulo03 = await sincronizarTitulo03(prisma, book).catch(() => null);
+  if (titulo03) for (const s of book.secoes) if (s.numero === "03") s.titulo = titulo03;
 
   const op = await prisma.oP.findFirst({
     where: book.opId ? { id: book.opId } : { numero: book.opNumero },

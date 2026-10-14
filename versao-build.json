@@ -1,7 +1,12 @@
 {
-  "build": 3620,
-  "gerado": "2026-10-14T14:20:56.653Z",
+  "build": 3621,
+  "gerado": "2026-10-14T14:32:05.274Z",
   "commits": [
+    {
+      "hash": "23fb6706",
+      "data": "14/10/2026",
+      "titulo": "Memória e revisão: data do recebimento na criação"
+    },
     {
       "hash": "d3d6f6e4",
       "data": "14/10/2026",
@@ -146,11 +151,6 @@
       "hash": "b6c239dc",
       "data": "05/10/2026",
       "titulo": "Memória e revisão: tubo DIN 2440 sem parede (OP-118)"
-    },
-    {
-      "hash": "3d354876",
-      "data": "05/10/2026",
-      "titulo": "Tubo DIN 2440 sem parede no perfil volta a casar com o CMR"
     }
   ]
 }
