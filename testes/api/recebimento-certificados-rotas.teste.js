@@ -110,6 +110,18 @@ describe("criar o recebimento pelos certificados", () => {
     expect(mockPrisma.oP.findFirst).not.toHaveBeenCalled();
   });
 
+  it("a data do recebimento vem da criação — retroativa vale (Vitor, 14/10/2026)", async () => {
+    const a = await (await post({ tipo: "RECEBIMENTO_ARAME", certificados: ["2"], dataRecebimento: "2026-09-03" })).json();
+    expect(a.relatorio.resultados.dataInspecao).toBe("2026-09-03");
+    const t = await (await post({ opNumero: "102", tipo: "RECEBIMENTO_TINTA", certificados: ["5"], dataRecebimento: "2026-08-20" })).json();
+    expect(t.relatorio.resultados.dataInspecao).toBe("2026-08-20");
+  });
+
+  it("data do recebimento no futuro ou inválida é recusada", async () => {
+    expect((await post({ tipo: "RECEBIMENTO_ARAME", certificados: ["2"], dataRecebimento: "2099-01-01" })).status).toBe(400);
+    expect((await post({ tipo: "RECEBIMENTO_ARAME", certificados: ["2"], dataRecebimento: "2026-02-30" })).status).toBe(400);
+  });
+
   it("tinta continua exigindo a OP", async () => {
     const r = await post({ tipo: "RECEBIMENTO_TINTA", certificados: ["5"] });
     expect(r.status).toBe(400);

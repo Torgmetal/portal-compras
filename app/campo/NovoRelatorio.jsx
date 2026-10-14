@@ -8,6 +8,7 @@ import { rotuloFase } from "@/lib/fase-peca";
 import FiltroFase from "@/components/qualidade/FiltroFase";
 import EscolherCertificados from "@/components/qualidade/EscolherCertificados";
 import { ehRecebimento, ehDeEstoque } from "@/lib/recebimento-certificados";
+import { hojeBRT } from "@/lib/data-br";
 
 // ─── CRIAR O RELATÓRIO PELO CELULAR ───────────────────────────────────────────
 // Vitor (22/08/2026): "podemos deixar ele criar relatórios do celular dele, sem a
@@ -35,6 +36,8 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
   const recebimento = ehRecebimento(tipo);
   // ⚠ arame e penetrante são de ESTOQUE (Vitor, 14/10/2026): a OP escolhida antes não vai ao relatório
   const estoque = ehDeEstoque(tipo);
+  // pode ser retroativo (Vitor, 14/10/2026): escolhido já na criação, hoje por padrão
+  const [dataReceb, setDataReceb] = useState(hojeBRT());
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
   // ⚠ POR FASE. Vitor (14/09/2026): "precisamos que separe por fases (…) isso deve ter em todos os
@@ -91,7 +94,7 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
       const r = await fetch("/api/qualidade/inspecoes/dimensional", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(recebimento
-          ? { opNumero: estoque ? undefined : op.numero, tipo, certificados: certs.map((c) => c.docId) }
+          ? { opNumero: estoque ? undefined : op.numero, tipo, certificados: certs.map((c) => c.docId), dataRecebimento: dataReceb }
           : { opNumero: op.numero, tipo, escopo: "AVULSAS", marcas: sel, pecasInformadas }),
       });
       const j = await r.json();
@@ -140,6 +143,11 @@ export default function NovoRelatorio({ op, onCriado, onSair, Tela }) {
             ? "Recebimento de estoque, vale para todas as obras: escolha os certificados do CMR. Assinado, entra no data book de cada obra que usar o R ou o lote."
             : "Escolha os certificados do CMR — recebimento não tem peça."}
         </p>
+        <label className="block mb-3">
+          <span className="block text-[13px] font-semibold text-torg-dark mb-1">Data do recebimento</span>
+          <input type="date" value={dataReceb} max={hojeBRT()} onChange={(e) => setDataReceb(e.target.value)}
+            className="w-full border border-gray-200 rounded-xl px-3 py-3 text-[16px]" />
+        </label>
         <EscolherCertificados tipo={tipo} opNumero={op.numero} selecionados={certs} onChange={setCerts} />
         {erro && <p className="text-[13px] text-red-600 my-2">{erro}</p>}
         <button onClick={criar} disabled={salvando}

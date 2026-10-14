@@ -8,6 +8,7 @@ import { rotuloFase } from "@/lib/fase-peca";
 import FiltroFase from "@/components/qualidade/FiltroFase";
 import EscolherCertificados from "@/components/qualidade/EscolherCertificados";
 import { ehRecebimento, ehDeEstoque, OP_ESTOQUE } from "@/lib/recebimento-certificados";
+import { hojeBRT } from "@/lib/data-br";
 // recebimento de estoque (arame, penetrante) não tem obra — "OP-EST" não diria nada
 const rotuloOp = (n) => (n === OP_ESTOQUE ? "Estoque" : `OP-${n}`);
 
@@ -426,6 +427,8 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
   // ⚠ arame e penetrante são de ESTOQUE: sem OP (Vitor, 14/10/2026 — "o Arame será usado para várias obras")
   const estoque = ehDeEstoque(tipo);
   const [certs, setCerts] = useState([]);
+  // ⚠ pode ser RETROATIVO (Vitor, 14/10/2026): a data vem escolhida já na criação, hoje por padrão
+  const [dataReceb, setDataReceb] = useState(hojeBRT());
   const [ops, setOps] = useState(null);
   const [op, setOp] = useState(null);
   // ⚠ NA PRÉ-MONTAGEM NÃO SE ESCOLHE PEÇA, SE ESCOLHE PROJETO. Vitor (22/08/2026): "não trouxe os
@@ -540,6 +543,7 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
         body: JSON.stringify({
           opNumero: estoque ? undefined : op.numero, tipo, escopo, marcas: recebimento ? [] : sel, inspetor,
           certificados: recebimento ? certs.map((c) => c.docId) : undefined,
+          dataRecebimento: recebimento ? dataReceb : undefined,
           // ⚠ o CAMINHO vai junto: assim o relatório de pré-montagem nasce com o desenho
           // vinculado, em vez de depender de uma varredura por marca que nunca acharia o
           // diagrama de montagem (ele não é uma peça da LPC).
@@ -610,6 +614,14 @@ function NovoRelatorio({ tipo, onFechar, onPronto }) {
 
             )}
 
+            {(op || estoque) && recebimento && (
+              <label className="block">
+                <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Data do recebimento</span>
+                <input type="date" value={dataReceb} max={hojeBRT()} onChange={(e) => setDataReceb(e.target.value)}
+                  className="w-full text-[13px] border border-gray-200 rounded-lg px-2 py-1.5 focus:border-torg-blue" />
+                <span className="block text-[10px] text-torg-gray mt-0.5">pode ser uma data passada, para recebimento retroativo</span>
+              </label>
+            )}
             {(op || estoque) && recebimento && (
               <div>
                 <span className="block text-[10px] font-semibold text-torg-gray mb-1">Certificados {certs.length ? `· ${certs.length} escolhido(s)` : ""}</span>

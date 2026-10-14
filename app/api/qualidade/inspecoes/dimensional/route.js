@@ -13,7 +13,8 @@ import { pecasReais } from "@/lib/peso-op";
 //
 // O caminho do desenho é resolvido na primeira vez que a marcação ou o PDF precisam dele
 // (`garantirDesenhos`) e fica gravado a partir dali.
-import { ehDeEstoque, OP_ESTOQUE } from "@/lib/recebimento-certificados";
+import { ehDeEstoque, OP_ESTOQUE, validarDataRecebimento } from "@/lib/recebimento-certificados";
+import { hojeBRT } from "@/lib/data-br";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { tipoNoEscopo } from "@/lib/qualidade-escopo";
@@ -79,6 +80,9 @@ export async function POST(req) {
   // pelas obras que usaram o R/lote — lib/recebimento-estoque.js.
   if (ehDeEstoque(tipo)) opNumero = OP_ESTOQUE;
   if (!opNumero) return NextResponse.json({ error: "Informe a OP." }, { status: 400 });
+  // ⚠ a data do recebimento pode ser RETROATIVA (Vitor, 14/10/2026) — escolhida já na criação
+  const dataReceb = recebimento ? validarDataRecebimento(body?.dataRecebimento, hojeBRT()) : { data: null };
+  if (dataReceb.erro) return NextResponse.json({ error: dataReceb.erro }, { status: 400 });
   if (certIds.length > (MAX_CERTIFICADOS[tipo] || 0)) {
     return NextResponse.json({
       error: tipo === "RECEBIMENTO_TINTA"
@@ -220,6 +224,7 @@ export async function POST(req) {
     // o recebimento de tintas preenche cabeçalho e lotes A/B/C pelos certificados; os outros, uma linha por certificado
     const semente = tipo === "RECEBIMENTO_TINTA" ? resultadosDaTinta(doCmr, padrao)
       : recebimento ? { ...padrao, itens: limparItensRir(doCmr) } : padrao;
+    if (dataReceb.data) semente.dataInspecao = dataReceb.data;
     // dimensional não usa fotos (Vitor: "não vamos usar fotos"), então nasce sem elas —
     // `criarRelatorio` exige foto, por isso o dimensional cria direto.
     const { proximoNumero } = await import("@/lib/relatorio-inspecao");
