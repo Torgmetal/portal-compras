@@ -139,7 +139,7 @@ export async function POST(req) {
     const docs = await prisma.documentoQualidade.findMany({
       where: { id: { in: certIds }, ativo: true, ...DO_CMR },
       select: {
-        id: true, nome: true, importRef: true, indiceR: true, fornecedor: true, nfNumero: true, pedidoCompra: true,
+        id: true, nome: true, importRef: true, fornecedor: true, nfNumero: true, pedidoCompra: true,
         numeroDocumento: true, numeroCorrida: true, quantidade: true, pesoKg: true, dataValidade: true,
         dataRecebimento: true, opNumero: true, arquivoUrl: true, sharepointUrl: true, norma: true,
       },

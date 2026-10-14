@@ -2,6 +2,7 @@
 // (Vitor, 07/10/2026: "selecionar apenas os certificados", sem peças).
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockPrisma } from "@/testes/apoio/prisma";
+import { readFileSync } from "node:fs";
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma, prismaDirect: mockPrisma }));
 vi.mock("@/lib/session", () => ({ requireRole: vi.fn().mockResolvedValue({ id: "u", name: "Geraldo" }) }));
 vi.mock("@/lib/relatorio-inspecao", () => ({ vincularNoDataBook: vi.fn().mockResolvedValue({}), proximoNumero: vi.fn().mockResolvedValue(1) }));
@@ -25,6 +26,12 @@ const CMR = [
   doc("6", "ENDURECEDOR PARA INDUSTHANE 35.010", { pesoKg: null, quantidade: 9, numeroCorrida: "85597" }),
   doc("7", "DILUENTE PARA INDUSTHANE ACR 34.019", { pesoKg: null, quantidade: 4, numeroCorrida: "85598" }),
 ];
+function camposInexistentes(select) {
+  const schema = readFileSync("prisma/schema.prisma", "utf8");
+  const modelo = schema.slice(schema.indexOf("model DocumentoQualidade {"));
+  const campos = new Set(modelo.slice(0, modelo.indexOf("\n}")).split("\n").map((l) => l.trim().split(/\s+/)[0]));
+  return Object.keys(select).filter((c) => !campos.has(c));
+}
 const get = (qs) => buscar(new Request(`http://localhost/api/qualidade/inspecoes/certificados?${qs}`));
 const post = (body) => criar(new Request("http://localhost", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
 
@@ -40,6 +47,21 @@ beforeEach(() => {
 });
 
 describe("buscar certificados no CMR", () => {
+  // ⚠⚠ O Prisma é mockado, então campo inexistente no `select` passava em todo teste e estourava em
+  // produção (14/10/2026: `indiceR` não existe em DocumentoQualidade; a tela dizia "Unexpected end of
+  // JSON input"). Este confere o select contra o schema de verdade.
+  it("só seleciona campos que existem em DocumentoQualidade", async () => {
+    await get("tipo=RECEBIMENTO_ARAME");
+    expect(camposInexistentes(mockPrisma.documentoQualidade.findMany.mock.calls[0][0].select)).toEqual([]);
+  });
+
+  it("erro do banco volta como JSON com a mensagem, não corpo vazio", async () => {
+    mockPrisma.documentoQualidade.findMany.mockRejectedValueOnce(new Error("boom"));
+    const r = await get("tipo=RECEBIMENTO_ARAME");
+    expect(r.status).toBe(500);
+    expect((await r.json()).error).toMatch(/CMR/);
+  });
+
   it("sem texto, lista só os da classe (arame: arame e eletrodo), o mais recente primeiro", async () => {
     const r = await get("tipo=RECEBIMENTO_ARAME&opNumero=102");
     expect(r.status).toBe(200);
@@ -77,6 +99,12 @@ describe("criar o recebimento pelos certificados", () => {
     expect(relatorio.resultados.itens.map((i) => i.r)).toEqual(["R3", "R2"]);
     expect(relatorio.resultados.itens[0]).toMatchObject({ docId: "3", certificado: "C-3", visual: null, dimensional: null, documentos: null });
     expect(relatorio.resultados.contrato).toBe("4600123456");
+  });
+
+  it("só seleciona do CMR campos que existem em DocumentoQualidade", async () => {
+    await post({ opNumero: "102", tipo: "RECEBIMENTO_ARAME", certificados: ["3"] });
+    const chamada = mockPrisma.documentoQualidade.findMany.mock.calls.find(([a]) => a.where?.id?.in);
+    expect(camposInexistentes(chamada[0].select)).toEqual([]);
   });
 
   it("tintas: os certificados preenchem os lotes A/B/C, com a quantidade do CMR", async () => {

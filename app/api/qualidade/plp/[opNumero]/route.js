@@ -47,7 +47,7 @@ async function tintasDaOP(opNumero) {
   const docs = await prisma.documentoQualidade.findMany({
     where: { opNumero, ativo: true, categoria: "MATERIAL" },
     select: {
-      id: true, nome: true, importRef: true, indiceR: true, numeroDocumento: true,
+      id: true, nome: true, importRef: true, numeroDocumento: true,
       numeroCorrida: true, fornecedor: true, dataValidade: true, norma: true, categoria: true,
     },
     take: 800,
@@ -78,7 +78,7 @@ async function tintasDaOP(opNumero) {
       certificado: d.numeroDocumento || null,
       // a norma da ficha preenche a NORMA do recebimento de tintas (lib/recebimento-tinta-campos)
       norma: d.norma || null,
-      r: d.indiceR || d.importRef || null,
+      r: d.importRef || null,
     }))
     // pelo LOTE dentro de cada produto: quem procura no galpão procura pelo número da lata
     .sort((a, b) => a.produto.localeCompare(b.produto) || String(a.lote).localeCompare(String(b.lote)));

@@ -18,7 +18,7 @@ export const runtime = "nodejs";
 
 const MAX_LISTA = 60;
 const SELECT = {
-  id: true, nome: true, importRef: true, indiceR: true, fornecedor: true, nfNumero: true, pedidoCompra: true,
+  id: true, nome: true, importRef: true, fornecedor: true, nfNumero: true, pedidoCompra: true,
   numeroDocumento: true, numeroCorrida: true, quantidade: true, pesoKg: true, dataValidade: true,
   dataRecebimento: true, opNumero: true, arquivoUrl: true, sharepointUrl: true, norma: true,
 };
@@ -33,6 +33,16 @@ export async function GET(req) {
   const opNumero = (searchParams.get("opNumero") || "").trim().slice(0, 20);
   const q = (searchParams.get("q") || "").trim().slice(0, 60);
 
+  try {
+    return NextResponse.json(await buscar(tipo, opNumero, q));
+  } catch (e) {
+    // ⚠ sem isto a exceção virava corpo VAZIO e a tela mostrava "Unexpected end of JSON input"
+    console.error("[certificados]", e);
+    return NextResponse.json({ error: "Não foi possível buscar no CMR. Tente de novo." }, { status: 500 });
+  }
+}
+
+async function buscar(tipo, opNumero, q) {
   const contem = (campo) => ({ [campo]: { contains: q, mode: "insensitive" } });
   const docs = await prisma.documentoQualidade.findMany({
     where: {
@@ -47,5 +57,5 @@ export async function GET(req) {
 
   const linhas = docs.map(linhaDoCertificado).filter((l) => q || certificadoDaClasse(tipo, l.descricao));
   const certificados = ordenarCertificados(linhas, { tipo, opNumero }).slice(0, MAX_LISTA);
-  return NextResponse.json({ certificados, total: linhas.length, classe: ROTULO_CLASSE[tipo] });
+  return { certificados, total: linhas.length, classe: ROTULO_CLASSE[tipo] };
 }
