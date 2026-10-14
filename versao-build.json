@@ -1,7 +1,17 @@
 {
-  "build": 3615,
-  "gerado": "2026-10-14T11:31:47.788Z",
+  "build": 3617,
+  "gerado": "2026-10-14T11:39:44.070Z",
   "commits": [
+    {
+      "hash": "98afffa5",
+      "data": "14/10/2026",
+      "titulo": "Memória e revisão: milhar com ponto nos itens comerciais do estudo"
+    },
+    {
+      "hash": "dead8c2e",
+      "data": "14/10/2026",
+      "titulo": "Itens comerciais: a tela trava a quantidade pela mesma regra da conta"
+    },
     {
       "hash": "9c42ee86",
       "data": "14/10/2026",
@@ -141,16 +151,6 @@
       "hash": "da30ce21",
       "data": "03/10/2026",
       "titulo": "OP › Qualidade: Qualidade de campo volta a ver os relatórios"
-    },
-    {
-      "hash": "e90c9718",
-      "data": "03/10/2026",
-      "titulo": "OP › Qualidade: Produção e demais setores veem o PLP da obra em PDF"
-    },
-    {
-      "hash": "c5182a62",
-      "data": "03/10/2026",
-      "titulo": "Corte e montagem: na Montagem a marca abre o desenho da peça, só para ver"
     }
   ]
 }

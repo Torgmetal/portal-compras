@@ -17,7 +17,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 ### Infra
 - Resend com domínio torg.com.br (EMAIL_FROM na env; DNS feito pelo Matheus). Sem staging: dev local roda contra Neon de produção.
 - [Deploy granular](torg_deploy_granular.md) — subir/validar CADA mudança em prod; não agrupar
-- [Deploy Vercel — atraso do webhook](torg_vercel_deploy_atraso.md) — push às vezes leva 20+ min p/ buildar (esperar, sobe sozinho); NÃO forçar `vercel --prod`; CLI scope `torg`/`workspace-torg`
+- [Deploy Vercel — atraso do webhook](torg_vercel_deploy_atraso.md) — push às vezes leva 20+ min p/ buildar (esperar, sobe sozinho); NÃO forçar `vercel --prod`; CLI scope `torg`/`workspace-torg`; ⚠ commit só de docs POR ÚLTIMO num push cancela o build do push inteiro: código e docs em pushes separados
 - [Deploy Vercel/Neon — branch limit](torg_vercel_neon_deploy.md) — "Provisioning integrations failed" = Neon estourou branches; desligar per-preview branch ou apagar previews (nunca a primária)
 - [Deploy decisivo](torg_deploy_decisivo.md) — direção acordada = subir sem pedir permissão a cada passo
 - [Neon — o que foi MEDIDO da infra](torg_neon_infra.md) — banco 229MB, mínimo pequeno × máximo enorme = OOM na largada; 2 mudanças de painel pendentes; NÃO temos API key do Neon
@@ -35,7 +35,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Neon: só 6 h de histórico, sem snapshot](torg_neon_historico.md) — apagou há mais de 6 h, só o backup semanal (domingo); caso RIP-112-001 (25/09); acesso ao console via Vercel "Open in Neon"
 - [Funções em Washington, banco em SP](torg_regiao_funcoes.md) — `gru1::iad1`: ~120 ms por consulta; laço linha a linha estoura (LPC T118B, 25/09); gravar em lote; mudar região = decisão do Vitor
 - [Libs compartilhadas](torg_libs_compartilhadas.md) — data-br, html (escapeHtml), blob-url (anti-SSRF), token (gerarTokenForte), **numero-br** (`numeroBR`), `fmtOP` única; usar em código novo
-- [CampoDecimal entrega TEXTO](torg_campo_decimal_texto.md) — "1.500,50" se lê com `numeroBR`; Number/parseFloat erravam em 26 telas (06/10); guarda `testes/campo-decimal-leitura`
+- [CampoDecimal entrega TEXTO](torg_campo_decimal_texto.md) — "1.500,50" se lê com `numeroBR`; Number/parseFloat erravam em 26 telas (06/10); guarda `testes/campo-decimal-leitura`; itens comerciais do LQC corrigidos em 14/10 (ponto sem vírgula segue decimal, de propósito)
 - [Fuso: servidor roda em UTC](torg_fuso_servidor.md) — `toLocaleString("pt-BR")` não define fuso; usar `dataHoraBR()`/`dataBR()` no que o SERVIDOR escreve (não em `@db.Date`)
 - [Upload trava em 4,5MB](torg_upload_4mb.md) — rota serverless trava ~4,5MB; "não anexa" costuma ser TAMANHO; fix = client-token (`*/upload-token` + `@vercel/blob/client`)
 - [Integração de IA (Claude)](torg_ia_integracao.md) — portal usa @anthropic-ai/sdk, `claude-sonnet-4-6`; resposta em formato estruturado (`pedirJson`/`Esquema`, teto de 16 campos "ou null"); cotação do fornecedor ainda no jeito antigo por decisão do Vitor; modelo aposentado = 404

@@ -2795,3 +2795,38 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (a) a cópia não roda o recálculo: as datas são as da origem, que já respeitam os vínculos;
   - (b) a ordem das cópias segue o cadastro das áreas, não a ordem do clique;
   - (c) não validei no navegador, porque a tela exige login. Não copiei nada na OP-118 sem pedido.
+
+## 14/10/2026 — Itens comerciais do estudo: milhar com ponto zerava o item (Claude)
+
+- **Feito:**
+  - `9c42ee86`: `numeroDecimal` (`lib/lqc-itens-comerciais.js`) passa ao `numeroBR` só onde a leitura antiga
+    dava NaN. "15.000,00" → 15000 e "1.234,5" → 1234,5 (antes, 0 sem aviso, em quantidade, custo unitário,
+    frete, montagem e quantidade por área). Testes: `testes/lib/lqc-itens-comerciais.teste.js`, +5 (4 do
+    vermelho ao verde e 1 de caracterização do ponto decimal).
+  - `dead8c2e`: a tela decidia "quantidade por área" com o mesmo `Number(String(v).replace(',','.'))` inline;
+    com a lib corrigida, o subtotal contaria a área e o campo seguiria liberado, mostrando 0. Agora
+    `temQuantidadePorArea` (lib) serve à conta e à tela. Teste: `testes/lqc-itens-comerciais-tela.teste.jsx`,
+    +1, do vermelho ao verde.
+  - Suíte com 5.167 passando; `npm run checar` sem erro; eslint sem erro (os avisos de complexidade já
+    existiam, e o da tela caiu de 18 para 16). Snapshots do `calcularLqc` intactos.
+- **Origem:** pendência (d) da entrada de 06/10, "Campo decimal: texto com vírgula lido como número".
+- **Medido no banco (só leitura: `BEGIN READ ONLY` e `default_transaction_read_only=on`):** 107 estudos;
+  **nenhum** com `comerciaisCompra`, ou seja, a composição nova nunca foi salva. Os 28 com itens comerciais
+  estão no formato antigo (`itensComerciais`, lido por `numeroLegado` na migração): 188 números JSON e, em
+  texto, três `""` e um `"0"`. Nenhum "0.125" nem "15.000,00" nos itens comerciais. Texto com ponto decimal
+  existe em outras partes do estudo (`bdi.impostos = "18.6"`, `resumos.*.item`), que não passam por
+  `numeroDecimal`.
+- **Antes × depois:** `calcularItensComerciais` sobre os 28 estudos reais (59 combinações de áreas, caminho
+  legado e migrado→salvo→reaberto) saiu idêntico byte a byte. Numa varredura de 137 mil entradas sintéticas,
+  nenhuma que a leitura antiga entendia mudou de valor.
+- ⚠ **Para revisar:**
+  - (a) a regra NÃO é `numeroBR` puro, de propósito: ponto sem vírgula segue decimal ("0.125" = 0,125, e
+    "1.234" = 1,234, como fixa o teste de 09/09 sobre a precisão do input numérico). Resíduo: "15.000" sem
+    vírgula ainda é 15. Como a medição não achou legado nessa classe, alinhar com o `numeroBR` (15 mil) é
+    decisão aberta e muda o teste de 09/09;
+  - (b) entrada malformada que antes dava 0 agora recebe a leitura do `numeroBR` ("1.234.567" → 1234567,
+    "0,5." → 5), como nas outras 26 telas;
+  - (c) não validei no navegador: a tela exige login, e o `npm run dev` grava na produção. O componente real
+    foi exercitado no jsdom;
+  - (d) fora do escopo: o botão "Cotar família" (`BotaoCotarFamilia.jsx`) saiu da tela em `c2b4991e`
+    (09/09), na reescrita dos itens comerciais, e não é importado por ninguém. Confirmar se foi intencional.

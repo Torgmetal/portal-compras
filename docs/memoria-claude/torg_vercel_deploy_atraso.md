@@ -26,3 +26,11 @@ em cada commit, e dá para ler sem autenticação:
 `curl -s https://api.github.com/repos/Torgmetal/portal-compras/commits/<sha>/status` → `Vercel · Deployment has
 completed` (success) ou erro/pendente. Commit só de docs aparece como cancelado pelo `ignoreCommand`.
 ⚠ Não abrir `vercel login` à toa: o fluxo por código expira em minutos e precisa do Vitor confirmando no navegador.
+⚠ `vercel api` sem credencial abre esse fluxo sozinho, sem pedir: em 14/10/2026 ficou esperando até ser interrompido.
+
+⚠⚠ **COMMIT SÓ DE DOCS POR ÚLTIMO NUM PUSH CANCELA O BUILD DO PUSH INTEIRO (14/10/2026).** O `ignoreCommand`
+(`vercel.json`) compara só `HEAD^..HEAD`, e a Vercel builda só o último commit do push. Se ele for só de
+docs/testes/`.md`, sai "Canceled by Ignored Build Step", e o código dos commits anteriores do MESMO push não vai
+ao ar até o próximo push com código. Por isso o código sobe num push e a memória/revisão no seguinte. Medido nos
+dois últimos pares: `046a4954`→`574ae46d` (07/10) e `d897aef6`→`52c4aa79` (09/10). O docs chegou 30 a 50 s
+depois, com o build do código ainda rodando, e ele terminou mesmo assim ("Deployment has completed" ~5 min depois).

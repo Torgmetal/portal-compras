@@ -37,7 +37,15 @@ texto e seguiu com `Number()`.
   vem do banco.
 - ⚠ Ele **não segue função auxiliar**: um `const num = (v) => Number(v)` aplicado ao texto, ou um
   `onQtd={(v) => Number(v)}` passado ao filho, escapa dele. Nesses casos, leia o código.
-- ⚠ O `numeroDecimal` de `lib/lqc-itens-comerciais.js` aceita uma vírgula só: "15.000,00" vira 0. Ficou
-  de fora da varredura porque o LQC tem testes de caracterização ([[torg-orcamento-lqc-numero]]).
+- O `numeroDecimal` de `lib/lqc-itens-comerciais.js` (itens comerciais do estudo LQC) trocava uma vírgula
+  só: "15.000,00" virava 0. Ficou de fora da varredura por causa dos testes de caracterização do LQC
+  ([[torg-orcamento-lqc-numero]]) e foi corrigido em 14/10/2026 (`9c42ee86`, `dead8c2e`). A leitura antiga
+  vale onde dá número, e o `numeroBR` entra só onde ela dava NaN. ⚠⚠ **Não é `numeroBR` puro, de
+  propósito**: o input numérico de antes de 16/09 gravava ponto decimal ("0.125"), que o `numeroBR` leria
+  como 125. Por isso "15.000" sem vírgula ainda é 15. Alinhar com o `numeroBR` é decisão aberta.
+- **Medido em 14/10/2026 (só leitura):** dos 107 estudos, **nenhum** tem `comerciaisCompra`, ou seja, a
+  composição nova dos itens comerciais (09/09) nunca foi salva. Os 28 com itens estão no formato antigo
+  (`itensComerciais`), com número JSON e nenhum texto com ponto. Mudar o formato de `comerciaisCompra`
+  ainda não exige migrar dado.
 
 Ver [[torg-libs-compartilhadas]] (numeroBR é a lib).
