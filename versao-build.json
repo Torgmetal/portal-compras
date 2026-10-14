@@ -1,7 +1,12 @@
 {
-  "build": 3614,
-  "gerado": "2026-10-14T13:49:14.070Z",
+  "build": 3615,
+  "gerado": "2026-10-14T13:49:14.275Z",
   "commits": [
+    {
+      "hash": "818bcfa7",
+      "data": "14/10/2026",
+      "titulo": "fix: busca de certificados do recebimento quebrava (indiceR não existe)"
+    },
     {
       "hash": "52c4aa79",
       "data": "09/10/2026",
@@ -146,11 +151,6 @@
       "hash": "c5182a62",
       "data": "03/10/2026",
       "titulo": "Corte e montagem: na Montagem a marca abre o desenho da peça, só para ver"
-    },
-    {
-      "hash": "1bdc41ba",
-      "data": "03/10/2026",
-      "titulo": "Corte e montagem: resposta atrasada não troca a tela; tocar no setor ativo não apaga a lista"
     }
   ]
 }

@@ -77,6 +77,20 @@ describe("o relatório só entra no data book assinado por todos", () => {
     expect(r).toMatchObject({ vinculado: true, secao: "14" });
   });
 
+  it("a rodada APROVADA e assinada sai quando a revisão nova é assinada — o livro fica só com a vigente", async () => {
+    banco({
+      assinaturas: [{ assinadoEm: ontem }, { assinadoEm: ontem }],
+      docsRevisao: [{ id: "d-r00", numeroDocumento: "RIP-112-001 R00" }],
+    });
+    const rel = {
+      ...RIP, status: "EMITIDO", envioAssinaturaId: "e2", revisao: 1,
+      revisoes: [{ revisao: 0, resultadoInspecao: "APROVADO", assinaturas: [{ assinadoEm: ontem.toISOString() }] }],
+    };
+    await vincularNoDataBook(rel, "/api/qualidade/inspecoes/rel1/pdf");
+    expect(vinculados()).toEqual(["doc-rip1"]);
+    expect(tirados()).toEqual(["d-r00"]);
+  });
+
   it("livro fechado não recebe nem perde nada — só muda por revisão", async () => {
     banco({ livro: { id: "b070", status: "ACEITO", emitidoEm: ontem, revisao: 1 }, assinaturas: [{ assinadoEm: ontem }] });
     const r = await vincularNoDataBook({ ...RIP, envioAssinaturaId: "e3" }, null);
@@ -91,8 +105,8 @@ describe("qual rodada encerrada acompanha o relatório assinado", () => {
     expect(revisaoEntraNoLivro({ resultadoInspecao: "REPROVADO", assinaturas: [] })).toBe(true);
     expect(revisaoEntraNoLivro({ resultadoInspecao: "REC", assinaturas: [] })).toBe(true);
   });
-  it("a que foi assinada por todos; a corrigida no meio do caminho, não", () => {
-    expect(revisaoEntraNoLivro({ resultadoInspecao: "APROVADO", assinaturas: [{ assinadoEm: "x" }, { assinadoEm: "y" }] })).toBe(true);
+  it("a aprovada, mesmo assinada por todos, não: a revisão nova a SUBSTITUI (OP-102, 14/10/2026)", () => {
+    expect(revisaoEntraNoLivro({ resultadoInspecao: "APROVADO", assinaturas: [{ assinadoEm: "x" }, { assinadoEm: "y" }] })).toBe(false);
     expect(revisaoEntraNoLivro({ resultadoInspecao: "APROVADO", assinaturas: [{ assinadoEm: "x" }, { assinadoEm: null }] })).toBe(false);
     expect(revisaoEntraNoLivro({ resultadoInspecao: "APROVADO", assinaturas: [] })).toBe(false);
   });
