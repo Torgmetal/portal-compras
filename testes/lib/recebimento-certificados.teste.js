@@ -40,7 +40,13 @@ describe("qual certificado do CMR serve para cada recebimento", () => {
     expect(certificadoDaClasse("RECEBIMENTO_PENETRANTE", "REVELADOR DE TRINCAS METALCHECK D-70")).toBe(true);
     expect(certificadoDaClasse("RECEBIMENTO_PENETRANTE", "LIQUIDO PENETRANTE VERMELHO VP-30")).toBe(true);
     expect(certificadoDaClasse("RECEBIMENTO_PENETRANTE", "REMOVEDOR E-59")).toBe(true);
+    // ⚠ como está escrito no CMR (14/10/2026, R 261929 e 261928): "METAL-CHEK", "VP 30" e "D 70" com espaço
+    expect(certificadoDaClasse("RECEBIMENTO_PENETRANTE", "METAL-CHEK VP 30 (5L) LP VISIVEL LAVAVEL A AGUA")).toBe(true);
+    expect(certificadoDaClasse("RECEBIMENTO_PENETRANTE", "METAL-CHEK E 59 REMOVEDOR")).toBe(true);
+    expect(certificadoDaClasse("RECEBIMENTO_PENETRANTE", "METAL CHECK D 70")).toBe(true);
+    expect(certificadoDaClasse("RECEBIMENTO_ACO", "METAL-CHEK VP 30 (5L) LP VISIVEL LAVAVEL A AGUA")).toBe(false);
     expect(certificadoDaClasse("RECEBIMENTO_PENETRANTE", "CHAPA ACO 9,50")).toBe(false);
+    expect(certificadoDaClasse("RECEBIMENTO_PENETRANTE", "PERFIL W 200 X 30")).toBe(false);
   });
 
   it("arame: arame e eletrodo de solda", () => {
