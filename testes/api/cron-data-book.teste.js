@@ -4,7 +4,7 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  aquecer: vi.fn(), registrar: vi.fn(), vincular: vi.fn(), estoque: vi.fn(), processar: vi.fn(), proximoJob: vi.fn(),
+  aquecer: vi.fn(), registrar: vi.fn(), vincular: vi.fn(), estoque: vi.fn(), lp: vi.fn(), processar: vi.fn(), proximoJob: vi.fn(),
 }));
 vi.mock("@/lib/db-retry", () => ({ aquecerBanco: mocks.aquecer, ehErroConexao: () => true }));
 vi.mock("@/lib/cron-monitor", () => ({ registrarExecucao: mocks.registrar }));
@@ -12,6 +12,7 @@ vi.mock("@/lib/cron-auth", () => ({ temCronSecret: () => true }));
 vi.mock("@/lib/databook-volumes", () => ({ processarGeracao: mocks.processar }));
 vi.mock("@/lib/databook-certificados-novos", () => ({ vincularCertificadosNovos: mocks.vincular }));
 vi.mock("@/lib/recebimento-estoque", () => ({ sincronizarRecebimentosDeEstoque: mocks.estoque }));
+vi.mock("@/lib/databook-consumiveis-lp", () => ({ sincronizarConsumiveisLp: mocks.lp }));
 vi.mock("@/lib/prisma", () => ({ prisma: { dataBookGeracao: { findFirst: mocks.proximoJob, update: vi.fn() } } }));
 
 import { GET } from "@/app/api/cron/data-book/route";
@@ -23,10 +24,19 @@ beforeEach(() => {
   mocks.aquecer.mockResolvedValue(undefined);
   mocks.proximoJob.mockResolvedValue(null);
   mocks.estoque.mockResolvedValue({ relatorios: 0, vinculos: 0 });
+  mocks.lp.mockResolvedValue({ livros: 0, vinculados: 0 });
   mocks.vincular.mockResolvedValue({ vinculados: 11, livros: [{ id: "book102", opNumero: "102", secoes: [{ numero: "04", rs: ["261646"] }] }] });
 });
 
 describe("cron do data book", () => {
+  it("puxa os certificados de LP para a §06 — e a falha aparece no monitor sem derrubar o resto", async () => {
+    mocks.lp.mockResolvedValueOnce({ livros: 13, vinculados: 2 });
+    expect((await (await rodar()).json()).lp).toEqual({ livros: 13, vinculados: 2 });
+    mocks.lp.mockRejectedValueOnce(new Error("pum"));
+    expect((await rodar()).status).toBe(200);
+    expect(mocks.registrar).toHaveBeenLastCalledWith("data-book", expect.objectContaining({ ok: false, mensagem: expect.stringMatching(/lp: pum/) }));
+  });
+
   it("distribui os recebimentos de estoque (RRA/RRP) — e a falha deles aparece no monitor sem derrubar o resto", async () => {
     mocks.estoque.mockResolvedValueOnce({ relatorios: 2, vinculos: 3 });
     expect((await (await rodar()).json()).estoque).toEqual({ relatorios: 2, vinculos: 3 });

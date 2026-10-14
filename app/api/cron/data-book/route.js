@@ -25,6 +25,7 @@ import { registrarExecucao } from "@/lib/cron-monitor";
 import { processarGeracao } from "@/lib/databook-volumes";
 import { vincularCertificadosNovos } from "@/lib/databook-certificados-novos";
 import { sincronizarRecebimentosDeEstoque } from "@/lib/recebimento-estoque";
+import { sincronizarConsumiveisLp } from "@/lib/databook-consumiveis-lp";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -43,6 +44,13 @@ async function vincularCertificados() {
 // assinatura passa a recebê-lo aqui — a assinatura só distribui para quem já tinha usado.
 async function recebimentosDeEstoque() {
   try { return await sincronizarRecebimentosDeEstoque(); }
+  catch (e) { return { erro: String(e?.message || e).slice(0, 300) }; }
+}
+
+// ⚠ certificados do penetrante/revelador na §06 pelos lotes dos LP assinados (14/10/2026) — pega o que foi lançado
+// ou escaneado no CMR DEPOIS da assinatura
+async function consumiveisLp() {
+  try { return await sincronizarConsumiveisLp(); }
   catch (e) { return { erro: String(e?.message || e).slice(0, 300) }; }
 }
 
@@ -83,13 +91,14 @@ export async function GET(req) {
     await aquecerBanco(prisma);
     const certificados = await vincularCertificados();
     const estoque = await recebimentosDeEstoque();
+    const lp = await consumiveisLp();
     const feitos = await terminarGeracoes(t0);
     await registrarExecucao("data-book", {
-      ok: !certificados.erro && !estoque.erro,
-      mensagem: [certificados.erro && `certificados: ${certificados.erro}`, estoque.erro && `estoque: ${estoque.erro}`].filter(Boolean).join(" · ") || null,
+      ok: !certificados.erro && !estoque.erro && !lp.erro,
+      mensagem: [certificados.erro && `certificados: ${certificados.erro}`, estoque.erro && `estoque: ${estoque.erro}`, lp.erro && `lp: ${lp.erro}`].filter(Boolean).join(" · ") || null,
       duracaoMs: Date.now() - t0,
     });
-    return NextResponse.json({ ok: true, certificados, estoque, volumes: feitos.length, feitos });
+    return NextResponse.json({ ok: true, certificados, estoque, lp, volumes: feitos.length, feitos });
   } catch (e) {
     await registrarExecucao("data-book", { ok: false, mensagem: e.message, duracaoMs: Date.now() - t0 });
     return NextResponse.json({ error: e.message }, { status: 500 });

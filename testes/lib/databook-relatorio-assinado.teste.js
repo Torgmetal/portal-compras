@@ -7,6 +7,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockPrisma } from "@/testes/apoio/prisma";
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma, prismaDirect: mockPrisma }));
+const consumiveisLp = vi.fn().mockResolvedValue({});
+vi.mock("@/lib/databook-consumiveis-lp", () => ({ sincronizarConsumiveisLp: (...a) => consumiveisLp(...a) }));
 
 import {
   vincularNoDataBook, anexarRevisaoNoDataBook, revisaoEntraNoLivro, bloqueioRelatorioNaoAssinado, aoConcluirAssinaturas,
@@ -128,6 +130,13 @@ describe("a última assinatura põe o relatório no livro", () => {
     await aoConcluirAssinaturas({ tipo: "RELATORIO_INSPECAO", snapshot: { relatorioId: "rel1" } });
     expect(vinculados()).toEqual(["doc-rip1"]);
     expect(mockPrisma.documentoQualidade.update.mock.calls[0][0].data.arquivoUrl).toBe("/api/qualidade/inspecoes/rel1/pdf");
+  });
+
+  it("LP assinado puxa os certificados do penetrante/revelador para a §06 da obra (14/10/2026)", async () => {
+    banco({ assinaturas: [{ assinadoEm: ontem }] });
+    mockPrisma.relatorioInspecao.findUnique.mockResolvedValue({ ...RIP, tipo: "LP", codigo: "RLP-112-001", envioAssinaturaId: "e9" });
+    await aoConcluirAssinaturas({ tipo: "RELATORIO_INSPECAO", snapshot: { relatorioId: "rel1" } });
+    expect(consumiveisLp).toHaveBeenCalledWith({ opNumero: "112" });
   });
 
   it("outro documento (PIT, PLP…) segue o caminho dele", async () => {
