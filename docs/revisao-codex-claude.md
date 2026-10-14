@@ -2840,3 +2840,10 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   real e com AuditLog: RRM-EST-001 (35 itens, aço da OP-102 de agosto, data 26/08) e RRM-EST-002 (11 itens,
   fev–mar sem NF, data 19/03). Inspetor Geraldo, inspeções em branco: ninguém marcou inspeção por ele.
   ⚠ Para revisar: a lista do celular de toda OP agora inclui todos os de estoque, sem filtro de uso.
+- **`f56fbc5b` — penetrante fora da lista do RRP:** o `RX_LP` só aceitava "METALCHECK"/"VP-30", e o CMR escreve
+  "METAL-CHEK VP 30" (R 261929). Agora aceita hífen, espaço e a grafia sem C. A pedido do Vitor, incluí o R 261929 no
+  RRP-EST-001 (AuditLog EDITAR), com as inspeções em branco.
+- **`e1a70447` — aço até 60 itens:** `N_ITENS_RIR` vai a 60 e `MAX_CERTIFICADOS.RECEBIMENTO_ACO` a 60; arame e
+  penetrante continuam com 40. Depois do deploy e a pedido do Vitor, juntei o RRM-EST-002 no 001 (46 itens, título
+  "Aço da OP-102", data 26/08) e apaguei o 002 pelos mesmos passos do DELETE da rota. AuditLog: EDITAR + EXCLUIR.
+  ⚠ Para revisar: o 002 tinha itens de fev–mar; o relatório único ficou com uma só data de recebimento (26/08).

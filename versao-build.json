@@ -1,7 +1,12 @@
 {
-  "build": 3629,
-  "gerado": "2026-10-14T17:37:42.399Z",
+  "build": 3630,
+  "gerado": "2026-10-14T17:42:57.515Z",
   "commits": [
+    {
+      "hash": "e1a70447",
+      "data": "14/10/2026",
+      "titulo": "feat: recebimento de aço aceita até 60 certificados"
+    },
     {
       "hash": "f56fbc5b",
       "data": "14/10/2026",
@@ -146,11 +151,6 @@
       "hash": "1b4bc350",
       "data": "06/10/2026",
       "titulo": "Plano: CMR usar R em branco da planilha — com a revisão do Codex (revisar antes de implementar)"
-    },
-    {
-      "hash": "82740378",
-      "data": "06/10/2026",
-      "titulo": "Memória e revisão: CMR com as três origens resolvido"
     }
   ]
 }
