@@ -1,7 +1,12 @@
 {
-  "build": 3617,
-  "gerado": "2026-10-14T14:05:44.388Z",
+  "build": 3618,
+  "gerado": "2026-10-14T14:06:15.899Z",
   "commits": [
+    {
+      "hash": "0c55be0e",
+      "data": "14/10/2026",
+      "titulo": "Memória e revisão: revisão vigente no data book, indiceR, recebimento de estoque"
+    },
     {
       "hash": "357de8e9",
       "data": "14/10/2026",
@@ -146,11 +151,6 @@
       "hash": "da8c93aa",
       "data": "04/10/2026",
       "titulo": "Memória: modelo novo de proposta, PIT no layout da Vale e selo BV"
-    },
-    {
-      "hash": "da30ce21",
-      "data": "03/10/2026",
-      "titulo": "OP › Qualidade: Qualidade de campo volta a ver os relatórios"
     }
   ]
 }

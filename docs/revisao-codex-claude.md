@@ -2813,7 +2813,7 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (a) `consumiveisDaOP` inclui o lote "vigente hoje" (origem `emissao`) de conjunto ainda não soldado, então o
     RRA pode entrar num livro antes da solda. Escolhi a consistência com a §06; trocar para só `apontamento` é uma linha;
   - (b) o cron calcula `consumiveisDaOP` para cada um dos 13 livros abertos. Cada chamada carrega todos os MATERIAL
-    do CMR (~4 mil), e não medi o tempo;
+    do CMR (~4 mil). Medi depois, só lendo: 2,7 s para os 13 livros;
   - (c) a remoção manual de um RRA de um livro é desfeita no próximo ciclo (os relatórios comuns já se comportam assim);
   - (d) o documento do RRA tem `opNumero: null`, então não aparece na lista de candidatos por OP para anexar à mão;
   - (e) não validei no navegador, porque as telas exigem login.
