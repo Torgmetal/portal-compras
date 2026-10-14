@@ -2826,3 +2826,12 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ Para revisar: (a) o memorial é reconhecido pelo NOME do arquivo; um PDF sem "memorial" no nome não muda o
   título; (b) o PDF de aceite/assinatura de um livro já gerado lê o título gravado na última abertura ou geração.
   Mapa de juntas (§09): pendente, aguarda a lista da API do Tekla.
+- **`9f7d0aef` — recebimento de aço (RRM):** usa o RIR com `inspecoesRir(tipo)` (+IDENTIFICAÇÃO), o campo `norma`
+  (agora gravado em todos os RIR) e colunas de PDF por tipo (`colunasRir`). É de estoque e vai para a §04 pelo R
+  (`certificadosDaOp`). Na §04, `certificadosQueEntram` ignora relatório ao medir a montagem, e `databook-pdf`
+  separa os relatórios da tabela de rastreabilidade. A guarda `relatorio-secao-databook` abre exceção só para o aço.
+  Testes: `recebimento-aco` (7), cron de certificados (+2), colunas (+1). Suíte com 5.203 passando. O PDF de exemplo
+  foi conferido em imagem.
+  ⚠ Para revisar: (a) `norma` passou a aparecer no formulário do arame e do penetrante também (o campo é comum);
+  (b) `tirar()` do estoque remove o documento do livro inteiro, o que vale porque cada tipo vai para uma seção só;
+  (c) não validei no navegador.

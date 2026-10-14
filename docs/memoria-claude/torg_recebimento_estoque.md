@@ -35,3 +35,16 @@ Relacionado: [[torg_recebimentos_certificado]], [[torg_databook_relatorio_assina
 (computador e celular) pede a data, hoje por padrão; vai para `resultados.dataInspecao` (o mesmo campo do
 cabeçalho e do PDF, que também confere a validade contra ela). `validarDataRecebimento`: futura ou inexistente é 400.
 Vale para os três recebimentos (tinta também).
+
+**Recebimento de AÇO — RRM (14/10/2026, `9f7d0aef`):** Vitor — *"o modelo de relatório dos materiais de uso, que seria o
+Aço — mesma linha dos demais no layout, porém informações compatíveis com recebimento de material"*.
+- O mesmo RIR do arame/penetrante (`ehRir`/`TIPOS_RIR`), com uma inspeção a mais, **IDENTIFICAÇÃO** (corrida marcada
+  na peça × certificado — `inspecoesRir(tipo)`), e a **NORMA / GRAU** no lugar da validade (aço não vence). PDF
+  com coluna "MATERIAL", instrumentos TR/PQ/ES. Classe dos certificados = `ESTRUTURAL` sem o penetrante (que também
+  cai em ESTRUTURAL em `classificarMaterial`).
+- De estoque (RRM-EST-001), escolha do Vitor. Assinado, entra na **§04** de cada livro cuja obra usou o R. O uso
+  vem de `certificadosDaOp`, o mesmo conjunto da §04, que inclui o R declarado vindo de outra obra.
+- ⚠⚠ **A §04 é seção de CERTIFICADO (vínculo automático), e relatório ali era proibido** (teste
+  `relatorio-secao-databook`). O aço é exceção deliberada, com dois ajustes: o cron ignora `categoria RELATORIO` ao
+  medir a "montagem" da seção (`livro.relatorios` em `certificadosQueEntram`), e o PDF lista os relatórios numa
+  tabela própria ("Relatórios de recebimento"), fora da rastreabilidade.

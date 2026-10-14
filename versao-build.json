@@ -1,7 +1,12 @@
 {
-  "build": 3624,
-  "gerado": "2026-10-14T14:47:09.278Z",
+  "build": 3625,
+  "gerado": "2026-10-14T14:50:13.638Z",
   "commits": [
+    {
+      "hash": "9f7d0aef",
+      "data": "14/10/2026",
+      "titulo": "feat: relatório de recebimento de aço (RRM)"
+    },
     {
       "hash": "eb8648af",
       "data": "14/10/2026",
@@ -146,11 +151,6 @@
       "hash": "34975dec",
       "data": "05/10/2026",
       "titulo": "Casamento de tubo: confirmação pelo diâmetro só vale para DIN 2440"
-    },
-    {
-      "hash": "58b92a3b",
-      "data": "05/10/2026",
-      "titulo": "CMR: data vai à planilha em ISO — \"05/10\" em texto virava 10 de maio"
     }
   ]
 }
