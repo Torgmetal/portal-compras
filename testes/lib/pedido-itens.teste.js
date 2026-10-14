@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { itensDoPedido, totalDosItens, divergenciaProposta, ordenarPelaRM } from "@/lib/pedido-itens";
+import { itensDoPedido, dimensoesDoItem, totalDosItens, divergenciaProposta, ordenarPelaRM } from "@/lib/pedido-itens";
 
 // ⚠⚠ Matheus (16/09/2026): "no Omie eu preciso que seja preenchido certo no pedido de compra o
 // campo IPI do valor unitário, está entrando o preço unitário cheio com IPI sem entrar no campo de
@@ -178,5 +178,28 @@ describe("ordenarPelaRM", () => {
   it("empate mantém a ordem de chegada", () => {
     const linhas = [l(null, 1, "X"), l(null, 1, "Y")];
     expect(ordenarPelaRM(linhas).map((x) => x.rmItem.descricao)).toEqual(["X", "Y"]);
+  });
+});
+
+// Matheus (14/10/2026): as medidas da chapa saem na RM para o fornecedor cotar ("Larg. (m)" e
+// "Comp. (m)"), mas não chegavam ao pedido do Omie — pelo pedido não dava para conferir a chapa.
+// Agora vão nas Informações Adicionais do item (cObs), antes da observação da engenharia.
+describe("dimensoesDoItem / itensDoPedido — as medidas vão para o pedido", () => {
+  it("chapa: largura e comprimento, em metros, como na RM", () => {
+    expect(dimensoesDoItem({ largura: "1.5", comprimento: "3" })).toBe("LARG. 1,500 M x COMP. 3,000 M");
+    expect(dimensoesDoItem({ largura: "2,44", comprimento: "1.5" })).toBe("LARG. 2,440 M x COMP. 1,500 M");
+  });
+  it("perfil: só o comprimento", () => {
+    expect(dimensoesDoItem({ comprimento: "12", largura: null })).toBe("COMP. 12,000 M");
+  });
+  it("⚠ sem medida, ou o traço que a planilha deixa, não escreve nada", () => {
+    expect(dimensoesDoItem({ comprimento: "---------", largura: "---------" })).toBe(null);
+    expect(dimensoesDoItem({})).toBe(null);
+    expect(dimensoesDoItem({ comprimento: "0", largura: "" })).toBe(null);
+  });
+  it("vão na observação do item, antes da observação da engenharia", () => {
+    const { itens } = itensDoPedido([linha({ rmItem: { largura: "1.5", comprimento: "3", observacao: "Corte a laser" } })]);
+    expect(itens[0].observacao).toBe("LARG. 1,500 M x COMP. 3,000 M - Corte a laser");
+    expect(itensDoPedido([linha({ rmItem: { comprimento: "6" } })]).itens[0].observacao).toBe("COMP. 6,000 M");
   });
 });
