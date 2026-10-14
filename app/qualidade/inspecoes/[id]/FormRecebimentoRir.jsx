@@ -3,7 +3,7 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle2, PackageCheck, Plus, Trash2 } from "lucide-react";
 import EscolherCertificados from "@/components/qualidade/EscolherCertificados";
 import {
-  CAMPOS_CABECALHO_RIR, CAMPOS_ITEM_RIR, INSPECOES_RIR, MARCAS_RIR, N_ITENS_RIR,
+  CAMPOS_CABECALHO_RIR, CAMPOS_ITEM_RIR, INSPECOES_ACO, inspecoesRir, MARCAS_RIR, N_ITENS_RIR,
   avisosRir, itensRir, pendenciasRir, resultadoExigidoRir, rotuloMarca,
 } from "@/lib/recebimento-rir-campos";
 
@@ -17,10 +17,10 @@ import {
  * ⚠ O QUE NÃO ESTÁ NO CMR ENTRA À MÃO: do líquido penetrante só o revelador foi lançado até hoje — sem esta
  * saída, o relatório do penetrante não teria como listar o penetrante.
  */
-const VAZIO = Object.fromEntries([...CAMPOS_ITEM_RIR.map((c) => [c.k, ""]), ["docId", ""], ["r", ""], ["validade", ""], ...INSPECOES_RIR.map((c) => [c.k, ""])]);
+const VAZIO = Object.fromEntries([...CAMPOS_ITEM_RIR.map((c) => [c.k, ""]), ["docId", ""], ["r", ""], ["validade", ""], ...INSPECOES_ACO.map((c) => [c.k, ""])]);
 const semNumero = ({ numero: _numero, ...i }) => i;
 // do que a busca devolve, só o que é campo do item (a busca traz também PDF, data e OP do lançamento)
-const paraItem = (c) => Object.fromEntries(Object.keys(VAZIO).map((k) => [k, INSPECOES_RIR.some((x) => x.k === k) ? "" : String(c[k] ?? "")]));
+const paraItem = (c) => Object.fromEntries(Object.keys(VAZIO).map((k) => [k, INSPECOES_ACO.some((x) => x.k === k) ? "" : String(c[k] ?? "")]));
 
 const CORES = { A: "bg-emerald-600 border-emerald-600", R: "bg-red-600 border-red-600", NA: "bg-slate-500 border-slate-500" };
 
@@ -104,14 +104,15 @@ export default function FormRecebimentoRir({ rel, res, travado, setResultado }) 
                     onChange={(e) => setItem(idx, c.k, e.target.value)} className={campo} />
                 </label>
               ))}
-              <label className="block">
+              {/* aço não vence (14/10/2026): no lugar da validade, a norma/grau já está nos campos acima */}
+              {rel.tipo !== "RECEBIMENTO_ACO" && <label className="block">
                 <span className="block text-[10px] font-semibold text-torg-gray mb-0.5">Validade</span>
                 <input type="date" value={i.validade} disabled={travado} aria-label={`Item ${i.numero}, Validade`}
                   onChange={(e) => setItem(idx, "validade", e.target.value)} className={campo} />
-              </label>
+              </label>}
             </div>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-              {INSPECOES_RIR.map((c) => (
+              {inspecoesRir(rel.tipo).map((c) => (
                 <div key={c.k} className="flex items-center gap-1">
                   <span className="text-[11px] text-torg-dark w-24">{c.rotulo}</span>
                   {MARCAS_RIR.map((v) => (

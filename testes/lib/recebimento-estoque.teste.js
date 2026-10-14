@@ -7,6 +7,7 @@ import { mockPrisma } from "@/testes/apoio/prisma";
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma, prismaDirect: mockPrisma }));
 const consumiveis = vi.fn();
 vi.mock("@/lib/consumivel-solda", () => ({ consumiveisDaOP: (...a) => consumiveis(...a) }));
+vi.mock("@/lib/databook-certificados-novos", () => ({ certificadosDaOp: vi.fn().mockResolvedValue([]) }));
 
 import {
   OP_ESTOQUE, ehDeEstoque, chavesDoRecebimento, chavesDoLp, sincronizarRecebimentosDeEstoque,
@@ -34,7 +35,7 @@ function banco({ rels, assinado = true, lps = [], usados = {} }) {
   mockPrisma.relatorioInspecao.findMany.mockImplementation(async ({ where }) =>
     where.tipo === "LP" ? lps.filter((l) => l.opNumero === where.opNumero) : rels);
   mockPrisma.dataBookSecao.findMany.mockImplementation(async ({ where }) =>
-    where.dataBookId.in.map((id) => ({ id: `s12-${id}`, dataBookId: id, titulo: "Relatório de Ensaios (END)", estado: "ANEXADO" })));
+    where.dataBookId.in.map((id) => ({ id: `s12-${id}`, dataBookId: id, numero: "12", titulo: "Relatório de Ensaios (END)", estado: "ANEXADO" })));
   mockPrisma.assinaturaDocumento.findMany.mockResolvedValue(assinado ? [{ assinadoEm: new Date() }] : [{ assinadoEm: null }]);
   mockPrisma.documentoQualidade.update.mockResolvedValue({});
   mockPrisma.documentoQualidade.create.mockResolvedValue({ id: "doc-novo" });

@@ -47,6 +47,7 @@ const TIPO_RELATORIO = {
   RECEBIMENTO_TINTA: "Recebimento de tintas",
   RECEBIMENTO_PENETRANTE: "Recebimento de penetrante e revelador",
   RECEBIMENTO_ARAME: "Recebimento de arame de solda",
+  RECEBIMENTO_ACO: "Recebimento de aço",
   MONTAGEM: "Montagem",
   GERAL: "Geral",
 };

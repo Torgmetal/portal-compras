@@ -16,6 +16,20 @@ const livroVazio = () => ({ ids: new Set(["d-antigo"]), rs: new Set(["261100"]),
 const chapa = (id, r, criado, extra = {}) => ({ id, importRef: r, nome: "CHAPA ACO CARBONO LAMINADO A-36 ESPESSURA 12,50MM", createdAt: dia(criado), ...extra });
 
 describe("quais certificados entram sozinhos", () => {
+  it("o RELATÓRIO de recebimento de aço na §04 não conta como montagem (14/10/2026)", () => {
+    // a seção foi montada em 21/09; o RRM foi assinado e vinculado em 30/09 — o certificado de 25/09 ainda entra
+    const secao = { ...secao04, documentos: [...secao04.documentos, { documentoId: "rrm", createdAt: dia("2026-09-30") }] };
+    const livro = { ...livroVazio(), relatorios: new Set(["rrm"]) };
+    const r = certificadosQueEntram({ secao, candidatos: [chapa("d1", "261646", "2026-09-25")], livro });
+    expect(r.map((c) => c.id)).toEqual(["d1"]);
+  });
+
+  it("seção só com o relatório não está montada", () => {
+    const secao = { ...secao04, documentos: [{ documentoId: "rrm", createdAt: dia("2026-09-30") }] };
+    const livro = { ...livroVazio(), relatorios: new Set(["rrm"]) };
+    expect(certificadosQueEntram({ secao, candidatos: [chapa("d1", "261646", "2026-10-02")], livro })).toEqual([]);
+  });
+
   it("o que chegou DEPOIS da última montagem da seção entra", () => {
     const r = certificadosQueEntram({ secao: secao04, candidatos: [chapa("d1", "261646", "2026-09-25")], livro: livroVazio() });
     expect(r.map((c) => c.id)).toEqual(["d1"]);

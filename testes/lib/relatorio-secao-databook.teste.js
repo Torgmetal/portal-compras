@@ -9,8 +9,10 @@ import { TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 import { SECOES_AUTOMATICAS } from "@/lib/databook-certificados-novos";
 
 describe("seção do data book de cada relatório", () => {
-  it("nenhum relatório de inspeção cai numa seção de vínculo automático de certificados", () => {
-    for (const t of TIPOS_RELATORIO) expect(SECOES_AUTOMATICAS, `${t.id} → §${t.secao}`).not.toContain(t.secao);
+  it("nenhum relatório de inspeção cai numa seção de vínculo automático de certificados — fora o de aço", () => {
+    // ⚠ EXCEÇÃO DELIBERADA (Vitor, 14/10/2026): o recebimento de aço vai na §04, junto do MTC. Para isso o
+    // cron ignora relatório ao medir a montagem (`livro.relatorios`) e o PDF o lista em tabela própria.
+    for (const t of TIPOS_RELATORIO.filter((x) => x.id !== "RECEBIMENTO_ACO")) expect(SECOES_AUTOMATICAS, `${t.id} → §${t.secao}`).not.toContain(t.secao);
   });
 
   it("o recebimento de tintas e o pull-off entram na §14, com os outros relatórios da pintura", () => {

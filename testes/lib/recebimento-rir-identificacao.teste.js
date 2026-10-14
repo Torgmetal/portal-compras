@@ -17,3 +17,19 @@ describe("identificação do recebimento", () => {
     expect(l.flat().some((t) => /CLIENTE|CONTRATO|OP-EST/.test(t))).toBe(false);
   });
 });
+
+import { colunasRir, legendaRir } from "@/lib/relatorio-recebimento-rir-pdf";
+describe("as colunas do PDF por tipo", () => {
+  it("o aço troca a validade pela norma/grau e ganha IDENT.; as larguras fecham a folha", () => {
+    const aco = colunasRir("RECEBIMENTO_ACO").map((c) => c.t);
+    expect(aco).toContain("NORMA / GRAU");
+    expect(aco).toContain("IDENT.");
+    expect(aco).not.toContain("VALIDADE");
+    expect(colunasRir("RECEBIMENTO_ARAME").map((c) => c.t)).toContain("VALIDADE");
+    for (const t of ["RECEBIMENTO_ACO", "RECEBIMENTO_ARAME"]) {
+      expect(colunasRir(t).reduce((s, c) => s + c.w, 0)).toBeCloseTo(1, 6);
+    }
+    expect(legendaRir("RECEBIMENTO_ACO")).toMatch(/IDENT\. = identificação/);
+    expect(legendaRir("RECEBIMENTO_ARAME")).not.toMatch(/IDENT/);
+  });
+});

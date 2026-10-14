@@ -15,9 +15,9 @@ const cmr = (extra) => ({
   opNumero: "036", arquivoUrl: "https://blob/x.pdf", norma: null, ...extra,
 });
 
-describe("os três recebimentos", () => {
-  it("são tintas, penetrante/revelador e arame de solda", () => {
-    expect(TIPOS_RECEBIMENTO).toEqual(["RECEBIMENTO_TINTA", "RECEBIMENTO_PENETRANTE", "RECEBIMENTO_ARAME"]);
+describe("os quatro recebimentos", () => {
+  it("são tintas, penetrante/revelador, arame de solda e aço (14/10/2026)", () => {
+    expect(TIPOS_RECEBIMENTO).toEqual(["RECEBIMENTO_TINTA", "RECEBIMENTO_PENETRANTE", "RECEBIMENTO_ARAME", "RECEBIMENTO_ACO"]);
     expect(ehRecebimento("RECEBIMENTO_ARAME")).toBe(true);
     expect(ehRecebimento("PINTURA")).toBe(false);
   });

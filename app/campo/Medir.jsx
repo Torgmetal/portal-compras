@@ -1,4 +1,5 @@
 "use client";
+import { ehRir } from "@/lib/recebimento-rir-campos";
 import CampoDecimal from "@/components/CampoDecimal";
 import { numeroBR } from "@/lib/numero-br";
 import AvisoPadroesInspecao from "@/components/AvisoPadroesInspecao";
@@ -379,7 +380,7 @@ function Preencher({ id, op, onVoltar, Tela, Equipamentos }) {
   const ehPullOff = rel.tipo === "PULL_OFF";
   const ehRecebimento = rel.tipo === "RECEBIMENTO_TINTA";
   // os recebimentos por certificado (07/10/2026): penetrante/revelador e arame de solda
-  const ehRecebimentoRir = rel.tipo === "RECEBIMENTO_PENETRANTE" || rel.tipo === "RECEBIMENTO_ARAME";
+  const ehRecebimentoRir = ehRir(rel.tipo);
   const ehSemJunta = semJunta(rel.tipo);
   const set = (i, campo, v) => setLinhas((p) => p.map((l, k) => (k === i ? { ...l, [campo]: v } : l)));
 

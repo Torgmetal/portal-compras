@@ -1,4 +1,5 @@
 "use client";
+import { ehRir } from "@/lib/recebimento-rir-campos";
 import ProtecaoEdicao from "@/components/qualidade/ProtecaoEdicao";
 import AvisoPadroesInspecao from "@/components/AvisoPadroesInspecao";
 import { useState, useEffect, useCallback } from "react";
@@ -383,7 +384,7 @@ export default function RelatorioDetalheClient({ id }) {
         </div>
       )}
       {/* ── recebimentos por certificado (07/10/2026): penetrante/revelador e arame de solda ── */}
-      {(rel.tipo === "RECEBIMENTO_PENETRANTE" || rel.tipo === "RECEBIMENTO_ARAME") && (
+      {ehRir(rel.tipo) && (
         <div className="mt-4">
           <FormRecebimentoRir rel={rel} res={res} travado={travado} setResultado={setResultado} />
         </div>
@@ -443,7 +444,7 @@ export default function RelatorioDetalheClient({ id }) {
 
 
 
-          {linhas.length > 0 && !["VISUAL_SOLDA", "ULTRASSOM", "PINTURA", "LP", "SAIS", "POEIRA", "PULL_OFF", "RECEBIMENTO_TINTA", "RECEBIMENTO_PENETRANTE", "RECEBIMENTO_ARAME"].includes(rel.tipo) && (
+          {linhas.length > 0 && !["VISUAL_SOLDA", "ULTRASSOM", "PINTURA", "LP", "SAIS", "POEIRA", "PULL_OFF", "RECEBIMENTO_TINTA", "RECEBIMENTO_PENETRANTE", "RECEBIMENTO_ARAME", "RECEBIMENTO_ACO"].includes(rel.tipo) && (
             <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[12px] font-bold text-torg-dark inline-flex items-center gap-1.5"><Ruler size={13} className="text-torg-blue" /> Dimensões</p>

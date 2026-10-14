@@ -3,7 +3,7 @@ import { useState } from "react";
 import { AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
 import EscolherCertificados from "@/components/qualidade/EscolherCertificados";
 import {
-  CAMPOS_CABECALHO_RIR, CAMPOS_ITEM_RIR, INSPECOES_RIR, MARCAS_RIR, N_ITENS_RIR,
+  CAMPOS_CABECALHO_RIR, CAMPOS_ITEM_RIR, INSPECOES_ACO, inspecoesRir, MARCAS_RIR, N_ITENS_RIR,
   avisosRir, itensRir, pendenciasRir, resultadoExigidoRir, rotuloMarca,
 } from "@/lib/recebimento-rir-campos";
 
@@ -16,7 +16,7 @@ import {
  */
 const ITEM_VAZIO = [...CAMPOS_ITEM_RIR.map((c) => c.k), "docId", "r", "validade"];
 const semNumero = ({ numero: _numero, ...i }) => i;
-const paraItem = (c) => ({ ...Object.fromEntries(ITEM_VAZIO.map((k) => [k, String(c[k] ?? "")])), ...Object.fromEntries(INSPECOES_RIR.map((x) => [x.k, ""])) });
+const paraItem = (c) => ({ ...Object.fromEntries(ITEM_VAZIO.map((k) => [k, String(c[k] ?? "")])), ...Object.fromEntries(INSPECOES_ACO.map((x) => [x.k, ""])) });
 const CORES = { A: "bg-emerald-600 border-emerald-600", R: "bg-red-600 border-red-600", NA: "bg-slate-500 border-slate-500" };
 // os dois campos do item que se editam no celular — o resto vem do CMR e se confere
 const EDITAVEIS = CAMPOS_ITEM_RIR.filter((c) => ["quantidade", "rnc"].includes(c.k));
@@ -68,11 +68,11 @@ export default function FormularioRecebimentoRirCampo({ rel, cond, setCond, resu
             <div className="min-w-0">
               <p className="text-[11px] text-torg-gray font-mono">Item {i.numero}{i.r ? ` · R ${i.r}` : ""}</p>
               <p className="text-[14px] font-semibold text-torg-dark">{i.descricao || "(sem descrição)"}</p>
-              <p className="text-[12px] text-torg-gray">{[i.nf && `NF ${i.nf}`, i.certificado && `cert. ${i.certificado}`, i.lote && `lote ${i.lote}`].filter(Boolean).join(" · ") || "—"}</p>
+              <p className="text-[12px] text-torg-gray">{[i.nf && `NF ${i.nf}`, i.certificado && `cert. ${i.certificado}`, i.lote && `lote ${i.lote}`, rel.tipo === "RECEBIMENTO_ACO" && i.norma].filter(Boolean).join(" · ") || "—"}</p>
             </div>
             <button type="button" onClick={() => remover(idx)} aria-label={`Remover item ${i.numero}`} className="min-h-11 px-2 text-torg-gray active:text-red-600"><Trash2 size={16} /></button>
           </div>
-          {INSPECOES_RIR.map((c) => (
+          {inspecoesRir(rel.tipo).map((c) => (
             <div key={c.k}>
               <span className="block text-[12px] text-torg-dark mb-1">{c.rotulo}</span>
               <div className="grid grid-cols-3 gap-2">
