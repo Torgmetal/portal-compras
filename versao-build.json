@@ -1,7 +1,12 @@
 {
-  "build": 3616,
-  "gerado": "2026-10-14T14:04:47.957Z",
+  "build": 3617,
+  "gerado": "2026-10-14T14:05:44.388Z",
   "commits": [
+    {
+      "hash": "357de8e9",
+      "data": "14/10/2026",
+      "titulo": "feat: recebimento de arame e penetrante sem OP (estoque)"
+    },
     {
       "hash": "6b24ecb4",
       "data": "14/10/2026",
@@ -146,11 +151,6 @@
       "hash": "da30ce21",
       "data": "03/10/2026",
       "titulo": "OP › Qualidade: Qualidade de campo volta a ver os relatórios"
-    },
-    {
-      "hash": "e90c9718",
-      "data": "03/10/2026",
-      "titulo": "OP › Qualidade: Produção e demais setores veem o PLP da obra em PDF"
     }
   ]
 }

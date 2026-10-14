@@ -1,6 +1,6 @@
 ---
 name: torg_databook_relatorio_assinado
-description: Relatório de inspeção só entra no data book ASSINADO POR TODOS — entra na última assinatura; rodada reprovada (retrabalho) e rodada assinada acompanham, intermediária não; anexar à mão também é barrado
+description: Relatório de inspeção só entra no data book ASSINADO POR TODOS — entra na última assinatura; só a rodada reprovada (retrabalho) acompanha — a aprovada é substituída (14/10); anexar à mão também é barrado
 metadata:
   type: project
 ---
@@ -21,9 +21,12 @@ assinatura incompleta e 4 rodadas intermediárias.
   `/api/assinar/[token]` junto do `CONCLUIDO`. O PDF vai pelo caminho relativo. Falhar ali não desfaz a assinatura.
 - Abrir revisão e reinspecionar devolvem o relatório a rascunho, e ele SAI do livro até a nova rodada
   ser assinada. `anexarRevisaoNoDataBook` só REGISTRA o documento da rodada; não o põe no livro.
-- ⚠⚠ **Duas regras do Vitor conciliadas:** a rodada REPROVADA/REC entra junto com o relatório assinado
-  (retrabalho, 21/08), e a rodada assinada por todos também (`revisaoEntraNoLivro`). A versão corrigida
-  no meio do caminho, sem as assinaturas, NÃO entra — é rascunho que ficou para trás.
+- ⚠⚠ **Só a rodada REPROVADA/REC acompanha o relatório assinado** (retrabalho, 21/08 — `revisaoEntraNoLivro`).
+  ⚠⚠ **A rodada APROVADA, mesmo assinada por todos, NÃO** (mudou em 14/10/2026, `6b24ecb4`). Vitor, no data
+  book da OP-102: *"está puxando o novo, porém não tira o relatório antigo"* — RIP-102-001 R00 aprovado ao
+  lado do R03 vigente; o cliente lia duas aprovações da mesma inspeção. A regra antiga ("a assinada também
+  entra") era a causa. Limpeza: 2 vínculos (RIP-102-001/002 R00) tirados da §14 da OP-102, auditoria
+  `REMOVER_REVISAO_SUBSTITUIDA_DATABOOK`. Outros livros se ajustam na próxima assinatura de cada relatório.
 - Anexar à mão (`POST …/secao/[id]/doc`) recusa documento de relatório não assinado com 409 e o motivo
   (`bloqueioRelatorioNaoAssinado`). O documento aparece na lista de candidatos da OP.
 - A tela, ao criar, diz *"Entra na seção N do data book quando todos assinarem"* sem ⚠

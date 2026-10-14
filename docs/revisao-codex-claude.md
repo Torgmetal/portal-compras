@@ -2795,3 +2795,25 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   - (a) a cópia não roda o recálculo: as datas são as da origem, que já respeitam os vínculos;
   - (b) a ordem das cópias segue o cadastro das áreas, não a ordem do clique;
   - (c) não validei no navegador, porque a tela exige login. Não copiei nada na OP-118 sem pedido.
+
+## 14/10/2026 — Data book só com a revisão vigente; busca de certificados; recebimento de estoque (Claude)
+
+- **`818bcfa7` — busca de certificados quebrada:** o select pedia `DocumentoQualidade.indiceR`, que não existe.
+  A rota devolvia corpo vazio ("Unexpected end of JSON input"). O mesmo estava na criação do recebimento e na
+  rota do PLP. Corrigido nos três; a busca devolve JSON com mensagem em erro. Guardas: o select confere com o
+  schema, e uma varredura procura `indiceR: true` em app/lib.
+- **`6b24ecb4` — revisão antiga no data book:** `revisaoEntraNoLivro` agora só aceita REPROVADO/REC. A rodada
+  aprovada e assinada é substituída pela revisão vigente. Pedido do Vitor (OP-102). Na produção tirei 2
+  vínculos (RIP-102-001/002 R00 da §14 da OP-102), com autorização e AuditLog `REMOVER_REVISAO_SUBSTITUIDA_DATABOOK`.
+- **`357de8e9` — RRA/RRP sem OP:** nascem com `opNumero "EST"` (RRA-EST-001). Assinados, entram na §12 de cada
+  livro aberto cuja obra usou o R (arame, `consumiveisDaOP`) ou o lote do LP (penetrante). A distribuição é
+  feita pela assinatura e pelo cron do data book. Tela do computador sem campo OP; celular ignora a OP. Testes:
+  `recebimento-estoque` (9), `recebimento-rir-identificacao` (2), rotas (+4) e cron (+1). Suíte com 5.181 passando.
+- ⚠ **Para revisar:**
+  - (a) `consumiveisDaOP` inclui o lote "vigente hoje" (origem `emissao`) de conjunto ainda não soldado, então o
+    RRA pode entrar num livro antes da solda. Escolhi a consistência com a §06; trocar para só `apontamento` é uma linha;
+  - (b) o cron calcula `consumiveisDaOP` para cada um dos 13 livros abertos. Cada chamada carrega todos os MATERIAL
+    do CMR (~4 mil), e não medi o tempo;
+  - (c) a remoção manual de um RRA de um livro é desfeita no próximo ciclo (os relatórios comuns já se comportam assim);
+  - (d) o documento do RRA tem `opNumero: null`, então não aparece na lista de candidatos por OP para anexar à mão;
+  - (e) não validei no navegador, porque as telas exigem login.
