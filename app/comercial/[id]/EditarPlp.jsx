@@ -194,7 +194,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
       demaos: x.demaos.map((dm, j) => {
         if (j !== i) return dm;
         const opcoes = diluicoesDe(t);
-        const pct = dm.diluicaoPct !== "" && dm.diluicaoPct != null ? Number(dm.diluicaoPct) : (opcoes[0] ?? "");
+        const pct = dm.diluicaoPct !== "" && dm.diluicaoPct != null ? numeroBR(dm.diluicaoPct, "") : (opcoes[0] ?? "");
         const seca = dm.espessuraMin || (t.secaMin != null ? t.secaMin : "");
         const umida = umidaDe(t, seca, pct);
         return {
@@ -235,10 +235,12 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
       ...x,
       demaos: x.demaos.map((dm, j) => {
         if (j !== i) return dm;
-        const umida = umidaDe(t, dm.espessuraMin, pct);
+        // ⚠ sem boletim no catálogo, a úmida sai do SV digitado na própria demão — e o nome do diluente fica como está
+        const base = t || { solidosVol: numeroBR(dm.solidosVol, null) };
+        const umida = umidaDe(base, dm.espessuraMin, numeroBR(pct, NaN));
         return {
           ...dm, diluicaoPct: pct === "" ? "" : String(pct),
-          diluicao: nomeDoDiluente(t, pct) || dm.diluicao,
+          diluicao: t ? (nomeDoDiluente(t, pct) || dm.diluicao) : dm.diluicao,
           camadaUmida: umida != null ? String(umida) : dm.camadaUmida,
           umidas: umidasDe(t, dm.espessuraMin),
         };
@@ -536,7 +538,7 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
             const t = catalogo.find((x) => x.id === dm.produtoId) || null;
             const faixas = diluicoesDe(t);
             return (
-              <div key={i} className="grid sm:grid-cols-[9rem_1fr_7rem_6rem_1fr] gap-1.5 items-center">
+              <div key={i} className="grid sm:grid-cols-[9rem_1fr_12rem_6rem_1fr] gap-1.5 items-center">
                 <span className="text-[11px] text-torg-dark truncate" title={dm.produto || dm.nome}>
                   <b>{dm.nome || `${i + 1}ª demão`}</b>{dm.produto ? ` · ${dm.produto}` : ""}
                 </span>
@@ -544,14 +546,17 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
                 {/* ⚠⚠ A CAMADA ÚMIDA VEM DA DILUIÇÃO. O boletim do INDUSTHANE dá 181 µm sem diluir,
                     200 µm a 10% e 209 µm a 15% — escolher a % preenche a espessura úmida sozinha.
                     Sem boletim cadastrado, os dois campos continuam livres para digitar. */}
-                {faixas.length ? (
-                  <select value={so(dm.diluicaoPct)} onChange={(e) => aplicarDiluicao(i, e.target.value)} className={cls}>
-                    <option value="">diluição…</option>
-                    {faixas.map((c) => <option key={c} value={c}>{c}%</option>)}
-                  </select>
-                ) : (
-                  <Texto valor={dm.diluicao} onChange={(v) => setDemao(i, "diluicao", v)} ph="diluição" />
-                )}
+                {/* ⚠⚠ A % É SEMPRE UM CAMPO NUMÉRICO (Vitor, 15/10/2026: "não estou conseguindo colocar a % de
+                    diluição"). Sem boletim no catálogo só aparecia o TEXTO do diluente, e a % nunca virava número;
+                    com boletim, uma lista fechada nas % dele. Agora: a % (com as do boletim como sugestão) e, ao lado,
+                    o nome do diluente. */}
+                <div className="flex gap-1 min-w-0">
+                  <CampoDecimal value={so(dm.diluicaoPct)} onChange={(txt) => aplicarDiluicao(i, txt)} casas={1}
+                    placeholder="%" title="Diluição (%)" aria-label={`Diluição (%) da ${dm.nome || `${i + 1}ª demão`}`}
+                    list={faixas.length ? `dil-plp-${i}` : undefined} className={`${cls} w-14 shrink-0`} />
+                  {faixas.length > 0 && <datalist id={`dil-plp-${i}`}>{faixas.map((c) => <option key={c} value={c} />)}</datalist>}
+                  <Texto valor={dm.diluicao} onChange={(v) => setDemao(i, "diluicao", v)} ph="diluente" />
+                </div>
                 {(dm.umidas || []).length ? (
                   // ⚠ as três (ou N) condições, não só a escolhida: é o que o pintor lê no galpão.
                   <span className="text-[11px] text-torg-dark leading-tight">
