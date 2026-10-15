@@ -170,9 +170,9 @@ export async function POST(req, { params }) {
   const tmsa = ehObraTmsa(op);
   async function arquivosTmsa() {
     const d = await dadosTmsa({ op, previoId: previo.id, seguirSimulacao: body.seguirSimulacao !== false });
-    const r = montarRomaneioTmsa({ itens, volumes: d.volumes, tags: d.tags, ocPorTag: d.ocPorTag });
+    const r = montarRomaneioTmsa({ itens, volumes: d.volumes, tags: d.tags, ocPorTag: d.ocPorTag, ocDe: d.ocDe });
     const xlsx = await gerarRomaneioTmsaExcel({ numero: previo.numero, data: new Date(), referencia: referenciaProjeto(d.tpr, op.numero), observacoes: body.observacoes || "", ...r });
-    return { xlsx, pdf: Buffer.from(await gerarRomaneioTmsaPdf(xlsx)), avisos: r.avisos, origem: r.origem };
+    return { xlsx, pdf: Buffer.from(await gerarRomaneioTmsaPdf(xlsx)), avisos: [...(d.avisos || []), ...r.avisos], origem: r.origem };
   }
   if (tmsa && body.previa) {
     const t = await arquivosTmsa();

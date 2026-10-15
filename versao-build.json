@@ -1,7 +1,12 @@
 {
-  "build": 3649,
-  "gerado": "2026-10-15T19:45:12.071Z",
+  "build": 3650,
+  "gerado": "2026-10-15T19:53:33.106Z",
   "commits": [
+    {
+      "hash": "9ad9b152",
+      "data": "15/10/2026",
+      "titulo": "Memória e revisão: geração no servidor e fontes de OC/TPR da TMSA"
+    },
     {
       "hash": "077ec385",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "23fb6706",
       "data": "14/10/2026",
       "titulo": "Memória e revisão: data do recebimento na criação"
-    },
-    {
-      "hash": "d3d6f6e4",
-      "data": "14/10/2026",
-      "titulo": "feat: data do recebimento escolhida na criação (retroativa)"
     }
   ]
 }
