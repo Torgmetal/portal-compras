@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { arquivosDaFabricacao, indiceDaFabricacao, desenhosDaMarca } from "@/lib/desenhos-fabricacao";
+import { arquivosDaFabricacao, desenhosDaMarca } from "@/lib/desenhos-fabricacao";
 import { requireRole } from "@/lib/session";
 import { getAccessToken, acharPastaOp, uploadFileToFolder } from "@/lib/sharepoint";
 import { rastreioDoConjunto } from "@/lib/rastreio-peca";
@@ -54,8 +54,6 @@ export async function GET(req) {
     }
   }
   if (!opNumero || !marca) return NextResponse.json({ error: "Informe opNumero e marca." }, { status: 400 });
-  // ⚠ só VER o desenho (Corte e montagem) aceita índice vencido; quem imprime pede fresco
-  const consulta = sp.get("consulta") === "1";
 
   // Liberações GRD já registradas (independem do SharePoint responder).
   const liberacoes = (await prisma.grdLiberacao.findMany({
@@ -78,10 +76,7 @@ export async function GET(req) {
     // ficou vazio em 7 telas de PCP/produção sem avisar ninguém, porque as liberações de GRD já
     // gravadas continuavam aparecendo. Agora a pasta é varrida por caminho, com cache por OP.
     // Ver `lib/desenhos-fabricacao.js` e `docs/memoria-claude/torg_graph_busca_500.md`.
-    const ind = await indiceDaFabricacao(base, { aceitarVencido: consulta });
-    arquivos = desenhosDaMarca(ind.arquivos, marca);
-    // ⚠ índice vencido sem a marca: pode ser o desenho que a Engenharia acabou de subir — varre
-    if (!arquivos.length && ind.vencido) arquivos = desenhosDaMarca(await arquivosDaFabricacao(base), marca);
+    arquivos = desenhosDaMarca(await arquivosDaFabricacao(base), marca);
   } catch (e) {
     erroSp = e?.message || "Falha ao consultar o SharePoint.";
   }

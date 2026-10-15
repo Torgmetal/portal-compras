@@ -1,7 +1,12 @@
 {
-  "build": 3654,
-  "gerado": "2026-10-15T20:54:37.010Z",
+  "build": 3655,
+  "gerado": "2026-10-15T20:54:37.237Z",
   "commits": [
+    {
+      "hash": "1b88e9a1bb",
+      "data": "15/10/2026",
+      "titulo": "Corte e montagem: lista e desenho rápidos, filtro \"Não montado\" e aviso de desenho impresso"
+    },
     {
       "hash": "6eeac6d300",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "fc96b96659",
       "data": "14/10/2026",
       "titulo": "Memória e revisão: recebimento de aço (RRM)"
-    },
-    {
-      "hash": "9f7d0aef41",
-      "data": "14/10/2026",
-      "titulo": "feat: relatório de recebimento de aço (RRM)"
     }
   ]
 }

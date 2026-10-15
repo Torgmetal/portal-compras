@@ -54,21 +54,11 @@ describe("arquivosDaFabricacao — índice no banco", () => {
     }));
   });
 
-  it("a consulta aceita o índice vencido (até o teto) sem varrer, e diz que venceu", async () => {
+  it("⚠⚠ índice vencido nunca serve — nem para só ver: varre (revisão pode ter ido para OBSOLETOS)", async () => {
     const agora = Date.now();
-    banco.findUnique.mockResolvedValue({ pasta: "x", arquivos: ARQ, em: new Date(agora - 30 * MIN) });
+    banco.findUnique.mockResolvedValue({ pasta: "x", arquivos: [{ id: "velho", name: "T1.pdf" }], em: new Date(agora - 6 * MIN) });
     const mod = await carregar();
-    const r = await mod.indiceDaFabricacao("/OP-1", { agora, aceitarVencido: true });
-    expect(r).toMatchObject({ arquivos: ARQ, vencido: true });
-    expect(varrer).not.toHaveBeenCalled();
-  });
-
-  it("⚠ vencido além do teto não serve nem para consulta", async () => {
-    const agora = Date.now();
-    banco.findUnique.mockResolvedValue({ pasta: "x", arquivos: [], em: new Date(agora - 3 * 60 * MIN) });
-    const mod = await carregar();
-    const r = await mod.indiceDaFabricacao("/OP-1", { agora, aceitarVencido: true });
-    expect(r).toMatchObject({ arquivos: ARQ, vencido: false });
+    expect(await mod.arquivosDaFabricacao("/OP-1", { agora })).toEqual(ARQ);
     expect(varrer).toHaveBeenCalledTimes(1);
   });
 

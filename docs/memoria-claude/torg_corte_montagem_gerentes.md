@@ -25,9 +25,9 @@ Matheus (03/10/2026): tela de consulta para os gerentes de Corte e Montagem, no 
   mesmas obras do PCP via `obrasCandidatas`, sem carregar peça (5 s → <1 s); a última lista fica no
   localStorage e aparece na hora.
 - Desenho: índice da pasta 2.5.2 Fabricação também no banco (`DesenhoIndice`, cache entre lambdas;
-  TTL conta da varredura). A tela chama `?aquecer=1` ao abrir a Montagem; o modal `soVer` manda
-  `consulta=1` e aceita índice vencido até 2 h (se a marca não estiver, varre). Imprimir (PCP) nunca
-  usa índice vencido — poderia apontar para revisão que foi para OBSOLETOS.
+  TTL 5 min contado da varredura). A tela chama `?aquecer=1` ao abrir a Montagem. ⚠ Índice
+  vencido NUNCA é servido, nem para só ver: chegou a aceitar até 2 h na consulta, e o Codex barrou
+  (revisão substituída/OBSOLETOS sem aviso ao montador) — Matheus decidiu voltar aos 5 min.
 - "Só o que falta" virou **"Não montado"** (Corte: "Não cortado"). A regra estava certa; em obra
   grande (OP-118: 2.641 peças) a lista inteira desenhada travava o celular e parecia que o filtro
   não funcionava → cartões em lotes de 60 com "Mostrar mais".
