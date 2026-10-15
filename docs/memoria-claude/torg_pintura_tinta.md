@@ -26,6 +26,16 @@ Qualidade da OP** — só a folha 3, da OP inteira, com valores CALCULADOS (`lib
 úmida = seca×(100+dil)÷SV), dizendo o que falta no PLP. Vitor: "as demais páginas apenas na produção". A rota
 `/api/pcp/pintura` passou a aceitar COMERCIAL.
 
+**⚠⚠ ESQUEMA POR ESTRUTURA (15/10/2026, `de32fe5b`, `lib/plp-esquema.js`).** Vitor: "a tinta amarela recebe o
+primer e depois o acabamento amarelo, assim como a azul — no PLP isso não está claro". O PLP guarda demãos e cores
+por item SEM ligação. Regra: **demãos de mesmo número são ALTERNATIVAS e a cor do item escolhe**; demão sem
+alternativa (primer) vale para todos. Demãos por peça = números distintos (OP-094: 2, não 3). Tinta de cada
+acabamento na área da SUA cor (`consumoDoPlano(..., { areaPorCor })`). Folha do pintor (avulsa e folha 3) em blocos
+por estrutura; a avulsa só sai com o PLP completo e coerente (`problemasParaOPintor`). PDF do PLP ganhou o quadro
+"Esquema por estrutura"; o editor mostra prévia e avisos. Em 15/10 só a 094 e a 106 passavam; a 067 tem preto e
+amarelo no NOME de uma demão só — precisa ser separada à mão; a 094 tem "Cinza RAL 7039" nas observações contra
+item "Azul". ⚠ `lib/fila-setor.js` ainda chama `consumoDoPlano` sem `areaPorCor` (conta antiga).
+
 **Caderno de 3 folhas** sai do botão na barra da faixa Pintura do Gantt (`lib/pintura-excel-cliente`),
 com os IDs do LOTE, não da obra. As células a preencher são **amarelas** e o resto é **fórmula de
 Excel viva**; a folha do pintor referencia a folha 2 por endereço (colunas A..M — mexer numa quebra

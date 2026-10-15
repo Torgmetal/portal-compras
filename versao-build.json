@@ -1,7 +1,12 @@
 {
-  "build": 3640,
-  "gerado": "2026-10-15T17:49:41.317Z",
+  "build": 3641,
+  "gerado": "2026-10-15T17:50:31.696Z",
   "commits": [
+    {
+      "hash": "de32fe5b",
+      "data": "15/10/2026",
+      "titulo": "feat: esquema de pintura por estrutura (primer + acabamento da sua cor)"
+    },
     {
       "hash": "03494799",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "307131d5",
       "data": "08/10/2026",
       "titulo": "OP › Compras: Qualidade carrega os materiais da obra"
-    },
-    {
-      "hash": "574ae46d",
-      "data": "07/10/2026",
-      "titulo": "Memória e revisão: recebimentos pelos certificados do CMR (RRT sem peças, RRP e RRA)"
     }
   ]
 }

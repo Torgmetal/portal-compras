@@ -2862,3 +2862,11 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   calculados por `linhasDoPintor` (sem fórmula para a folha 2, que não existe nesse arquivo). `/api/pcp/pintura`
   aceita COMERCIAL. Testes: 3 + o botão na aba. ⚠ Para revisar: o alinhamento de `d.demaos[i]` com `d.camadas[i]`
   é por índice, o mesmo que o caderno completo já fazia (`primeiraDemao + i`).
+- **`de32fe5b` — esquema de pintura por estrutura:** `lib/plp-esquema.js` agrupa demãos por número (mesmo número =
+  alternativas escolhidas pela cor do item) e é usado pela folha do pintor (avulsa e folha 3), por `consumoDoPlano`
+  (área por cor com `areaPorCor`), pelo PDF do PLP e pela prévia do editor (`EsquemaPrevia.jsx`). A folha avulsa só
+  sai sem `problemasPlp`. Testes: esquema (11), folha (2), prévia (2). Suíte com 5.233 passando. PDF da OP-094
+  conferido em imagem. ⚠ Para revisar: (a) `lib/fila-setor.js` continua sem `areaPorCor`, então a conta da fila
+  infla o acabamento em obra de duas cores; (b) a OP-067 tem duas cores no nome de uma demão só, e a regra não
+  detecta (passa a valer para as duas estruturas); (c) `linhaNaFolha2` acha a linha da folha 2 por
+  ordem+cor+produto, e duas demãos idênticas cairiam na mesma linha.
