@@ -364,6 +364,14 @@ export default function DataBookDetalheClient({ id, userId }) {
                 <FileDown size={13} /> Baixar PDF
               </a>
             )}
+            {/* ⚠ sem o arquivo único, o botão do mesmo lugar leva aos volumes — Geraldo (15/10/2026) procurou o
+                "Baixar PDF" de sempre na OP-094 e achou que não dava para baixar */}
+            {totalAnexos > 300 && (
+              <a href="#volumes" title="Data book grande: sai em volumes — baixe cada um no card de Volumes"
+                className="text-[12px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-3 py-1.5 hover:bg-torg-blue-50 inline-flex items-center gap-1.5">
+                <FileDown size={13} /> Baixar PDF (em volumes)
+              </a>
+            )}
             {/* A revisão fica sempre à vista: é ela que diz QUAL documento é este. */}
             <span className="text-[11px] px-2 py-1 rounded-full font-bold bg-gray-100 text-torg-dark" title="Revisão do data book">
               {rotuloRev}

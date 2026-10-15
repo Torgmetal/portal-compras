@@ -49,4 +49,16 @@ describe("volumes do data book na tela", () => {
     expect(screen.getByText(/\b1\d s\b/)).toBeTruthy();
     expect(f.mock.calls.filter(([u, i]) => ehServidor(u, i))).toHaveLength(1);
   });
+
+  // Geraldo (Qualidade, 15/10/2026, OP-094): "não dá opção de baixar o PDF igual às demais". Acima de 300 anexos o
+  // "Baixar PDF" do topo some (arquivo único não cabe) e só havia "Abrir" em cada volume.
+  it("cada volume tem Abrir (no navegador) e Baixar (arquivo)", async () => {
+    const pronto = { ...estado, geracao: { status: "CONCLUIDO" }, volumes: [{ id: "v1", volume: 1, paginas: 70, tamanho: 352084 }, { id: "v3", volume: 3, paginas: 370, tamanho: 74975893 }], totais: { paginas: 440, tamanho: 75327977 } };
+    vi.stubGlobal("fetch", vi.fn(() => json(pronto)));
+    render(<Volumes id="b94" />);
+    const baixar = await screen.findAllByRole("link", { name: /Baixar/ });
+    expect(baixar.map((a) => a.getAttribute("href"))).toEqual(["/api/qualidade/data-books/b94/volume/1", "/api/qualidade/data-books/b94/volume/3"]);
+    expect(baixar[0].hasAttribute("download")).toBe(true);
+    expect(screen.getAllByRole("link", { name: /Abrir/ })[0].getAttribute("href")).toBe("/api/qualidade/data-books/b94/volume/1?inline=1");
+  });
 });

@@ -1,156 +1,156 @@
 {
-  "build": 3658,
-  "gerado": "2026-10-15T21:19:08.450Z",
+  "build": 3659,
+  "gerado": "2026-10-15T21:32:10.104Z",
   "commits": [
     {
-      "hash": "abe41e0542",
+      "hash": "136fb8d0",
+      "data": "15/10/2026",
+      "titulo": "Corte e montagem: composição do conjunto abre também quando tudo já foi cortado"
+    },
+    {
+      "hash": "abe41e05",
       "data": "15/10/2026",
       "titulo": "Corte e montagem: busca por croqui e material, e filtro com Montado"
     },
     {
-      "hash": "e479928255",
+      "hash": "e4799282",
       "data": "15/10/2026",
       "titulo": "Corte e montagem: obra lembrada que saiu da lista atual some da tela"
     },
     {
-      "hash": "21c18869e0",
+      "hash": "21c18869",
       "data": "15/10/2026",
       "titulo": "Desenhos: índice vencido nunca é servido, nem na consulta da Montagem"
     },
     {
-      "hash": "1b88e9a1bb",
+      "hash": "1b88e9a1",
       "data": "15/10/2026",
       "titulo": "Corte e montagem: lista e desenho rápidos, filtro \"Não montado\" e aviso de desenho impresso"
     },
     {
-      "hash": "6eeac6d300",
+      "hash": "6eeac6d3",
       "data": "15/10/2026",
       "titulo": "Memória e revisão: editar/excluir aditivo"
     },
     {
-      "hash": "adadfaa806",
+      "hash": "adadfaa8",
       "data": "15/10/2026",
       "titulo": "Aditivo: editar (inclusive divulgado) e excluir rascunho"
     },
     {
-      "hash": "23088e067f",
+      "hash": "23088e06",
       "data": "15/10/2026",
       "titulo": "Memória e revisão: OC/TPR pelas ETCs"
     },
     {
-      "hash": "b25a17e183",
+      "hash": "b25a17e1",
       "data": "15/10/2026",
       "titulo": "feat: romaneio TMSA lê OC e TPR das ETCs da obra"
     },
     {
-      "hash": "9ad9b152ae",
+      "hash": "9ad9b152",
       "data": "15/10/2026",
       "titulo": "Memória e revisão: geração no servidor e fontes de OC/TPR da TMSA"
     },
     {
-      "hash": "077ec3854a",
+      "hash": "077ec385",
       "data": "15/10/2026",
       "titulo": "fix: geração do data book continua no servidor ao sair da tela"
     },
     {
-      "hash": "5cbb0a7841",
+      "hash": "5cbb0a78",
       "data": "15/10/2026",
       "titulo": "Memória e revisão: romaneio TMSA (FOR-081)"
     },
     {
-      "hash": "d5abfb00b6",
+      "hash": "d5abfb00",
       "data": "15/10/2026",
       "titulo": "feat: romaneio no modelo da TMSA (FOR-081), em Excel e PDF"
     },
     {
-      "hash": "4cdba3f055",
+      "hash": "4cdba3f0",
       "data": "15/10/2026",
       "titulo": "Revisão: itens comprados na aba Produção"
     },
     {
-      "hash": "b3a1a27f38",
+      "hash": "b3a1a27f",
       "data": "15/10/2026",
       "titulo": "fix: aba Produção da OP sem parafusos e grades de piso"
     },
     {
-      "hash": "39fa2e0c0a",
+      "hash": "39fa2e0c",
       "data": "15/10/2026",
       "titulo": "Revisão: % de diluição no PLP"
     },
     {
-      "hash": "b5f51b46d1",
+      "hash": "b5f51b46",
       "data": "15/10/2026",
       "titulo": "fix: % de diluição no editor do PLP"
     },
     {
-      "hash": "aafe0a116e",
+      "hash": "aafe0a11",
       "data": "15/10/2026",
       "titulo": "Memória e revisão: esquema de pintura por estrutura"
     },
     {
-      "hash": "de32fe5b54",
+      "hash": "de32fe5b",
       "data": "15/10/2026",
       "titulo": "feat: esquema de pintura por estrutura (primer + acabamento da sua cor)"
     },
     {
-      "hash": "03494799db",
+      "hash": "03494799",
       "data": "15/10/2026",
       "titulo": "Memória e revisão: folha do pintor na aba Qualidade"
     },
     {
-      "hash": "d18c3920c5",
+      "hash": "d18c3920",
       "data": "15/10/2026",
       "titulo": "feat: folha do pintor na aba Qualidade da OP"
     },
     {
-      "hash": "375d41ccab",
+      "hash": "375d41cc",
       "data": "15/10/2026",
       "titulo": "Memória: MJ da OP-112 anexada na §09"
     },
     {
-      "hash": "ac981379d6",
+      "hash": "ac981379",
       "data": "15/10/2026",
       "titulo": "Revisão: PDF dos recebimentos de estoque"
     },
     {
-      "hash": "712279521f",
+      "hash": "71227952",
       "data": "15/10/2026",
       "titulo": "fix: PDF dos recebimentos de estoque no data book (Arquivo inválido)"
     },
     {
-      "hash": "b6b6fd1c11",
+      "hash": "b6b6fd1c",
       "data": "14/10/2026",
       "titulo": "Projeto: app Torg Engenharia (prompt → Tekla), fase F0"
     },
     {
-      "hash": "f67a6c8c2a",
+      "hash": "f67a6c8c",
       "data": "14/10/2026",
       "titulo": "Pedido no Omie: quantidade em peças junto do KG nas Informações Adicionais"
     },
     {
-      "hash": "cf40b8fb99",
+      "hash": "cf40b8fb",
       "data": "14/10/2026",
       "titulo": "Memória e revisão: certificados de LP na §06"
     },
     {
-      "hash": "4c2cd9913b",
+      "hash": "4c2cd991",
       "data": "14/10/2026",
       "titulo": "feat: certificados do penetrante/revelador entram sozinhos na §06"
     },
     {
-      "hash": "66e8237672",
+      "hash": "66e82376",
       "data": "14/10/2026",
       "titulo": "Revisão: penetrante no RRP e RRM único da OP-102"
     },
     {
-      "hash": "e1a70447d5",
+      "hash": "e1a70447",
       "data": "14/10/2026",
       "titulo": "feat: recebimento de aço aceita até 60 certificados"
-    },
-    {
-      "hash": "f56fbc5bfc",
-      "data": "14/10/2026",
-      "titulo": "fix: penetrante do CMR não aparecia no recebimento (METAL-CHEK VP 30)"
     }
   ]
 }

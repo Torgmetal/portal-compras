@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Loader2, Layers, FileDown, Play, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { Loader2, Layers, FileDown, Download, Play, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
 
 // ─── O DATA BOOK COMO CONJUNTO DE VOLUMES ─────────────────────────────────────
 // Vitor (22/08/2026): "pode ser que teremos data books com até 10 mil páginas".
@@ -111,7 +111,7 @@ export default function Volumes({ id }) {
   const segundos = usarSegundosDaEtapa(g?.etapa || "", rodando);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+    <div id="volumes" className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4 scroll-mt-24">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
           <h2 className="text-sm font-bold text-torg-dark flex items-center gap-2">
@@ -188,6 +188,11 @@ export default function Volumes({ id }) {
                 <a href={`/api/qualidade/data-books/${id}/volume/${v.volume}?inline=1`} target="_blank" rel="noreferrer"
                   className="text-[11px] font-semibold text-torg-blue border border-torg-blue-300 rounded-lg px-2.5 py-1 hover:bg-torg-blue-50 inline-flex items-center gap-1 shrink-0">
                   <FileDown size={12} /> Abrir
+                </a>
+                {/* Geraldo (15/10/2026, OP-094): acima de 300 anexos o "Baixar PDF" do topo some e só havia "Abrir" */}
+                <a href={`/api/qualidade/data-books/${id}/volume/${v.volume}`} download
+                  className="text-[11px] font-semibold text-white bg-torg-blue rounded-lg px-2.5 py-1 hover:bg-torg-dark inline-flex items-center gap-1 shrink-0">
+                  <Download size={12} /> Baixar
                 </a>
               </div>
             ))}
