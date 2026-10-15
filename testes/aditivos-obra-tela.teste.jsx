@@ -3,6 +3,9 @@
 import React from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+// o card do aditivo tem Editar/Excluir (AcoesAditivo), que avisa pelo toast da store
+vi.mock("@/lib/store", () => ({ useStore: () => ({ showToast: vi.fn() }) }));
+vi.mock("next/link", () => ({ default: ({ href, children, ...p }) => React.createElement("a", { href, ...p }, children) }));
 import AditivosObra from "@/components/comercial/AditivosObra";
 
 afterEach(() => cleanup());
@@ -38,4 +41,17 @@ it("sem aditivo: diz que não há e oferece criar para quem pode", () => {
   render(<AditivosObra op={{ aditivos: [], referencias: [] }} podeGerenciar onNovo={() => {}} />);
   expect(screen.getByText(/Nenhum aditivo nesta obra/)).toBeTruthy();
   expect(screen.getByText("Novo aditivo")).toBeTruthy();
+});
+
+// Matheus (15/10/2026, OP-105): "não tem a opção de editar e nem a opção de excluir". Editar vale
+// também para o divulgado (Vitor); excluir só aparece no rascunho.
+it("Editar em todo aditivo; Excluir só no rascunho; nada disso para quem não gerencia", () => {
+  const rascunho = { ...op.aditivos[0], id: "ad2", numero: 2, status: "RASCUNHO", divulgadoEm: null, aceites: [] };
+  const { unmount } = render(<AditivosObra op={{ ...op, id: "op105", aditivos: [op.aditivos[0], rascunho] }} podeGerenciar onDivulgar={() => {}} />);
+  const editar = screen.getAllByText("Editar").map((e) => e.closest("a").getAttribute("href"));
+  expect(editar).toEqual(["/comercial/op105/aditivo/ad1/editar", "/comercial/op105/aditivo/ad2/editar"]);
+  expect(screen.getAllByText("Excluir")).toHaveLength(1);
+  unmount();
+  render(<AditivosObra op={{ ...op, id: "op105" }} />);
+  expect(screen.queryByText("Editar")).toBeNull();
 });

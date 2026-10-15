@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { receitasDoAditivo } from "@/lib/receita-aditivo";
+import { cabecalhoAditivo } from "@/lib/aditivo-esquema";
 import { salvarReferencias, termosDaOP } from "@/lib/referencias-op";
 import { rotuloDoPapel } from "@/lib/referencias-cliente";
 import { prisma } from "@/lib/prisma";
@@ -23,45 +24,9 @@ const itemSchema = z.object({
   observacao: z.string().optional().nullable(),
 });
 
-// A receita digitada à mão na abertura do aditivo (lib/receita-aditivo → linhasParaEnvio).
-// Vitor (17/09/2026): "para o caso de ter que digitar na mão precisamos de algumas coisas,
-// informar o peso, unitário e a descrição".
-const receitaSchema = z.object({
-  categoria: z.string().min(1).max(40),
-  descricao: z.string().trim().min(1).max(200),
-  tipoPreco: z.enum(["VALOR", "POR_UNIDADE"]),
-  unidade: z.string().trim().max(20).optional().nullable(),
-  quantidade: z.number().min(0).optional().nullable(),
-  valorUnitario: z.number().min(0).optional().nullable(),
-  valor: z.number().min(0),
-});
-
 const schema = z.object({
-  descricao: z.string().min(1),
+  ...cabecalhoAditivo,
   itens: z.array(itemSchema).min(1),
-  // Aditivo tem prazo e orçamento PRÓPRIOS — Vitor (19/08): "quando criamos um aditivo precisa ser
-  // divulgado a todos os setores as informações desse aditivo… importar proposta e planilha de
-  // estudo… importante ter data de início e fim também".
-  dataInicio: z.string().nullable().optional(),
-  dataFimPrevista: z.string().nullable().optional(),
-  orcamentoPasta: z.string().nullable().optional(),
-  orcamentoRef: z.string().nullable().optional(),
-  propostas: z.any().nullable().optional(),
-  estudoArquivo: z.any().nullable().optional(),
-  estudoDados: z.any().nullable().optional(),
-  // ⚠⚠ ADITIVO É UM PEDIDO NOVO DO CLIENTE (Vitor, 16/09/2026): a OC/AF/PC dele, com itens e TAGs, nas
-  // palavras do cliente (lib/referencias-cliente), e um valor contratado próprio.
-  pedido: z.object({
-    codigo: z.string().trim().max(120).optional().nullable(),
-    descricao: z.string().trim().max(300).optional().nullable(),
-    valor: z.union([z.number(), z.string()]).optional().nullable(),
-    data: z.string().optional().nullable(),
-    revisao: z.string().trim().max(40).optional().nullable(),
-    itens: z.union([z.array(z.any()), z.string()]).optional().nullable(),
-    tags: z.union([z.array(z.any()), z.string()]).optional().nullable(),
-  }).optional().nullable(),
-  receitas: z.array(receitaSchema).max(50).optional().nullable(),
-  valor: z.number().min(0).optional().nullable(),
 });
 
 export async function POST(req, { params }) {

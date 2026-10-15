@@ -6,11 +6,13 @@ import { ArrowLeft, Plus, Loader2, AlertCircle, Hash, Coins, ShoppingCart, Calen
 import CampoData from "@/components/CampoData";
 import ItemFormRow, { novoItem } from "@/components/ItemFormRow";
 import OrcamentoComercial from "@/components/OrcamentoComercial";
-import ReferenciasClienteEditor, { pedidoVazio } from "@/components/comercial/ReferenciasClienteEditor";
+import ReferenciasClienteEditor, { pedidoVazio, arvoreParaEditor } from "@/components/comercial/ReferenciasClienteEditor";
 import ReceitasAditivoEditor from "@/components/comercial/ReceitasAditivoEditor";
 import { itensDaPlanilhaComercial } from "@/lib/op-categorias";
 import { linhaReceitaVazia, linhasDaPlanilha, linhasParaEnvio, totalDasLinhas } from "@/lib/receita-aditivo";
 import { numeroBR } from "@/lib/numero-br";
+import { agruparReferencias } from "@/lib/referencias-cliente";
+import { receitasParaEditor } from "@/lib/aditivo-edicao";
 import { fmtOP } from "@/lib/utils";
 
 // A abertura do aditivo em PÁGINA, em blocos, na ordem em que o Comercial pensa nele: o pedido do
@@ -39,15 +41,31 @@ function Bloco({ n, icone: Icone, titulo, ajuda, children }) {
   );
 }
 
-export default function NovoAditivoClient({ op, proximoNumero }) {
+// o aditivo gravado no formato dos campos da tela (edição — `aditivo` vem de ../[aditivoId]/editar)
+const dia = (d) => (d ? String(d).slice(0, 10) : "");
+function inicialDe(ad) {
+  if (!ad) return null;
+  const receitas = receitasParaEditor(ad.receitas);
+  return {
+    pedido: arvoreParaEditor(agruparReferencias(ad.referencias)).pedidos[0] || pedidoVazio(),
+    receitas: receitas.length ? receitas : [linhaReceitaVazia()],
+    prazo: { inicio: dia(ad.dataInicio), fim: dia(ad.dataFimPrevista) },
+    descricao: ad.descricao || "",
+    orc: { pasta: ad.orcamentoPasta, ref: ad.orcamentoRef, propostas: ad.propostas || [], estudo: ad.estudoArquivo, dados: ad.estudoDados },
+  };
+}
+
+export default function NovoAditivoClient({ op, proximoNumero, aditivo = null }) {
   const router = useRouter();
+  const ini = inicialDe(aditivo);
+  const editando = Boolean(aditivo);
   const [termos, setTermos] = useState(null);
-  const [pedido, setPedido] = useState(pedidoVazio());
-  const [receitas, setReceitas] = useState([linhaReceitaVazia()]);
+  const [pedido, setPedido] = useState(ini?.pedido || pedidoVazio());
+  const [receitas, setReceitas] = useState(ini?.receitas || [linhaReceitaVazia()]);
   const [itens, setItens] = useState([novoItem()]);
-  const [prazo, setPrazo] = useState({ inicio: "", fim: "" });
-  const [descricao, setDescricao] = useState("");
-  const [orc, setOrc] = useState({ pasta: null, ref: null, propostas: [], estudo: null, dados: null });
+  const [prazo, setPrazo] = useState(ini?.prazo || { inicio: "", fim: "" });
+  const [descricao, setDescricao] = useState(ini?.descricao || "");
+  const [orc, setOrc] = useState(ini?.orc || { pasta: null, ref: null, propostas: [], estudo: null, dados: null });
   const [mostrarOrc, setMostrarOrc] = useState(false);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -80,15 +98,16 @@ export default function NovoAditivoClient({ op, proximoNumero }) {
     const itensValidos = itens.filter((it) => String(it.descricao || "").trim());
     if (!receitasEnvio.length && !orc.dados && !(valorPedido > 0)) return setErro("Informe a receita do aditivo (descrição, peso e unitário) — ou, no mínimo, o valor do pedido do cliente.");
     if (!descricao.trim()) return setErro("Descreva o que muda com este aditivo — é o texto que vai aos setores no comunicado.");
-    if (!itensValidos.length) return setErro("Informe ao menos um item de verba de compras (pode ser uma linha só, com o total).");
+    if (!editando && !itensValidos.length) return setErro("Informe ao menos um item de verba de compras (pode ser uma linha só, com o total).");
     setSalvando(true);
     try {
-      const res = await fetch(`/api/comercial/op/${op.id}/aditivo`, {
-        method: "POST",
+      const res = await fetch(editando ? `/api/comercial/aditivo/${aditivo.id}` : `/api/comercial/op/${op.id}/aditivo`, {
+        method: editando ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           descricao: descricao.trim(),
-          itens: itensValidos.map((it) => ({ ...it, qtdContratada: Number(it.qtdContratada) || null, meses: Number(it.meses) || null, valorPorMes: Number(it.valorPorMes) || null, valorVerba: Number(it.valorVerba) || 0 })),
+          // ⚠ na edição a verba não vai: os itens se editam na aba Resumo (têm RM e verba penduradas)
+          itens: editando ? undefined : itensValidos.map((it) => ({ ...it, qtdContratada: Number(it.qtdContratada) || null, meses: Number(it.meses) || null, valorPorMes: Number(it.valorPorMes) || null, valorVerba: Number(it.valorVerba) || 0 })),
           dataInicio: prazo.inicio || null,
           dataFimPrevista: prazo.fim || null,
           orcamentoPasta: orc.pasta, orcamentoRef: orc.ref, propostas: orc.propostas, estudoArquivo: orc.estudo, estudoDados: orc.dados,
@@ -98,7 +117,7 @@ export default function NovoAditivoClient({ op, proximoNumero }) {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Não foi possível criar o aditivo.");
+      if (!res.ok) throw new Error(data.error || (editando ? "Não foi possível salvar o aditivo." : "Não foi possível criar o aditivo."));
       router.push(`/comercial/${op.id}?vista=obra#aditivo-${data.numero}`);
       router.refresh();
     } catch (e) {
@@ -115,6 +134,12 @@ export default function NovoAditivoClient({ op, proximoNumero }) {
           <span className="inline-flex items-center rounded-lg bg-orange-100 text-[#c2610f] font-black text-xl px-3 py-1 border border-orange-200">ADITIVO {proximoNumero}</span>
           <h2 className="text-2xl font-extrabold text-torg-dark tracking-tight">{fmtOP(op.numero)} · {op.cliente}</h2>
         </div>
+        {editando && aditivo.status !== "RASCUNHO" && (
+          <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-lg px-3 py-2 flex items-start gap-2" role="status">
+            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <span>Este aditivo <b>já foi divulgado aos setores</b>. Quem confirmou leu a versão anterior: depois de salvar, use <b>Reenviar comunicado</b> no card do aditivo.</span>
+          </div>
+        )}
         <p className="text-sm text-torg-gray mt-1">{op.obra}{op.refCliente ? ` · ${op.refCliente}` : ""}. O aditivo é um pedido novo do cliente dentro desta obra: tem receita, verba e medição próprias, e é comunicado aos setores depois de criado.</p>
       </div>
 
@@ -132,6 +157,11 @@ export default function NovoAditivoClient({ op, proximoNumero }) {
         <ReceitasAditivoEditor linhas={receitas} onChange={setReceitas} valorPedido={valorPedido} />
       </Bloco>
 
+      {editando ? (
+        <Bloco n={3} icone={ShoppingCart} titulo="Verba de compras" ajuda="Os itens de verba se editam na aba Resumo da obra — eles podem ter RM e solicitação de verba ligadas.">
+          <Link href={`/comercial/${op.id}?vista=resumo`} className="text-sm text-torg-blue font-medium hover:underline">Abrir a aba Resumo</Link>
+        </Bloco>
+      ) : (
       <Bloco n={3} icone={ShoppingCart} titulo="Verba de compras" ajuda="O que o Compras pode gastar neste aditivo, por categoria — não é a receita. Vai para a aba Resumo, junto com a verba da obra.">
         <div className="flex items-center justify-end gap-3 flex-wrap">
           <button type="button" onClick={() => setItens((p) => [...p, novoItem("MATERIA_PRIMA")])} className="text-xs text-torg-blue hover:text-torg-dark font-medium inline-flex items-center gap-1"><Plus size={12} /> Material</button>
@@ -145,6 +175,7 @@ export default function NovoAditivoClient({ op, proximoNumero }) {
         </div>
         <p className="text-right text-sm text-torg-gray">Total da verba do aditivo: <span className="font-bold text-torg-orange-700 tabular-nums">{fmtMoeda(totalVerba)}</span></p>
       </Bloco>
+      )}
 
       <Bloco n={4} icone={CalendarRange} titulo="Prazo e comunicado aos setores" ajuda="O que muda com este aditivo, do jeito que a fábrica precisa ler. É o texto do comunicado (PDF + aceite) que vai a todos os setores.">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
@@ -177,12 +208,12 @@ export default function NovoAditivoClient({ op, proximoNumero }) {
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-4 flex-wrap">
           <div className="text-sm text-torg-gray flex gap-4 flex-wrap">
             <span>Receita <b className="text-torg-dark tabular-nums">{fmtMoeda(totalReceita)}</b></span>
-            <span>Verba <b className="text-torg-orange-700 tabular-nums">{fmtMoeda(totalVerba)}</b></span>
+            {!editando && <span>Verba <b className="text-torg-orange-700 tabular-nums">{fmtMoeda(totalVerba)}</b></span>}
           </div>
           <div className="flex gap-3">
             <Link href={voltar} className="px-4 py-2 text-torg-gray border border-gray-300 rounded-lg hover:bg-gray-100 text-sm">Cancelar</Link>
             <button type="button" onClick={submit} disabled={salvando} className="px-5 py-2 bg-[#F4801F] text-white rounded-lg hover:bg-[#dd7119] text-sm font-semibold flex items-center gap-2 disabled:opacity-50">
-              {salvando && <Loader2 size={14} className="animate-spin" />} Criar aditivo {proximoNumero}
+              {salvando && <Loader2 size={14} className="animate-spin" />} {editando ? "Salvar aditivo" : "Criar aditivo"} {proximoNumero}
             </button>
           </div>
         </div>

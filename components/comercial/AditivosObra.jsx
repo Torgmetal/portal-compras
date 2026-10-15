@@ -1,6 +1,7 @@
 "use client";
 import { FilePlus2, Rocket, Plus, Users, CalendarRange, Hash, Coins } from "lucide-react";
 import ReferenciasClienteResumo from "./ReferenciasClienteResumo";
+import AcoesAditivo from "./AcoesAditivo";
 import { agruparReferencias } from "@/lib/referencias-cliente";
 
 // Os aditivos da obra, na aba Obra, com cara de aditivo. Vitor (17/09/2026): "os usuários estão
@@ -20,7 +21,7 @@ const STATUS = {
   ENCERRADO: { rotulo: "Encerrado", cls: "bg-gray-100 text-gray-600 border-gray-200" },
 };
 
-export default function AditivosObra({ op, podeGerenciar = false, encerrada = false, onNovo, onDivulgar }) {
+export default function AditivosObra({ op, podeGerenciar = false, encerrada = false, onNovo, onDivulgar, onAtualizar }) {
   const aditivos = op?.aditivos || [];
   const refs = op?.referencias || [];
   return (
@@ -100,13 +101,14 @@ export default function AditivosObra({ op, podeGerenciar = false, encerrada = fa
                   </div>
                 )}
 
-                {podeGerenciar && !encerrada && onDivulgar && (
-                  <div className="flex justify-end">
-                    <button onClick={() => onDivulgar({ id: ad.id, numero: ad.numero })}
+                {podeGerenciar && !encerrada && (
+                  <div className="flex justify-end gap-2 flex-wrap">
+                    <AcoesAditivo opId={op.id} aditivo={ad} onExcluido={onAtualizar} />
+                    {onDivulgar && <button onClick={() => onDivulgar({ id: ad.id, numero: ad.numero })}
                       className={`px-3 py-1.5 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 ${ad.status === "RASCUNHO" ? "bg-[#F4801F] text-white hover:bg-[#dd7119]" : "bg-white border border-orange-200 text-[#c2610f] hover:bg-orange-50"}`}
                       title="Manda o comunicado do aditivo (PDF + aceite) aos setores">
                       <Rocket size={14} /> {ad.status === "RASCUNHO" ? "Divulgar aos setores" : "Reenviar comunicado"}
-                    </button>
+                    </button>}
                   </div>
                 )}
               </article>

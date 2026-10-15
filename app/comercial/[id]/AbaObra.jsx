@@ -39,7 +39,7 @@ export default function AbaObra({ op, podeEditar, onEditar, onAtualizar, onNovoA
     <div className="space-y-4">
       {/* Aditivos primeiro, com cara de aditivo — Vitor (17/09/2026): "de uma forma evidente" */}
       {(op.aditivos?.length > 0 || podeEditar) && (
-        <AditivosObra op={op} podeGerenciar={podeEditar} encerrada={encerrada} onNovo={onNovoAditivo} onDivulgar={onDivulgarAditivo} />
+        <AditivosObra op={op} podeGerenciar={podeEditar} encerrada={encerrada} onNovo={onNovoAditivo} onDivulgar={onDivulgarAditivo} onAtualizar={onAtualizar} />
       )}
       <section className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden" aria-label="Contatos do cliente">
         <div className="px-5 py-4 flex items-center justify-between gap-3 flex-wrap">

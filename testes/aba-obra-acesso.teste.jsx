@@ -2,6 +2,9 @@
 import React from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+// o card do aditivo tem Editar/Excluir (AcoesAditivo), que avisa pelo toast da store
+vi.mock("@/lib/store", () => ({ useStore: () => ({ showToast: vi.fn() }) }));
+vi.mock("next/link", () => ({ default: ({ href, children, ...p }) => React.createElement("a", { href, ...p }, children) }));
 import AbaObra from "@/app/comercial/[id]/AbaObra";
 
 beforeEach(() => {

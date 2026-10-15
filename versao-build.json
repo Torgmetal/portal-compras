@@ -1,7 +1,12 @@
 {
-  "build": 3651,
-  "gerado": "2026-10-15T19:53:54.769Z",
+  "build": 3652,
+  "gerado": "2026-10-15T20:48:50.885Z",
   "commits": [
+    {
+      "hash": "23088e06",
+      "data": "15/10/2026",
+      "titulo": "Memória e revisão: OC/TPR pelas ETCs"
+    },
     {
       "hash": "b25a17e1",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "4aa8126a",
       "data": "14/10/2026",
       "titulo": "Memória e revisão: memorial na §03 e mapa de juntas pendente"
-    },
-    {
-      "hash": "b9b413b3",
-      "data": "14/10/2026",
-      "titulo": "feat: memorial de cálculo na §03 do data book, com nome que acompanha"
     }
   ]
 }
