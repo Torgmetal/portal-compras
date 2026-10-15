@@ -1,7 +1,12 @@
 {
-  "build": 3648,
-  "gerado": "2026-10-15T19:44:36.924Z",
+  "build": 3649,
+  "gerado": "2026-10-15T19:45:12.071Z",
   "commits": [
+    {
+      "hash": "077ec385",
+      "data": "15/10/2026",
+      "titulo": "fix: geração do data book continua no servidor ao sair da tela"
+    },
     {
       "hash": "5cbb0a78",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "d3d6f6e4",
       "data": "14/10/2026",
       "titulo": "feat: data do recebimento escolhida na criação (retroativa)"
-    },
-    {
-      "hash": "37967b17",
-      "data": "14/10/2026",
-      "titulo": "Revisão: tempo medido do cálculo de arame no cron"
     }
   ]
 }

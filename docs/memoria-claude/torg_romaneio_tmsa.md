@@ -26,3 +26,10 @@ O simulador grava `itens: [{marca, qtd}]` por volume. Simulação antiga só val
 ⚠ **Dado que falta (15/10/2026):** nenhuma OP da TMSA tem as Referências (TPR, OC→TAG) cadastradas. Só a OP-105 tem
 TAG por peça (1.663). A OP-105 tem 2 OCs no `refCliente` (233707-1, 233708-1), sem dizer qual TAG é de qual. Quem
 cadastra é o Comercial. A simulação da OP-105 R2 tem 12 volumes com várias marcas: precisa simular de novo.
+
+**15/10/2026 (fim do dia), TPR e OC estão nos documentos da TMSA na pasta da obra:** cada OC tem a sua **ETC** (FOR-1155)
+em `2. Engenharia/2.1 Projetos Orçados/OC<nº>_…/ETC-00846-xx*.xls`, com `Pos | Descrição | Qtd | Desenho | TAG | …` e
+"Nº TPR: TPR00846". O nome da pasta da OP também traz o TPR ("OP-105 - TMSA - TPR 846 - Bianchini"). Na OP-105, a
+TC 4708 está em DUAS OCs (228631 = quadro do vazador 72118932-1; 228630 = longarinas e apoios), por isso a regra é
+TAG + desenho. As OCs R1 (234182 e 234172) repetem as ETC-31/32: **vale a OC original** (233707/233708), decisão do
+Vitor. PENDENTE: o leitor de ETCs no romaneio (aprovado, ainda não feito).

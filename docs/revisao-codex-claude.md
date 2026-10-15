@@ -2889,3 +2889,10 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   7/0 fixas): planilha que não for esta pode sair diferente; (b) a TAG é distribuída pela ordem das unidades entre
   os volumes, e a simulação não sabe QUAL unidade foi em cada pacote; (c) o FOR-081 da revisão não ganha aba de
   histórico, porque o layout é do cliente; (d) `ehObraTmsa` é um regex /\bTMSA\b/ em `OP.cliente`.
+- **`077ec385` — geração do data book no servidor:** a OP-094 "não gerava" porque a tela, que tocava volume a volume,
+  trocou de página no volume 2, e o cron só recolhe na hora cheia + 15. Agora `/gerar/servidor` (sessão ou
+  CRON_SECRET) usa `tocarNoServidor`: monta volumes até 180 s e se relança com `fetch` + `AbortSignal.timeout(3000)`.
+  A tela só dispara e acompanha. Terminei a geração parada da OP-094 rodando `processarGeracao` (4 volumes, 663
+  páginas). Testes: 3 + rota 3 + tela 2 reescritos. ⚠ Para revisar: (a) o relançamento depende de a Vercel manter
+  a função nova rodando depois que quem chamou abortou; se não mantiver, o cron das :15 continua sendo a rede;
+  (b) a rota `/gerar/continuar` ficou sem chamador na tela, mas continua existindo.
