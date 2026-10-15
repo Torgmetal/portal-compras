@@ -1,7 +1,12 @@
 {
-  "build": 3639,
-  "gerado": "2026-10-15T17:35:34.436Z",
+  "build": 3640,
+  "gerado": "2026-10-15T17:49:41.317Z",
   "commits": [
+    {
+      "hash": "03494799",
+      "data": "15/10/2026",
+      "titulo": "Memória e revisão: folha do pintor na aba Qualidade"
+    },
     {
       "hash": "d18c3920",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "574ae46d",
       "data": "07/10/2026",
       "titulo": "Memória e revisão: recebimentos pelos certificados do CMR (RRT sem peças, RRP e RRA)"
-    },
-    {
-      "hash": "046a4954",
-      "data": "07/10/2026",
-      "titulo": "Recebimentos pelos certificados do CMR: tintas sem peças, e os novos de penetrante (RRP) e de arame de solda (RRA)"
     }
   ]
 }

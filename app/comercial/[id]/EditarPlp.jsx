@@ -5,6 +5,7 @@ import { Loader2, Check, X, Plus, Trash2, AlertCircle, Pencil, Upload, Sparkles 
 import { METODOS_PREPARO, PLP_PADRAO, descreverSistema } from "@/lib/plp";
 import { GRAUS_LIMPEZA, METODOS_APLICACAO, grauNaNorma } from "@/lib/pintura-campos";
 import { numeroBR } from "@/lib/numero-br";
+import EsquemaPrevia from "./EsquemaPrevia";
 
 // ─── CORRIGIR O PLANO DE PINTURA DA OBRA ──────────────────────────────────────
 // Vitor (27/08/2026): "na parte do plano de pintura preciso que no botão de editar você me permita
@@ -617,6 +618,12 @@ export default function EditarPlp({ opNumero, aoSalvar }) {
         <button onClick={() => setF((x) => ({ ...x, itens: [...x.itens, { item: "", sistema: sistemas[0] || "1", cor: "", obs: "", interno: false, externo: true }] }))}
           className="text-[11px] text-torg-blue hover:underline inline-flex items-center gap-1"><Plus size={11} /> item</button>
       </Secao>
+
+      {/* ⚠⚠ O QUE CADA ESTRUTURA RECEBE (Vitor, 15/10/2026): "a tinta amarela recebe o primer e depois o acabamento
+          amarelo, assim como a azul — no PLP isso não está claro". Demãos de mesmo número são alternativas e a cor
+          do item escolhe (lib/plp-esquema.js). A prévia mostra a leitura; os avisos dizem o que não fecha — é o
+          mesmo que trava a folha do pintor. */}
+      <EsquemaPrevia plano={f} />
 
       {/* sugestões que se alimentam do que já foi preenchido — nada é imposto, tudo aceita texto livre */}
       <datalist id="cores-plp">{cores.map((c) => <option key={c} value={c} />)}</datalist>
