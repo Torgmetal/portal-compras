@@ -14,7 +14,8 @@ import { cadernoDePintura } from "@/lib/pintura-lote";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ROLES = ["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO", "QUALIDADE"];
+// ⚠ COMERCIAL (15/10/2026): a folha do pintor também sai da aba Qualidade da OP, que é tela do Comercial
+const ROLES = ["ADMIN", "PCP", "PLANEJAMENTO", "PRODUCAO", "QUALIDADE", "COMERCIAL"];
 
 export async function GET(req) {
   try { await requireRole(ROLES); }

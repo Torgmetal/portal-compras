@@ -9,6 +9,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 vi.mock("@/components/comercial/PitCompacto", () => ({ default: () => <div>PIT</div> }));
 vi.mock("@/app/comercial/[id]/AceitePlano", () => ({ default: () => <div>ACEITE DO PLANO</div> }));
 vi.mock("@/app/comercial/[id]/EditarPlp", () => ({ default: () => <button>Editar PLP</button> }));
+vi.mock("@/lib/store", () => ({ useStore: () => ({ showToast: vi.fn() }) }));
 
 import AbaQualidade from "@/app/comercial/[id]/AbaQualidade";
 
@@ -47,5 +48,11 @@ describe("Aba Qualidade da OP — PLP para quem só consulta", () => {
     expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/api/qualidade/inspecoes?opNumero=094"));
     expect(screen.queryByRole("button", { name: /editar plp/i })).toBeNull();
     expect(screen.queryByText("ACEITE DO PLANO")).toBeNull();
+  });
+
+  // Vitor (15/10/2026): o caderno de pintura também pela aba Qualidade — só a folha do pintor
+  it("tem o botão da folha do pintor, também para quem só consulta", async () => {
+    render(<AbaQualidade opNumero="124" soConsulta verRelatorios={false} />);
+    expect(await screen.findByRole("button", { name: /folha do pintor/i })).toBeTruthy();
   });
 });

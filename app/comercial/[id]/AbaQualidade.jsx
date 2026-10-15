@@ -6,6 +6,7 @@ import { TIPO_LABEL, TIPOS_RELATORIO } from "@/lib/qualidade-campo";
 import PitCompacto from "@/components/comercial/PitCompacto";
 import AceitePlano from "./AceitePlano";
 import EditarPlp from "./EditarPlp";
+import { useStore } from "@/lib/store";
 
 // ─── OS RELATÓRIOS DE INSPEÇÃO DESTA OBRA ─────────────────────────────────────
 // Vitor (22/08/2026): "relatórios aprovados deverão ser guardados na aba de qualidade
@@ -61,6 +62,8 @@ export default function AbaQualidade({ opNumero, soConsulta = false, verRelatori
           {/* ⚠ EDITA AQUI MESMO. Era um link para a fila de inspeções — quem clicava caía numa
               lista de relatórios de todas as obras e voltava sem editar nada. (Vitor, 27/08/2026) */}
           {!soConsulta && <EditarPlp opNumero={opNumero} />}
+          {/* ⚠ só a folha do PINTOR (Vitor, 15/10/2026): quantidade e qual tinta usar continuam na Produção */}
+          <FolhaDoPintor opNumero={opNumero} />
         </div>
         {!soConsulta && <AceitePlano opNumero={opNumero} doc="PLP" nome="o PLP" />}
       </div>
@@ -142,5 +145,25 @@ function Relatorios({ dados, erro }) {
         fora do portal.
       </p>
     </>
+  );
+}
+
+// a folha do pintor da OP inteira, com diluente, espessura úmida, secagem e cor por estrutura
+function FolhaDoPintor({ opNumero }) {
+  const { showToast } = useStore();
+  const [gerando, setGerando] = useState(false);
+  async function gerar() {
+    setGerando(true);
+    try {
+      const { baixarFolhaDoPintor } = await import("@/lib/pintura-excel-cliente");
+      await baixarFolhaDoPintor(opNumero);
+    } catch (e) { showToast(e.message || "Não consegui gerar a folha do pintor.", "error"); }
+    finally { setGerando(false); }
+  }
+  return (
+    <button type="button" onClick={gerar} disabled={gerando} title="Diluente, espessura úmida e secagem de cada demão, em Excel"
+      className="text-[12px] font-semibold text-torg-blue border border-torg-blue/40 rounded-lg px-3 py-1.5 hover:bg-torg-blue/5 inline-flex items-center gap-1.5 disabled:opacity-50">
+      {gerando ? <Loader2 size={13} className="animate-spin" /> : <Paintbrush size={13} />} Folha do pintor (Excel)
+    </button>
   );
 }
