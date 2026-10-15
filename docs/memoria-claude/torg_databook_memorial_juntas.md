@@ -17,7 +17,14 @@ e o **mapa de juntas** (gerado pela API do Tekla — Vitor vai trazer a lista).
 - A §03 navega em `2. Engenharia/2.2 Memória de Calculo` e, opcional, `2.5 Projetos/2.5.5 Cliente/Memorial de
   Cálculo e ART` (casa pelo CÓDIGO da pasta). Conferido no SharePoint: OP-112 e OP-102 têm as duas; a OP-105 só a 2.2.
 
-**Mapa de juntas:** já existe a **§09 "Mapa de soldagem"**, que hoje só navega em `Qualidade/Mapa de Juntas`.
-PENDENTE: o formato da lista da API do Tekla, para o portal montar o mapa.
+**Mapa de juntas:** já existe a **§09 "Mapa de soldagem"**, que navega em `8. Qualidade/Mapa de Juntas`. A MJ sai do
+**ListasTORG** (sessão do Tekla, Windows) em xlsx + pdf, com duas abas: "Juntas por conjunto" (desenho, qtd, peças,
+soldas, emendas, EPS, soldador/sinete, consumível R, data, EVS, LP) e "Emendas de topo" (junta J-nnn ou "A EMENDAR",
+peças A/B, perfil, material, espessura, chanfro, EPS, ensaios do PIT, soldador, data, EVS, LP, US/RX). Soldador e
+consumível vêm de `apontamentos*.csv` (marca;soldador;data;consumivel).
+- **OP-112 (15/10/2026):** T112-MJ-R00 (121 marcas, 36 emendas "A EMENDAR"). O ProjectNumber do modelo era **T78**
+  (sobra do modelo de origem); foi trocado para T112 com o ok do Vitor e a MJ gravada na pasta da obra. Anexei o PDF
+  na §09 pela rota `navegar` (NA → ANEXADO).
+- PRÓXIMO, se o Vitor quiser: o portal preencher EVS/LP/US/RX da MJ a partir dos relatórios assinados.
 
 Relacionado: [[torg_databook_relatorio_assinado]], [[torg_tekla_tmsa_vale]].

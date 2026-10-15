@@ -1,7 +1,12 @@
 {
-  "build": 3636,
-  "gerado": "2026-10-15T11:23:19.339Z",
+  "build": 3637,
+  "gerado": "2026-10-15T16:30:11.934Z",
   "commits": [
+    {
+      "hash": "ac981379",
+      "data": "15/10/2026",
+      "titulo": "Revisão: PDF dos recebimentos de estoque"
+    },
     {
       "hash": "71227952",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "08dce6d6",
       "data": "06/10/2026",
       "titulo": "Memória e revisão: troca de e-mail das etapas do fluxo de assinaturas do Data Book"
-    },
-    {
-      "hash": "5e743f93",
-      "data": "06/10/2026",
-      "titulo": "Data Book: trocar o e-mail de uma etapa do fluxo de assinaturas ainda não assinada"
     }
   ]
 }
