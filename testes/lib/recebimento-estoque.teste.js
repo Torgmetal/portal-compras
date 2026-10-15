@@ -106,4 +106,15 @@ describe("sincronizar com os data books", () => {
     expect(consumiveis).not.toHaveBeenCalledWith("op067");
     expect(JSON.stringify(tiradosDe())).not.toMatch(/b067/);
   });
+
+  // ⚠⚠ 15/10/2026, data book da OP-102: RRA/RRP/RRM entraram no livro mas sem PDF ("Arquivo inválido" e "documento
+  // sem arquivo"). O documento nascia com opNumero null, e `fonteDeInspecao` RECUSA sem obra para conferir.
+  it("o documento do recebimento leva opNumero EST — e a fonte do PDF aceita", async () => {
+    const { fonteDeInspecao } = await import("@/lib/relatorio-pdf-fonte");
+    banco({ rels: [RRA()], usados: { op102: ["R261700"] } });
+    await sincronizarRecebimentosDeEstoque();
+    const dados = mockPrisma.documentoQualidade.update.mock.calls[0][0].data;
+    expect(dados.opNumero).toBe("EST");
+    expect(fonteDeInspecao(dados)).toMatchObject({ relatorioId: "rra1", exigirOp: "EST" });
+  });
 });
