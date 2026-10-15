@@ -19,7 +19,6 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 // duas vezes. Agora a tela CONSULTA o andamento durante a espera, mostra o tempo da etapa correndo,
 // e quem pega a geração em andamento noutra janela só acompanha (o servidor responde "ocupado").
 const CONSULTA_MS = 4_000;
-const ESPERA_OCUPADO_MS = 4_000;
 
 // ⚠ o tempo da etapa corre no relógio da TELA, contado de quando a etapa mudou — comparar com a
 // hora gravada pelo servidor misturaria dois relógios (ver lib/cron-trava)
@@ -55,33 +54,41 @@ export default function Volumes({ id }) {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // Um volume por chamada, até acabar. Cada volta atualiza a barra.
-  const tocar = useCallback(async () => {
+  // ⚠⚠ QUEM MONTA OS VOLUMES É O SERVIDOR (Vitor, 15/10/2026, OP-094). Antes esta tela tocava volume a volume, e trocar
+  // de página no meio parava a geração até o cron da hora cheia + 15. Agora ela DISPARA a geração no servidor
+  // (/gerar/servidor, que continua sozinho — lib/databook-geracao-servidor.js) e só ACOMPANHA o andamento. Sair da tela
+  // não interrompe nada; voltando, ela retoma o acompanhamento.
+  const acompanhar = useCallback(async (disparar) => {
     setRodando(true); setErro(""); setOutraJanela(false);
+    if (disparar) {
+      // não espera: a resposta só vem quando a rodada do servidor termina (~3 min)
+      fetch(`/api/qualidade/data-books/${id}/gerar/servidor`, { method: "POST", keepalive: true })
+        .then(async (r) => { if (!r.ok && vivo.current) { const j = await r.json().catch(() => ({})); setErro(j.error || "Falha ao gerar o volume"); } })
+        .catch(() => {});
+    }
     try {
-      for (let i = 0; i < 400 && vivo.current; i++) {
-        const r = await fetch(`/api/qualidade/data-books/${id}/gerar/continuar`, { method: "POST" });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || "Falha ao gerar o volume");
-        // ⚠ vez tomada não é erro: outra janela (ou o cron) está montando este data book
-        setOutraJanela(!!j.ocupado);
-        await carregar();
-        if (j.semJob || j.concluido) break;
-        if (j.ocupado) await esperar(ESPERA_OCUPADO_MS);
+      for (let i = 0; i < 3000 && vivo.current; i++) {
+        await esperar(CONSULTA_MS);
+        const r = await fetch(`/api/qualidade/data-books/${id}/gerar`);
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !vivo.current) continue;
+        setEstado(j);
+        const st = j?.geracao?.status;
+        if (st === "ERRO") { setErro(j.geracao.erro || "Falha ao gerar o volume"); break; }
+        if (!st || st === "CONCLUIDO" || st === "CANCELADO") break;
       }
-    } catch (e) {
-      setErro(e.message);
     } finally {
-      if (vivo.current) { setRodando(false); setOutraJanela(false); carregar(); }
+      if (vivo.current) { setRodando(false); carregar(); }
     }
   }, [id, carregar]);
+  const tocar = useCallback(() => acompanhar(true), [acompanhar]);
 
-  // durante a espera de um volume (~1 min), a barra acompanha o servidor em vez de ficar parada
+  // abriu a tela com geração em andamento (pedida noutra hora ou noutra janela): só acompanha
+  const jaAcompanhando = useRef(false);
   useEffect(() => {
-    if (!rodando) return undefined;
-    const t = setInterval(carregar, CONSULTA_MS);
-    return () => clearInterval(t);
-  }, [rodando, carregar]);
+    const st = estado?.geracao?.status;
+    if (!jaAcompanhando.current && !rodando && (st === "NA_FILA" || st === "GERANDO")) { jaAcompanhando.current = true; acompanhar(false); }
+  }, [estado, rodando, acompanhar]);
 
   const gerar = useCallback(async () => {
     setRodando(true); setErro("");
@@ -152,8 +159,10 @@ export default function Volumes({ id }) {
               Outra janela está gerando este data book — acompanhando o andamento.
             </p>
           )}
-          <p className="text-[10px] text-torg-gray mt-1">
-            Pode fechar esta página: a geração continua sozinha e termina em segundo plano.
+          {/* ⚠ agora é verdade (15/10/2026): o servidor monta os volumes sozinho — antes, sem a tela, parava até o cron */}
+          <p className="text-[11px] text-torg-dark bg-torg-blue/5 border border-torg-blue/20 rounded-lg px-2.5 py-1.5 mt-2 inline-flex items-center gap-1.5">
+            <CheckCircle2 size={12} className="text-torg-blue shrink-0" />
+            A geração continua no servidor: pode sair desta tela ou fechar o navegador. Volte depois para baixar os volumes.
           </p>
         </div>
       )}

@@ -11,38 +11,42 @@ import Volumes from "@/app/qualidade/data-books/[id]/Volumes";
 const geracao = { status: "GERANDO", etapa: "Montando o volume 03 — a partir do anexo 131 de 264", cursor: 130, totalItens: 264, paginas: 144, pendencias: [] };
 const estado = { geracao, volumes: [], totais: { paginas: 0, tamanho: 0 }, revisao: 0 };
 const json = (b, status = 200) => Promise.resolve({ ok: status < 400, status, json: async () => b });
-const ehContinuar = (url, init) => init?.method === "POST" && String(url).endsWith("/continuar");
+const ehServidor = (url, init) => init?.method === "POST" && String(url).endsWith("/gerar/servidor");
 
 beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-describe("volumes do data book na tela", () => {
-  it("outra janela com a vez: a tela não acusa erro, avisa e segue acompanhando", async () => {
-    const continuar = vi.fn()
-      .mockImplementationOnce(() => json({ ok: true, ocupado: true }))
-      .mockImplementationOnce(() => json({ ok: true, concluido: true }));
-    vi.stubGlobal("fetch", vi.fn((url, init) => (ehContinuar(url, init) ? continuar() : json(estado))));
-    render(<Volumes id="b112" />);
-    fireEvent.click(await screen.findByRole("button", { name: /Continuar/ }));
-    expect(await screen.findByText(/Outra janela está gerando/)).toBeTruthy();
-    expect(screen.queryByText(/Falha/)).toBeNull();
-    await act(async () => { vi.advanceTimersByTime(5_000); });
-    expect(continuar).toHaveBeenCalledTimes(2);
-  });
+// avança o relógio falso aos poucos, deixando as promessas da tela andarem entre um passo e outro
+async function passar(ms) { for (let t = 0; t < ms; t += 500) await act(async () => { vi.advanceTimersByTime(500); }); }
 
-  it("enquanto monta, a etapa vem do servidor e o tempo corre — a barra não parece travada", async () => {
-    let soltar;
-    const demora = new Promise((r) => { soltar = r; });
-    const f = vi.fn((url, init) => (ehContinuar(url, init) ? demora.then(() => json({ ok: true, concluido: true })) : json(estado)));
+// ⚠ 15/10/2026 (OP-094): quem monta os volumes passou a ser o SERVIDOR (/gerar/servidor, que continua sozinho). A tela
+// dispara e só acompanha — trocar de página no meio não para mais a geração.
+describe("volumes do data book na tela", () => {
+  it("abriu com geração em andamento: só acompanha (não dispara de novo), avisa que pode sair, e para quando conclui", async () => {
+    let n = 0;
+    const f = vi.fn((url, init) => (ehServidor(url, init) ? json({ ok: true }) : json(++n > 3 ? { ...estado, geracao: { ...geracao, status: "CONCLUIDO" } } : estado)));
     vi.stubGlobal("fetch", f);
     render(<Volumes id="b112" />);
-    fireEvent.click(await screen.findByRole("button", { name: /Continuar/ }));
-    await act(async () => { vi.advanceTimersByTime(12_000); });
+    expect(await screen.findByText(/continua no servidor: pode sair desta tela/)).toBeTruthy();
+    await passar(25_000);
+    expect(f.mock.calls.some(([u, i]) => ehServidor(u, i))).toBe(false);
+    expect(screen.queryByText(/continua no servidor/)).toBeNull();
+  });
+
+  it("gerar dispara o servidor UMA vez e acompanha: a etapa e o tempo correm, a barra não parece travada", async () => {
+    const parado = { ...estado, geracao: null, volumes: [{ volume: 1, paginas: 10, tamanho: 1000, url: "u" }] };
+    let pediu = false;
+    const f = vi.fn((url, init) => {
+      if (ehServidor(url, init)) return new Promise(() => {}); // a rodada do servidor demora; a tela não espera
+      if (init?.method === "POST") { pediu = true; return json({ ok: true }); }
+      return json(pediu ? estado : parado);
+    });
+    vi.stubGlobal("fetch", f);
+    render(<Volumes id="b112" />);
+    fireEvent.click(await screen.findByRole("button", { name: /Gerar de novo/ }));
+    await passar(12_000);
     expect(screen.getByText(/Montando o volume 03/)).toBeTruthy();
     expect(screen.getByText(/\b1\d s\b/)).toBeTruthy();
-    // e consulta o andamento durante a espera, não só quando o volume termina
-    const consultas = f.mock.calls.filter(([url, init]) => !init?.method && String(url).endsWith("/gerar")).length;
-    expect(consultas).toBeGreaterThan(2);
-    soltar();
+    expect(f.mock.calls.filter(([u, i]) => ehServidor(u, i))).toHaveLength(1);
   });
 });
