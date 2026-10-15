@@ -2853,3 +2853,8 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   6 + gatilho + cron. ⚠ Para revisar: (a) o título da §06 só se acerta quando a sincronização roda; tirar à mão o
   último certificado de LP deixa o título com "…líquido penetrante" até o próximo cron; (b) `relatorio-inspecao.js`
   está no teto de 350 linhas.
+- **`71227952` — PDF dos recebimentos de estoque no data book (15/10/2026):** o documento do RRA/RRP/RRM nascia com
+  `opNumero: null`, e `fonteDeInspecao` recusa servir relatório sem obra. Resultado: "Arquivo inválido" na
+  visualização e "documento sem arquivo" nos volumes da OP-102. Agora o documento leva "EST" (a trava continua:
+  EST só serve EST). Depois do deploy rodei a sincronização: 3 relatórios, 7 vínculos, e os 3 PDFs foram gerados
+  por `baixarDocumento` (559–586 KB). ⚠ Para revisar: a combinação EST/EST em `conferirObra`.

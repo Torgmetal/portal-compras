@@ -1,7 +1,12 @@
 {
-  "build": 3635,
-  "gerado": "2026-10-15T11:18:23.221Z",
+  "build": 3636,
+  "gerado": "2026-10-15T11:23:19.339Z",
   "commits": [
+    {
+      "hash": "71227952",
+      "data": "15/10/2026",
+      "titulo": "fix: PDF dos recebimentos de estoque no data book (Arquivo inválido)"
+    },
     {
       "hash": "b6b6fd1c",
       "data": "14/10/2026",
@@ -146,11 +151,6 @@
       "hash": "5e743f93",
       "data": "06/10/2026",
       "titulo": "Data Book: trocar o e-mail de uma etapa do fluxo de assinaturas ainda não assinada"
-    },
-    {
-      "hash": "eafb5b86",
-      "data": "06/10/2026",
-      "titulo": "Memória e revisão: campo decimal lido com numeroBR (receita da OP + varredura de 26 telas)"
     }
   ]
 }
