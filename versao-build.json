@@ -1,7 +1,12 @@
 {
-  "build": 3652,
-  "gerado": "2026-10-15T20:48:50.885Z",
+  "build": 3653,
+  "gerado": "2026-10-15T20:49:51.611Z",
   "commits": [
+    {
+      "hash": "adadfaa8",
+      "data": "15/10/2026",
+      "titulo": "Aditivo: editar (inclusive divulgado) e excluir rascunho"
+    },
     {
       "hash": "23088e06",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "eb8648af",
       "data": "14/10/2026",
       "titulo": "Pedido no Omie: medidas do item da RM nas Informações Adicionais"
-    },
-    {
-      "hash": "4aa8126a",
-      "data": "14/10/2026",
-      "titulo": "Memória e revisão: memorial na §03 e mapa de juntas pendente"
     }
   ]
 }

@@ -60,3 +60,13 @@ coisas, informar o peso, unitário e a descrição".
   financeiro (a página apaga `op.receitas` dos outros).
 - O `ModalAditivo` do `OPDetailClient` foi removido; os botões "Novo aditivo" (cabeçalho e aba Obra)
   fazem `router.push` para a página.
+
+## Editar e excluir (15/10/2026)
+Matheus (OP-105): não havia como corrigir OC errada de um aditivo. Agora há **Editar** em todo aditivo (inclusive
+DIVULGADO — Vitor) e **Excluir** só no rascunho, recusado com medição/RM/verba ligada (Vitor: "recusa", nada é
+desvinculado sozinho). `lib/aditivo-edicao.js` + `/api/comercial/aditivo/[id]`.
+⚠⚠ **`OPReceita.aditivo` e `OPReferencia.aditivo` são `onDelete: SetNull`.** Apagar só o aditivo faria a receita e a
+OC dele virarem do CONTRATO, em silêncio. Quem apaga aditivo apaga as duas antes.
+⚠ Receita se atualiza NO LUGAR (por id), nunca recria: a aba Resumo acrescenta CFOP/impostos/endereço na linha.
+⚠ Itens de verba não passam pela edição do aditivo — têm RM/solicitação penduradas e se editam na aba Resumo.
+

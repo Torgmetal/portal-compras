@@ -2901,3 +2901,13 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ETCs reais da OP-105. ⚠ Para revisar: (a) o desempate exige que os dígitos da marca comecem pelos do desenho
   (≥ 6 dígitos), e marca Torg ("105A1") de TAG compartilhada sai sem OC; (b) a OC sai como está no nome da pasta
   ("233707-1" × "228627"), sem padronizar o sufixo; (c) a emissão faz algumas chamadas ao Graph a mais.
+- **`adadfaa8` — editar e excluir aditivo:** Matheus (OP-105) não conseguia corrigir a OC de um aditivo. `PATCH`/`DELETE`
+  `/api/comercial/aditivo/[id]`, regras em `lib/aditivo-edicao.js`, esquema comum em `lib/aditivo-esquema.js`. A
+  edição reusa a página da abertura (`aditivo/[aditivoId]/editar`), vale para o divulgado (aviso de reenviar o
+  comunicado), e deixa a verba na aba Resumo. Receita atualiza no lugar; exclusão só em rascunho, recusada com
+  medição/RM/verba, e apaga antes as receitas e OC/TAG do aditivo (são `SetNull`). Testes: lib 8, rota 7, tela +1.
+  Suíte 5.290. Conferido no dev contra a produção, só lendo: a página do aditivo 4 volta preenchida e o DELETE
+  real responde 409 "1 medição vinculada".
+  ⚠ Para revisar: (a) excluir não renumera os outros (de propósito: o número pode estar citado); (b) o valor do
+  aditivo é recalculado pelo que a tela manda (receita > valor do pedido), como na criação; (c) editar o
+  divulgado não zera os aceites — quem confirmou leu a versão anterior até o reenvio.
