@@ -1,7 +1,12 @@
 {
-  "build": 3656,
-  "gerado": "2026-10-15T20:54:37.436Z",
+  "build": 3657,
+  "gerado": "2026-10-15T21:13:36.134Z",
   "commits": [
+    {
+      "hash": "e479928255",
+      "data": "15/10/2026",
+      "titulo": "Corte e montagem: obra lembrada que saiu da lista atual some da tela"
+    },
     {
       "hash": "21c18869e0",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "008352b63c",
       "data": "14/10/2026",
       "titulo": "Revisão: visibilidade do estoque e RRM da OP-102"
-    },
-    {
-      "hash": "03e476d7a2",
-      "data": "14/10/2026",
-      "titulo": "fix: recebimentos de estoque visíveis no celular e busca pelo título"
     }
   ]
 }

@@ -32,3 +32,7 @@ Matheus (03/10/2026): tela de consulta para os gerentes de Corte e Montagem, no 
   grande (OP-118: 2.641 peças) a lista inteira desenhada travava o celular e parecia que o filtro
   não funcionava → cartões em lotes de 60 com "Mostrar mais".
 - Montagem mostra "desenho impresso dd/mm" discreto quando há GRD (`p.grd`, já vem do despacho).
+- (15/10, 2ª rodada) Busca acha o conjunto pela marca/material de QUALQUER croqui dele: o despacho
+  da Montagem devolve `croquis: [{marca, material}]` (material = perfil ‖ descrição do croqui); o
+  cartão diz "usa T119A-P75 · U200X60X6.35". Busca ignora espaço e caixa. Filtro virou 3 botões:
+  Todos / Não montado / Montado (Corte: Não cortado / Cortado); lembrado em `filtro`.

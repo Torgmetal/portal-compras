@@ -81,7 +81,7 @@ describe("Produção › Corte e montagem", () => {
     fireEvent.click(screen.getByRole("button", { name: "Corte" }));
     await screen.findByText("T124A1-P1");
     expect(screen.getByText("T124A1-P2")).toBeTruthy();
-    fireEvent.click(screen.getByRole("checkbox", { name: "Não cortado" }));
+    fireEvent.click(screen.getByRole("button", { name: "Não cortado" }));
     expect(screen.queryByText("T124A1-P2")).toBeNull();
   });
 
@@ -89,16 +89,67 @@ describe("Produção › Corte e montagem", () => {
     await escolherObra();
     fireEvent.click(screen.getByRole("button", { name: "Montagem" }));
     await screen.findByText("T124A2");
-    fireEvent.click(screen.getByRole("checkbox", { name: "Não montado" }));
+    fireEvent.click(screen.getByRole("button", { name: "Não montado" }));
     expect(screen.queryByText("T124A2")).toBeNull();
     expect(screen.getByText("T124A1")).toBeTruthy();
+  });
+
+  // Matheus (15/10/2026): "Filtros de Não montado precisa ter de montados também".
+  it("'Montado' mostra só o conjunto já montado, e 'Todos' volta a lista inteira", async () => {
+    await escolherObra();
+    fireEvent.click(screen.getByRole("button", { name: "Montagem" }));
+    await screen.findByText("T124A2");
+    fireEvent.click(screen.getByRole("button", { name: "Montado" }));
+    expect(screen.getByText("T124A2")).toBeTruthy();
+    expect(screen.queryByText("T124A1")).toBeNull();
+    expect(screen.queryByText("T124A3")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Todos" }));
+    expect(screen.getByText("T124A1")).toBeTruthy();
+  });
+
+  it("corte: 'Cortado' mostra só o que já foi cortado", async () => {
+    await escolherObra();
+    fireEvent.click(screen.getByRole("button", { name: "Corte" }));
+    await screen.findByText("T124A1-P1");
+    fireEvent.click(screen.getByRole("button", { name: "Cortado" }));
+    expect(screen.getByText("T124A1-P2")).toBeTruthy();
+    expect(screen.queryByText("T124A1-P1")).toBeNull();
+  });
+
+  // Matheus (15/10/2026): "pesquisar a marca e o material e trazer todos os conjuntos que usam".
+  it("busca pelo croqui ou pelo material traz o conjunto que usa, e diz qual croqui", async () => {
+    const comCroquis = { ...MONTAGEM, pecas: MONTAGEM.pecas.map((p) => ({ ...p, croquis:
+      p.id === "a" ? [{ marca: "T124A1-P1", material: "PL 12.5" }, { marca: "T124A1-P2", material: "U200X60X6.35" }]
+      : p.id === "c" ? [{ marca: "T124A3-P1", material: "U200X60X6.35" }] : [{ marca: "T124A2-P1", material: "L 2X1/4" }] })) };
+    global.fetch = vi.fn(async (url) => ({ ok: true, status: 200, json: async () => (String(url).includes("/api/pcp/producao") ? OPS : comCroquis) }));
+    await escolherObra();
+    fireEvent.click(screen.getByRole("button", { name: "Montagem" }));
+    await screen.findByText("T124A1");
+    const busca = screen.getByLabelText("Buscar marca, croqui ou material");
+    fireEvent.change(busca, { target: { value: "u200x60" } });
+    expect(screen.getByText("T124A1")).toBeTruthy();
+    expect(screen.getByText("T124A3")).toBeTruthy();
+    expect(screen.queryByText("T124A2")).toBeNull();
+    expect(screen.getByText("T124A1").closest("li").textContent).toMatch(/usa T124A1-P2 · U200X60X6.35/);
+    fireEvent.change(busca, { target: { value: "T124A2-P1" } });
+    expect(screen.getByText("T124A2")).toBeTruthy();
+    expect(screen.queryByText("T124A1")).toBeNull();
+  });
+
+  it("⚠ a busca ignora espaço e caixa: 'pl12.5' acha 'PL 12.5'", async () => {
+    await escolherObra();
+    fireEvent.click(screen.getByRole("button", { name: "Corte" }));
+    await screen.findByText("T124A1-P1");
+    fireEvent.change(screen.getByLabelText("Buscar marca, croqui ou material"), { target: { value: "pl12.5" } });
+    expect(screen.getByText("T124A1-P1")).toBeTruthy();
+    expect(screen.queryByText("T124A1-P2")).toBeNull();
   });
 
   it("busca por marca", async () => {
     await escolherObra();
     fireEvent.click(screen.getByRole("button", { name: "Montagem" }));
     await screen.findByText("T124A1");
-    fireEvent.change(screen.getByLabelText("Buscar marca"), { target: { value: "a3" } });
+    fireEvent.change(screen.getByLabelText("Buscar marca, croqui ou material"), { target: { value: "a3" } });
     expect(screen.queryByText("T124A1")).toBeNull();
     expect(screen.getByText("T124A3")).toBeTruthy();
   });

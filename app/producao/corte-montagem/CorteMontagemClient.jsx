@@ -36,6 +36,18 @@ const lerLembrado = () => { try { return JSON.parse(localStorage.getItem(LEMBRAR
 const lembrar = (v) => { try { localStorage.setItem(LEMBRAR, JSON.stringify({ ...lerLembrado(), ...v })); } catch { /* sem armazenamento: só não lembra */ } };
 const lerObrasGuardadas = () => { try { const o = JSON.parse(localStorage.getItem(OBRAS_GUARDADAS) || "null"); return Array.isArray(o) ? o : null; } catch { return null; } };
 const guardarObras = (o) => { try { localStorage.setItem(OBRAS_GUARDADAS, JSON.stringify(o)); } catch { /* só não guarda */ } };
+// ⚠ busca sem espaço nem caixa: o perfil vem escrito "PL 12.5", "PL12.5", "u200x60x6.35"…
+const normal = (v) => String(v || "").toLowerCase().replace(/\s+/g, "");
+const PRONTA = ["FINALIZADO", "EXPEDIDA"];
+// Matheus (15/10/2026): o filtro tem as duas pontas — o que falta e o que já foi feito.
+const FILTROS = [
+  { id: "TODOS", rotulo: () => "Todos" },
+  { id: "FALTA", rotulo: (setor) => (setor === "CORTE" ? "Não cortado" : "Não montado") },
+  { id: "PRONTO", rotulo: (setor) => (setor === "CORTE" ? "Cortado" : "Montado") },
+];
+const filtroLembrado = () => { const l = lerLembrado(); return FILTROS.some((f) => f.id === l.filtro) ? l.filtro : (l.soFalta ? "FALTA" : "TODOS"); };
+/** Os croquis do conjunto que casam com a busca — é por eles que o conjunto entrou na lista. */
+const croquisQueCasam = (p, q) => (q ? (p.croquis || []).filter((c) => normal(c.marca).includes(q) || normal(c.material).includes(q)) : []);
 const fmtDia = (iso) => (iso ? new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "");
 
 async function lerJson(r) {
@@ -54,7 +66,7 @@ export default function CorteMontagemClient() {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState(null);
   const [busca, setBusca] = useState("");
-  const [soFalta, setSoFalta] = useState(() => !!lerLembrado().soFalta);
+  const [filtro, setFiltro] = useState(filtroLembrado);
   const [limite, setLimite] = useState(LOTE);
   const [abertos, setAbertos] = useState(() => new Set());
   const [desenho, setDesenho] = useState(null); // marca com o desenho aberto
@@ -117,16 +129,20 @@ export default function CorteMontagemClient() {
     aquecidas.current.add(op);
     fetch(`/api/producao/desenhos?opNumero=${encodeURIComponent(op)}&aquecer=1`, { cache: "no-store" }).catch(() => {});
   }, [dados, setor]);
-  useEffect(() => { setLimite(LOTE); }, [dados, busca, soFalta]);
+  useEffect(() => { setLimite(LOTE); }, [dados, busca, filtro]);
 
   const pecas = useMemo(() => {
-    const q = busca.trim().toLowerCase();
+    // ⚠ A BUSCA ACHA O CONJUNTO PELO QUE ELE USA (Matheus, 15/10/2026: "pesquisar a marca e o
+    // material e trazer todos os conjuntos que usam"): marca, descrição e perfil da peça, e na
+    // Montagem também a marca e o material de cada croqui do conjunto.
+    const q = normal(busca);
     return (dados?.pecas || [])
-      .filter((p) => !q || String(p.marca).toLowerCase().includes(q) || String(p.descricao || "").toLowerCase().includes(q))
-      .filter((p) => !soFalta || !["FINALIZADO", "EXPEDIDA"].includes(situacaoDaPeca(p)))
+      .filter((p) => !q || [p.marca, p.descricao, p.perfil].some((v) => normal(v).includes(q)) || croquisQueCasam(p, q).length > 0)
+      .filter((p) => filtro === "TODOS" || (filtro === "PRONTO") === PRONTA.includes(situacaoDaPeca(p)))
       .sort((a, b) => (ORDEM[situacaoDaPeca(a)] - ORDEM[situacaoDaPeca(b)])
         || String(a.marca).localeCompare(String(b.marca), "pt-BR", { numeric: true }));
-  }, [dados, busca, soFalta]);
+  }, [dados, busca, filtro]);
+  const q = normal(busca);
   const resumo = useMemo(() => resumoDoSetor(dados?.pecas || []), [dados]);
   const alternar = (id) => setAbertos((a) => { const n = new Set(a); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
@@ -187,14 +203,18 @@ export default function CorteMontagemClient() {
           <div className="flex flex-wrap items-center gap-3">
             <label className="relative min-w-0 flex-1">
               <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-torg-gray" />
-              <input aria-label="Buscar marca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar marca ou descrição"
+              <input aria-label="Buscar marca, croqui ou material" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar marca, croqui ou material"
                 className="w-full rounded-xl border-2 border-gray-200 py-2.5 pl-9 pr-3 text-base focus:border-torg-blue focus:outline-none" />
             </label>
-            <label className="flex min-h-11 items-center gap-2 text-sm text-torg-dark">
-              <input type="checkbox" checked={soFalta} onChange={(e) => { setSoFalta(e.target.checked); lembrar({ soFalta: e.target.checked }); }} className="h-5 w-5 accent-torg-blue" />
-              {/* Matheus (15/10/2026): "mude o Só o que falta para Não montado" — no Corte, "Não cortado" */}
-              {setor === "CORTE" ? "Não cortado" : "Não montado"}
-            </label>
+            <div role="group" aria-label="Filtrar por situação" className="grid w-full grid-cols-3 gap-1 rounded-xl border-2 border-gray-200 bg-white p-1 sm:w-auto">
+              {FILTROS.map((f) => (
+                <button key={f.id} type="button" aria-pressed={filtro === f.id}
+                  onClick={() => { setFiltro(f.id); lembrar({ filtro: f.id }); }}
+                  className={`min-h-9 whitespace-nowrap rounded-lg px-1.5 text-sm font-semibold sm:px-3 ${filtro === f.id ? "bg-torg-blue text-white" : "text-torg-dark"}`}>
+                  {f.rotulo(setor)}
+                </button>
+              ))}
+            </div>
           </div>
           {pecas.length === 0 ? (
             <div className="rounded-xl border border-gray-100 bg-white p-8 text-center text-sm text-torg-gray">
@@ -205,7 +225,7 @@ export default function CorteMontagemClient() {
             <>
               <ul className="space-y-2">
                 {pecas.slice(0, limite).map((p) => (
-                  <Cartao key={p.id} p={p} setor={setor} aberto={abertos.has(p.id)} onAlternar={() => alternar(p.id)}
+                  <Cartao key={p.id} p={p} setor={setor} usa={croquisQueCasam(p, q)} aberto={abertos.has(p.id)} onAlternar={() => alternar(p.id)}
                     onDesenho={dados.opNumero ? () => setDesenho(p.marca) : null} />
                 ))}
               </ul>
@@ -253,7 +273,7 @@ function Resumo({ resumo: r, setor }) {
   );
 }
 
-function Cartao({ p, setor, aberto, onAlternar, onDesenho }) {
+function Cartao({ p, setor, usa = [], aberto, onAlternar, onDesenho }) {
   const s = SIT[situacaoDaPeca(p)];
   const feito = feitoDaPeca(p);
   const qtd = Number(p.qte) || 0;
@@ -272,6 +292,13 @@ function Cartao({ p, setor, aberto, onAlternar, onDesenho }) {
             <p className="font-mono text-base font-bold text-torg-dark">{p.marca}</p>
           )}
           {p.descricao && <p className="text-sm text-torg-gray">{p.descricao}</p>}
+          {/* o conjunto entrou pela busca de um croqui/material: diz qual, senão parece engano */}
+          {usa.length > 0 && (
+            <p className="mt-0.5 text-xs text-torg-blue">
+              usa {usa.slice(0, 3).map((c) => `${c.marca}${c.material ? ` · ${c.material}` : ""}`).join(", ")}
+              {usa.length > 3 ? ` e mais ${usa.length - 3}` : ""}
+            </p>
+          )}
           {/* ⚠ Discreto, de propósito (Matheus, 15/10/2026): só para o montador ver na lista quais
               conjuntos já tiveram o desenho impresso. É a GRD que o PCP registra ao imprimir. */}
           {setor === "MONTAGEM" && p.grd && (

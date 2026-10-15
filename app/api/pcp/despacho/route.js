@@ -311,7 +311,14 @@ export async function GET(req) {
         // `qtd` é o total do croqui: a tela escreve "faltam 2 de 4" (Matheus, 03/10/2026).
         if (!croquiCortado(cr)) faltam.push({ marca: cm, descricao: cr?.descricao || null, faltaQtd: faltaCortarQtd(cr), qtd: Number(cr?.qte) || null });
       }
-      prontoInfo.set(conj, { prontoMontar: faltam.length === 0, faltamCroquis: faltam, totalCroquis: croquis.length });
+      // ⚠ TODOS os croquis, só marca e material: a busca da Corte e montagem acha o conjunto pelo
+      // croqui ou pelo perfil que ele usa (Matheus, 15/10/2026: "pesquisar a marca e o material e
+      // trazer todos os conjuntos que usam"). Compacto de propósito — a OP-118 tem 919 conjuntos.
+      const todosCroquis = croquis.map((cm) => {
+        const cr = croquiMap.get(cm);
+        return { marca: cm, material: String(cr?.perfil || cr?.descricao || "").trim() || null };
+      });
+      prontoInfo.set(conj, { prontoMontar: faltam.length === 0, faltamCroquis: faltam, totalCroquis: croquis.length, croquis: todosCroquis });
     }
   }
 
@@ -580,7 +587,7 @@ export async function GET(req) {
       // lote": a fábrica cortou por fora, ou o Planejamento programou direto (dia/bancada).
       montagemDiaProgramado: p.montagemDiaProgramado || null,
       corteDiaProgramado: p.corteDiaProgramado || null,
-      apontadoDesde: apontadoDesde.get(p.marca) || null, prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null,
+      apontadoDesde: apontadoDesde.get(p.marca) || null, prontoMontar: mont?.prontoMontar ?? null, faltamCroquis: mont?.faltamCroquis ?? null, totalCroquis: mont?.totalCroquis ?? null, croquis: mont?.croquis ?? null,
       // ⚠⚠ "FICOU PRONTO E NINGUÉM VIU". Vitor (01/09/2026): "para essas peças que estão com a
       // etiqueta amarela, assim que estiverem com todas as peças prontas do corte preciso alertar o
       // PCP para ele enviar para produção essas peças que faltaram".
