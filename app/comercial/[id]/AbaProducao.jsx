@@ -142,6 +142,14 @@ export default function AbaProducao({ opId, opNumero, obra, cliente, refCliente 
           <p className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3 inline-flex items-center gap-1.5"><AlertCircle size={13} /> Nenhum apontamento do Syneco para esta OP ainda — todas as peças aparecem como “não iniciadas”.</p>
         )}
 
+        {/* ⚠ os itens comprados prontos (parafuso, grade de piso, telha…) não passam pela fábrica e saem desta lista —
+            a nota diz quantos, para ninguém achar que a lista "perdeu" marcas da L.E. (Vitor, 15/10/2026) */}
+        {dados.itensComprados > 0 && (
+          <p className="text-[11px] text-torg-gray mb-2">
+            {dados.itensComprados} {dados.itensComprados === 1 ? "item comprado pronto não aparece" : "itens comprados prontos não aparecem"} (parafusos, grades de piso, telhas…) — não passam pela fábrica.
+          </p>
+        )}
+
         {/* funil por etapa (clicável = filtro) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-px bg-gray-100 border border-gray-100 rounded-lg overflow-hidden mb-3">
           <button onClick={() => setEtapa("")} className={`bg-white p-2.5 text-left hover:bg-gray-50 ${etapa === "" ? "ring-2 ring-torg-blue ring-inset" : ""}`}>

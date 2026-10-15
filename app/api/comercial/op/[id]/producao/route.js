@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { acumularRomaneio, totalExpedido, fundirExpedido } from "@/lib/expedido-por-romaneio";
+import { ehItemComprado } from "@/lib/item-comprado";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -98,6 +99,25 @@ export async function GET(_req, { params }) {
   }
   if (!marcas.size) return NextResponse.json({ success: true, semLista: true, pecas: [], resumo: [] });
 
+  // Tipo, perfil e material de cada marca na LPC — o tipo separa a rota no relatório (o croqui só passa pelo corte e
+  // vira conjunto na montagem); perfil e material alimentam a regra de item comprado logo abaixo.
+  const tiposPC = await prisma.pecaConjunto.findMany({ where: { opId: op.id }, select: { marca: true, tipoPeca: true, material: true, perfil: true } });
+  const lpcPorMarca = new Map();
+  for (const t of tiposPC) { const k = normMarca(t.marca); if (k && !lpcPorMarca.has(k)) lpcPorMarca.set(k, t); }
+
+  // ⚠⚠ SÓ O QUE A TORG FABRICA (Vitor, 15/10/2026: "ainda temos parafusos e grades de piso aparecendo — itens que
+  // não são fabricados na Torg não devem aparecer nessas listas de produção"). O universo é a Lista de Expedição, que
+  // tem 100% dos itens DE PROPÓSITO (é o que embarca); aqui vale a regra da casa, a mesma da fila de produção e da TV
+  // (lib/item-comprado.js). O material da LPC entra porque é ele que denuncia a grade (GS_*) com perfil falso de chapa.
+  let itensComprados = 0;
+  for (const [k, m] of marcas) {
+    const lpc = lpcPorMarca.get(k);
+    if (ehItemComprado({ marca: m.marca, descricao: m.descricao, pesoTotalKg: m.pesoTotal, perfil: lpc?.perfil, material: lpc?.material, tipoPeca: lpc?.tipoPeca })) {
+      marcas.delete(k); itensComprados++;
+    }
+  }
+  if (!marcas.size) return NextResponse.json({ success: true, semLista: false, pecas: [], resumo: [], itensComprados });
+
   // 2) setor REAL por marca no Syneco (mais avançado com produção > 0)
   const rows = op.id
     ? await prisma.mesOrdem.groupBy({
@@ -115,16 +135,11 @@ export async function GET(_req, { params }) {
     if (cur === undefined || ORDEM.indexOf(st) > ORDEM.indexOf(cur)) setorPorMarca.set(k, st);
   }
 
-  // Tipo de cada peça (CROQUI / CONJUNTO / avulsa) — pro relatório separar a rota: o croqui (P)
-  // só passa pelo corte e vira conjunto na montagem; o conjunto segue montagem→pintura.
-  const tiposPC = await prisma.pecaConjunto.findMany({ where: { opId: op.id }, select: { marca: true, tipoPeca: true } });
-  const tipoPorMarca = new Map();
-  for (const t of tiposPC) { const k = normMarca(t.marca); if (k && !tipoPorMarca.has(k)) tipoPorMarca.set(k, t.tipoPeca || null); }
 
   // 3) status de cada peça: expedido > setor do Syneco > pendente
   const pecas = [...marcas.values()].map((m) => {
     const setor = m.expedido ? "EXPEDIDO" : (setorPorMarca.get(normMarca(m.marca)) || "PENDENTE");
-    return { ...m, setor, tipoPeca: tipoPorMarca.get(normMarca(m.marca)) || null };
+    return { ...m, setor, tipoPeca: lpcPorMarca.get(normMarca(m.marca))?.tipoPeca || null };
   }).sort((a, b) => (ORDEM.indexOf(b.setor) - ORDEM.indexOf(a.setor)) || String(a.marca).localeCompare(String(b.marca), "pt-BR"));
 
   // 4) resumo por etapa (contagem + peso)
@@ -134,5 +149,5 @@ export async function GET(_req, { params }) {
   }).filter((r) => r.qtd > 0);
 
   const temSyneco = rows.length > 0;
-  return NextResponse.json({ success: true, pecas, resumo, total: pecas.length, pesoTotal: pecas.reduce((s, p) => s + (p.pesoTotal || 0), 0), temSyneco });
+  return NextResponse.json({ success: true, pecas, resumo, total: pecas.length, pesoTotal: pecas.reduce((s, p) => s + (p.pesoTotal || 0), 0), temSyneco, itensComprados });
 }

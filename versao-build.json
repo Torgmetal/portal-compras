@@ -1,7 +1,12 @@
 {
-  "build": 3643,
-  "gerado": "2026-10-15T18:08:46.990Z",
+  "build": 3644,
+  "gerado": "2026-10-15T18:15:52.859Z",
   "commits": [
+    {
+      "hash": "39fa2e0c",
+      "data": "15/10/2026",
+      "titulo": "Revisão: % de diluição no PLP"
+    },
     {
       "hash": "b5f51b46",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "818bcfa7",
       "data": "14/10/2026",
       "titulo": "fix: busca de certificados do recebimento quebrava (indiceR não existe)"
-    },
-    {
-      "hash": "52c4aa79",
-      "data": "09/10/2026",
-      "titulo": "Memória e revisão: copiar área no cronograma"
     }
   ]
 }
