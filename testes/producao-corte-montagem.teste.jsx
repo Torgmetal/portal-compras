@@ -28,7 +28,17 @@ beforeEach(() => {
     const corpo = u.includes("/api/pcp/producao") ? OPS : u.includes("setor=CORTE") ? CORTE : MONTAGEM;
     return { ok: true, status: 200, json: async () => corpo };
   });
-  try { localStorage.clear(); } catch {}
+  // ⚠ O Node 25+ põe um `localStorage` próprio no global, que vale `undefined` sem
+  // `--localstorage-file` e esconde o do jsdom: `localStorage.setItem` direto no teste estourava
+  // (o `try { localStorage.clear() }` engolia o mesmo erro em silêncio). Mesmo stub dos outros
+  // testes (minha-fila, campanha-banner), novo a cada teste — a obra lembrada num não vaza pro outro.
+  const guardado = new Map();
+  vi.stubGlobal("localStorage", {
+    getItem: (k) => guardado.get(k) ?? null,
+    setItem: (k, v) => guardado.set(k, String(v)),
+    removeItem: (k) => guardado.delete(k),
+    clear: () => guardado.clear(),
+  });
 });
 afterEach(cleanup);
 

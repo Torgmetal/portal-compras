@@ -1,7 +1,12 @@
 {
-  "build": 3659,
-  "gerado": "2026-10-15T21:32:10.104Z",
+  "build": 3660,
+  "gerado": "2026-10-15T21:48:01.220Z",
   "commits": [
+    {
+      "hash": "cb2fbb41",
+      "data": "15/10/2026",
+      "titulo": "Data book grande: botão Baixar por volume e atalho no topo"
+    },
     {
       "hash": "136fb8d0",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "66e82376",
       "data": "14/10/2026",
       "titulo": "Revisão: penetrante no RRP e RRM único da OP-102"
-    },
-    {
-      "hash": "e1a70447",
-      "data": "14/10/2026",
-      "titulo": "feat: recebimento de aço aceita até 60 certificados"
     }
   ]
 }
