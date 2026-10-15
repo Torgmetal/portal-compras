@@ -1,7 +1,12 @@
 {
-  "build": 3638,
-  "gerado": "2026-10-15T17:35:14.816Z",
+  "build": 3639,
+  "gerado": "2026-10-15T17:35:34.436Z",
   "commits": [
+    {
+      "hash": "d18c3920",
+      "data": "15/10/2026",
+      "titulo": "feat: folha do pintor na aba Qualidade da OP"
+    },
     {
       "hash": "375d41cc",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "046a4954",
       "data": "07/10/2026",
       "titulo": "Recebimentos pelos certificados do CMR: tintas sem peças, e os novos de penetrante (RRP) e de arame de solda (RRA)"
-    },
-    {
-      "hash": "771f9486",
-      "data": "07/10/2026",
-      "titulo": "Holerite: e-mail só avisa que está no portal, sem o PDF anexo"
     }
   ]
 }

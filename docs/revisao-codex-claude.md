@@ -2858,3 +2858,7 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   visualização e "documento sem arquivo" nos volumes da OP-102. Agora o documento leva "EST" (a trava continua:
   EST só serve EST). Depois do deploy rodei a sincronização: 3 relatórios, 7 vínculos, e os 3 PDFs foram gerados
   por `baixarDocumento` (559–586 KB). ⚠ Para revisar: a combinação EST/EST em `conferirObra`.
+- **`d18c3920` — folha do pintor na aba Qualidade da OP:** `baixarFolhaDoPintor` gera só a folha 3 com valores
+  calculados por `linhasDoPintor` (sem fórmula para a folha 2, que não existe nesse arquivo). `/api/pcp/pintura`
+  aceita COMERCIAL. Testes: 3 + o botão na aba. ⚠ Para revisar: o alinhamento de `d.demaos[i]` com `d.camadas[i]`
+  é por índice, o mesmo que o caderno completo já fazia (`primeiraDemao + i`).

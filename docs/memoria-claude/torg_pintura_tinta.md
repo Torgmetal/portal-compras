@@ -21,6 +21,11 @@ preto e guarda-corpo é amarelo, no mesmo sistema).
 (8 h no PLP da 094). `diasDePintura` = teto(kg÷meta) + (demãos−1). Lote de 3 demãos leva 3 dias
 mesmo cabendo num.
 
+**Folha do pintor sozinha (15/10/2026, `d18c3920`):** botão "Folha do pintor (Excel)" no quadro do PLP da **aba
+Qualidade da OP** — só a folha 3, da OP inteira, com valores CALCULADOS (`lib/pintura-folha-pintor.js`, mesma conta
+úmida = seca×(100+dil)÷SV), dizendo o que falta no PLP. Vitor: "as demais páginas apenas na produção". A rota
+`/api/pcp/pintura` passou a aceitar COMERCIAL.
+
 **Caderno de 3 folhas** sai do botão na barra da faixa Pintura do Gantt (`lib/pintura-excel-cliente`),
 com os IDs do LOTE, não da obra. As células a preencher são **amarelas** e o resto é **fórmula de
 Excel viva**; a folha do pintor referencia a folha 2 por endereço (colunas A..M — mexer numa quebra
