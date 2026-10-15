@@ -2911,3 +2911,23 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   ⚠ Para revisar: (a) excluir não renumera os outros (de propósito: o número pode estar citado); (b) o valor do
   aditivo é recalculado pelo que a tela manda (receita > valor do pedido), como na criação; (c) editar o
   divulgado não zera os aceites — quem confirmou leu a versão anterior até o reenvio.
+
+## 15/10/2026 — Corte e montagem: 2 testes vermelhos no Node 26 (`localStorage` indefinido) (Claude)
+
+- **Sintoma:** `testes/producao-corte-montagem.teste.jsx` — "a última lista de obras aparece na hora…" e "⚠ a obra
+  lembrada que saiu da lista atual some…" com `TypeError: Cannot read properties of undefined (reading 'setItem')`,
+  desde os commits de Matheus de 15/10 (`e4799282`, `1b88e9a1`, `abe41e05`, `136fb8d0`).
+- **Causa:** o erro estoura no PRÓPRIO teste (`localStorage.setItem` direto, linhas 251/259), não na tela. O Node 25+
+  liga o Web Storage por padrão e põe um getter `localStorage` no global que devolve `undefined` sem
+  `--localstorage-file` — e ele esconde o `localStorage` do jsdom no ambiente do vitest. Medido: Node v26.10.0,
+  `typeof localStorage === "undefined"`. O `try { localStorage.clear() } catch {}` do `beforeEach` engolia o mesmo erro.
+  No Node do Windows (sem o getter) o jsdom fornece o armazenamento, e por isso os testes passavam lá.
+- **A tela já estava certa:** as 4 leituras/escritas de `CorteMontagemClient.jsx` (linhas 35–38) já estão em try/catch;
+  sem armazenamento ela só não lembra. Nenhuma mudança de comportamento.
+- **Feito:** o `beforeEach` do teste passa a fazer `vi.stubGlobal("localStorage", …)` com um `Map` novo por teste
+  (getItem/setItem/removeItem/clear) — o mesmo stub de `minha-fila`, `toggle-sidebar-mobile` e `campanha-banner`.
+  Arquivo 22/22, `npm test` 605 arquivos / 5.318 testes verdes, `npm run checar` limpo.
+- **Para revisar (`testing`):** são agora 4 testes com o mesmo stub copiado. Vale um ajuste único em
+  `testes/apoio/setup.js` (quando `globalThis.jsdom` existe e `localStorage` é `undefined`, usar o do
+  `jsdom.window`)? Não fiz por dois motivos: armazenamento real persiste entre testes do mesmo arquivo (precisa de
+  `clear` em todo arquivo), e mexe em todos os testes jsdom de uma vez.

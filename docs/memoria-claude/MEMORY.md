@@ -28,6 +28,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [iCloud apaga arquivos-fonte](torg_icloud_delecao.md) — repo no iCloud remove fontes e cria pastas " 2"; NUNCA `add -A`/`commit -a`; conferir `git status` antes
 
 - [`npm run checar` antes de subir](torg_checar_imports.md) — `next build` NÃO pega função usada sem import; 3 quebras em 5 dias
+- [Node 26: `localStorage` indefinido no teste](torg_node26_localstorage_teste.md) — getter nativo esconde o do jsdom; `vi.stubGlobal` com Map novo por teste; verde no Windows e vermelho no Mac = isto
 
 ### Segurança & libs
 - [Segurança — decisões e pendências](torg_seguranca_pendencias.md) — limitador POR CONTA (nunca por IP); `audit fix --force` PROIBIDO (quebra exceljs); não regenerar token de fornecedor

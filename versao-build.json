@@ -1,7 +1,12 @@
 {
-  "build": 3660,
-  "gerado": "2026-10-15T21:48:01.220Z",
+  "build": 3661,
+  "gerado": "2026-10-15T21:48:01.441Z",
   "commits": [
+    {
+      "hash": "b29de95b",
+      "data": "15/10/2026",
+      "titulo": "Corte e montagem: teste ganha localStorage próprio — no Node 26 o do jsdom some"
+    },
     {
       "hash": "cb2fbb41",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "4c2cd991",
       "data": "14/10/2026",
       "titulo": "feat: certificados do penetrante/revelador entram sozinhos na §06"
-    },
-    {
-      "hash": "66e82376",
-      "data": "14/10/2026",
-      "titulo": "Revisão: penetrante no RRP e RRM único da OP-102"
     }
   ]
 }
