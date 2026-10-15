@@ -2874,3 +2874,8 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   sempre um `CampoDecimal` (as % do boletim entram como `datalist`), e `aplicarDiluicao` sem boletim usa o SV da
   demão e não sobrescreve o nome do diluente. `diluicaoPct()` lê a % no texto ("10%", "Thinner · 7,5%"). Com isso a
   folha do pintor da OP-102 passou a gerar, sem mexer no dado. Testes: 3; a guarda de decimal pegou um `Number()`.
+- **`b3a1a27f` — aba Produção da OP sem itens comprados:** `/api/comercial/op/[id]/producao` passa a aplicar
+  `ehItemComprado` às marcas da L.E. (com perfil, material e tipo da LPC) e devolve `itensComprados`, que a tela
+  mostra numa nota. Medido só lendo: OP-089 280 → 228, OP-112 167 → 121, OP-067 2094 → 2038; 102 e 105 sem mudança.
+  ⚠ Para revisar: "CHAPA XADREZ GRELHA" (OP-067, T67B36–39, com peso) sai pela palavra "grelha" de `RX_COBERTURA`.
+  É a mesma regra da fila de produção, mas pode ser chapa cortada aqui.

@@ -1,7 +1,12 @@
 {
-  "build": 3644,
-  "gerado": "2026-10-15T18:15:52.859Z",
+  "build": 3645,
+  "gerado": "2026-10-15T18:16:15.753Z",
   "commits": [
+    {
+      "hash": "b3a1a27f",
+      "data": "15/10/2026",
+      "titulo": "fix: aba Produção da OP sem parafusos e grades de piso"
+    },
     {
       "hash": "39fa2e0c",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "6b24ecb4",
       "data": "14/10/2026",
       "titulo": "fix: data book deixa só a revisão vigente do relatório"
-    },
-    {
-      "hash": "818bcfa7",
-      "data": "14/10/2026",
-      "titulo": "fix: busca de certificados do recebimento quebrava (indiceR não existe)"
     }
   ]
 }
