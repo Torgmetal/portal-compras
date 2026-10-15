@@ -265,6 +265,13 @@ async function main() {
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  // Índice da pasta de fabricação (cache dos desenhos entre as lambdas — lib/desenhos-fabricacao.js).
+  await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "DesenhoIndice" (
+    "pasta" TEXT PRIMARY KEY,
+    "arquivos" JSONB NOT NULL,
+    "em" TIMESTAMP(3) NOT NULL
+  )`);
+
   // Estudo de fabricacao (a LQC dentro do portal).
   await prisma.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "EstudoFabricacao" (
     "id" TEXT PRIMARY KEY,

@@ -20,7 +20,7 @@ import { requireRole } from "@/lib/session";
 import {
   FLUXO_SETORES, progressoPorSetor, progressoMontagemMontavel, entregaDoSetor, temDetalheCorte,
 } from "@/lib/prioridades-setor";
-import { carregarPrioridadesPorObra } from "@/lib/prioridades-setor-data";
+import { carregarPrioridadesPorObra, listaDeObrasDaProducao } from "@/lib/prioridades-setor-data";
 import { statusCompraPorOp } from "@/lib/status-compra";
 
 export const runtime = "nodejs";
@@ -39,6 +39,12 @@ export async function GET(req) {
   // Antes esta lista trazia TODA obra com cronograma ativo — 30 linhas, e escolher qual atacar
   // virava conversa diária. `?todas=1` continua mostrando tudo, para quem precisa procurar.
   const todas = new URL(req.url).searchParams.get("todas") === "1";
+
+  // ⚠ `?lista=1`: só QUAIS obras, para o seletor da Corte e montagem (Matheus, 15/10/2026: "está
+  // demorando muito para carregar a lista das obras"). Mesmas obras, sem montar kg nem setores.
+  if (new URL(req.url).searchParams.get("lista") === "1") {
+    return NextResponse.json({ ops: await listaDeObrasDaProducao({ todas }), geradoEm: new Date().toISOString() });
+  }
 
   const { porObra, now } = await carregarPrioridadesPorObra();
   if (!porObra.length) return NextResponse.json({ ops: [], geradoEm: new Date().toISOString() });

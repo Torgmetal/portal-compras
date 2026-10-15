@@ -23,11 +23,13 @@ export default function DesenhoPecaModal({ opNumero, opId, marca, setor, soImpri
 
   useEffect(() => {
     setDados(null); setErro("");
-    fetch(`/api/producao/desenhos?opNumero=${encodeURIComponent(opNumero)}&marca=${encodeURIComponent(marca)}`)
+    // ⚠ `consulta=1` só no soVer: ver o desenho aceita o índice da pasta já vencido (abre na hora);
+    // imprimir não — o vencido pode apontar para a revisão que já foi para OBSOLETOS.
+    fetch(`/api/producao/desenhos?opNumero=${encodeURIComponent(opNumero)}&marca=${encodeURIComponent(marca)}${soVer ? "&consulta=1" : ""}`)
       .then((r) => r.json())
       .then((j) => { if (j.error) setErro(j.error); else setDados(j); })
       .catch(() => setErro("Não foi possível buscar os desenhos."));
-  }, [opNumero, marca]);
+  }, [opNumero, marca, soVer]);
 
   const abrirItem = (itemId, nome) => window.open(`/api/producao/desenhos/arquivo?itemId=${encodeURIComponent(itemId)}&nome=${encodeURIComponent(nome)}`, "_blank");
   const abrir = (a) => abrirItem(a.itemId, a.nome); // original, sem carimbo (só visualizar)

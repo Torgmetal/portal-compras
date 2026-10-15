@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { arquivosDaFabricacao, desenhosDaMarca } from "@/lib/desenhos-fabricacao";
+import { arquivosDaFabricacao, indiceDaFabricacao, desenhosDaMarca } from "@/lib/desenhos-fabricacao";
 import { requireRole } from "@/lib/session";
 import { getAccessToken, acharPastaOp, uploadFileToFolder } from "@/lib/sharepoint";
 import { rastreioDoConjunto } from "@/lib/rastreio-peca";
@@ -38,7 +38,24 @@ export async function GET(req) {
   const sp = new URL(req.url).searchParams;
   const opNumero = sp.get("opNumero");
   const marca = (sp.get("marca") || "").trim();
+
+  // ⚠ AQUECER (Matheus, 15/10/2026: "muito mais rápido"). A Corte e montagem chama isto ao abrir a
+  // lista da obra, para a varredura do SharePoint acontecer ANTES do gerente tocar no desenho.
+  // ⚠ ESPERA o trabalho antes de responder: na Vercel, promessa solta depois da resposta não tem
+  // garantia de terminar (Codex, 15/10/2026). Quem chama é que não espera a resposta.
+  if (sp.get("aquecer") === "1") {
+    if (!opNumero) return NextResponse.json({ error: "Informe opNumero." }, { status: 400 });
+    try {
+      const base = await acharPastaOp(opNumero);
+      const arquivos = base ? await arquivosDaFabricacao(base) : [];
+      return NextResponse.json({ ok: true, pdfs: arquivos.length });
+    } catch (e) {
+      return NextResponse.json({ ok: false, error: e?.message || "Falha ao consultar o SharePoint." }, { status: 502 });
+    }
+  }
   if (!opNumero || !marca) return NextResponse.json({ error: "Informe opNumero e marca." }, { status: 400 });
+  // ⚠ só VER o desenho (Corte e montagem) aceita índice vencido; quem imprime pede fresco
+  const consulta = sp.get("consulta") === "1";
 
   // Liberações GRD já registradas (independem do SharePoint responder).
   const liberacoes = (await prisma.grdLiberacao.findMany({
@@ -61,7 +78,10 @@ export async function GET(req) {
     // ficou vazio em 7 telas de PCP/produção sem avisar ninguém, porque as liberações de GRD já
     // gravadas continuavam aparecendo. Agora a pasta é varrida por caminho, com cache por OP.
     // Ver `lib/desenhos-fabricacao.js` e `docs/memoria-claude/torg_graph_busca_500.md`.
-    arquivos = desenhosDaMarca(await arquivosDaFabricacao(base), marca);
+    const ind = await indiceDaFabricacao(base, { aceitarVencido: consulta });
+    arquivos = desenhosDaMarca(ind.arquivos, marca);
+    // ⚠ índice vencido sem a marca: pode ser o desenho que a Engenharia acabou de subir — varre
+    if (!arquivos.length && ind.vencido) arquivos = desenhosDaMarca(await arquivosDaFabricacao(base), marca);
   } catch (e) {
     erroSp = e?.message || "Falha ao consultar o SharePoint.";
   }

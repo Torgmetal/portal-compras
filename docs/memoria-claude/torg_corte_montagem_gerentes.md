@@ -19,3 +19,16 @@ Matheus (03/10/2026): tela de consulta para os gerentes de Corte e Montagem, no 
   layout próprio.
 - PCP › Produção: abaixo do `md` a tabela tem min-w 900 e rola só ela; acima, segue a regra do Vitor
   (sem rolagem lateral).
+
+**15/10/2026 — rápida, filtro e desenho impresso (Matheus):**
+- Lista das obras: `/api/pcp/producao?lista=1` → `listaDeObrasDaProducao` (lib/prioridades-setor-data),
+  mesmas obras do PCP via `obrasCandidatas`, sem carregar peça (5 s → <1 s); a última lista fica no
+  localStorage e aparece na hora.
+- Desenho: índice da pasta 2.5.2 Fabricação também no banco (`DesenhoIndice`, cache entre lambdas;
+  TTL conta da varredura). A tela chama `?aquecer=1` ao abrir a Montagem; o modal `soVer` manda
+  `consulta=1` e aceita índice vencido até 2 h (se a marca não estiver, varre). Imprimir (PCP) nunca
+  usa índice vencido — poderia apontar para revisão que foi para OBSOLETOS.
+- "Só o que falta" virou **"Não montado"** (Corte: "Não cortado"). A regra estava certa; em obra
+  grande (OP-118: 2.641 peças) a lista inteira desenhada travava o celular e parecia que o filtro
+  não funcionava → cartões em lotes de 60 com "Mostrar mais".
+- Montagem mostra "desenho impresso dd/mm" discreto quando há GRD (`p.grd`, já vem do despacho).

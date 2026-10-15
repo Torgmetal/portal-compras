@@ -75,13 +75,23 @@ describe("Produção › Corte e montagem", () => {
     expect(cartao.textContent).toMatch(/faltam 2/);
   });
 
-  it("'só o que falta' esconde o que já terminou", async () => {
+  // Matheus (15/10/2026): "mude o Só o que falta para Não montado" — no Corte, "Não cortado".
+  it("'Não cortado' esconde o que já terminou no corte", async () => {
     await escolherObra();
     fireEvent.click(screen.getByRole("button", { name: "Corte" }));
     await screen.findByText("T124A1-P1");
     expect(screen.getByText("T124A1-P2")).toBeTruthy();
-    fireEvent.click(screen.getByRole("checkbox", { name: /só o que falta/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Não cortado" }));
     expect(screen.queryByText("T124A1-P2")).toBeNull();
+  });
+
+  it("'Não montado' esconde o conjunto já montado", async () => {
+    await escolherObra();
+    fireEvent.click(screen.getByRole("button", { name: "Montagem" }));
+    await screen.findByText("T124A2");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Não montado" }));
+    expect(screen.queryByText("T124A2")).toBeNull();
+    expect(screen.getByText("T124A1")).toBeTruthy();
   });
 
   it("busca por marca", async () => {
@@ -145,5 +155,52 @@ describe("⚠ respostas fora de ordem e toque repetido", () => {
     expect(screen.getByRole("button", { name: /ver desenho/i })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /emitir carimbado/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /imprimir \(grd\)/i })).toBeNull();
+  });
+});
+
+// Matheus (15/10/2026): aviso discreto de desenho impresso, filtro que responde em obra grande e a
+// lista das obras rápida.
+describe("Corte e montagem — desenho impresso, lista grande e obras rápidas", () => {
+  it("montagem: o conjunto com GRD mostra 'desenho impresso' e a data, discreto", async () => {
+    const comGrd = { ...MONTAGEM, pecas: MONTAGEM.pecas.map((p) => (p.id === "c" ? { ...p, grd: { em: "2026-10-15T13:52:00.000Z", por: "Larissa", impressoes: 2 } } : p)) };
+    global.fetch = vi.fn(async (url) => ({ ok: true, status: 200, json: async () => (String(url).includes("/api/pcp/producao") ? OPS : String(url).includes("aquecer") ? { ok: true } : comGrd) }));
+    await escolherObra();
+    fireEvent.click(screen.getByRole("button", { name: "Montagem" }));
+    const cartao = (await screen.findByText("T124A3")).closest("li");
+    const aviso = within(cartao).getByText(/desenho impresso 15\/10/);
+    expect(aviso.getAttribute("title")).toMatch(/Larissa · 2 impressões/);
+    expect(screen.getByText("T124A1").closest("li").textContent).not.toMatch(/desenho impresso/);
+  });
+
+  it("a lista das obras vem da rota enxuta", async () => {
+    await escolherObra();
+    expect(global.fetch).toHaveBeenCalledWith("/api/pcp/producao?lista=1", expect.anything());
+  });
+
+  it("⚠ ao abrir a Montagem, aquece o desenho da obra uma vez", async () => {
+    await escolherObra();
+    fireEvent.click(screen.getByRole("button", { name: "Montagem" }));
+    await screen.findByText("T124A1");
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith("/api/producao/desenhos?opNumero=124&aquecer=1", expect.anything()));
+    expect(global.fetch.mock.calls.filter(([u]) => String(u).includes("aquecer")).length).toBe(1);
+  });
+
+  it("⚠ lista grande sai em lotes de 60, com 'Mostrar mais'", async () => {
+    const muitas = { pecas: Array.from({ length: 130 }, (_, i) => ({ id: `p${i}`, marca: `P${String(i).padStart(3, "0")}`, qte: 1 })) };
+    global.fetch = vi.fn(async (url) => ({ ok: true, status: 200, json: async () => (String(url).includes("/api/pcp/producao") ? OPS : muitas) }));
+    await escolherObra();
+    fireEvent.click(screen.getByRole("button", { name: "Corte" }));
+    await screen.findByText("P000");
+    expect(screen.getAllByRole("listitem").length).toBe(60);
+    fireEvent.click(screen.getByRole("button", { name: /Mostrar mais 60 · 70 restantes/ }));
+    expect(screen.getAllByRole("listitem").length).toBe(120);
+  });
+
+  it("a última lista de obras aparece na hora, antes da resposta", async () => {
+    localStorage.setItem("producao-corte-montagem-obras", JSON.stringify(OPS.ops));
+    global.fetch = vi.fn(() => new Promise(() => {})); // a rota nunca responde
+    render(<CorteMontagemClient />);
+    const sel = await screen.findByLabelText("Obra");
+    expect(sel.querySelectorAll("option").length).toBe(3);
   });
 });

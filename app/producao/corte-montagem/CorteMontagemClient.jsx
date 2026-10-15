@@ -13,7 +13,7 @@
 // ⚠ CARTÃO, NÃO TABELA: é lida no celular de pé, no pátio. Tabela de 9 colunas em 390 px vira
 // "ini…", "fin…" (foi o que motivou o pedido).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, AlertCircle, RefreshCw, Search, Scissors, Wrench, PackageOpen, FileText } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Search, Scissors, Wrench, PackageOpen, FileText, Printer } from "lucide-react";
 import { situacaoDaPeca, feitoDaPeca, resumoDoSetor, SIT } from "@/lib/status-setor";
 import { CroquisChip, CroquisFaltando } from "@/app/pcp/producao/CroquisConjunto";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
@@ -25,10 +25,18 @@ const SETORES = [
 // o que ainda está andando primeiro; o que acabou, por último
 const ORDEM = { PARCIAL: 0, NAO_INICIADO: 1, FINALIZADO: 2, EXPEDIDA: 3 };
 const LEMBRAR = "producao-corte-montagem";
+const OBRAS_GUARDADAS = "producao-corte-montagem-obras";
+// ⚠ Lista grande desenhada de uma vez trava o celular: a OP-118 tem 2.641 peças no corte e marcar
+// "Só o que falta" levava segundos para responder — parecia que o filtro não funcionava (Matheus,
+// 15/10/2026). Desenha em lotes; o resumo do topo continua contando tudo.
+const LOTE = 60;
 
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const lerLembrado = () => { try { return JSON.parse(localStorage.getItem(LEMBRAR) || "{}"); } catch { return {}; } };
-const lembrar = (v) => { try { localStorage.setItem(LEMBRAR, JSON.stringify(v)); } catch { /* sem armazenamento: só não lembra */ } };
+const lembrar = (v) => { try { localStorage.setItem(LEMBRAR, JSON.stringify({ ...lerLembrado(), ...v })); } catch { /* sem armazenamento: só não lembra */ } };
+const lerObrasGuardadas = () => { try { const o = JSON.parse(localStorage.getItem(OBRAS_GUARDADAS) || "null"); return Array.isArray(o) ? o : null; } catch { return null; } };
+const guardarObras = (o) => { try { localStorage.setItem(OBRAS_GUARDADAS, JSON.stringify(o)); } catch { /* só não guarda */ } };
+const fmtDia = (iso) => (iso ? new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "");
 
 async function lerJson(r) {
   let j = null;
@@ -46,18 +54,28 @@ export default function CorteMontagemClient() {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState(null);
   const [busca, setBusca] = useState("");
-  const [soFalta, setSoFalta] = useState(false);
+  const [soFalta, setSoFalta] = useState(() => !!lerLembrado().soFalta);
+  const [limite, setLimite] = useState(LOTE);
   const [abertos, setAbertos] = useState(() => new Set());
   const [desenho, setDesenho] = useState(null); // marca com o desenho aberto
 
+  // ⚠ A LISTA ENXUTA (`?lista=1`): mesmas obras do PCP, sem kg e setores (Matheus, 15/10/2026: a
+  // lista "está demorando muito para carregar"). E a última lista aparece NA HORA enquanto a nova
+  // chega — o gerente que volta à tela não espera para escolher a obra de sempre.
   const carregarOps = useCallback(async () => {
     setErroOps(null);
-    try {
-      const j = await lerJson(await fetch("/api/pcp/producao", { cache: "no-store" }));
-      setOps(j.ops || []);
+    const escolher = (lista) => {
       const l = lerLembrado();
-      if (l.opId && (j.ops || []).some((o) => o.opId === l.opId)) { setOpId(l.opId); setSetor(l.setor || ""); }
-    } catch (e) { setErroOps(e.message); }
+      if (l.opId && lista.some((o) => o.opId === l.opId)) { setOpId((a) => a || l.opId); setSetor((a) => a || l.setor || ""); }
+    };
+    const guardadas = lerObrasGuardadas();
+    if (guardadas) { setOps((a) => a || guardadas); escolher(guardadas); }
+    try {
+      const j = await lerJson(await fetch("/api/pcp/producao?lista=1", { cache: "no-store" }));
+      setOps(j.ops || []);
+      guardarObras(j.ops || []);
+      escolher(j.ops || []);
+    } catch (e) { if (!guardadas) setErroOps(e.message); }
   }, []);
   useEffect(() => { carregarOps(); }, [carregarOps]);
 
@@ -80,6 +98,18 @@ export default function CorteMontagemClient() {
     finally { if (vale()) setCarregando(false); }
   }, [opId, setor]);
   useEffect(() => { carregar(); }, [carregar]);
+
+  // ⚠ AQUECE O DESENHO: ao abrir a Montagem de uma obra, a varredura da pasta no SharePoint (~13 s
+  // na OP-105) começa já, para estar pronta quando o gerente tocar na marca. Uma vez por obra por
+  // visita; a resposta não importa — o índice fica guardado no servidor.
+  const aquecidas = useRef(new Set());
+  useEffect(() => {
+    const op = dados?.opNumero;
+    if (setor !== "MONTAGEM" || !op || aquecidas.current.has(op)) return;
+    aquecidas.current.add(op);
+    fetch(`/api/producao/desenhos?opNumero=${encodeURIComponent(op)}&aquecer=1`, { cache: "no-store" }).catch(() => {});
+  }, [dados, setor]);
+  useEffect(() => { setLimite(LOTE); }, [dados, busca, soFalta]);
 
   const pecas = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -153,8 +183,9 @@ export default function CorteMontagemClient() {
                 className="w-full rounded-xl border-2 border-gray-200 py-2.5 pl-9 pr-3 text-base focus:border-torg-blue focus:outline-none" />
             </label>
             <label className="flex min-h-11 items-center gap-2 text-sm text-torg-dark">
-              <input type="checkbox" checked={soFalta} onChange={(e) => setSoFalta(e.target.checked)} className="h-5 w-5 accent-torg-blue" />
-              Só o que falta
+              <input type="checkbox" checked={soFalta} onChange={(e) => { setSoFalta(e.target.checked); lembrar({ soFalta: e.target.checked }); }} className="h-5 w-5 accent-torg-blue" />
+              {/* Matheus (15/10/2026): "mude o Só o que falta para Não montado" — no Corte, "Não cortado" */}
+              {setor === "CORTE" ? "Não cortado" : "Não montado"}
             </label>
           </div>
           {pecas.length === 0 ? (
@@ -163,12 +194,20 @@ export default function CorteMontagemClient() {
               {dados.pecas?.length ? "Nenhuma peça com esse filtro." : "Nenhuma peça desta obra passa por este setor."}
             </div>
           ) : (
-            <ul className="space-y-2">
-              {pecas.map((p) => (
-                <Cartao key={p.id} p={p} setor={setor} aberto={abertos.has(p.id)} onAlternar={() => alternar(p.id)}
-                  onDesenho={dados.opNumero ? () => setDesenho(p.marca) : null} />
-              ))}
-            </ul>
+            <>
+              <ul className="space-y-2">
+                {pecas.slice(0, limite).map((p) => (
+                  <Cartao key={p.id} p={p} setor={setor} aberto={abertos.has(p.id)} onAlternar={() => alternar(p.id)}
+                    onDesenho={dados.opNumero ? () => setDesenho(p.marca) : null} />
+                ))}
+              </ul>
+              {pecas.length > limite && (
+                <button type="button" onClick={() => setLimite((n) => n + LOTE)}
+                  className="w-full rounded-xl border-2 border-gray-200 bg-white py-3 text-sm font-semibold text-torg-blue">
+                  Mostrar mais {Math.min(LOTE, pecas.length - limite)} · {fmtN(pecas.length - limite)} restantes
+                </button>
+              )}
+            </>
           )}
         </>
       )}
@@ -225,6 +264,14 @@ function Cartao({ p, setor, aberto, onAlternar, onDesenho }) {
             <p className="font-mono text-base font-bold text-torg-dark">{p.marca}</p>
           )}
           {p.descricao && <p className="text-sm text-torg-gray">{p.descricao}</p>}
+          {/* ⚠ Discreto, de propósito (Matheus, 15/10/2026): só para o montador ver na lista quais
+              conjuntos já tiveram o desenho impresso. É a GRD que o PCP registra ao imprimir. */}
+          {setor === "MONTAGEM" && p.grd && (
+            <p title={`Impresso${p.grd.por ? ` por ${p.grd.por}` : ""}${p.grd.impressoes > 1 ? ` · ${p.grd.impressoes} impressões` : ""}`}
+              className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-torg-gray">
+              <Printer size={11} className="shrink-0" /> desenho impresso{p.grd.em ? ` ${fmtDia(p.grd.em)}` : ""}
+            </p>
+          )}
         </div>
         <span title={s.dica} className={`shrink-0 rounded border px-2 py-0.5 text-xs font-semibold ${s.cls}`}>{s.txt}</span>
       </div>
