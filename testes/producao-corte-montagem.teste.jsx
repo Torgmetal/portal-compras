@@ -203,4 +203,20 @@ describe("Corte e montagem — desenho impresso, lista grande e obras rápidas",
     const sel = await screen.findByLabelText("Obra");
     expect(sel.querySelectorAll("option").length).toBe(3);
   });
+
+  it("⚠ a obra lembrada que saiu da lista atual some da tela junto com as peças", async () => {
+    localStorage.setItem("producao-corte-montagem-obras", JSON.stringify([...OPS.ops, { opId: "op999", opNumero: "999", cliente: "X", obra: "Encerrada" }]));
+    localStorage.setItem("producao-corte-montagem", JSON.stringify({ opId: "op999", setor: "MONTAGEM" }));
+    let soltar;
+    const listaAtual = new Promise((r) => { soltar = r; });
+    global.fetch = vi.fn(async (url) => {
+      if (String(url).includes("/api/pcp/producao")) { await listaAtual; return { ok: true, status: 200, json: async () => OPS }; }
+      return { ok: true, status: 200, json: async () => MONTAGEM };
+    });
+    render(<CorteMontagemClient />);
+    await screen.findByText("T124A1"); // a obra lembrada abriu com a lista guardada
+    soltar();
+    await waitFor(() => expect(screen.queryByText("T124A1")).toBeNull());
+    expect(screen.getByLabelText("Obra").value).toBe("");
+  });
 });

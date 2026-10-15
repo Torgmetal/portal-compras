@@ -1,7 +1,12 @@
 {
-  "build": 3655,
-  "gerado": "2026-10-15T20:54:37.237Z",
+  "build": 3656,
+  "gerado": "2026-10-15T20:54:37.436Z",
   "commits": [
+    {
+      "hash": "21c18869e0",
+      "data": "15/10/2026",
+      "titulo": "Desenhos: índice vencido nunca é servido, nem na consulta da Montagem"
+    },
     {
       "hash": "1b88e9a1bb",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "03e476d7a2",
       "data": "14/10/2026",
       "titulo": "fix: recebimentos de estoque visíveis no celular e busca pelo título"
-    },
-    {
-      "hash": "fc96b96659",
-      "data": "14/10/2026",
-      "titulo": "Memória e revisão: recebimento de aço (RRM)"
     }
   ]
 }

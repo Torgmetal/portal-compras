@@ -72,9 +72,17 @@ export default function CorteMontagemClient() {
     if (guardadas) { setOps((a) => a || guardadas); escolher(guardadas); }
     try {
       const j = await lerJson(await fetch("/api/pcp/producao?lista=1", { cache: "no-store" }));
-      setOps(j.ops || []);
-      guardarObras(j.ops || []);
-      escolher(j.ops || []);
+      const lista = j.ops || [];
+      setOps(lista);
+      guardarObras(lista);
+      // ⚠ a obra que veio da lista guardada pode ter saído da atual (encerrada, liberação fechada):
+      // sem isto, o seletor perdia a opção e as peças da obra antiga continuavam na tela (Codex)
+      setOpId((atual) => {
+        if (!atual || lista.some((o) => o.opId === atual)) return atual;
+        setSetor(""); setDados(null);
+        return "";
+      });
+      escolher(lista);
     } catch (e) { if (!guardadas) setErroOps(e.message); }
   }, []);
   useEffect(() => { carregarOps(); }, [carregarOps]);
