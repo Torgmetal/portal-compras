@@ -19,6 +19,7 @@ import { pecasDosLotes } from "@/lib/liberacao-pecas";
 import { croquiCortado, pecaEhComposta, setorRealIndex, mapaSetorReal, FLUXO_SETORES, soloPassaNoSetor } from "@/lib/prioridades-setor";
 import { z } from "zod";
 import { pecasNoTerceiro } from "@/lib/fora-da-fabrica";
+import { composicaoDosConjuntos } from "@/lib/composicao-conjunto";
 
 export const runtime = "nodejs";
 
@@ -289,37 +290,14 @@ export async function GET(req) {
   if (setor === "MONTAGEM") {
     const links = await prisma.conjuntoCroqui.findMany({
       where: { conjunto: { opId } },
-      select: { conjunto: { select: { marca: true } }, croqui: { select: { marca: true } } },
+      // ⚠ perfil/descrição vêm do PRÓPRIO croqui vinculado, não do `croquiMap`: aquele mapa sai de
+      // `todas`, que já tirou o croqui no terceiro e o item comprado — e a busca por material
+      // perdia exatamente esses (achado do Codex, 15/10/2026).
+      select: { conjunto: { select: { marca: true } }, croqui: { select: { marca: true, perfil: true, descricao: true, qte: true } } },
     });
     const croquiMap = new Map();
     for (const p of todas) if (ehCroqui(p)) croquiMap.set(p.marca, p);
-    // Quantos ainda faltam cortar deste croqui (qte total menos o já cortado/baixado).
-    const faltaCortarQtd = (cr) => {
-      const q = Number(cr?.qte) || 1;
-      const bxC = cr?.baixaSetores && typeof cr.baixaSetores === "object" ? cr.baixaSetores.CORTE : null;
-      const cortado = Math.max(Number(cr?.qteProduzida) || 0, bxC ? (bxC.qtd != null ? Number(bxC.qtd) : q) : 0);
-      return Math.max(1, q - cortado);
-    };
-    const porConj = new Map();
-    for (const lk of links) { const a = porConj.get(lk.conjunto.marca) || []; a.push(lk.croqui.marca); porConj.set(lk.conjunto.marca, a); }
-    prontoInfo = new Map();
-    for (const [conj, croquis] of porConj) {
-      const faltam = [];
-      for (const cm of croquis) {
-        const cr = croquiMap.get(cm);
-        // croquiCortado (critério ÚNICO, igual à TV): corte concluído / qtd produzida / baixa no corte.
-        // `qtd` é o total do croqui: a tela escreve "faltam 2 de 4" (Matheus, 03/10/2026).
-        if (!croquiCortado(cr)) faltam.push({ marca: cm, descricao: cr?.descricao || null, faltaQtd: faltaCortarQtd(cr), qtd: Number(cr?.qte) || null });
-      }
-      // ⚠ TODOS os croquis, só marca e material: a busca da Corte e montagem acha o conjunto pelo
-      // croqui ou pelo perfil que ele usa (Matheus, 15/10/2026: "pesquisar a marca e o material e
-      // trazer todos os conjuntos que usam"). Compacto de propósito — a OP-118 tem 919 conjuntos.
-      const todosCroquis = croquis.map((cm) => {
-        const cr = croquiMap.get(cm);
-        return { marca: cm, material: String(cr?.perfil || cr?.descricao || "").trim() || null };
-      });
-      prontoInfo.set(conj, { prontoMontar: faltam.length === 0, faltamCroquis: faltam, totalCroquis: croquis.length, croquis: todosCroquis });
-    }
+    prontoInfo = composicaoDosConjuntos(links, croquiMap);
   }
 
   // CORTE — quantos CONJUNTOS cada croqui está TRAVANDO. Vitor (19/08): "não pode ignorar nenhuma

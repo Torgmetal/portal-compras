@@ -36,3 +36,7 @@ Matheus (03/10/2026): tela de consulta para os gerentes de Corte e Montagem, no 
   da Montagem devolve `croquis: [{marca, material}]` (material = perfil ‖ descrição do croqui); o
   cartão diz "usa T119A-P75 · U200X60X6.35". Busca ignora espaço e caixa. Filtro virou 3 botões:
   Todos / Não montado / Montado (Corte: Não cortado / Cortado); lembrado em `filtro`.
+- (15/10, 3ª) A composição dos conjuntos saiu do despacho para `lib/composicao-conjunto.js`
+  (`composicaoDosConjuntos`). Material/qtd vêm do VÍNCULO (conjuntoCroqui→croqui), não da fila —
+  a fila tira croqui no terceiro/comprado e a busca perdia esses (achado do Codex). O chip verde
+  "N/N pronto" abre na Corte e montagem (`sempreAbre`) e lista "Cortados"; no PCP segue só informando.

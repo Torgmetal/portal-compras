@@ -1,7 +1,12 @@
 {
-  "build": 3657,
-  "gerado": "2026-10-15T21:13:36.134Z",
+  "build": 3658,
+  "gerado": "2026-10-15T21:19:08.450Z",
   "commits": [
+    {
+      "hash": "abe41e0542",
+      "data": "15/10/2026",
+      "titulo": "Corte e montagem: busca por croqui e material, e filtro com Montado"
+    },
     {
       "hash": "e479928255",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "f56fbc5bfc",
       "data": "14/10/2026",
       "titulo": "fix: penetrante do CMR não aparecia no recebimento (METAL-CHEK VP 30)"
-    },
-    {
-      "hash": "008352b63c",
-      "data": "14/10/2026",
-      "titulo": "Revisão: visibilidade do estoque e RRM da OP-102"
     }
   ]
 }

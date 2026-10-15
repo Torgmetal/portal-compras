@@ -9,10 +9,22 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 
 const fmtN = (n) => Number(n || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
-export function CroquisChip({ peca: p, aberto, onAlternar }) {
+// `sempreAbre` (Produção › Corte e montagem, Matheus 15/10/2026): o conjunto todo cortado também
+// abre, para o montador ver as peças que o compõem. No PCP o chip verde continua só informando.
+export function CroquisChip({ peca: p, aberto, onAlternar, sempreAbre = false }) {
   if (!p?.totalCroquis) return <span className="text-torg-gray-light">—</span>;
   const faltam = p.faltamCroquis?.length || 0;
   const texto = `${p.totalCroquis - faltam}/${p.totalCroquis}${p.prontoMontar ? " pronto" : ` · faltam ${faltam}`}`;
+  if ((p.prontoMontar || !faltam) && sempreAbre) {
+    return (
+      <button type="button" onClick={onAlternar} aria-expanded={aberto}
+        title="Ver as peças que compõem o conjunto"
+        className="text-[10px] px-1.5 py-0.5 rounded border font-semibold whitespace-nowrap inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700 border-emerald-200 hover:brightness-95">
+        {texto}
+        {aberto ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+      </button>
+    );
+  }
   if (p.prontoMontar || !faltam) {
     return (
       <span title={`Os ${p.totalCroquis} croquis deste conjunto estão cortados — pode descer.`}
@@ -51,6 +63,37 @@ export function CroquisFaltando({ faltam = [], presa = true }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * A COMPOSIÇÃO INTEIRA do conjunto: o que falta cortar primeiro, depois o que já foi cortado.
+ * Matheus (15/10/2026): "até os que já estão cortados mas não montados ainda é interessante abrir
+ * para ver as peças que compõem". `croquis` = todos ({marca, material, qtd}); `faltam` = os do corte.
+ */
+export function CroquisDoConjunto({ croquis = [], faltam = [] }) {
+  const faltaPor = new Map(faltam.map((c) => [c.marca, c]));
+  const cortados = croquis.filter((c) => !faltaPor.has(c.marca));
+  return (
+    <div className="text-[11px] space-y-2">
+      {faltam.length > 0 && <CroquisFaltando faltam={faltam} presa={false} />}
+      {cortados.length > 0 && (
+        <div>
+          <div className="text-emerald-700 font-semibold mb-1">Cortados ({cortados.length}):</div>
+          <div className="space-y-0.5">
+            {cortados.map((c, i) => (
+              <div key={`${c.marca}-${i}`} className="flex items-baseline gap-1.5">
+                <span className="font-mono font-semibold text-torg-dark shrink-0">{c.marca}</span>
+                {c.material && <span className="text-torg-gray truncate">· {c.material}</span>}
+                <span className="text-emerald-700 font-semibold tabular-nums shrink-0 ml-auto">
+                  cortado{c.qtd ? ` ${fmtN(c.qtd)}` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

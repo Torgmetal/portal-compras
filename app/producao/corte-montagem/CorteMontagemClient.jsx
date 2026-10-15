@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, AlertCircle, RefreshCw, Search, Scissors, Wrench, PackageOpen, FileText, Printer } from "lucide-react";
 import { situacaoDaPeca, feitoDaPeca, resumoDoSetor, SIT } from "@/lib/status-setor";
-import { CroquisChip, CroquisFaltando } from "@/app/pcp/producao/CroquisConjunto";
+import { CroquisChip, CroquisFaltando, CroquisDoConjunto } from "@/app/pcp/producao/CroquisConjunto";
 import DesenhoPecaModal from "@/components/DesenhoPecaModal";
 
 const SETORES = [
@@ -319,13 +319,17 @@ function Cartao({ p, setor, usa = [], aberto, onAlternar, onDesenho }) {
         ) : (
           <>
             <span className="tabular-nums text-torg-dark">montado <b>{fmtN(feito)}</b> de {fmtN(qtd)}</span>
-            <span className="flex items-center gap-1 text-torg-gray">croquis <CroquisChip peca={p} aberto={aberto} onAlternar={onAlternar} /></span>
+            <span className="flex items-center gap-1 text-torg-gray">croquis <CroquisChip peca={p} aberto={aberto} onAlternar={onAlternar} sempreAbre={p.croquis?.length > 0} /></span>
           </>
         )}
       </div>
-      {setor === "MONTAGEM" && aberto && p.faltamCroquis?.length > 0 && (
+      {setor === "MONTAGEM" && aberto && (p.croquis?.length > 0 ? (
+        <div className={`mt-2 rounded-lg p-2 ${p.faltamCroquis?.length ? "bg-amber-50/60" : "bg-emerald-50/50"}`}>
+          <CroquisDoConjunto croquis={p.croquis} faltam={p.faltamCroquis || []} />
+        </div>
+      ) : p.faltamCroquis?.length > 0 && (
         <div className="mt-2 rounded-lg bg-amber-50/60 p-2"><CroquisFaltando faltam={p.faltamCroquis} presa={false} /></div>
-      )}
+      ))}
     </li>
   );
 }

@@ -270,4 +270,27 @@ describe("Corte e montagem — desenho impresso, lista grande e obras rápidas",
     await waitFor(() => expect(screen.queryByText("T124A1")).toBeNull());
     expect(screen.getByLabelText("Obra").value).toBe("");
   });
+
+  // Matheus (15/10/2026): "até os que já estão cortados mas não montados ainda é interessante abrir
+  // para ver as peças que compõem".
+  it("conjunto com tudo cortado também abre e lista as peças, marcadas como cortadas", async () => {
+    const comCroquis = { ...MONTAGEM, pecas: MONTAGEM.pecas.map((p) => (p.id === "c"
+      ? { ...p, croquis: [{ marca: "T124A3-P1", material: "PL 8", qtd: 2 }, { marca: "T124A3-P2", material: "L 2X1/4", qtd: 1 }, { marca: "T124A3-P3", material: "CH 6", qtd: 4 }] }
+      : p.id === "a" ? { ...p, croquis: [{ marca: "T124A1-P1", material: "PL 12.5", qtd: 4 }, { marca: "T124A1-P2", material: "U200", qtd: 1 }] } : p)) };
+    global.fetch = vi.fn(async (url) => ({ ok: true, status: 200, json: async () => (String(url).includes("/api/pcp/producao") ? OPS : comCroquis) }));
+    await escolherObra();
+    fireEvent.click(screen.getByRole("button", { name: "Montagem" }));
+    const pronto = (await screen.findByText("T124A3")).closest("li");
+    fireEvent.click(within(pronto).getByRole("button", { name: /3\/3 pronto/ }));
+    expect(pronto.textContent).toMatch(/T124A3-P1/);
+    expect(pronto.textContent).toMatch(/T124A3-P3/);
+    expect(within(pronto).getAllByText(/^cortado/).length).toBe(3);
+
+    // e no conjunto que ainda espera corte, aparecem as duas listas: o que falta e o que já foi
+    const falta = screen.getByText("T124A1").closest("li");
+    fireEvent.click(within(falta).getByRole("button", { name: /faltam/ }));
+    expect(falta.textContent).toMatch(/faltam 2 de 4/);
+    expect(falta.textContent).toMatch(/T124A1-P2/);
+    expect(within(falta).getAllByText(/^cortado/).length).toBe(1);
+  });
 });
