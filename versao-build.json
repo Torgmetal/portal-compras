@@ -1,7 +1,12 @@
 {
-  "build": 3646,
-  "gerado": "2026-10-15T18:54:17.670Z",
+  "build": 3647,
+  "gerado": "2026-10-15T18:55:03.564Z",
   "commits": [
+    {
+      "hash": "d5abfb00",
+      "data": "15/10/2026",
+      "titulo": "feat: romaneio no modelo da TMSA (FOR-081), em Excel e PDF"
+    },
     {
       "hash": "4cdba3f0",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "0c55be0e",
       "data": "14/10/2026",
       "titulo": "Memória e revisão: revisão vigente no data book, indiceR, recebimento de estoque"
-    },
-    {
-      "hash": "357de8e9",
-      "data": "14/10/2026",
-      "titulo": "feat: recebimento de arame e penetrante sem OP (estoque)"
     }
   ]
 }

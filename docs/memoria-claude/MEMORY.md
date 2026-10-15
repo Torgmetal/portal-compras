@@ -199,6 +199,7 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Importar romaneios da pasta](torg_import_romaneios.md) — FORM 22 do SharePoint → portal (só obra antiga); ⚠ romaneio EMITIDO ≠ embarcado: escolher quais saíram
 - [Expedição → baixa no cronograma](torg_expedicao_cronograma.md) — linha "Expedição" alinha c/ expedido das listas (FORM-22); % da ESTRUTURA em kg, itens fora editáveis em /planejamento/config-expedicao; avança só
 - [Romaneio a partir da carga + FORM 22](torg_romaneio_carga.md) — romaneio da carga (PlanejamentoCarga); tirar peça exige motivo; gera FORM 22 (.xlsm base64, exceljs) em 4.2 Romaneios; A4 scale=20 era o bug
+- [Romaneio TMSA (FOR-081)](torg_romaneio_tmsa.md) — só obras TMSA, no lugar do FORM 22; layout do modelo intacto; Excel + PDF na 4.2; TAG por peça, OC por TAG (Referências), volumes da simulação; 625 kg/m³ de madeira
 - [Módulo Fiscal](torg_fiscal.md) — /fiscal; romaneio EMITIDO cai na fila aguardando NF; informa número+tipo → FINALIZADO; campos nf* no RomaneioPrevio
 - [Apontamento Syneco por setor](torg_syneco_apontamento_fonte.md) — somar `mesApontamento` por `dataInicio` (BRT), normalizar via lib/syneco-dia.js; NUNCA `mesOrdem` (cumulativo)
 - [Planilha "Apontamentos para o Syneco"](torg_apontamentos_syneco_planilha.md) — baixa do portal − Syneco, por marca/setor; card em Produção › Meu trabalho + botão por OP/setor; lib/apontamentos-syneco.js

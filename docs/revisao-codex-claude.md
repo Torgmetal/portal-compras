@@ -2879,3 +2879,13 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   mostra numa nota. Medido só lendo: OP-089 280 → 228, OP-112 167 → 121, OP-067 2094 → 2038; 102 e 105 sem mudança.
   ⚠ Para revisar: "CHAPA XADREZ GRELHA" (OP-067, T67B36–39, com peso) sai pela palavra "grelha" de `RX_COBERTURA`.
   É a mesma regra da fila de produção, mas pode ser chapa cortada aqui.
+
+## 15/10/2026 — Romaneio TMSA (FOR-081) (Claude)
+- **`d5abfb00`:** nas obras com cliente TMSA, `lotes-expedicao/[loteId]/romaneio` gera o FOR-081 (o modelo dela,
+  preenchido) e o PDF, e salva os dois na 4.2. Libs `romaneio-tmsa*.js`. Testes: montagem (11), dados (4),
+  Excel ida e volta (4), PDF (2), rota (3), simulador (+1). Suíte com 5.261 passando. Conferido em imagem com
+  dados reais da OP-105, só lendo.
+  ⚠ Para revisar: (a) o PDF é um renderizador próprio da planilha (larguras em unidade Excel → pt, cores de tema
+  7/0 fixas): planilha que não for esta pode sair diferente; (b) a TAG é distribuída pela ordem das unidades entre
+  os volumes, e a simulação não sabe QUAL unidade foi em cada pacote; (c) o FOR-081 da revisão não ganha aba de
+  histórico, porque o layout é do cliente; (d) `ehObraTmsa` é um regex /\bTMSA\b/ em `OP.cliente`.
