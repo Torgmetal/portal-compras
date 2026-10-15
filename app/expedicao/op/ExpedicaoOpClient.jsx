@@ -70,7 +70,7 @@ export default function ExpedicaoOpClient({ ops, initialOpId = null }) {
           </div>
 
           {/* Mesmo workspace do módulo OPs — Expedição vê os lotes e emite/revisa romaneio */}
-          <AbaExpedicao opId={opSel.id} proposta={null} podeEditarLotes={false} />
+          <AbaExpedicao opId={opSel.id} proposta={null} podeEditarLotes={false} cliente={opSel.cliente} />
           {/* Quadro informativo (só leitura): expedido/pendente por peça */}
           <ConsultaExpedicao opId={opSel.id} readOnly />
         </div>

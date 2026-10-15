@@ -9,6 +9,10 @@ import { requireRole } from "@/lib/session";
 import { gerarRomaneioForm22 } from "@/lib/romaneio-form22";
 import { salvarRomaneioNoServidor } from "@/lib/sharepoint-lista";
 import { itensDeObra } from "@/lib/expedido-por-romaneio";
+import { ehObraTmsa, montarRomaneioTmsa, referenciaProjeto } from "@/lib/romaneio-tmsa";
+import { dadosTmsa } from "@/lib/romaneio-tmsa-dados";
+import { gerarRomaneioTmsaExcel } from "@/lib/romaneio-tmsa-excel";
+import { gerarRomaneioTmsaPdf } from "@/lib/romaneio-tmsa-pdf";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -32,6 +36,9 @@ const schema = z.object({
   })).optional(),
   mudanca: z.string().max(2000).nullable().optional(), // o que mudou (obrigatório na revisão)
   previa: z.boolean().optional(), // true = só gera pra conferir (não salva, não emite)
+  // obras da TMSA (FOR-081): seguir a simulação de carga para as medidas e a madeira; observações do romaneio
+  seguirSimulacao: z.boolean().optional(),
+  observacoes: z.string().max(500).nullable().optional(),
 });
 
 export async function POST(req, { params }) {
@@ -47,7 +54,7 @@ export async function POST(req, { params }) {
     select: {
       id: true, numero: true, cliente: true, obra: true, clienteRazaoSocial: true,
       clienteEndereco: true, clienteCidade: true, clienteUF: true, clienteCep: true,
-      clienteCnpj: true, clienteIE: true, clienteContato: true, clienteEmail: true,
+      clienteCnpj: true, clienteIE: true, clienteContato: true, clienteEmail: true, refCliente: true,
     },
   });
   if (!op) return NextResponse.json({ error: "OP não encontrada" }, { status: 404 });
@@ -157,6 +164,23 @@ export async function POST(req, { params }) {
   await prisma.loteExpedicao.update({ where: { id: lote.id }, data: { transportadora, motorista, placaVeiculo: placa, placaCarreta, contatoTransporte: contato } }).catch(() => {});
   const cli = (op.cliente || "").slice(0, 40).trim();
 
+  // ⚠⚠ OBRAS DA TMSA: O ROMANEIO É O FOR-081 DELA, NÃO O FORM 22 (Vitor, 15/10/2026: "isso será apenas para as obras
+  // da TMSA"; "deve ser salvo na pasta de expedição de cada OP, tanto o excel e o pdf"). Data do embarque = a da
+  // EMISSÃO; número = o do prévio (1, 2, 3 por OP). Regras em lib/romaneio-tmsa.js.
+  const tmsa = ehObraTmsa(op);
+  async function arquivosTmsa() {
+    const d = await dadosTmsa({ op, previoId: previo.id, seguirSimulacao: body.seguirSimulacao !== false });
+    const r = montarRomaneioTmsa({ itens, volumes: d.volumes, tags: d.tags, ocPorTag: d.ocPorTag });
+    const xlsx = await gerarRomaneioTmsaExcel({ numero: previo.numero, data: new Date(), referencia: referenciaProjeto(d.tpr, op.numero), observacoes: body.observacoes || "", ...r });
+    return { xlsx, pdf: Buffer.from(await gerarRomaneioTmsaPdf(xlsx)), avisos: r.avisos, origem: r.origem };
+  }
+  if (tmsa && body.previa) {
+    const t = await arquivosTmsa();
+    const nomeBase = `PREVIA Romaneio ${numero} - OP-${op.numero} - TMSA`;
+    return NextResponse.json({ ok: true, previa: true, numero, ignoradas, tmsa: true, avisos: t.avisos, origem: t.origem,
+      nome: `${nomeBase}.xlsx`, arquivo: t.xlsx.toString("base64"), nomePdf: `${nomeBase}.pdf`, arquivoPdf: t.pdf.toString("base64") });
+  }
+
   // PRÉVIA: só gera o FORM 22 pra conferir — não salva no SharePoint, não marca
   // emitido, não vira revisão.
   if (body.previa) {
@@ -179,22 +203,29 @@ export async function POST(req, { params }) {
     porQuem: user.name || user.email || null,
   }];
 
-  const buf = await gerarRomaneioForm22({
+  // TMSA: o FOR-081 sem aba de histórico — o layout é o do cliente, e a revisão fica no AuditLog e no prévio
+  const tm = tmsa ? await arquivosTmsa() : null;
+  const buf = tm ? tm.xlsx : await gerarRomaneioForm22({
     op,
     romaneio: { numero, data, transportadora, motorista, placa, placaCarreta, contatoTransporte: contato },
     itens,
     historico: novaRevisao > 0 ? historico : null, // aba Histórico só na revisão
   });
   const prefixo = `Romaneio ${numero} - OP-${op.numero}`; // base do nome (acha a versão anterior na revisão)
-  const fileNome = `${prefixo}${cli ? ` - ${cli}` : ""}.xlsx`;
+  const fileNome = tm ? `${prefixo} - TMSA.xlsx` : `${prefixo}${cli ? ` - ${cli}` : ""}.xlsx`;
+  const fileNomePdf = tm ? `${prefixo} - TMSA.pdf` : null;
 
   let sharepoint = null;
   try {
-    // Na revisão, move a versão anterior desse romaneio pra Obsoleto antes de salvar.
+    // Na revisão, move a versão anterior desse romaneio pra Obsoleto antes de salvar (o prefixo pega o Excel e o PDF).
     const r = await salvarRomaneioNoServidor({ opNumero: op.numero, fileNome, buffer: buf, moverPrefixo: jaEmitido ? prefixo : undefined });
     sharepoint = { ok: true, nome: r.nome, caminho: r.caminho, webUrl: r.webUrl };
+    if (tm) {
+      const rp = await salvarRomaneioNoServidor({ opNumero: op.numero, fileNome: fileNomePdf, buffer: tm.pdf });
+      sharepoint.pdf = { nome: rp.nome, webUrl: rp.webUrl };
+    }
   } catch (e) {
-    sharepoint = { ok: false, erro: e?.message || "Falha ao salvar no SharePoint." };
+    sharepoint = { ...(sharepoint || {}), ok: !!sharepoint?.ok, erro: e?.message || "Falha ao salvar no SharePoint." };
   }
 
   // Marca como emitido / atualiza a revisão + histórico no prévio.
@@ -217,5 +248,6 @@ export async function POST(req, { params }) {
 
   await prisma.auditLog.create({ data: { userId: user.id, action: novaRevisao === 0 ? "EMITIR_ROMANEIO" : "REVISAR_ROMANEIO", entity: "RomaneioPrevio", entityId: previo.id, diff: { numero, revisao: novaRevisao, itens: itens.length, ...(ignoradas.length ? { ignoradasSemQuantidade: ignoradas } : {}) } } }).catch(() => {});
 
-  return NextResponse.json({ ok: true, numero, revisao: novaRevisao, ignoradas, nome: fileNome, arquivo: buf.toString("base64"), sharepoint });
+  return NextResponse.json({ ok: true, numero, revisao: novaRevisao, ignoradas, nome: fileNome, arquivo: buf.toString("base64"), sharepoint,
+    ...(tm ? { tmsa: true, avisos: tm.avisos, origem: tm.origem, nomePdf: fileNomePdf, arquivoPdf: tm.pdf.toString("base64") } : {}) });
 }

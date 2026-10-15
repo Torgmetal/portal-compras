@@ -77,6 +77,8 @@ describe("simularCarga", () => {
     expect(c.veiculo.chave).toBe("carreta"); expect(c.volumes).toBe(4); expect(c.altura).toBeLessThanOrEqual(2900);
     expect(c.itens.reduce((t, u) => t + u.membros.length, 0)).toBe(12);
     expect(c.romaneio.map((v) => v.volume)).toEqual([1, 2, 3, 4]);
+    // ⚠ quantas peças de CADA marca vão no volume (romaneio TMSA, 15/10/2026) — a lista de marcas sozinha não dizia
+    expect(c.romaneio.map((v) => v.itens)).toEqual([[{ marca: "T118A1", qtd: 3 }], [{ marca: "T118A1", qtd: 3 }], [{ marca: "T118A1", qtd: 3 }], [{ marca: "T118A1", qtd: 3 }]]);
     expect(c.passos).toHaveLength(4); expect(c.madeira.pecas.caibro).toBeGreaterThan(0);
     for (const u of c.itens) { expect(u.tipo).toBe("PACOTE"); expect(u.L).toBeLessThanOrEqual(larguraDoPacote()); }
     for (const u of c.itens.filter((x) => !(x.nivelPilha > 0))) { expect(u.y).toBe(MEDIDAS.MADEIRA); expect(u.caibros.length).toBeGreaterThanOrEqual(2); }

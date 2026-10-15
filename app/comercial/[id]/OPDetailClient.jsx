@@ -912,7 +912,7 @@ export default function OPDetailClient({ op, userRole, userId: _userId, podeAlte
               (ConsultaExpedicao) —, as duas com "Lista de Expedição" no título, uma embaixo da
               outra. Aqui fica o que é da Expedição: lote e romaneio.
               ⚠ o atalho abaixo existe para ninguém procurar a lista e concluir que ela sumiu. */}
-          <AbaExpedicao opId={op.id} proposta={proposta} />
+          <AbaExpedicao opId={op.id} proposta={proposta} cliente={op.cliente} />
           <p className="text-[12px] text-torg-gray bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
             A <strong>Lista de Expedição</strong> — resumo por frente e as peças marca a marca —
             fica na aba <button onClick={() => setVista("planejamento")} className="text-torg-blue font-semibold hover:underline">Planejamento</button>,

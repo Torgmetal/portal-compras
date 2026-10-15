@@ -1,7 +1,12 @@
 {
-  "build": 3645,
-  "gerado": "2026-10-15T18:16:15.753Z",
+  "build": 3646,
+  "gerado": "2026-10-15T18:54:17.670Z",
   "commits": [
+    {
+      "hash": "4cdba3f0",
+      "data": "15/10/2026",
+      "titulo": "Revisão: itens comprados na aba Produção"
+    },
     {
       "hash": "b3a1a27f",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "357de8e9",
       "data": "14/10/2026",
       "titulo": "feat: recebimento de arame e penetrante sem OP (estoque)"
-    },
-    {
-      "hash": "6b24ecb4",
-      "data": "14/10/2026",
-      "titulo": "fix: data book deixa só a revisão vigente do relatório"
     }
   ]
 }

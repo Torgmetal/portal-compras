@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, Fragment } from "react";
 import * as XLSX from "xlsx";
 import { Truck, Plus, Pencil, Trash2, ChevronDown, ChevronRight, Loader2, X, Upload, Download, AlertCircle, CheckCircle2, FileSpreadsheet } from "lucide-react";
 import { numeroBR } from "@/lib/numero-br";
+import { ehObraTmsa } from "@/lib/romaneio-tmsa";
 
 const fmtKg = (n) => (n == null ? null : `${Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`);
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -81,7 +82,7 @@ async function baixarModelo() {
 }
 
 // ── componente ────────────────────────────────────────────────────────────────
-export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = true }) {
+export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = true, cliente = null }) {
   const [lotes, setLotes] = useState(null);
   const [erro, setErro] = useState("");
   const [modal, setModal] = useState(null); // { lote } (novo = {})
@@ -304,7 +305,7 @@ export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = 
 
       {modal && <LoteModal opId={opId} lote={modal.lote} onClose={() => setModal(null)} onSaved={() => { setModal(null); carregar(); }} />}
       {importOpen && <ImportarModal opId={opId} temLotes={(lotes || []).length > 0} onClose={() => setImportOpen(false)} onImportado={() => { setImportOpen(false); carregar(); }} />}
-      {exportar && <EmitirRomaneioWizard opId={opId} lote={exportar.lote} emitido={exportar.emitido} onClose={() => setExportar(null)} onEmitido={() => { setExportar(null); carregar(); }} />}
+      {exportar && <EmitirRomaneioWizard opId={opId} tmsa={ehObraTmsa({ cliente })} lote={exportar.lote} emitido={exportar.emitido} onClose={() => setExportar(null)} onEmitido={() => { setExportar(null); carregar(); }} />}
     </div>
   );
 }
@@ -524,7 +525,16 @@ const avisoSemQuantidade = (marcas) =>
   `${marcas.length} marca(s) sem quantidade não entram no romaneio: ${marcas.slice(0, 6).join(", ")}${marcas.length > 6 ? "…" : ""}. Informe quantas peças de cada uma vão nesta carga, ou tire-as da lista.`;
 
 // ── wizard emitir romaneio (FORM 22) — 3 passos ───────────────────────────────
-function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
+// baixa um arquivo que veio em base64 na resposta (Excel do romaneio, e o PDF no FOR-081 da TMSA)
+function baixarBase64(b64, nome, tipo) {
+  const bin = atob(b64); const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([bytes], { type: tipo }));
+  const a = document.createElement("a"); a.href = url; a.download = nome; a.click(); URL.revokeObjectURL(url);
+}
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido, tmsa = false }) {
   const [passo, setPasso] = useState(1);
   const [f, setF] = useState({
     transportadora: lote?.transportadora || "", motorista: lote?.motorista || "",
@@ -532,6 +542,8 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
     contato: lote?.contatoTransporte || "",
     data: lote?.dataPrevista ? String(lote.dataPrevista).slice(0, 10) : "",
     mudanca: "",
+    // ⚠ obras da TMSA (FOR-081, Vitor 15/10/2026): medidas e madeira da simulação de carga; observações do romaneio
+    seguirSimulacao: true, observacoes: "",
   });
   const [marcas, setMarcas] = useState(null);
   const [sel, setSel] = useState(new Set());
@@ -540,6 +552,7 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
   const [gerandoPrevia, setGerandoPrevia] = useState(false);
   const [erro, setErro] = useState("");
   const [ok, setOk] = useState(null);
+  const [avisosPrevia, setAvisosPrevia] = useState([]);
   const inp = "w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-torg-blue outline-none";
 
   // Transportadoras do Vendor List (categoria "Transporte") — puxa e auto-preenche.
@@ -645,15 +658,13 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
           placa: f.placa.trim() || null, placaCarreta: f.placaCarreta.trim() || null, contato: f.contato.trim() || null, data: f.data || null,
           itensSel: selecionadas.map(itemSel),
           mudanca: emitido ? f.mudanca.trim() : undefined,
+          ...(tmsa ? { seguirSimulacao: f.seguirSimulacao, observacoes: f.observacoes.trim() || null } : {}),
         }),
       });
       const j = await r.json();
       if (!r.ok || !j.ok) throw new Error(j.error || "Erro ao emitir o romaneio");
-      const bin = atob(j.arquivo);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-      const a = document.createElement("a"); a.href = url; a.download = j.nome; a.click(); URL.revokeObjectURL(url);
+      baixarBase64(j.arquivo, j.nome, XLSX_MIME);
+      if (j.arquivoPdf) baixarBase64(j.arquivoPdf, j.nomePdf, "application/pdf");
       setOk(j);
     } catch (e) { setErro(e.message); setGerando(false); }
   }
@@ -671,14 +682,14 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
           placa: f.placa.trim() || null, placaCarreta: f.placaCarreta.trim() || null, contato: f.contato.trim() || null, data: f.data || null,
           itensSel: selecionadas.map(itemSel),
           previa: true,
+          ...(tmsa ? { seguirSimulacao: f.seguirSimulacao, observacoes: f.observacoes.trim() || null } : {}),
         }),
       });
       const j = await r.json();
       if (!r.ok || !j.ok) throw new Error(j.error || "Erro ao gerar a prévia");
-      const bin = atob(j.arquivo); const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-      const a = document.createElement("a"); a.href = url; a.download = j.nome; a.click(); URL.revokeObjectURL(url);
+      baixarBase64(j.arquivo, j.nome, XLSX_MIME);
+      if (j.arquivoPdf) baixarBase64(j.arquivoPdf, j.nomePdf, "application/pdf");
+      setAvisosPrevia(j.avisos || []);
     } catch (e) { setErro(e.message); } finally { setGerandoPrevia(false); }
   }
 
@@ -708,7 +719,12 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
             <div className="py-8 text-center">
               <CheckCircle2 size={32} className="mx-auto text-emerald-600 mb-2" />
               <p className="text-sm font-semibold text-torg-dark">Romaneio {ok.numero}{ok.revisao > 0 ? ` — revisão R${String(ok.revisao).padStart(2, "0")}` : ""} emitido</p>
-              <p className="text-xs text-torg-gray mt-1">{ok.sharepoint?.ok ? "Salvo no servidor (4.2 Romaneios) e baixado." : ok.sharepoint ? `Baixado — mas não salvou no SharePoint: ${ok.sharepoint.erro}` : "Baixado."}</p>
+              <p className="text-xs text-torg-gray mt-1">{ok.sharepoint?.ok ? `Salvo no servidor (4.2 Romaneios)${ok.tmsa ? " — Excel e PDF" : ""} e baixado.` : ok.sharepoint ? `Baixado — mas não salvou no SharePoint: ${ok.sharepoint.erro}` : "Baixado."}</p>
+              {(ok.avisos || []).length > 0 && (
+                <ul className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2 text-left space-y-0.5">
+                  {ok.avisos.map((a) => <li key={a}>⚠ {a}</li>)}
+                </ul>
+              )}
               {/* ⚠ o servidor também descarta marca sem quantidade — se chegou aqui, diz quais: o
                   prévio é reescrito com o que foi emitido, e a peça sumiria sem ninguém saber. */}
               {ok.ignoradas?.length > 0 && (
@@ -833,6 +849,24 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido }) {
                 <p><b>{selecionadas.length}</b> marca(s) · <b>{fmtKg(pesoSel)}</b></p>
                 <p className="text-torg-gray text-[12px]">{[f.transportadora, f.motorista, f.placa].filter(Boolean).join(" · ") || "Sem transportador"}</p>
               </div>
+              {tmsa && (
+                <div className="rounded-lg border border-torg-blue/20 bg-torg-blue/5 p-3 space-y-2">
+                  <p className="text-[12px] text-torg-dark"><b>Obra TMSA:</b> sai o romaneio no modelo da TMSA (FOR-081), em Excel e PDF, com a data de hoje.</p>
+                  <label className="flex items-start gap-2 text-[12px] text-torg-dark">
+                    <input type="checkbox" className="mt-0.5 accent-torg-blue" checked={f.seguirSimulacao} onChange={(e) => setF({ ...f, seguirSimulacao: e.target.checked })} />
+                    <span>Seguir a simulação de carga — dimensões de cada volume e peso da madeira. Sem simulação (ou desmarcado), sai um volume por marca, sem medida.</span>
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Observações</span>
+                    <textarea value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} rows={2} maxLength={500} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue outline-none" />
+                  </label>
+                  {avisosPrevia.length > 0 && (
+                    <ul className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 space-y-0.5">
+                      {avisosPrevia.map((a) => <li key={a}>⚠ {a}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
               {emitido ? (
                 <label className="block">
                   <span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">O que mudou nesta revisão? *</span>
