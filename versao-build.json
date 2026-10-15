@@ -1,7 +1,12 @@
 {
-  "build": 3642,
-  "gerado": "2026-10-15T18:08:27.999Z",
+  "build": 3643,
+  "gerado": "2026-10-15T18:08:46.990Z",
   "commits": [
+    {
+      "hash": "b5f51b46",
+      "data": "15/10/2026",
+      "titulo": "fix: % de diluição no editor do PLP"
+    },
     {
       "hash": "aafe0a11",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "52c4aa79",
       "data": "09/10/2026",
       "titulo": "Memória e revisão: copiar área no cronograma"
-    },
-    {
-      "hash": "d897aef6",
-      "data": "09/10/2026",
-      "titulo": "Cronograma: copiar uma área (tarefas, datas e encadeamento) para outras áreas"
     }
   ]
 }

@@ -2870,3 +2870,7 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   infla o acabamento em obra de duas cores; (b) a OP-067 tem duas cores no nome de uma demão só, e a regra não
   detecta (passa a valer para as duas estruturas); (c) `linhaNaFolha2` acha a linha da folha 2 por
   ordem+cor+produto, e duas demãos idênticas cairiam na mesma linha.
+- **`b5f51b46` — % de diluição no editor do PLP:** sem boletim no catálogo só havia o texto do diluente. Agora a % é
+  sempre um `CampoDecimal` (as % do boletim entram como `datalist`), e `aplicarDiluicao` sem boletim usa o SV da
+  demão e não sobrescreve o nome do diluente. `diluicaoPct()` lê a % no texto ("10%", "Thinner · 7,5%"). Com isso a
+  folha do pintor da OP-102 passou a gerar, sem mexer no dado. Testes: 3; a guarda de decimal pegou um `Number()`.
