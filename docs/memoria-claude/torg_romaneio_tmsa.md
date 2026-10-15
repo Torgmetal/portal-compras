@@ -32,4 +32,7 @@ em `2. Engenharia/2.1 Projetos Orçados/OC<nº>_…/ETC-00846-xx*.xls`, com `Pos
 "Nº TPR: TPR00846". O nome da pasta da OP também traz o TPR ("OP-105 - TMSA - TPR 846 - Bianchini"). Na OP-105, a
 TC 4708 está em DUAS OCs (228631 = quadro do vazador 72118932-1; 228630 = longarinas e apoios), por isso a regra é
 TAG + desenho. As OCs R1 (234182 e 234172) repetem as ETC-31/32: **vale a OC original** (233707/233708), decisão do
-Vitor. PENDENTE: o leitor de ETCs no romaneio (aprovado, ainda não feito).
+Vitor. **Feito (`b25a17e1`):** `lib/etc-tmsa.js` (lê a ETC; decide a OC por TAG e, em empate, por desenho, com a marca
+começando pelos dígitos do desenho) e `lib/etc-tmsa-dados.js` (pasta da OP → 2.1 Projetos Orçados → OC*/ETC de maior
+revisão). Prioridade: Referências da OP > ETC; TPR: Referências > ETC > nome da pasta > refCliente. OP-105 conferida:
+7 ETCs, TPR00846, romaneio 2 inteiro (TC 4706) na OC 228627.

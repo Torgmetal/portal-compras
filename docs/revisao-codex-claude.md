@@ -2896,3 +2896,8 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   páginas). Testes: 3 + rota 3 + tela 2 reescritos. ⚠ Para revisar: (a) o relançamento depende de a Vercel manter
   a função nova rodando depois que quem chamou abortou; se não mantiver, o cron das :15 continua sendo a rede;
   (b) a rota `/gerar/continuar` ficou sem chamador na tela, mas continua existindo.
+- **`b25a17e1` — OC e TPR pelas ETCs da TMSA:** `etc-tmsa.js` (puro) e `etc-tmsa-dados.js` (SharePoint, só leitura,
+  falha vira aviso). `montarRomaneioTmsa` recebe `ocDe(tag, marca)`. Testes: ETC 5 e dados +2. Conferido com as
+  ETCs reais da OP-105. ⚠ Para revisar: (a) o desempate exige que os dígitos da marca comecem pelos do desenho
+  (≥ 6 dígitos), e marca Torg ("105A1") de TAG compartilhada sai sem OC; (b) a OC sai como está no nome da pasta
+  ("233707-1" × "228627"), sem padronizar o sufixo; (c) a emissão faz algumas chamadas ao Graph a mais.
