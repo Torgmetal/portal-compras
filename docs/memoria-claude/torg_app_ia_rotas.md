@@ -41,6 +41,13 @@ porque a checagem é feita ali. Erro sempre `{ ok:false, error }`.
 ⚠ A Vercel corta corpo/resposta em ~4,5 MB: o download do documento sai em **stream**, o upload de lista
 tem teto de 4 MB em base64 (413 legível), e a lista segue a paginação do SharePoint por dentro.
 
+### Pasta da obra — só o que a Engenharia pode ver
+⚠⚠ Decisão do Vitor (16/10/2026): pelo app, proposta só **sem valores**; pedido de compra e documento financeiro
+**nunca**. Lista de PERMITIDOS (`caminhoObraLiberado` em `lib/app-documentos.js`), na listagem **e** no download
+(o download não confia na listagem): topo `2`, `4`, `6`, `8`, `10` inteiros (casa pelo número antes do ponto);
+do `1. Comercial` só `1.2 Propostas` (número **e** nome — há dois "1.2") e, dentro dela, só `PT-` (não `PTC-`/`PC-`,
+nem `.msg`). Resto (3, 5, 7, 9, nome desconhecido, arquivo solto na raiz) some da lista e dá **403**.
+
 ### Antes do deploy
 ⚠⚠ Rodar **`scripts/ensure-roteiro-engenharia.mjs` em produção ANTES** de liberar a versão do app que usa
 `/roteiro` (cria a tabela e o índice único de expressão); sem isso `roteiro` dá **500 "falha interna"**.

@@ -6,7 +6,7 @@ vi.mock("@/lib/sharepoint", () => ({ getAccessToken: vi.fn(async () => "tk") }))
 vi.mock("@/lib/sharepoint-lpc", () => ({ resolveServidorDriveId: vi.fn(async () => "drv-servidor") }));
 vi.mock("@/lib/le-servidor", () => ({ pastaDaOp: vi.fn() }));
 import { pastaDaOp } from "@/lib/le-servidor";
-import { caminhoRelativoSeguro, listarDocumentos, baixarDocumento } from "@/lib/app-documentos";
+import { caminhoRelativoSeguro, caminhoObraLiberado, listarDocumentos, baixarDocumento } from "@/lib/app-documentos";
 
 const NORMAS = "https://graph.microsoft.com/v1.0/drives/drv-normas/root:/Engenharia/03.%20Padr%C3%A3o%20Torg/NORMAS";
 let fetchMock;
@@ -98,5 +98,80 @@ describe("baixarDocumento", () => {
     expect(urls()[0]).toContain("drives/drv-servidor/items/sp1?$select=");
     expect(urls()[1]).toBe("https://graph.microsoft.com/v1.0/drives/drv-servidor/items/sp1/content");
     expect(r).toMatchObject({ nome: "PO-06.pdf", tamanho: 3, contentType: "application/pdf" });
+  });
+});
+
+// Decisão do Vitor (16/10/2026): pelo app a Engenharia lê só proposta SEM valores; pedido de compra e documento
+// financeiro nunca. Lista de PERMITIDOS, aplicada à listagem e ao download.
+describe("obra: só o que a Engenharia pode ver", () => {
+  const BLOQ = "Este documento não é liberado para a Engenharia pelo app.";
+  const PROP = "1. Comercial/1.2 Propostas";
+  beforeEach(() => pastaDaOp.mockResolvedValue({ pasta: "OP-105 - X", base: "/OS" }));
+  const item = (name, pasta) => (pasta ? { id: name, name, folder: {} } : { id: name, name, size: 1, file: {} });
+
+  it("caminhoObraLiberado: regra pura", () => {
+    const ok = (c, arq) => caminhoObraLiberado(c.split("/").filter(Boolean), arq);
+    expect(ok("", false)).toBe(true);
+    expect(ok("2. Engenharia/x.pdf", true)).toBe(true);
+    expect(ok("02. ENGENHARIA/2.5.2 Fab/a.dwg", true)).toBe(true);
+    for (const n of ["4. Expedição", "6. Planejamento", "8. Qualidade", "10. Montagem"]) expect(ok(`${n}/a.pdf`, true)).toBe(true);
+    for (const n of ["3. Compras", "5. Medição", "7. Garantias", "9. Seguros", "Outros", "1.2 Propostas"]) expect(ok(n, false)).toBe(false);
+    expect(ok("leiame.pdf", true)).toBe(false);
+    expect(ok("2. Engenharia", true)).toBe(false);
+    expect(ok("1. Comercial", false)).toBe(true);
+    expect(ok("1. Comercial/a.pdf", true)).toBe(false);
+    expect(ok(PROP, false)).toBe(true);
+    expect(ok("1. Comercial/1.2 PROPOSTAS", false)).toBe(true);
+    expect(ok("1. Comercial/1.2 Divulgação", false)).toBe(false);
+    expect(ok("1. Comercial/1.3 Pedido de compras", false)).toBe(false);
+    expect(ok("1. Comercial/1.3 Pedido de compras/PT-1.pdf", true)).toBe(false);
+    expect(ok(`${PROP}/PT-105 R0.pdf`, true)).toBe(true);
+    expect(ok(`${PROP}/pt-105.pdf`, true)).toBe(true);
+    for (const n of ["PC-105.pdf", "PTC-105.pdf", "ptc-105.pdf", "PT-105.msg", "Proposta.pdf"]) expect(ok(`${PROP}/${n}`, true)).toBe(false);
+    expect(ok(`${PROP}/Sub`, false)).toBe(false);
+    expect(ok(`${PROP}/Sub/PT-1.pdf`, true)).toBe(false);
+  });
+
+  it("raiz da OP lista só as pastas liberadas e o 1. Comercial", async () => {
+    fetchMock.mockResolvedValue(json({ value: [
+      item("1. Comercial", 1), item("2. Engenharia", 1), item("3. Compras", 1), item("4. Expedição", 1), item("5. Medição", 1),
+      item("6. Planejamento", 1), item("7. Garantias", 1), item("8. Qualidade", 1), item("9. Seguros", 1), item("10. Montagem", 1),
+      item("Diversos", 1), item("2. Engenharia.pdf"),
+    ] }));
+    const r = await listarDocumentos({ fonte: "obra", opNumero: "105", caminho: "" });
+    expect(r.itens.map((i) => i.nome)).toEqual(["1. Comercial", "2. Engenharia", "4. Expedição", "6. Planejamento", "8. Qualidade", "10. Montagem"]);
+  });
+
+  it("1. Comercial lista só 1.2 Propostas; dentro dela só PT-", async () => {
+    fetchMock.mockResolvedValueOnce(json({ value: [item("1.2 Divulgação", 1), item("1.2 Propostas", 1), item("1.3 Pedido de compras", 1),
+      item("1.4 Contrato", 1), item("1.5 Documentos Financeiros e Fiscais", 1), item("resumo.pdf")] }));
+    expect((await listarDocumentos({ fonte: "obra", opNumero: "105", caminho: "1. Comercial" })).itens.map((i) => i.nome)).toEqual(["1.2 Propostas"]);
+    fetchMock.mockResolvedValueOnce(json({ value: [item("PT-105 R0.pdf"), item("pt-105 R1.pdf"), item("PC-105.pdf"), item("PTC-105.pdf"),
+      item("PT-105.msg"), item("Antigas", 1)] }));
+    expect((await listarDocumentos({ fonte: "obra", opNumero: "105", caminho: PROP })).itens.map((i) => i.nome)).toEqual(["PT-105 R0.pdf", "pt-105 R1.pdf"]);
+  });
+
+  it("listar pasta bloqueada é 403 sem chamar o SharePoint", async () => {
+    for (const c of ["3. Compras", "1. Comercial/1.3 Pedido de compras"]) {
+      await expect(listarDocumentos({ fonte: "obra", opNumero: "105", caminho: c })).rejects.toMatchObject({ status: 403, message: BLOQ });
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("download não confia na listagem: 403 antes do Graph; liberado baixa", async () => {
+    for (const c of [`${PROP}/PC-105.pdf`, `${PROP}/PTC-105.pdf`, `${PROP}/PT-105.msg`, "1. Comercial/1.3 Pedido de compras/PT-1.pdf",
+      "3. Compras/x.pdf", "leiame.pdf"]) {
+      await expect(baixarDocumento({ fonte: "obra", opNumero: "105", caminho: c })).rejects.toMatchObject({ status: 403, message: BLOQ });
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    for (const c of [`${PROP}/PT-105.pdf`, "2. Engenharia/x.pdf"]) {
+      fetchMock.mockResolvedValueOnce(json({ name: "x.pdf", size: 3, file: {} })).mockResolvedValueOnce(new Response("abc"));
+      await expect(baixarDocumento({ fonte: "obra", opNumero: "105", caminho: c })).resolves.toMatchObject({ nome: "x.pdf" });
+    }
+  });
+
+  it("normas não passa pela regra da obra", async () => {
+    fetchMock.mockResolvedValue(json({ value: [item("3. Compras", 1)] }));
+    expect((await listarDocumentos({ fonte: "normas", caminho: "" })).itens).toHaveLength(1);
   });
 });

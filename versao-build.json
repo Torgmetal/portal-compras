@@ -1,7 +1,12 @@
 {
-  "build": 3684,
-  "gerado": "2026-10-16T20:17:31.591Z",
+  "build": 3685,
+  "gerado": "2026-10-16T20:17:31.970Z",
   "commits": [
+    {
+      "hash": "d18ef555",
+      "data": "16/10/2026",
+      "titulo": "fix(ia): app recusa LPC sem fase/de outra OP e LE de OP inexistente; GRD desde por updatedAt"
+    },
     {
       "hash": "7dc4f2cf",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "21c18869",
       "data": "15/10/2026",
       "titulo": "Desenhos: índice vencido nunca é servido, nem na consulta da Montagem"
-    },
-    {
-      "hash": "1b88e9a1",
-      "data": "15/10/2026",
-      "titulo": "Corte e montagem: lista e desenho rápidos, filtro \"Não montado\" e aviso de desenho impresso"
     }
   ]
 }
