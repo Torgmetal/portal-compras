@@ -14,6 +14,9 @@ const consulta = z.object({
 }).refine((v) => v.fonte !== "obra" || v.op, { message: "op é obrigatório para a fonte obra" })
   .refine((v) => v.fonte === "procedimentos" ? v.id : v.caminho, { message: "informe id (procedimentos) ou caminho" });
 
+// encodeURIComponent deixa `'()*!` passarem, e o RFC 5987 não os aceita sem escape.
+const nomeRfc5987 = (n) => encodeURIComponent(n).replace(/['()*!]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+
 const NC = { "cache-control": "no-store" };
 
 export async function GET(req) {
@@ -22,10 +25,10 @@ export async function GET(req) {
     const p = consulta.safeParse(Object.fromEntries(["fonte", "op", "caminho", "id"].map((k) => [k, sp.get(k) ?? undefined])));
     if (!p.success) return Response.json({ ok: false, error: p.error.issues[0]?.message || "parâmetros inválidos" }, { status: 400, headers: NC });
     try {
-      const { buffer, nome, contentType } = await baixarDocumento({ fonte: p.data.fonte, opNumero: p.data.op, caminho: p.data.caminho, id: p.data.id });
-      return new Response(buffer, {
+      const { stream, nome, tamanho, contentType } = await baixarDocumento({ fonte: p.data.fonte, opNumero: p.data.op, caminho: p.data.caminho, id: p.data.id });
+      return new Response(stream, {
         status: 200,
-        headers: { "content-type": contentType, "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(nome)}`, "content-length": String(buffer.length), ...NC },
+        headers: { "content-type": contentType, "content-disposition": `attachment; filename*=UTF-8''${nomeRfc5987(nome)}`, "content-length": String(tamanho), ...NC },
       });
     } catch (e) {
       if (e.status) return Response.json({ ok: false, error: e.message }, { status: e.status, headers: NC });

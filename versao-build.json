@@ -1,7 +1,12 @@
 {
-  "build": 3677,
-  "gerado": "2026-10-16T20:17:28.926Z",
+  "build": 3678,
+  "gerado": "2026-10-16T20:17:29.301Z",
   "commits": [
+    {
+      "hash": "2adf176a",
+      "data": "16/10/2026",
+      "titulo": "feat(ia): app lê procedimentos, pasta da obra e NORMAS pelo portal"
+    },
     {
       "hash": "5dadfb53",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "077ec385",
       "data": "15/10/2026",
       "titulo": "fix: geração do data book continua no servidor ao sair da tela"
-    },
-    {
-      "hash": "5cbb0a78",
-      "data": "15/10/2026",
-      "titulo": "Memória e revisão: romaneio TMSA (FOR-081)"
     }
   ]
 }
