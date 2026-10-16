@@ -78,6 +78,36 @@ describe("POST", () => {
     mockPrisma.roteiroEtapa.findMany.mockResolvedValue([{ id: "r1", etapa: 1, fase: null, status: "AGUARDANDO_ACEITE", divergencias: [d] }]);
     expect((await post({ opNumero: "89", etapa: 1, para: "CONCLUIDA" })).status).toBe(409);
   });
+  it("divergencias [] não apaga as gravadas: 409 e nada é gravado", async () => {
+    const d = { id: "d1", descricao: "x", fonte: "ifc", evidencia: null, situacao: "aberta" };
+    mockPrisma.roteiroEtapa.findMany.mockResolvedValue([{ id: "r1", etapa: 1, fase: null, status: "AGUARDANDO_ACEITE", divergencias: [d] }]);
+    const r = await post({ opNumero: "89", etapa: 1, para: "CONCLUIDA", divergencias: [] });
+    expect(r.status).toBe(409);
+    expect(mockPrisma.roteiroEtapa.update).not.toHaveBeenCalled();
+  });
+  it("mesmos ids com situacao aceita concluem; diff do AuditLog leva divergências e aceite", async () => {
+    const d = { id: "d1", descricao: "x", fonte: "ifc", evidencia: null, situacao: "aberta" };
+    mockPrisma.roteiroEtapa.findMany.mockResolvedValue([{ id: "r1", etapa: 1, fase: null, status: "AGUARDANDO_ACEITE", divergencias: [d] }]);
+    const r = await post({ opNumero: "89", etapa: 1, para: "CONCLUIDA", divergencias: [{ ...d, situacao: "aceita" }], observacao: "ok" });
+    expect(r.status).toBe(200);
+    const diff = mockPrisma.auditLog.create.mock.calls[0][0].data.diff;
+    expect(diff.antes.divergencias[0].situacao).toBe("aberta");
+    expect(diff.depois.divergencias[0].situacao).toBe("aceita");
+    expect(diff.depois).toMatchObject({ observacao: "ok", aceitoPorId: "u1" });
+    expect(diff.depois.aceitoEm).toBeInstanceOf(Date);
+  });
+  it("reabrir uma etapa CONCLUIDA limpa o aceite", async () => {
+    mockPrisma.roteiroEtapa.findMany.mockResolvedValue([{ id: "r1", etapa: 1, fase: null, status: "CONCLUIDA", divergencias: [], aceitoPorId: "u9", aceitoEm: new Date() }]);
+    await post({ opNumero: "89", etapa: 1, para: "EM_ANDAMENTO" });
+    expect(mockPrisma.roteiroEtapa.update.mock.calls[0][0].data).toMatchObject({ aceitoPorId: null, aceitoEm: null });
+  });
+  it("trava da OP é pedida antes de qualquer leitura", async () => {
+    await post({ opNumero: "89", etapa: 1, para: "EM_ANDAMENTO" });
+    const trava = mockPrisma.$executeRaw.mock.invocationCallOrder[0];
+    expect(trava).toBeLessThan(mockPrisma.roteiroEtapa.findMany.mock.invocationCallOrder.at(-1));
+    expect(mockPrisma.$executeRaw.mock.calls[0][0].join("")).toContain("pg_advisory_xact_lock");
+    expect(mockPrisma.$executeRaw.mock.calls[0][1]).toBe("op89");
+  });
   it("P2002 da corrida vira 409", async () => {
     mockPrisma.roteiroEtapa.create.mockRejectedValue(Object.assign(new Error("dup"), { code: "P2002" }));
     expect((await post({ opNumero: "89", etapa: 1, para: "EM_ANDAMENTO" })).status).toBe(409);

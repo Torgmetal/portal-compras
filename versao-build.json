@@ -1,7 +1,12 @@
 {
-  "build": 3681,
-  "gerado": "2026-10-16T20:17:30.463Z",
+  "build": 3682,
+  "gerado": "2026-10-16T20:17:30.840Z",
   "commits": [
+    {
+      "hash": "4c0bd59e",
+      "data": "16/10/2026",
+      "titulo": "feat(ia): roteiro de 6 etapas da obra com portão de aceite"
+    },
     {
       "hash": "8bf6e0ca",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "adadfaa8",
       "data": "15/10/2026",
       "titulo": "Aditivo: editar (inclusive divulgado) e excluir rascunho"
-    },
-    {
-      "hash": "23088e06",
-      "data": "15/10/2026",
-      "titulo": "Memória e revisão: OC/TPR pelas ETCs"
     }
   ]
 }

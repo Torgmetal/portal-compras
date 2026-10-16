@@ -3,7 +3,8 @@
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { comAparelho } from "@/lib/ia-aparelho-auth";
-import { ETAPAS, STATUS, podeMudar } from "@/lib/roteiro-engenharia";
+import { comTravaDaObra } from "@/lib/conferencia-peca";
+import { ETAPAS, STATUS, podeMudar, mesclarDivergencias } from "@/lib/roteiro-engenharia";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +41,40 @@ async function acharOP(opNumero) {
   return casa.length === 1 ? casa[0] : null;
 }
 
+const resumo = (r) => ({
+  status: r?.status ?? "PENDENTE", divergencias: r?.divergencias ?? [], observacao: r?.observacao ?? null,
+  aceitoPorId: r?.aceitoPorId ?? null, aceitoEm: r?.aceitoEm ?? null,
+});
+
+// Roda dentro da transação travada por OP: a regra olha o estado que vai ser alterado, e duas chamadas da mesma
+// OP não leem o mesmo retrato velho. Lança `{recusa}` para a rota responder 409.
+async function gravar(tx, { op, etapa, fase, para, divergencias, observacao, user, aparelho }) {
+  const registros = await tx.roteiroEtapa.findMany({ where: { opId: op.id } });
+  const atual = registros.find((r) => r.etapa === etapa && (r.fase ?? null) === fase) ?? null;
+  const mescla = mesclarDivergencias(atual?.divergencias, divergencias);
+  if (!mescla.ok) throw Object.assign(new Error(mescla.motivo), { recusa: mescla });
+  const regra = podeMudar(registros, { etapa, fase, para, divergencias: mescla.lista });
+  if (!regra.ok) throw Object.assign(new Error(regra.motivo), { recusa: regra });
+
+  const dados = { status: para, atualizadoPorId: user.id, divergencias: mescla.lista };
+  if (observacao !== undefined) dados.observacao = observacao;
+  // Regra 4: quem aceita é o dono do aparelho, só na transição para CONCLUIDA. Sair de CONCLUIDA (reabrir)
+  // apaga o aceite: a linha não pode continuar parecendo aceita.
+  if (para === "CONCLUIDA") { dados.aceitoPorId = user.id; dados.aceitoEm = new Date(); }
+  else if (atual?.status === "CONCLUIDA") { dados.aceitoPorId = null; dados.aceitoEm = null; }
+
+  const registro = atual
+    ? await tx.roteiroEtapa.update({ where: { id: atual.id }, data: dados })
+    : await tx.roteiroEtapa.create({ data: { opId: op.id, etapa, fase, ...dados } });
+  await tx.auditLog.create({
+    data: {
+      userId: user.id, action: "ROTEIRO_ENGENHARIA", entity: "RoteiroEtapa", entityId: registro.id,
+      diff: { antes: resumo(atual), depois: { ...resumo(registro), etapa, fase, opNumero: op.numero }, aparelhoId: aparelho.id },
+    },
+  });
+  return registro;
+}
+
 export async function GET(req) {
   return comAparelho(req, async () => {
     const opNumero = new URL(req.url).searchParams.get("op")?.trim();
@@ -63,33 +98,7 @@ export async function POST(req) {
     if (!op) return falha(404, "OP não encontrada no portal.");
 
     try {
-      // Interativa: lê o roteiro e grava na mesma transação, para a regra olhar o estado que vai ser alterado.
-      const salvo = await prisma.$transaction(async (tx) => {
-        const registros = await tx.roteiroEtapa.findMany({ where: { opId: op.id } });
-        const atual = registros.find((r) => r.etapa === etapa && (r.fase ?? null) === fase) ?? null;
-        // Sem divergências no pedido vale o que já está gravado: a regra 3 olha a lista da etapa, não uma lista vazia.
-        const lista = divergencias ?? (Array.isArray(atual?.divergencias) ? atual.divergencias : []);
-        const regra = podeMudar(registros, { etapa, fase, para, divergencias: lista });
-        if (!regra.ok) throw Object.assign(new Error(regra.motivo), { recusa: regra });
-
-        const dados = { status: para, atualizadoPorId: user.id };
-        if (divergencias) dados.divergencias = divergencias;
-        if (observacao !== undefined) dados.observacao = observacao;
-        // Regra 4: quem aceita é o dono do aparelho, e só na transição para CONCLUIDA.
-        if (para === "CONCLUIDA") { dados.aceitoPorId = user.id; dados.aceitoEm = new Date(); }
-
-        const registro = atual
-          ? await tx.roteiroEtapa.update({ where: { id: atual.id }, data: dados })
-          : await tx.roteiroEtapa.create({ data: { opId: op.id, etapa, fase, ...dados } });
-        await tx.auditLog.create({
-          data: {
-            userId: user.id, action: "ROTEIRO_ENGENHARIA", entity: "RoteiroEtapa",
-            entityId: registro.id ?? `${op.id}|${etapa}|${fase ?? "-"}`,
-            diff: { antes: atual ? { status: atual.status } : { status: "PENDENTE" }, depois: { status: para, etapa, fase, opNumero: op.numero }, aparelhoId: aparelho.id },
-          },
-        });
-        return registro;
-      });
+      const salvo = await comTravaDaObra(prisma, op.id, (tx) => gravar(tx, { op, etapa, fase, para, divergencias, observacao, user, aparelho }));
       return Response.json({ ok: true, registro: salvo }, { headers: NC });
     } catch (e) {
       if (e.recusa) return falha(409, e.recusa.motivo, e.recusa.pendentes ? { pendentes: e.recusa.pendentes } : {});

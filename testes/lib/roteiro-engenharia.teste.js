@@ -73,6 +73,10 @@ describe("regra 5: etapa 6 NAO_SE_APLICA vale para a obra", () => {
     expect(podeMudar(feitas123, { etapa: 6, fase: 1, para: "NAO_SE_APLICA" }).ok).toBe(false);
     expect(podeMudar(feitas123, { etapa: 6, fase: null, para: "NAO_SE_APLICA" }).ok).toBe(true);
   });
+  it("dispensar a etapa 6 com fase já iniciada é recusado", () => {
+    const reg = [...feitas123, r(6, "EM_ANDAMENTO", 1)];
+    expect(podeMudar(reg, { etapa: 6, fase: null, para: "NAO_SE_APLICA" }).ok).toBe(false);
+  });
   it("encerrado o roteiro, nenhuma fase da etapa 6 anda", () => {
     const reg = [...feitas123, r(5, "CONCLUIDA", 1), r(6, "NAO_SE_APLICA")];
     const res = podeMudar(reg, { etapa: 6, fase: 1, para: "EM_ANDAMENTO" });
