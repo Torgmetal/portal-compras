@@ -1,6 +1,7 @@
 "use client";
 import ProtecaoEdicao from "@/components/qualidade/ProtecaoEdicao";
 import CampoData from "@/components/CampoData";
+import AcompanhamentoEficacia from "@/components/qualidade/AcompanhamentoEficacia";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -211,6 +212,7 @@ export default function RncDetalheClient({ id }) {
           )}
         </div>
         <h1 className="text-xl font-extrabold text-torg-dark tracking-tight">Relatório de Não Conformidade</h1>
+        <AcompanhamentoEficacia rnc={d} />
       </div>
 
       {/* Identificação */}

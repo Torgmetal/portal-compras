@@ -1,14 +1,17 @@
 "use client";
 import CampoData from "@/components/CampoData";
+import AcompanhamentoEficacia from "@/components/qualidade/AcompanhamentoEficacia";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertOctagon, Plus, Loader2, X, AlertCircle, CheckCircle2, Building2, User, Upload, FileSpreadsheet, ListChecks } from "lucide-react";
-import { numRNC, STATUS_RNC, statusRncLabel, diasParaPrazo } from "@/lib/nao-conformidade";
+import { numRNC, STATUS_RNC, statusRncLabel, diasParaPrazo, acompanhamentoEficacia } from "@/lib/nao-conformidade";
 import PlanosAcaoLista from "../auditorias-internas/PlanosAcaoLista";
 
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
 
-function PrazoBadge({ prazo, encerradaEm }) {
+function PrazoBadge({ rnc }) {
+  if (acompanhamentoEficacia(rnc)) return <AcompanhamentoEficacia rnc={rnc} compacto />;
+  const { prazoResposta: prazo, encerradaEm } = rnc;
   const dias = diasParaPrazo(prazo, encerradaEm);
   if (dias == null) return <span className="text-torg-gray">—</span>;
   if (dias < 0) return <span className="text-[11px] font-semibold text-red-700 bg-red-50 rounded-full px-2 py-0.5">vencido {-dias}d</span>;
@@ -117,7 +120,7 @@ export default function RncClient() {
                     <td className="px-3 py-2 text-torg-dark">{r.cliente || "—"}</td>
                     <td className="px-3 py-2 text-torg-gray whitespace-nowrap">{r.opNumero ? r.opNumero.replace(/^[Tt]\s*/, "") : "—"}</td>
                     <td className="px-3 py-2 text-torg-gray max-w-[280px] truncate">{r.descricao || <span className="italic">sem descrição</span>}{r.tipo === "CLIENTE" && r.pertinente === false && <span className="ml-1.5 text-[9px] font-bold text-gray-600 bg-gray-100 rounded px-1 py-0.5">improcedente</span>}{r.recorrente && <span className="ml-1.5 text-[9px] font-bold text-amber-700 bg-amber-50 rounded px-1 py-0.5">recorrente</span>}</td>
-                    <td className="px-3 py-2 whitespace-nowrap"><PrazoBadge prazo={r.prazoResposta} encerradaEm={r.encerradaEm} /></td>
+                    <td className="px-3 py-2 whitespace-nowrap"><PrazoBadge rnc={r} /></td>
                     <td className="px-3 py-2 text-center"><StatusChip s={r.status} /></td>
                   </tr>
                 ))}

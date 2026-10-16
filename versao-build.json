@@ -1,7 +1,12 @@
 {
-  "build": 3661,
-  "gerado": "2026-10-15T21:48:01.441Z",
+  "build": 3662,
+  "gerado": "2026-10-16T11:35:21.796Z",
   "commits": [
+    {
+      "hash": "0cfb1ec1",
+      "data": "15/10/2026",
+      "titulo": "Revisão e memória: localStorage indefinido nos testes do Node 26"
+    },
     {
       "hash": "b29de95b",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "cf40b8fb",
       "data": "14/10/2026",
       "titulo": "Memória e revisão: certificados de LP na §06"
-    },
-    {
-      "hash": "4c2cd991",
-      "data": "14/10/2026",
-      "titulo": "feat: certificados do penetrante/revelador entram sozinhos na §06"
     }
   ]
 }
