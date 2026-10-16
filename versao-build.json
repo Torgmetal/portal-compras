@@ -1,7 +1,12 @@
 {
-  "build": 3679,
-  "gerado": "2026-10-16T20:17:29.684Z",
+  "build": 3680,
+  "gerado": "2026-10-16T20:17:30.082Z",
   "commits": [
+    {
+      "hash": "b7e470c0",
+      "data": "16/10/2026",
+      "titulo": "refactor(le): import da LE sai da rota para lib/importar-le-core (caracterização congela o comportamento)"
+    },
     {
       "hash": "ec1596b0",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "b25a17e1",
       "data": "15/10/2026",
       "titulo": "feat: romaneio TMSA lê OC e TPR das ETCs da obra"
-    },
-    {
-      "hash": "9ad9b152",
-      "data": "15/10/2026",
-      "titulo": "Memória e revisão: geração no servidor e fontes de OC/TPR da TMSA"
     }
   ]
 }
