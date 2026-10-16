@@ -252,3 +252,4 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Cotação encerrada no Pedido gerado](torg_cotacao_encerrada.md) — RM vira PEDIDO_GERADO → cotações sem resposta ENCERRADA + e-mail neutro; 236 antigas encerradas sem e-mail
 - [Corte e montagem (gerentes, celular)](torg_corte_montagem_gerentes.md) — consulta obra→setor em cartões; mesma rota do PCP; lib/status-setor é a regra única de situação
 - [CMR: lote atômico com chave](torg_cmr_lote.md) — "Gravar N" grava tudo ou nada; reenvio com o mesmo loteId devolve os R (CmrLote); avisos em lote; reenvio não espelha
+- [Portão de IA da Engenharia (F1)](torg_engenharia_ia_portao.md) — PC pareado com aprovação do ADMIN, teto mensal R$ por projetista, só Opus/Sonnet 5.5, chave só no portal; conector torg-tekla no repo Torgmetal/torg-engenharia

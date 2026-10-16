@@ -2946,3 +2946,19 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   quebras somem); OC de outro layout da Valmet pode não casar; (b) `ehObraValmet` = /\bVALMET\b/ em `OP.cliente`
   (OP-125 Klabin também é Valmet e passa a emitir este modelo); (c) a revisão da lista vem do nome do arquivo
   (`_R01`) — renomear sem o sufixo faz voltar à R00; (d) a mudança no desenhador de PDF também vale para o FOR-081.
+
+## 16/10/2026 — Portão de IA da Engenharia, F1 do app Torg Engenharia (Claude)
+- **`05738630` + `98304676`** (spec `70c5ac73`): pareamento de PC (código TRG-XXXX → projetista vincula logado → só
+  o ADMIN do portal aprova → token entregue UMA vez, só o SHA-256 no banco), portão `/api/engenharia-ia/v1/messages`
+  e `/count_tokens` no formato da API da Anthropic (aparelho ATIVO, usuário com ENGENHARIA ou ADMIN, só
+  claude-opus-5-5/claude-sonnet-5-5, teto mensal em R$ por projetista, 60 chamadas/min por aparelho), repasse do
+  stream com `ANTHROPIC_API_KEY_ENGENHARIA` lendo o `usage` no caminho e gravando `IaUso` no fim (falha ao gravar não
+  derruba a resposta), telas `/admin/engenharia-ia` e `/engenharia/ia/vincular`. Tabelas por SQL
+  (`scripts/ensure-ia-engenharia.mjs`). Testes: regras 13, portão 13, pareamento/admin 17, middleware 2. Suíte 5.400.
+  ⚠ **PEDIDO DE REVISÃO DE SEGURANÇA (`security`)** — o CLAUDE.md pede consulta antes de implementar login/permissão/
+  endpoint, mas `scripts/revisao-codex/consultar.py` e `.codex/skills/` não existem neste repositório; segue para
+  revisão depois. Pontos a olhar: (a) rotas PÚBLICAS no middleware (`iniciar`, `status`, `v1/*`) — `iniciar` cria
+  linha sem autenticação (teto de 50 pareando/hora); (b) o token também é aceito em `x-api-key`; (c) teto FLEXÍVEL
+  (soma do mês lida antes da chamada — concorrência pode passar um pouco); (d) ritmo contado pelo `IaUso` (as chamadas
+  recusadas também contam); (e) cabeçalhos repassados: só `anthropic-version` e `anthropic-beta`; (f) `pedido`
+  guardado em texto (até 2.000 caracteres) — dado de obra, visível só ao ADMIN do portal; (g) `maxDuration` 300.
