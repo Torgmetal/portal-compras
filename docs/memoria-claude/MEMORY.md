@@ -253,4 +253,4 @@ a linha aqui e commite. Nada de segredo: senha, token e chave ficam no `.env.loc
 - [Corte e montagem (gerentes, celular)](torg_corte_montagem_gerentes.md) — consulta obra→setor em cartões; mesma rota do PCP; lib/status-setor é a regra única de situação
 - [CMR: lote atômico com chave](torg_cmr_lote.md) — "Gravar N" grava tudo ou nada; reenvio com o mesmo loteId devolve os R (CmrLote); avisos em lote; reenvio não espelha
 - [Portão de IA da Engenharia (F1)](torg_engenharia_ia_portao.md) — PC pareado com aprovação do ADMIN, teto mensal R$ por projetista, só Opus/Sonnet 5.5, chave só no portal; conector torg-tekla no repo Torgmetal/torg-engenharia
-- [App Torg IA — rotas /app/*](torg_app_ia_rotas.md) — token do aparelho (comAparelho), roteiro de 6 etapas (divergência nunca some, trava por OP), download em stream, rodar ensure-roteiro-engenharia.mjs antes do deploy
+- [App Torg IA — rotas /app/*](torg_app_ia_rotas.md) — token do aparelho (comAparelho), roteiro de 6 etapas (divergência nunca some, trava por OP), download em stream, rodar ensure-roteiro-engenharia.mjs antes do release do app; LPC só com fase da mesma OP, LE de OP inexistente = 404

@@ -1,7 +1,12 @@
 {
-  "build": 3683,
-  "gerado": "2026-10-16T20:17:31.212Z",
+  "build": 3684,
+  "gerado": "2026-10-16T20:17:31.591Z",
   "commits": [
+    {
+      "hash": "7dc4f2cf",
+      "data": "16/10/2026",
+      "titulo": "feat(ia): app confirma a GRD da obra"
+    },
     {
       "hash": "2f99570d",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "1b88e9a1",
       "data": "15/10/2026",
       "titulo": "Corte e montagem: lista e desenho rápidos, filtro \"Não montado\" e aviso de desenho impresso"
-    },
-    {
-      "hash": "6eeac6d3",
-      "data": "15/10/2026",
-      "titulo": "Memória e revisão: editar/excluir aditivo"
     }
   ]
 }

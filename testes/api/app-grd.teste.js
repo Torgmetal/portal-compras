@@ -37,10 +37,11 @@ describe("GET /grd", () => {
     expect(mockPrisma.cronHeartbeat.findUnique.mock.calls[0][0].where).toEqual({ job: "grd-sincronizar" });
   });
 
-  it("desde filtra por createdAt; desde inválido é 400", async () => {
+  it("desde filtra por updatedAt (GRD reprocessada também conta); desde inválido é 400", async () => {
     await get("?op=089&desde=2026-10-10T00:00:00Z");
     const where = mockPrisma.grdEngenharia.findMany.mock.calls[0][0].where;
-    expect(where.createdAt).toEqual({ gte: new Date("2026-10-10T00:00:00Z") });
+    expect(where.updatedAt).toEqual({ gte: new Date("2026-10-10T00:00:00Z") });
+    expect(where.createdAt).toBeUndefined();
     expect((await get("?op=89&desde=lixo")).status).toBe(400);
   });
 

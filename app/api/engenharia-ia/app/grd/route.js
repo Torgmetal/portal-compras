@@ -27,7 +27,9 @@ export async function GET(req) {
     if (desde) {
       const d = new Date(desde);
       if (Number.isNaN(d.getTime())) return falha(400, "desde deve ser uma data ISO.");
-      where.createdAt = { gte: d };
+      // ⚠ updatedAt, não createdAt: o cron reprocessa a GRD quando o arquivo muda na pasta (nova revisão,
+      // item corrigido) — pelo createdAt o app perguntaria "mudou algo desde ontem?" e ouviria que não.
+      where.updatedAt = { gte: d };
     }
     const [grds, beat] = await Promise.all([
       prisma.grdEngenharia.findMany({ where, orderBy: [{ data: "desc" }, { createdAt: "desc" }], take: 200 }),

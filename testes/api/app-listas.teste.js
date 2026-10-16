@@ -81,6 +81,29 @@ describe("LE", () => {
     expect(audit).toMatchObject({ userId: "u1", diff: { tipo: "LE", revisao: "R01", aparelhoId: "ap1", previsto: { incluidas: 2 }, gravado: { criados: 2 } } });
   });
 
+  it("recibo diz qual OP foi encontrada e sob que número gravou ('89' → '089')", async () => {
+    const j = await (await pedir()).json();
+    expect(j).toMatchObject({ opNumero: "89", opEncontrada: true, opCadastrada: "089", chaveGravada: "089" });
+  });
+
+  it("OP que não existe no portal → 404 ANTES de gravar ou arquivar", async () => {
+    mockPrisma.oP.findMany.mockResolvedValue([{ id: "op90", numero: "090" }]);
+    const r = await pedir();
+    expect(r.status).toBe(404);
+    const j = await r.json();
+    expect(j).toEqual({ ok: false, error: "OP 89 não encontrada no portal." });
+    expect(parseFormularioLE).not.toHaveBeenCalled();
+    expect(mockPrisma.pecaConjunto.create).not.toHaveBeenCalled();
+    expect(mockPrisma.pecaConjunto.deleteMany).not.toHaveBeenCalled();
+    expect(salvarListaNoServidor).not.toHaveBeenCalled();
+  });
+
+  it("OP ambígua pelo número ('089' e 'T89' cadastradas) também é 404 — mesma regra do import da tela", async () => {
+    mockPrisma.oP.findMany.mockResolvedValue([{ id: "a", numero: "089" }, { id: "b", numero: "T89" }]);
+    expect((await pedir()).status).toBe(404);
+    expect(mockPrisma.pecaConjunto.create).not.toHaveBeenCalled();
+  });
+
   it("OP '89' grava sob a OP cadastrada '089'", async () => {
     await pedir();
     const gravadas = mockPrisma.pecaConjunto.create.mock.calls.map(([x]) => x.data);
@@ -164,6 +187,46 @@ describe("LPC", () => {
     expect(j.gravado).toEqual({ criados: 1, atualizados: 1, ignorados: 1 });
     expect(j.divergente).toBe(true);
     expect(j.alerta).toContain("1 NÃO entrou");
+  });
+
+  it("recibo da LPC diz a OP cadastrada e a chave da fase gravada", async () => {
+    importarLpcMerge.mockResolvedValue(merge({ opEncontrada: true, opCadastrada: "089" }));
+    const j = await (await pedir(corpo({ tipo: "LPC", arquivoNome: "T89A-LPC_R02.xlsx" }))).json();
+    expect(j).toMatchObject({ opEncontrada: true, opCadastrada: "089", chaveGravada: "T89A" });
+  });
+
+  it("parser devolveu o número da OP no lugar da fase ('089') → 400, nada gravado", async () => {
+    parseLPC.mockReturnValue({ opNumero: "089", conjuntos: [], croquis: [], avulsas: [], relacoes: [] });
+    const r = await pedir(corpo({ tipo: "LPC", arquivoNome: "089-LPC_R02.xlsx" }));
+    expect(r.status).toBe(400);
+    const j = await r.json();
+    expect(j.error).toContain("fase");
+    expect(j.error).toContain("T94A");
+    expect(importarLpcMerge).not.toHaveBeenCalled();
+    expect(salvarListaNoServidor).not.toHaveBeenCalled();
+  });
+
+  it("fase de OUTRA OP (T094A para a OP 89) → 400, nada gravado", async () => {
+    const r = await pedir(corpo({ tipo: "LPC", arquivoNome: "T094A-LPC_R02.xlsx" }));
+    expect(r.status).toBe(400);
+    expect((await r.json()).error).toContain("T094A");
+    expect(importarLpcMerge).not.toHaveBeenCalled();
+    expect(salvarListaNoServidor).not.toHaveBeenCalled();
+  });
+
+  it("fase com zero à esquerda da MESMA OP (T089A para a OP 89) passa", async () => {
+    importarLpcMerge.mockResolvedValue(merge({ opNumero: "T089A" }));
+    const r = await pedir(corpo({ tipo: "LPC", opNumero: "089", arquivoNome: "T089A-LPC_R02.xlsx" }));
+    expect(r.status).toBe(200);
+    expect(importarLpcMerge).toHaveBeenCalled();
+  });
+
+  it("LPC com sobrescrever:true → 400, nada lido nem gravado", async () => {
+    const r = await pedir(corpo({ tipo: "LPC", arquivoNome: "T89A-LPC_R02.xlsx", sobrescrever: true }));
+    expect(r.status).toBe(400);
+    expect((await r.json()).error).toContain("a LPC pelo app só entra em modo complementar");
+    expect(parseLPC).not.toHaveBeenCalled();
+    expect(importarLpcMerge).not.toHaveBeenCalled();
   });
 
   it("sem fase no arquivo nem nas marcas → 400, nunca grava sob o número da OP", async () => {
