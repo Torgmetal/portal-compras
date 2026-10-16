@@ -1,7 +1,12 @@
 {
-  "build": 3662,
-  "gerado": "2026-10-16T11:35:21.796Z",
+  "build": 3663,
+  "gerado": "2026-10-16T12:17:57.048Z",
   "commits": [
+    {
+      "hash": "37137539",
+      "data": "16/10/2026",
+      "titulo": "fix: avisar avaliação das RNCs após 60 dias da emissão"
+    },
     {
       "hash": "0cfb1ec1",
       "data": "15/10/2026",
@@ -146,11 +151,6 @@
       "hash": "f67a6c8c",
       "data": "14/10/2026",
       "titulo": "Pedido no Omie: quantidade em peças junto do KG nas Informações Adicionais"
-    },
-    {
-      "hash": "cf40b8fb",
-      "data": "14/10/2026",
-      "titulo": "Memória e revisão: certificados de LP na §06"
     }
   ]
 }

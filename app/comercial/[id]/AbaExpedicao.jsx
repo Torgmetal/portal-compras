@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { Truck, Plus, Pencil, Trash2, ChevronDown, ChevronRight, Loader2, X, Upload, Download, AlertCircle, CheckCircle2, FileSpreadsheet } from "lucide-react";
 import { numeroBR } from "@/lib/numero-br";
 import { ehObraTmsa } from "@/lib/romaneio-tmsa";
+import { ehObraValmet } from "@/lib/packing-valmet";
 
 const fmtKg = (n) => (n == null ? null : `${Number(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`);
 const fmtD = (d) => (d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
@@ -305,7 +306,7 @@ export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = 
 
       {modal && <LoteModal opId={opId} lote={modal.lote} onClose={() => setModal(null)} onSaved={() => { setModal(null); carregar(); }} />}
       {importOpen && <ImportarModal opId={opId} temLotes={(lotes || []).length > 0} onClose={() => setImportOpen(false)} onImportado={() => { setImportOpen(false); carregar(); }} />}
-      {exportar && <EmitirRomaneioWizard opId={opId} tmsa={ehObraTmsa({ cliente })} lote={exportar.lote} emitido={exportar.emitido} onClose={() => setExportar(null)} onEmitido={() => { setExportar(null); carregar(); }} />}
+      {exportar && <EmitirRomaneioWizard opId={opId} tmsa={ehObraTmsa({ cliente })} valmet={!ehObraTmsa({ cliente }) && ehObraValmet({ cliente })} lote={exportar.lote} emitido={exportar.emitido} onClose={() => setExportar(null)} onEmitido={() => { setExportar(null); carregar(); }} />}
     </div>
   );
 }
@@ -534,7 +535,7 @@ function baixarBase64(b64, nome, tipo) {
 }
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido, tmsa = false }) {
+function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido, tmsa = false, valmet = false }) {
   const [passo, setPasso] = useState(1);
   const [f, setF] = useState({
     transportadora: lote?.transportadora || "", motorista: lote?.motorista || "",
@@ -543,7 +544,7 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido, tmsa = 
     data: lote?.dataPrevista ? String(lote.dataPrevista).slice(0, 10) : "",
     mudanca: "",
     // ⚠ obras da TMSA (FOR-081, Vitor 15/10/2026): medidas e madeira da simulação de carga; observações do romaneio
-    seguirSimulacao: true, observacoes: "",
+    seguirSimulacao: true, observacoes: "", nf: "",
   });
   const [marcas, setMarcas] = useState(null);
   const [sel, setSel] = useState(new Set());
@@ -658,7 +659,7 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido, tmsa = 
           placa: f.placa.trim() || null, placaCarreta: f.placaCarreta.trim() || null, contato: f.contato.trim() || null, data: f.data || null,
           itensSel: selecionadas.map(itemSel),
           mudanca: emitido ? f.mudanca.trim() : undefined,
-          ...(tmsa ? { seguirSimulacao: f.seguirSimulacao, observacoes: f.observacoes.trim() || null } : {}),
+          ...(tmsa ? { seguirSimulacao: f.seguirSimulacao, observacoes: f.observacoes.trim() || null } : valmet ? { seguirSimulacao: f.seguirSimulacao, nf: f.nf.trim() || null } : {}),
         }),
       });
       const j = await r.json();
@@ -682,7 +683,7 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido, tmsa = 
           placa: f.placa.trim() || null, placaCarreta: f.placaCarreta.trim() || null, contato: f.contato.trim() || null, data: f.data || null,
           itensSel: selecionadas.map(itemSel),
           previa: true,
-          ...(tmsa ? { seguirSimulacao: f.seguirSimulacao, observacoes: f.observacoes.trim() || null } : {}),
+          ...(tmsa ? { seguirSimulacao: f.seguirSimulacao, observacoes: f.observacoes.trim() || null } : valmet ? { seguirSimulacao: f.seguirSimulacao, nf: f.nf.trim() || null } : {}),
         }),
       });
       const j = await r.json();
@@ -719,7 +720,7 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido, tmsa = 
             <div className="py-8 text-center">
               <CheckCircle2 size={32} className="mx-auto text-emerald-600 mb-2" />
               <p className="text-sm font-semibold text-torg-dark">Romaneio {ok.numero}{ok.revisao > 0 ? ` — revisão R${String(ok.revisao).padStart(2, "0")}` : ""} emitido</p>
-              <p className="text-xs text-torg-gray mt-1">{ok.sharepoint?.ok ? `Salvo no servidor (4.2 Romaneios)${ok.tmsa ? " — Excel e PDF" : ""} e baixado.` : ok.sharepoint ? `Baixado — mas não salvou no SharePoint: ${ok.sharepoint.erro}` : "Baixado."}</p>
+              <p className="text-xs text-torg-gray mt-1">{ok.sharepoint?.ok ? `Salvo no servidor (4.2 Romaneios)${ok.tmsa || ok.valmet ? " — Excel e PDF" : ""} e baixado.` : ok.sharepoint ? `Baixado — mas não salvou no SharePoint: ${ok.sharepoint.erro}` : "Baixado."}</p>
               {(ok.avisos || []).length > 0 && (
                 <ul className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2 text-left space-y-0.5">
                   {ok.avisos.map((a) => <li key={a}>⚠ {a}</li>)}
@@ -859,6 +860,25 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido, tmsa = 
                   <label className="block">
                     <span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Observações</span>
                     <textarea value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} rows={2} maxLength={500} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue outline-none" />
+                  </label>
+                  {avisosPrevia.length > 0 && (
+                    <ul className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 space-y-0.5">
+                      {avisosPrevia.map((a) => <li key={a}>⚠ {a}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
+              {valmet && (
+                <div className="rounded-lg border border-torg-blue/20 bg-torg-blue/5 p-3 space-y-2">
+                  <p className="text-[12px] text-torg-dark"><b>Obra Valmet:</b> sai o Packing List da Valmet, em Excel e PDF, com a OC, a Instrução de Faturamento e a Lista de Equivalência (revisão mais nova) da pasta da obra.</p>
+                  <label className="flex items-start gap-2 text-[12px] text-torg-dark">
+                    <input type="checkbox" className="mt-0.5 accent-torg-blue" checked={f.seguirSimulacao} onChange={(e) => setF({ ...f, seguirSimulacao: e.target.checked })} />
+                    <span>Seguir a simulação de carga — dimensões de cada volume e peso da madeira. Sem simulação (ou desmarcado), sai um volume por marca, sem medida.</span>
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] font-medium text-torg-gray uppercase tracking-wide">Nº da Nota Fiscal</span>
+                    <input value={f.nf} onChange={(e) => setF({ ...f, nf: e.target.value })} maxLength={30} inputMode="numeric" className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-torg-blue outline-none" />
+                    <span className="text-[11px] text-torg-gray">Entra no &quot;Nr. do Pacote&quot; (fórmula do modelo: NF + fornecedor). Sem ela, o pacote sai só com o nome da Torg.</span>
                   </label>
                   {avisosPrevia.length > 0 && (
                     <ul className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 space-y-0.5">

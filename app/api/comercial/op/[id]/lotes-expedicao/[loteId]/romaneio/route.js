@@ -13,6 +13,9 @@ import { ehObraTmsa, montarRomaneioTmsa, referenciaProjeto } from "@/lib/romanei
 import { dadosTmsa } from "@/lib/romaneio-tmsa-dados";
 import { gerarRomaneioTmsaExcel } from "@/lib/romaneio-tmsa-excel";
 import { gerarRomaneioTmsaPdf } from "@/lib/romaneio-tmsa-pdf";
+import { ehObraValmet, montarPackingValmet } from "@/lib/packing-valmet";
+import { dadosValmet } from "@/lib/packing-valmet-dados";
+import { gerarPackingValmetExcel } from "@/lib/packing-valmet-excel";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -39,6 +42,8 @@ const schema = z.object({
   // obras da TMSA (FOR-081): seguir a simulação de carga para as medidas e a madeira; observações do romaneio
   seguirSimulacao: z.boolean().optional(),
   observacoes: z.string().max(500).nullable().optional(),
+  // obras da Valmet (Packing List): o nº da NF entra na fórmula do Nr. do Pacote do modelo
+  nf: z.string().max(30).nullable().optional(),
 });
 
 export async function POST(req, { params }) {
@@ -174,10 +179,25 @@ export async function POST(req, { params }) {
     const xlsx = await gerarRomaneioTmsaExcel({ numero: previo.numero, data: new Date(), referencia: referenciaProjeto(d.tpr, op.numero), observacoes: body.observacoes || "", ...r });
     return { xlsx, pdf: Buffer.from(await gerarRomaneioTmsaPdf(xlsx)), avisos: [...(d.avisos || []), ...r.avisos], origem: r.origem };
   }
-  if (tmsa && body.previa) {
-    const t = await arquivosTmsa();
-    const nomeBase = `PREVIA Romaneio ${numero} - OP-${op.numero} - TMSA`;
-    return NextResponse.json({ ok: true, previa: true, numero, ignoradas, tmsa: true, avisos: t.avisos, origem: t.origem,
+  // ⚠⚠ OBRAS DA VALMET: O ROMANEIO É O PACKING LIST DELA (Vitor, 16/10/2026: "para as obras da Valmet teremos esse
+  // modelo, precisa acessar a pasta da obra e verificar as informações"). OC, Instrução de Faturamento e Lista de
+  // Equivalência vêm da pasta da obra A CADA EMISSÃO — a lista vai sofrer revisão. Regras em lib/packing-valmet*.js.
+  const valmet = !tmsa && ehObraValmet(op);
+  async function arquivosValmet() {
+    const d = await dadosValmet({ op, previoId: previo.id, seguirSimulacao: body.seguirSimulacao !== false });
+    const r = montarPackingValmet({ itens, volumes: d.volumes, equivalencia: d.equivalencia });
+    const xlsx = await gerarPackingValmetExcel({
+      numero: previo.numero, data: new Date(), obra: op.obra, nf: body.nf?.trim() || null, oc: d.oc, instrucao: d.instrucao,
+      revisaoEquivalencia: d.revisaoEquivalencia, transporte: { transportadora, placa, motorista: [motorista, contato].filter(Boolean).join(" / ") || null }, ...r,
+    });
+    return { xlsx, pdf: Buffer.from(await gerarRomaneioTmsaPdf(xlsx)), avisos: [...(d.avisos || []), ...r.avisos], origem: r.origem };
+  }
+  const modelo = tmsa ? "TMSA" : valmet ? "VALMET" : null;
+  const arquivosDoCliente = tmsa ? arquivosTmsa : arquivosValmet;
+  if (modelo && body.previa) {
+    const t = await arquivosDoCliente();
+    const nomeBase = `PREVIA Romaneio ${numero} - OP-${op.numero} - ${modelo}`;
+    return NextResponse.json({ ok: true, previa: true, numero, ignoradas, tmsa: tmsa || undefined, valmet: valmet || undefined, avisos: t.avisos, origem: t.origem,
       nome: `${nomeBase}.xlsx`, arquivo: t.xlsx.toString("base64"), nomePdf: `${nomeBase}.pdf`, arquivoPdf: t.pdf.toString("base64") });
   }
 
@@ -203,8 +223,8 @@ export async function POST(req, { params }) {
     porQuem: user.name || user.email || null,
   }];
 
-  // TMSA: o FOR-081 sem aba de histórico — o layout é o do cliente, e a revisão fica no AuditLog e no prévio
-  const tm = tmsa ? await arquivosTmsa() : null;
+  // TMSA e Valmet: o modelo do cliente, sem aba de histórico — o layout é dele, e a revisão fica no AuditLog e no prévio
+  const tm = modelo ? await arquivosDoCliente() : null;
   const buf = tm ? tm.xlsx : await gerarRomaneioForm22({
     op,
     romaneio: { numero, data, transportadora, motorista, placa, placaCarreta, contatoTransporte: contato },
@@ -212,8 +232,8 @@ export async function POST(req, { params }) {
     historico: novaRevisao > 0 ? historico : null, // aba Histórico só na revisão
   });
   const prefixo = `Romaneio ${numero} - OP-${op.numero}`; // base do nome (acha a versão anterior na revisão)
-  const fileNome = tm ? `${prefixo} - TMSA.xlsx` : `${prefixo}${cli ? ` - ${cli}` : ""}.xlsx`;
-  const fileNomePdf = tm ? `${prefixo} - TMSA.pdf` : null;
+  const fileNome = tm ? `${prefixo} - ${modelo}.xlsx` : `${prefixo}${cli ? ` - ${cli}` : ""}.xlsx`;
+  const fileNomePdf = tm ? `${prefixo} - ${modelo}.pdf` : null;
 
   let sharepoint = null;
   try {
@@ -249,5 +269,5 @@ export async function POST(req, { params }) {
   await prisma.auditLog.create({ data: { userId: user.id, action: novaRevisao === 0 ? "EMITIR_ROMANEIO" : "REVISAR_ROMANEIO", entity: "RomaneioPrevio", entityId: previo.id, diff: { numero, revisao: novaRevisao, itens: itens.length, ...(ignoradas.length ? { ignoradasSemQuantidade: ignoradas } : {}) } } }).catch(() => {});
 
   return NextResponse.json({ ok: true, numero, revisao: novaRevisao, ignoradas, nome: fileNome, arquivo: buf.toString("base64"), sharepoint,
-    ...(tm ? { tmsa: true, avisos: tm.avisos, origem: tm.origem, nomePdf: fileNomePdf, arquivoPdf: tm.pdf.toString("base64") } : {}) });
+    ...(tm ? { tmsa: tmsa || undefined, valmet: valmet || undefined, avisos: tm.avisos, origem: tm.origem, nomePdf: fileNomePdf, arquivoPdf: tm.pdf.toString("base64") } : {}) });
 }
