@@ -1,7 +1,12 @@
 {
-  "build": 3685,
-  "gerado": "2026-10-16T20:17:31.970Z",
+  "build": 3686,
+  "gerado": "2026-10-16T23:46:38.937Z",
   "commits": [
+    {
+      "hash": "0f549a00",
+      "data": "16/10/2026",
+      "titulo": "fix(ia): app só lê da obra o que a Engenharia pode ver (sem valores nem compras)"
+    },
     {
       "hash": "d18ef555",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "e4799282",
       "data": "15/10/2026",
       "titulo": "Corte e montagem: obra lembrada que saiu da lista atual some da tela"
-    },
-    {
-      "hash": "21c18869",
-      "data": "15/10/2026",
-      "titulo": "Desenhos: índice vencido nunca é servido, nem na consulta da Montagem"
     }
   ]
 }

@@ -2962,3 +2962,22 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   (soma do mês lida antes da chamada — concorrência pode passar um pouco); (d) ritmo contado pelo `IaUso` (as chamadas
   recusadas também contam); (e) cabeçalhos repassados: só `anthropic-version` e `anthropic-beta`; (f) `pedido`
   guardado em texto (até 2.000 caracteres) — dado de obra, visível só ao ADMIN do portal; (g) `maxDuration` 300.
+
+## 16/10/2026 — F2 do app Torg Metal IA: portal, conector e app (Claude)
+- **Portal (F2a, na main `0f549a00`):** rotas `/api/engenharia-ia/app/*` autenticadas pelo token do aparelho
+  (`lib/ia-aparelho-auth.js`): documentos (procedimentos, pasta da obra com lista de liberados — só PT- sem valores,
+  nada de compras/contrato/financeiro —, NORMAS; download em stream), import de LE/LPC com recibo previsto × gravado
+  (recusa LPC sem fase, fase de outra OP e LE de OP inexistente), roteiro de 6 etapas (`RoteiroEtapa`, criada em
+  produção com o ok do Vitor; divergência nunca some; trava por OP) e GRD. Suíte 5.516.
+- **Conector (repo torg-engenharia, `f2b-conector`) e app Electron (`f2c-app`):** 28 ferramentas em 4 classes,
+  confirmação só nas destrutivas e no import de lista; verificadores com saída capturada por hook; app só com
+  ferramentas da Torg pelo portão. Testes: conector 70, app 257.
+- **Validação no Windows (sessão do Tekla, `f2c-app` `68fa426`, `conector/VALIDACAO-WINDOWS.md`):** os 21 EXEs com
+  `--json` validados numa cópia do T123 AJUSTES. `apagar` só apaga a marca pedida (145→144, croquis intactos).
+  Corrigidos na validação: total de colisões 0 (eventos chegam depois do "concluído"), destacar sem vista aberta,
+  lacunas listando séries de blank, IFC com conjunto ilegível derrubando a importação. Ambiente reduzido do conector
+  (28 variáveis) funciona com a licença TORG.
+  ⚠ Pendente: Node.js no PC do Windows (aguarda o ok do Vitor) para as etapas 4 (pacote) e 5 (checagens: deny do
+  PreToolUse × allowedTools, claude.exe fora do asar, node_modules do conector); etapa 6 (piloto com o John).
+  ⚠ Para revisão do Codex (`security`): rotas públicas `/app/*`, lista de liberados da pasta da obra, gating de
+  ferramentas e subagentes no app, isolamento de ambiente do conector.
