@@ -161,6 +161,12 @@ export default withAuth(
           path.startsWith("/api/estudo-cotacao/") ||
           // Sync MES — autenticado por Bearer API key própria (não NextAuth)
           path.startsWith("/api/mes/") ||
+          // Portão de IA da Engenharia (F1 do app Torg Engenharia, 16/10/2026): o app no PC do projetista NÃO tem
+          // sessão — o portão autentica pelo token do APARELHO (lib/ia-portao.js), e o pareamento pelo segredo de
+          // espera. ⚠ /aparelho/vincular fica DE FORA de propósito: é o projetista logado quem prende o código.
+          path === "/api/engenharia-ia/aparelho/iniciar" ||
+          path === "/api/engenharia-ia/aparelho/status" ||
+          path.startsWith("/api/engenharia-ia/v1/") ||
           // Sync LPC SharePoint — auth própria no handler. ⚠ o bearer do MES só CONSULTA ali:
           // importar apaga e recria 15.066 peças e exige sessão ADMIN/PRODUÇÃO + ?obra=.
           path.startsWith("/api/producao/pecas/sync-lpc-sharepoint") ||

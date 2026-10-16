@@ -1,7 +1,12 @@
 {
-  "build": 3666,
-  "gerado": "2026-10-16T15:22:58.777Z",
+  "build": 3667,
+  "gerado": "2026-10-16T15:51:08.888Z",
   "commits": [
+    {
+      "hash": "70c5ac73",
+      "data": "16/10/2026",
+      "titulo": "Spec Torg Engenharia: desenho da F1 (portão no portal)"
+    },
     {
       "hash": "1bd1c9a5",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "375d41cc",
       "data": "15/10/2026",
       "titulo": "Memória: MJ da OP-112 anexada na §09"
-    },
-    {
-      "hash": "ac981379",
-      "data": "15/10/2026",
-      "titulo": "Revisão: PDF dos recebimentos de estoque"
     }
   ]
 }

@@ -7082,3 +7082,59 @@ model FiscalAnexo {
   @@unique([userId, sha256])
   @@index([userId, criadoEm])
 }
+
+// ─── PORTÃO DE IA DA ENGENHARIA (F1 do app Torg Engenharia, 16/10/2026) ─────────────────────────
+// Spec: docs/superpowers/specs/2026-10-14-torg-engenharia-app-design.md. Tabelas criadas por SQL
+// (scripts/ensure-ia-engenharia.mjs), sem relação Prisma com User — mesmo padrão de CargaSimulada.
+// ⚠ O token do aparelho NUNCA é gravado: só `tokenHash` (SHA-256). `esperaHash` é o segredo com que o
+// app consulta o status do pareamento — também só o hash.
+model IaAparelho {
+  id               String    @id @default(cuid())
+  nome             String
+  userId           String?
+  status           String    @default("PAREANDO") // PAREANDO | AGUARDANDO_ADMIN | APROVADO | ATIVO | RECUSADO | REVOGADO
+  codigo           String?   @unique
+  codigoExpiraEm   DateTime?
+  esperaHash       String    @unique
+  tokenHash        String?   @unique
+  aprovadoPorId    String?
+  aprovadoEm       DateTime?
+  revogadoPorId    String?
+  revogadoEm       DateTime?
+  ultimoUsoEm      DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Uma linha por chamada ao portão (inclusive as recusadas). `pedido` = último texto escrito pelo projetista
+// (até 2.000 caracteres) — Vitor pediu (16/10/2026); visível só para ADMIN.
+model IaUso {
+  id                 String   @id @default(cuid())
+  aparelhoId         String?
+  userId             String?
+  modelo             String?
+  situacao           String   // ok | erro | recusado_modelo | recusado_teto | recusado_ritmo | recusado_acesso
+  inputTokens        Int      @default(0)
+  outputTokens       Int      @default(0)
+  cacheReadTokens    Int      @default(0)
+  cacheWriteTokens   Int      @default(0)
+  custoUsd           Float    @default(0)
+  custoBrl           Float    @default(0)
+  duracaoMs          Int?
+  pedido             String?
+  createdAt          DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([aparelhoId, createdAt])
+}
+
+// Teto mensal em R$ por projetista. Sem linha = sem acesso ao portão.
+model IaLimite {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  tetoMensalBrl Float
+  atualizadoPorId String?
+  updatedAt     DateTime @default(now()) @updatedAt
+}

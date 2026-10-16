@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FileText, GitCompareArrows, RotateCcw, Gauge, FolderKanban, ListChecks, ListOrdered, GanttChart, FileSpreadsheet } from "lucide-react";
+import { LayoutDashboard, FileText, GitCompareArrows, RotateCcw, Gauge, FolderKanban, ListChecks, ListOrdered, GanttChart, FileSpreadsheet, Laptop } from "lucide-react";
 import SidebarModuleSwitcher from "@/components/SidebarModuleSwitcher";
 import SidebarUserFooter from "@/components/SidebarUserFooter";
 
@@ -17,6 +17,8 @@ const ITENS = [
   { href: "/engenharia/grd", label: "GRD", icon: FileSpreadsheet },
   // Tarefas dos cronogramas em ordem de prazo — só as que o Planejamento enviou. (Vitor 19/08.)
   { href: "/engenharia/sequencia", label: "Sequência", icon: ListOrdered },
+  // Ligar o PC do projetista ao portão de IA (F1 do app Torg Engenharia, 16/10/2026).
+  { href: "/engenharia/ia/vincular", label: "IA — ligar PC", icon: Laptop },
   // ⚠⚠ CRONOGRAMA ≠ SEQUÊNCIA. A Sequência só mostra cronograma cujas tarefas o Planejamento
   // ENVIOU (`tarefasEnviadasEm`); o Cronograma mostra TODAS as tarefas de Engenharia, que é o
   // conjunto pelo qual o indicador de aderência cobra o setor. Vitor (29/08/2026): "preciso criar
