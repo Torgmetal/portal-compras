@@ -194,7 +194,7 @@ export default function AbaExpedicao({ opId, proposta = null, podeEditarLotes = 
                     <td className="px-3 py-2 text-right whitespace-nowrap">{pesoLote(l) != null ? <span className="text-torg-dark tabular-nums">{fmtKg(pesoLote(l))}</span> : <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">a definir</span>}</td>
                     <td className="px-2 py-2">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button onClick={() => setExportar({ lote: l, emitido })} className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-2.5 py-1 rounded-lg inline-flex items-center gap-1 whitespace-nowrap" title={emitido ? "Gerar uma revisão do romaneio" : "Emitir o romaneio (FORM 22)"}>
+                        <button onClick={() => setExportar({ lote: l, emitido })} className="text-xs font-semibold text-white bg-torg-blue hover:bg-torg-dark px-2.5 py-1 rounded-lg inline-flex items-center gap-1 whitespace-nowrap" title={emitido ? "Gerar uma revisão do romaneio" : `Emitir o romaneio (${ehObraTmsa({ cliente }) ? "FOR-081 da TMSA" : ehObraValmet({ cliente }) ? "Packing List da Valmet" : "FORM 22"})`}>
                           <FileSpreadsheet size={12} /> {emitido ? "Revisar" : "Emitir"}
                         </button>
                         {podeEditarLotes && <button onClick={() => setModal({ lote: l })} className="text-torg-gray hover:text-torg-blue" title="Editar"><Pencil size={14} /></button>}
@@ -894,7 +894,7 @@ function EmitirRomaneioWizard({ opId, lote, emitido, onClose, onEmitido, tmsa = 
                   <span className="text-[11px] text-torg-gray">A versão anterior vai pra pasta Obsoleto; o novo Excel ganha a aba Histórico.</span>
                 </label>
               ) : (
-                <p className="text-xs text-torg-gray"><strong>Baixar prévia</strong>: confere/imprime sem emitir (não salva no servidor). <strong>Emitir</strong>: gera o FORM 22, salva na pasta <strong>4.2 Romaneios</strong> e baixa — a partir daí, novas gerações viram <strong>revisão</strong>.</p>
+                <p className="text-xs text-torg-gray"><strong>Baixar prévia</strong>: confere/imprime sem emitir (não salva no servidor). <strong>Emitir</strong>: gera o {tmsa ? "FOR-081 da TMSA (Excel e PDF)" : valmet ? "Packing List da Valmet (Excel e PDF)" : "FORM 22"}, salva na pasta <strong>4.2 Romaneios</strong> e baixa — a partir daí, novas gerações viram <strong>revisão</strong>.</p>
               )}
             </>
           )}

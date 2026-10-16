@@ -1,7 +1,12 @@
 {
-  "build": 3663,
-  "gerado": "2026-10-16T12:17:57.048Z",
+  "build": 3664,
+  "gerado": "2026-10-16T12:17:57.395Z",
   "commits": [
+    {
+      "hash": "a559d151",
+      "data": "16/10/2026",
+      "titulo": "feat: Packing List da Valmet como romaneio das obras Valmet"
+    },
     {
       "hash": "37137539",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "b6b6fd1c",
       "data": "14/10/2026",
       "titulo": "Projeto: app Torg Engenharia (prompt → Tekla), fase F0"
-    },
-    {
-      "hash": "f67a6c8c",
-      "data": "14/10/2026",
-      "titulo": "Pedido no Omie: quantidade em peças junto do KG nas Informações Adicionais"
     }
   ]
 }
