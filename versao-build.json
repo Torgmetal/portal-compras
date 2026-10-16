@@ -1,7 +1,12 @@
 {
-  "build": 3674,
-  "gerado": "2026-10-16T19:15:11.995Z",
+  "build": 3675,
+  "gerado": "2026-10-16T20:12:32.915Z",
   "commits": [
+    {
+      "hash": "abb1246b",
+      "data": "16/10/2026",
+      "titulo": "Planos F2 do Torg Metal IA: portal (F2a), conector (F2b) e app (F2c)"
+    },
     {
       "hash": "06603564",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "4cdba3f0",
       "data": "15/10/2026",
       "titulo": "Revisão: itens comprados na aba Produção"
-    },
-    {
-      "hash": "b3a1a27f",
-      "data": "15/10/2026",
-      "titulo": "fix: aba Produção da OP sem parafusos e grades de piso"
     }
   ]
 }
