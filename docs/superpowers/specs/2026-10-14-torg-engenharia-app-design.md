@@ -197,8 +197,8 @@ tolerável / falso positivo), o projetista confirma; "levar até" mostra cada um
 **Etapa 3 — Revisão ou numeração.** Com revisão: o Claude compara a revisão nova com a anterior, lista o que muda no
 modelo e aplica (destrutivas confirmadas). Sem revisão: numeração (confirmada) + `StatusNumeracao`.
 
-**Etapa 4 — Detalhamento, por fase:** Croquis → Conjuntos → pergunta obrigatória *"Esta obra tem diagrama de
-montagem?"*. Depois de cada lote, **verificação profunda** (onde o Claude mais erra):
+**Etapa 4 — Detalhamento, por fase:** Croquis → Conjuntos. Depois de cada lote, **verificação profunda** (onde o
+Claude mais erra):
 - dados das **ferramentas** (`DesenhoCotas`, `MarcasDesenho`, `DesenhoAuditar`), nunca da opinião do modelo;
 - cada prancha **renderizada em imagem** e conferida por um verificador que **não** a gerou: cotas × geometria,
   marcas × lista, detalhes (furos, solda, chanfro);
@@ -209,6 +209,11 @@ montagem?"*. Depois de cada lote, **verificação profunda** (onde o Claude mais
 não fecha a etapa. Projetos vão para a 2.5.2 e o FORM 09 para `Engenharia/13. GRD`; a **GRD entra no portal pelo cron
 que já existe** (`/api/engenharia/grd/sincronizar`, 11/17/21h dias úteis — conferido em 16/10/2026: rodando, GRD-539
 lida). O app só confirma que ela apareceu.
+
+**Etapa 6 — Diagrama de montagem** (roteiro próprio, depois das listas). Abre com a pergunta obrigatória *"Esta obra
+tem diagrama de montagem?"* — não → registrado como "não se aplica"; sim → gera os diagramas por fase, com a mesma
+verificação profunda da Etapa 4 (marcas do diagrama × LE importada), aceite do projetista e GRD própria pela pasta.
+Vitor (16/10/2026): LE e LPC vêm **antes** do diagrama.
 
 ### 5. Visual (mockup aprovado em 16/10/2026)
 **Tema claro** igual ao portal (substitui a "tela escura" do rascunho): cartões brancos, azul `#006EAB`, laranja só em

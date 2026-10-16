@@ -1,7 +1,12 @@
 {
-  "build": 3672,
-  "gerado": "2026-10-16T19:06:17.777Z",
+  "build": 3673,
+  "gerado": "2026-10-16T19:08:33.175Z",
   "commits": [
+    {
+      "hash": "c97d393e",
+      "data": "16/10/2026",
+      "titulo": "Spec Torg Metal IA: F2 aprovada — roteiro em 5 etapas, ferramentas, documentos e visual"
+    },
     {
       "hash": "198b78a7",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "39fa2e0c",
       "data": "15/10/2026",
       "titulo": "Revisão: % de diluição no PLP"
-    },
-    {
-      "hash": "b5f51b46",
-      "data": "15/10/2026",
-      "titulo": "fix: % de diluição no editor do PLP"
     }
   ]
 }
