@@ -1,6 +1,6 @@
 # Torg Engenharia — app de projeto por prompt no Tekla
 
-**Data:** 14/10/2026 · **Pedido:** Vitor · **Status:** F0 aprovada para começar
+**Data:** 14/10/2026 · **Pedido:** Vitor · **Status:** F0 e F1 no ar; F2 aprovada (16/10/2026)
 
 ## O que é
 
@@ -152,23 +152,77 @@ contra o teto), e o histórico de uso com o pedido. Aprovar, revogar e mudar tet
   leitura do `usage` no stream, registro que falha sem derrubar a resposta.
 - ⚠ Vercel: a rota do portão declara `maxDuration` alto (resposta longa do Opus em stream).
 
-## Direção visual (F2) — "de respeito, notória, autêntica"
+## F2 em detalhe — o app "Torg Metal IA" (16/10/2026)
 
-Ferramenta de engenharia, não chat genérico. Identidade Torg: navy `#002945`, azul `#006EAB`, laranja `#F4801F`,
-cinza `#576D7E`, fonte Saira.
+Aprovado pelo Vitor em 16/10/2026. Piloto: John (engenharia4@), teto R$ 200/mês.
 
-- **Tela escura de trabalho** (projetista fica horas nela), com o laranja reservado para ação e confirmação.
-- **Três colunas:** conversas/obras à esquerda; ao centro o pedido e o **plano do Claude como cartões de etapas**
-  (cada ferramenta usada vira um cartão com o que leu ou vai alterar); à direita o **contexto vivo do modelo**
-  (obra aberta, fase, seleção atual, estado da licença).
-- **Barra de confirmação** antes de alterar o modelo: "Vai criar 12 terças U150 nos eixos A–F · Confirmar / Ajustar".
-- Estado do Tekla sempre visível (chip verde/âmbar/vermelho), em português, dizendo o que fazer.
-- Mockup para aprovação do Vitor antes da F2.
+### 1. Base técnica
+Electron + **Claude Agent SDK** (o harness do Claude Code, embutido). O app entra com o login do portal e todo uso de IA
+passa pelo portão da F1 (teto, registro, só Opus 5.5/Sonnet 5.5). O agente só enxerga as ferramentas da Torg:
+**sem terminal, sem leitura livre de disco** (Bash/Read/Write/Edit do SDK desligados). O projetista não vê "Claude
+Code" em lugar nenhum — o produto se chama **Torg Metal IA**.
 
-## Decisões pendentes (Vitor)
+### 2. Ferramentas — quatro classes
 
-- ~~Repositório~~: separado — `Torgmetal/torg-engenharia`, privado (criado 16/10/2026).
-- Confirmação: toda alteração (recomendado no piloto) ou só destrutivas.
-- Projetista do piloto e o valor do teto dele (R$).
-- Créditos de API do Team/Enterprise: confirmar com a Anthropic (Enterprise: assento ~US$ 20 + uso a preço de API,
-  mínimo de 20 assentos — fontes de terceiros, 16/10/2026).
+| Classe | Ferramentas | Confirma? |
+|---|---|---|
+| Leitura | as 7 da F0; documentos (portal, pasta da obra, NORMAS, anexos) | não |
+| Levar até | `SelecionarIds`, `DestacarPeca`, `ZoomCaptura`, `LimparSelecao` | não |
+| Escrita | `NomearConjuntos`, `Desenhos`/`DesenhoCroquis`, `MontarSpec gerar`, `ListasTORG` | não |
+| Destrutiva | `NumerarBlanks` (muda marcas), `MontarSpec apagar` (TAG), sobrescrever desenho, alterar por revisão | **sim** |
+
+Decisão do Vitor: confirmação **só nas destrutivas** — barra "Vai … · Confirmar / Ajustar".
+
+### 3. Documentos
+- **Procedimentos** (Controle de Documentos da Qualidade), **pasta da obra** no SharePoint e **normas**
+  (`Engenharia/03. Padrão Torg/NORMAS`, já existe, ~2 GB): lidos **pelo portal** — rotas novas de leitura
+  autenticadas pelo token do aparelho. As credenciais do SharePoint não saem da Vercel.
+- **PC do projetista**: só o que ele **anexar** ou a **pasta que ele indicar** (PDF, DWG, IFC, XLSX). O app não varre
+  o disco.
+
+### 4. Roteiro da obra — etapas com portão
+O app é um roteiro, não um chat solto. Coluna esquerda: obra › etapa. Cada etapa só fecha com **verificação
+dos agentes + aceite do projetista**, gravados no portal (quem, quando, divergências aceitas — rastreabilidade ISO).
+
+**Etapa 1 — Modelo.** O Claude lê documentos do cliente, normas e procedimentos e monta o spec (JSON do
+`MontarSpec`, um por desenho). Antes de criar, **três verificadores independentes** conferem: (a) cotas/perfis
+contra o desenho do cliente, (b) normas e materiais, (c) requisitos do cliente (memorial, pintura, galvanização).
+Saída: lista de divergências **com a fonte** (arquivo/página). Projetista resolve ou aceita cada uma → só então
+`MontarSpec gerar` (confere o peso de cada peça). Tudo nasce com a TAG da obra; desfazer = apagar a TAG (destrutiva).
+
+**Etapa 2 — Interferência com o IFC do cliente** (opcional). Sem IFC → "não se aplica", registrado. Com IFC: importa
+como referência (`IfcToTekla`/`IfcDump`), roda o clash (`VerColisoes`), os agentes classificam cada colisão (real /
+tolerável / falso positivo), o projetista confirma; "levar até" mostra cada uma no Tekla.
+
+**Etapa 3 — Revisão ou numeração.** Com revisão: o Claude compara a revisão nova com a anterior, lista o que muda no
+modelo e aplica (destrutivas confirmadas). Sem revisão: numeração (confirmada) + `StatusNumeracao`.
+
+**Etapa 4 — Detalhamento, por fase:** Croquis → Conjuntos → pergunta obrigatória *"Esta obra tem diagrama de
+montagem?"*. Depois de cada lote, **verificação profunda** (onde o Claude mais erra):
+- dados das **ferramentas** (`DesenhoCotas`, `MarcasDesenho`, `DesenhoAuditar`), nunca da opinião do modelo;
+- cada prancha **renderizada em imagem** e conferida por um verificador que **não** a gerou: cotas × geometria,
+  marcas × lista, detalhes (furos, solda, chanfro);
+- prancha sem evidência = **"não verificada"**, nunca "ok"; aceite do projetista por prancha ou lote.
+
+**Etapa 5 — Listas e GRD.** `ListasTORG` gera **LE e LPC**; o app **importa as duas no portal sozinho**
+(rota de import autenticada pelo token do aparelho + usuário) e mostra o recibo **Previsto × Gravado** — divergência
+não fecha a etapa. Projetos vão para a 2.5.2 e o FORM 09 para `Engenharia/13. GRD`; a **GRD entra no portal pelo cron
+que já existe** (`/api/engenharia/grd/sincronizar`, 11/17/21h dias úteis — conferido em 16/10/2026: rodando, GRD-539
+lida). O app só confirma que ela apareceu.
+
+### 5. Visual (mockup aprovado em 16/10/2026)
+**Tema claro** igual ao portal (substitui a "tela escura" do rascunho): cartões brancos, azul `#006EAB`, laranja só em
+ação/confirmação, Saira. Topo: logo Torg │ **Torg Metal IA** (selo "IA") │ Engenharia. Três colunas: conversas/obras ·
+pedido + cartões de etapa · contexto vivo do modelo com avisos clicáveis ("levar até").
+**Ícone do assistente:** 5 bolinhas que trocam de formação (linha → quadrado → roda) e **sempre terminam no T**;
+CSS puro (sem JS). O gasto em R$ **não** aparece para o projetista — só na tela de Admin.
+
+### 6. Fora da F2
+Instalador e atualização automática (F3); os outros 3 projetistas (F3).
+
+## Decisões (Vitor)
+
+- ~~Repositório~~: separado — `Torgmetal/torg-engenharia`, privado (16/10/2026).
+- ~~Confirmação~~: só destrutivas (16/10/2026).
+- ~~Piloto~~: John, teto R$ 200/mês (16/10/2026).
+- Pendente: créditos de API do Team/Enterprise — confirmar com a Anthropic.

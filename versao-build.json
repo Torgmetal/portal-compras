@@ -1,7 +1,12 @@
 {
-  "build": 3671,
-  "gerado": "2026-10-16T18:25:10.741Z",
+  "build": 3672,
+  "gerado": "2026-10-16T19:06:17.777Z",
   "commits": [
+    {
+      "hash": "198b78a7",
+      "data": "16/10/2026",
+      "titulo": "Spec Torg Engenharia: ferramentas \"levar até\" (F2, navegação)"
+    },
     {
       "hash": "f2d1a43f",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "b5f51b46",
       "data": "15/10/2026",
       "titulo": "fix: % de diluição no editor do PLP"
-    },
-    {
-      "hash": "aafe0a11",
-      "data": "15/10/2026",
-      "titulo": "Memória e revisão: esquema de pintura por estrutura"
     }
   ]
 }
