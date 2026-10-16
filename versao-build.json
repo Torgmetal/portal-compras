@@ -1,7 +1,12 @@
 {
-  "build": 3670,
-  "gerado": "2026-10-16T18:14:09.592Z",
+  "build": 3671,
+  "gerado": "2026-10-16T18:25:10.741Z",
   "commits": [
+    {
+      "hash": "f2d1a43f",
+      "data": "16/10/2026",
+      "titulo": "fix: usar procedimentos vigentes do SGQ nos data books"
+    },
     {
       "hash": "1f709843",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "aafe0a11",
       "data": "15/10/2026",
       "titulo": "Memória e revisão: esquema de pintura por estrutura"
-    },
-    {
-      "hash": "de32fe5b",
-      "data": "15/10/2026",
-      "titulo": "feat: esquema de pintura por estrutura (primer + acabamento da sua cor)"
     }
   ]
 }

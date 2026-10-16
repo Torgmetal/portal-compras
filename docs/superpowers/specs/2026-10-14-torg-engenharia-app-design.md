@@ -66,6 +66,18 @@ utilitários soltos em `C:\Temp\des` e `C:\Temp\pref`. Não é repositório git.
 
 **Fora da F0:** ferramentas de escrita (montar_spec, numerar, nomear_conjuntos, desenhos), app, portão.
 
+## Ferramentas de navegação — "levar até" (F2, baixo risco)
+
+Clicar num aviso do painel (colisão, conjunto sem desenho, peça sem número) e o assistente **mostra o problema no
+Tekla aberto**: seleciona os objetos e dá zoom. Pedido do Vitor (16/10/2026), a partir do aviso de colisões do mockup.
+
+⚠ NÃO altera o modelo, mas MEXE na tela do Tekla (seleção + vista) — por isso é F2, não F0. Entra como uma classe
+própria de ferramentas, entre leitura e escrita:
+- `selecionar` / `levar_ate <ids|marca>` — seleciona e enquadra; base do clique nos avisos.
+- `isolar` / `esconder_resto` — deixa só o alvo visível (reversível, não altera o modelo).
+São de baixo risco (view-only): podem rodar SEM a barra de confirmação que as de escrita exigem — mas seguem passando
+pelo portão (teto, log). Confirmar no piloto se alguma merece confirmação.
+
 ## F1 em detalhe — o portão no portal (16/10/2026)
 
 **Decisões do Vitor (16/10):** teto **mensal por projetista** (em R$); **só ADMIN aprova** um PC novo; modelos
