@@ -1,7 +1,12 @@
 {
-  "build": 3669,
-  "gerado": "2026-10-16T15:59:04.262Z",
+  "build": 3670,
+  "gerado": "2026-10-16T18:14:09.592Z",
   "commits": [
+    {
+      "hash": "1f709843",
+      "data": "16/10/2026",
+      "titulo": "Memória e revisão: portão de IA da Engenharia (F1)"
+    },
     {
       "hash": "98304676",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "de32fe5b",
       "data": "15/10/2026",
       "titulo": "feat: esquema de pintura por estrutura (primer + acabamento da sua cor)"
-    },
-    {
-      "hash": "03494799",
-      "data": "15/10/2026",
-      "titulo": "Memória e revisão: folha do pintor na aba Qualidade"
     }
   ]
 }

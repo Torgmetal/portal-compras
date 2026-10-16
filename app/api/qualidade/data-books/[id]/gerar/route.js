@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { sincronizarProcedimentosDataBook } from "@/lib/databook-procedimentos";
 import { montarRoteiro } from "@/lib/databook-volumes";
 
 export const runtime = "nodejs";
@@ -35,32 +36,36 @@ export async function POST(_req, { params }) {
   });
   if (aberto) return NextResponse.json({ ok: true, geracao: aberto, reaproveitado: true });
 
-  const { roteiro } = await montarRoteiro(book.id);
+  try {
+    return await sincronizarProcedimentosDataBook(book.id, { userId: user.id, finalizar: async () => {
+        const { roteiro } = await montarRoteiro(book.id);
 
-  // Refazer apaga os volumes da revisão: o conjunto tem que ser coerente entre si.
-  // Sobrar o Volume 07 de uma geração antiga ao lado de um novo Volume 03 é pior que
-  // não ter nada — o cliente baixa dois pedaços de livros diferentes.
-  //
-  // ⚠ E APAGA O ARQUIVO, não só a linha. Um data book destes passa de 1,5 GB; deixar
-  // o blob órfão a cada "gerar de novo" acumula gigabyte de lixo pago em silêncio.
-  const antigos = await prisma.dataBookArquivo.findMany({
-    where: { dataBookId: book.id, revisao: book.revisao },
-    select: { url: true },
-  });
-  if (antigos.length) {
-    // falha ao apagar não pode impedir a nova geração — o pior caso é sobrar arquivo
-    await del(antigos.map((a) => a.url)).catch(() => {});
-    await prisma.dataBookArquivo.deleteMany({ where: { dataBookId: book.id, revisao: book.revisao } });
-  }
+        // Refazer apaga os volumes da revisão: o conjunto tem que ser coerente entre si.
+        // Sobrar o Volume 07 de uma geração antiga ao lado de um novo Volume 03 é pior que
+        // não ter nada — o cliente baixa dois pedaços de livros diferentes.
+        //
+        // ⚠ E APAGA O ARQUIVO, não só a linha. Um data book destes passa de 1,5 GB; deixar
+        // o blob órfão a cada "gerar de novo" acumula gigabyte de lixo pago em silêncio.
+        const antigos = await prisma.dataBookArquivo.findMany({
+          where: { dataBookId: book.id, revisao: book.revisao },
+          select: { url: true },
+        });
+        if (antigos.length) {
+          // falha ao apagar não pode impedir a nova geração — o pior caso é sobrar arquivo
+          await del(antigos.map((a) => a.url)).catch(() => {});
+          await prisma.dataBookArquivo.deleteMany({ where: { dataBookId: book.id, revisao: book.revisao } });
+        }
 
-  const geracao = await prisma.dataBookGeracao.create({
-    data: {
-      dataBookId: book.id, revisao: book.revisao, status: "NA_FILA",
-      totalItens: roteiro.length, solicitadoPor: user.name || user.email || null,
-      etapa: roteiro.length ? `${roteiro.length} anexo(s) na fila` : "Sem anexos — só o livro",
-    },
-  });
-  return NextResponse.json({ ok: true, geracao });
+        const geracao = await prisma.dataBookGeracao.create({
+          data: {
+            dataBookId: book.id, revisao: book.revisao, status: "NA_FILA",
+            totalItens: roteiro.length, solicitadoPor: user.name || user.email || null,
+            etapa: roteiro.length ? `${roteiro.length} anexo(s) na fila` : "Sem anexos — só o livro",
+          },
+        });
+        return NextResponse.json({ ok: true, geracao });
+    } });
+  } catch (e) { return NextResponse.json({ error: e.message }, { status: 409 }); }
 }
 
 export async function GET(_req, { params }) {

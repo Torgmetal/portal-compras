@@ -127,7 +127,7 @@ export async function POST(req) {
   // se a Qualidade revisasse o procedimento o documento emitido continuaria dizendo a revisão
   // velha — sem ninguém perceber.
   const { procedimentoDoTipo } = await import("@/lib/importar-procedimentos");
-  const proc = await procedimentoDoTipo(tipo).catch(() => null);
+  const proc = await procedimentoDoTipo(tipo, { sincronizar: true });
   const erros = [];
 
   const op = ehDeEstoque(tipo) ? null : await prisma.oP.findFirst({ where: { numero: opNumero }, select: { id: true, escopoQualidade: true } });
