@@ -1,7 +1,12 @@
 {
-  "build": 3665,
-  "gerado": "2026-10-16T12:20:11.421Z",
+  "build": 3666,
+  "gerado": "2026-10-16T15:22:58.777Z",
   "commits": [
+    {
+      "hash": "1bd1c9a5",
+      "data": "16/10/2026",
+      "titulo": "Memória e revisão: Packing List da Valmet"
+    },
     {
       "hash": "8e5b4e6e",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "ac981379",
       "data": "15/10/2026",
       "titulo": "Revisão: PDF dos recebimentos de estoque"
-    },
-    {
-      "hash": "71227952",
-      "data": "15/10/2026",
-      "titulo": "fix: PDF dos recebimentos de estoque no data book (Arquivo inválido)"
     }
   ]
 }
