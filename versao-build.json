@@ -1,7 +1,12 @@
 {
-  "build": 3682,
-  "gerado": "2026-10-16T20:17:30.840Z",
+  "build": 3683,
+  "gerado": "2026-10-16T20:17:31.212Z",
   "commits": [
+    {
+      "hash": "2f99570d",
+      "data": "16/10/2026",
+      "titulo": "fix(ia): roteiro não perde divergência, trava por OP e audita aceite"
+    },
     {
       "hash": "4c0bd59e",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "6eeac6d3",
       "data": "15/10/2026",
       "titulo": "Memória e revisão: editar/excluir aditivo"
-    },
-    {
-      "hash": "adadfaa8",
-      "data": "15/10/2026",
-      "titulo": "Aditivo: editar (inclusive divulgado) e excluir rascunho"
     }
   ]
 }
