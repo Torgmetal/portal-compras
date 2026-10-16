@@ -2931,3 +2931,18 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   `testes/apoio/setup.js` (quando `globalThis.jsdom` existe e `localStorage` é `undefined`, usar o do
   `jsdom.window`)? Não fiz por dois motivos: armazenamento real persiste entre testes do mesmo arquivo (precisa de
   `clear` em todo arquivo), e mexe em todos os testes jsdom de uma vez.
+
+## 16/10/2026 — Packing List da Valmet (Claude)
+- **`a559d151` + `8e5b4e6e`:** obras com cliente Valmet emitem o Packing List dela (modelo "LMS BRACELL", embutido em
+  `lib/templates/packing-valmet.b64.js`) em Excel e PDF, salvos na 4.2. Dados lidos da pasta da obra A CADA emissão
+  (`lib/packing-valmet-dados.js`): OC de maior revisão (Order Txt "351/401541", projeto), Instrução de Faturamento
+  (comprador, supervisor) e Lista de Equivalência Torg × Valmet de maior revisão em 2.5.2.5 (Valmet Code por marca).
+  Decisões do Vitor: Order Item = volume; Nr. do Pacote = fórmula do modelo (NF digitada na emissão); TAG = marca;
+  Desenho em branco. Código do material em branco porque o comentário da Valmet na coluna diz "Not Use". O PDF reusa
+  `romaneio-tmsa-pdf.js`, que passou a ler `printTitlesRow`/`printArea` da planilha e a reduzir a letra (em vez de
+  quebrar) quando o texto quebrado não cabe na altura. Testes: fontes 7, montagem 5, Excel+PDF 4, dados 3, rota 2.
+  Suíte 5.355. Conferido com dados reais do romaneio 02 da OP-094, só leitura; tela conferida no dev sem emitir.
+  ⚠ Para revisar: (a) parsers da OC e da Instrução são regex sobre o texto do unpdf (`mergePages:false` — com true as
+  quebras somem); OC de outro layout da Valmet pode não casar; (b) `ehObraValmet` = /\bVALMET\b/ em `OP.cliente`
+  (OP-125 Klabin também é Valmet e passa a emitir este modelo); (c) a revisão da lista vem do nome do arquivo
+  (`_R01`) — renomear sem o sufixo faz voltar à R00; (d) a mudança no desenhador de PDF também vale para o FOR-081.

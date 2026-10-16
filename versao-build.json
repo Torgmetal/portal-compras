@@ -1,7 +1,12 @@
 {
-  "build": 3664,
-  "gerado": "2026-10-16T12:17:57.395Z",
+  "build": 3665,
+  "gerado": "2026-10-16T12:20:11.421Z",
   "commits": [
+    {
+      "hash": "8e5b4e6e",
+      "data": "16/10/2026",
+      "titulo": "Expedição: botão e aviso do romaneio dizem o modelo do cliente (FOR-081, Packing List Valmet)"
+    },
     {
       "hash": "a559d151",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "71227952",
       "data": "15/10/2026",
       "titulo": "fix: PDF dos recebimentos de estoque no data book (Arquivo inválido)"
-    },
-    {
-      "hash": "b6b6fd1c",
-      "data": "14/10/2026",
-      "titulo": "Projeto: app Torg Engenharia (prompt → Tekla), fase F0"
     }
   ]
 }
