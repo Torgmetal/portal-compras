@@ -47,7 +47,7 @@ export default function EngenhariaIaClient() {
     setErro("");
     try {
       const r = await fetch("/api/admin/engenharia-ia", { cache: "no-store" });
-      const d = await r.json();
+      const d = await r.json().catch(() => ({ error: `O servidor não respondeu (erro ${r.status}). Tente de novo em instantes.` }));
       if (!r.ok) throw new Error(d.error || "Falha ao carregar");
       setDados(d);
       setTetos(Object.fromEntries(d.projetistas.map((p) => [p.id, p.tetoMensalBrl == null ? "" : String(p.tetoMensalBrl).replace(".", ",")])));
@@ -59,7 +59,7 @@ export default function EngenhariaIaClient() {
     setAgindo(aparelho.id);
     try {
       const r = await fetch(`/api/admin/engenharia-ia/aparelho/${aparelho.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: qual }) });
-      const d = await r.json();
+      const d = await r.json().catch(() => ({ error: `O servidor não respondeu (erro ${r.status}). Tente de novo em instantes.` }));
       if (!r.ok) throw new Error(d.error || "Falha");
       setDados((prev) => ({ ...prev, aparelhos: prev.aparelhos.map((a) => (a.id === aparelho.id ? { ...a, status: d.status } : a)) }));
       showToast(qual === "aprovar" ? `${aparelho.nome} aprovado` : qual === "recusar" ? `${aparelho.nome} recusado` : `${aparelho.nome} revogado`, "success");
@@ -73,7 +73,7 @@ export default function EngenhariaIaClient() {
     setAgindo(p.id);
     try {
       const r = await fetch("/api/admin/engenharia-ia/limite", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: p.id, tetoMensalBrl: valor }) });
-      const d = await r.json();
+      const d = await r.json().catch(() => ({ error: `O servidor não respondeu (erro ${r.status}). Tente de novo em instantes.` }));
       if (!r.ok) throw new Error(d.error || "Falha");
       setDados((prev) => ({ ...prev, projetistas: prev.projetistas.map((x) => (x.id === p.id ? { ...x, tetoMensalBrl: valor } : x)) }));
       showToast(valor == null ? `Acesso de ${p.nome} removido` : `Teto de ${p.nome}: ${brl(valor)}/mês`, "success");

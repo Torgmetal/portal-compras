@@ -15,7 +15,7 @@ export default function VincularClient() {
     setErro(""); setEnviando(true);
     try {
       const r = await fetch("/api/engenharia-ia/aparelho/vincular", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ codigo }) });
-      const d = await r.json();
+      const d = await r.json().catch(() => ({ error: `O servidor não respondeu (erro ${r.status}). Tente de novo em instantes.` }));
       if (!r.ok) throw new Error(d.error || "Não foi possível vincular.");
       setFeito(d.nome);
     } catch (e2) { setErro(e2.message); } finally { setEnviando(false); }

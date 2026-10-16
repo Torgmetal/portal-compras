@@ -1,7 +1,12 @@
 {
-  "build": 3667,
-  "gerado": "2026-10-16T15:51:08.888Z",
+  "build": 3668,
+  "gerado": "2026-10-16T15:52:34.765Z",
   "commits": [
+    {
+      "hash": "05738630",
+      "data": "16/10/2026",
+      "titulo": "feat: portão de IA da Engenharia (F1 do app Torg Engenharia)"
+    },
     {
       "hash": "70c5ac73",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "d18c3920",
       "data": "15/10/2026",
       "titulo": "feat: folha do pintor na aba Qualidade da OP"
-    },
-    {
-      "hash": "375d41cc",
-      "data": "15/10/2026",
-      "titulo": "Memória: MJ da OP-112 anexada na §09"
     }
   ]
 }
