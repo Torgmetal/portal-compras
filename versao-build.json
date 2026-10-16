@@ -1,7 +1,12 @@
 {
-  "build": 3676,
-  "gerado": "2026-10-16T20:17:28.543Z",
+  "build": 3677,
+  "gerado": "2026-10-16T20:17:28.926Z",
   "commits": [
+    {
+      "hash": "5dadfb53",
+      "data": "16/10/2026",
+      "titulo": "feat(ia): autenticarAparelho compartilhado e rotas /app liberadas no middleware"
+    },
     {
       "hash": "8f600ab9",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "5cbb0a78",
       "data": "15/10/2026",
       "titulo": "Memória e revisão: romaneio TMSA (FOR-081)"
-    },
-    {
-      "hash": "d5abfb00",
-      "data": "15/10/2026",
-      "titulo": "feat: romaneio no modelo da TMSA (FOR-081), em Excel e PDF"
     }
   ]
 }
