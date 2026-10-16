@@ -1,0 +1,300 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`rota importar-le (caracterização) > modo complementar: resposta e gravações 1`] = `
+{
+  "atualizados": 1,
+  "avisoListaUnica": "1 marca(s) desta LE já existem nesta OP pela LPC — é a mesma peça, não foram duplicadas.",
+  "criados": 1,
+  "diff": {
+    "alteradas": [
+      {
+        "de": 75,
+        "marca": "T89C2",
+        "para": 80,
+      },
+    ],
+    "incluidas": [
+      {
+        "marca": "T89C1",
+        "peso": 100,
+      },
+      {
+        "marca": "T89C3",
+        "peso": 40,
+      },
+    ],
+    "nAlteradas": 1,
+    "nIncluidas": 2,
+    "nRemovidas": 1,
+    "removidas": [
+      {
+        "marca": "T89C9",
+        "peso": 12,
+      },
+    ],
+  },
+  "ignorados": 1,
+  "jaNaOutraLista": [
+    "T89C3",
+  ],
+  "obra": "BRACELL",
+  "ok": true,
+  "opEncontrada": true,
+  "opNumero": "89",
+  "pesoTotal": 180.46,
+  "qteTotal": 14,
+  "totalNoArquivo": 3,
+}
+`;
+
+exports[`rota importar-le (caracterização) > modo complementar: resposta e gravações 2`] = `
+{
+  "audit": [
+    [
+      {
+        "data": {
+          "action": "IMPORTAR_LE",
+          "diff": {
+            "atualizados": 1,
+            "criados": 1,
+            "ignorados": 1,
+            "jaNaOutraLista": [
+              "T89C3",
+            ],
+            "obra": "BRACELL",
+            "opEncontrada": true,
+            "opNumero": "89",
+            "pesoTotal": 180.46,
+            "totalNoArquivo": 3,
+          },
+          "entity": "PecaConjunto",
+          "entityId": "op89",
+          "userId": "u1",
+        },
+      },
+    ],
+  ],
+  "create": [
+    [
+      {
+        "data": {
+          "descricao": "VIGA",
+          "fluxoEspecial": null,
+          "fonte": "LE_IMPORT",
+          "item": 1,
+          "marca": "T89C1",
+          "naLE": true,
+          "observacao": null,
+          "opId": "op89",
+          "opNumero": "089",
+          "pesoTotalKg": 100,
+          "pesoUnitKg": 50,
+          "qte": 2,
+          "status": "PENDENTE",
+        },
+      },
+    ],
+    [
+      {
+        "data": {
+          "descricao": "TERCA",
+          "fluxoEspecial": null,
+          "fonte": "LE_IMPORT",
+          "item": 3,
+          "marca": "T89C3",
+          "naLE": true,
+          "observacao": null,
+          "opId": "op89",
+          "opNumero": "089",
+          "pesoTotalKg": 40,
+          "pesoUnitKg": 10,
+          "qte": 4,
+          "status": "PENDENTE",
+        },
+      },
+    ],
+  ],
+  "deleteMany": [],
+  "update": [
+    [
+      {
+        "data": {
+          "descricao": "COLUNA",
+          "item": 2,
+          "naLE": true,
+          "observacao": "GALV",
+          "opId": "op89",
+          "pesoTotalKg": 80,
+          "pesoUnitKg": 80,
+          "qte": 1,
+        },
+        "where": {
+          "id": "id-c2",
+        },
+      },
+    ],
+  ],
+  "updateMany": [],
+}
+`;
+
+exports[`rota importar-le (caracterização) > modo sobrescrever: resposta e gravações 1`] = `
+{
+  "atualizados": 1,
+  "avisoListaUnica": "1 marca(s) desta LE já existem nesta OP pela LPC — é a mesma peça, não foram duplicadas.",
+  "criados": 1,
+  "diff": {
+    "alteradas": [
+      {
+        "de": 75,
+        "marca": "T89C2",
+        "para": 80,
+      },
+    ],
+    "incluidas": [
+      {
+        "marca": "T89C1",
+        "peso": 100,
+      },
+      {
+        "marca": "T89C3",
+        "peso": 40,
+      },
+    ],
+    "nAlteradas": 1,
+    "nIncluidas": 2,
+    "nRemovidas": 1,
+    "removidas": [
+      {
+        "marca": "T89C9",
+        "peso": 12,
+      },
+    ],
+  },
+  "ignorados": 1,
+  "jaNaOutraLista": [
+    "T89C3",
+  ],
+  "obra": "BRACELL",
+  "ok": true,
+  "opEncontrada": true,
+  "opNumero": "89",
+  "pesoTotal": 180.46,
+  "qteTotal": 14,
+  "totalNoArquivo": 3,
+}
+`;
+
+exports[`rota importar-le (caracterização) > modo sobrescrever: resposta e gravações 2`] = `
+{
+  "audit": [
+    [
+      {
+        "data": {
+          "action": "IMPORTAR_LE",
+          "diff": {
+            "atualizados": 1,
+            "criados": 1,
+            "ignorados": 1,
+            "jaNaOutraLista": [
+              "T89C3",
+            ],
+            "obra": "BRACELL",
+            "opEncontrada": true,
+            "opNumero": "89",
+            "pesoTotal": 180.46,
+            "totalNoArquivo": 3,
+          },
+          "entity": "PecaConjunto",
+          "entityId": "op89",
+          "userId": "u1",
+        },
+      },
+    ],
+  ],
+  "create": [
+    [
+      {
+        "data": {
+          "descricao": "VIGA",
+          "fluxoEspecial": null,
+          "fonte": "LE_IMPORT",
+          "item": 1,
+          "marca": "T89C1",
+          "naLE": true,
+          "observacao": null,
+          "opId": "op89",
+          "opNumero": "089",
+          "pesoTotalKg": 100,
+          "pesoUnitKg": 50,
+          "qte": 2,
+          "status": "PENDENTE",
+        },
+      },
+    ],
+    [
+      {
+        "data": {
+          "descricao": "TERCA",
+          "fluxoEspecial": null,
+          "fonte": "LE_IMPORT",
+          "item": 3,
+          "marca": "T89C3",
+          "naLE": true,
+          "observacao": null,
+          "opId": "op89",
+          "opNumero": "089",
+          "pesoTotalKg": 40,
+          "pesoUnitKg": 10,
+          "qte": 4,
+          "status": "PENDENTE",
+        },
+      },
+    ],
+  ],
+  "deleteMany": [
+    [
+      {
+        "where": {
+          "naLE": true,
+          "naLPC": false,
+          "opNumero": "089",
+        },
+      },
+    ],
+  ],
+  "update": [
+    [
+      {
+        "data": {
+          "descricao": "COLUNA",
+          "item": 2,
+          "naLE": true,
+          "observacao": "GALV",
+          "opId": "op89",
+          "pesoTotalKg": 80,
+          "pesoUnitKg": 80,
+          "qte": 1,
+        },
+        "where": {
+          "id": "id-c2",
+        },
+      },
+    ],
+  ],
+  "updateMany": [
+    [
+      {
+        "data": {
+          "naLE": false,
+        },
+        "where": {
+          "naLE": true,
+          "naLPC": true,
+          "opNumero": "089",
+        },
+      },
+    ],
+  ],
+}
+`;

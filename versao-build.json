@@ -1,7 +1,12 @@
 {
-  "build": 3678,
-  "gerado": "2026-10-16T20:17:29.301Z",
+  "build": 3679,
+  "gerado": "2026-10-16T20:17:29.684Z",
   "commits": [
+    {
+      "hash": "ec1596b0",
+      "data": "16/10/2026",
+      "titulo": "fix(ia): documentos do app paginam, transmitem em stream e codificam o caminho"
+    },
     {
       "hash": "2adf176a",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "9ad9b152",
       "data": "15/10/2026",
       "titulo": "Memória e revisão: geração no servidor e fontes de OC/TPR da TMSA"
-    },
-    {
-      "hash": "077ec385",
-      "data": "15/10/2026",
-      "titulo": "fix: geração do data book continua no servidor ao sair da tela"
     }
   ]
 }
