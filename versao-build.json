@@ -1,7 +1,12 @@
 {
-  "build": 3673,
-  "gerado": "2026-10-16T19:08:33.175Z",
+  "build": 3674,
+  "gerado": "2026-10-16T19:15:11.995Z",
   "commits": [
+    {
+      "hash": "06603564",
+      "data": "16/10/2026",
+      "titulo": "Spec Torg Metal IA: diagrama de montagem vira etapa 6, depois de LE/LPC"
+    },
     {
       "hash": "c97d393e",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "b3a1a27f",
       "data": "15/10/2026",
       "titulo": "fix: aba Produção da OP sem parafusos e grades de piso"
-    },
-    {
-      "hash": "39fa2e0c",
-      "data": "15/10/2026",
-      "titulo": "Revisão: % de diluição no PLP"
     }
   ]
 }
