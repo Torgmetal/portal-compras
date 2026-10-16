@@ -1,7 +1,12 @@
 {
-  "build": 3680,
-  "gerado": "2026-10-16T20:17:30.082Z",
+  "build": 3681,
+  "gerado": "2026-10-16T20:17:30.463Z",
   "commits": [
+    {
+      "hash": "8bf6e0ca",
+      "data": "16/10/2026",
+      "titulo": "feat(ia): app importa LE/LPC no portal com recibo previsto × gravado"
+    },
     {
       "hash": "b7e470c0",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "23088e06",
       "data": "15/10/2026",
       "titulo": "Memória e revisão: OC/TPR pelas ETCs"
-    },
-    {
-      "hash": "b25a17e1",
-      "data": "15/10/2026",
-      "titulo": "feat: romaneio TMSA lê OC e TPR das ETCs da obra"
     }
   ]
 }

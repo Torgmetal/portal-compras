@@ -7138,3 +7138,24 @@ model IaLimite {
   atualizadoPorId String?
   updatedAt     DateTime @default(now()) @updatedAt
 }
+
+// Roteiro de 6 etapas da obra (app Torg Engenharia, F2a). Uma linha por (OP, etapa, fase); fase nula = obra inteira.
+// ⚠ O único real é um índice de EXPRESSÃO (`COALESCE(fase,-1)`) criado por scripts/ensure-roteiro-engenharia.mjs:
+// no Postgres NULL nunca colide com NULL, então `@@unique([opId, etapa, fase])` deixaria duplicar a etapa da obra.
+// Por isso o upsert da rota é feito à mão (find + create/update), não por `upsert` do Prisma.
+model RoteiroEtapa {
+  id              String    @id @default(cuid())
+  opId            String
+  etapa           Int
+  fase            Int?
+  status          String    @default("PENDENTE")
+  divergencias    Json      @default("[]")
+  observacao      String?
+  aceitoPorId     String?
+  aceitoEm        DateTime?
+  atualizadoPorId String?
+  updatedAt       DateTime  @default(now()) @updatedAt
+  createdAt       DateTime  @default(now())
+
+  @@index([opId])
+}
