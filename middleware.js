@@ -167,6 +167,8 @@ export default withAuth(
           path === "/api/engenharia-ia/aparelho/iniciar" ||
           path === "/api/engenharia-ia/aparelho/status" ||
           path.startsWith("/api/engenharia-ia/v1/") ||
+          // Rotas do app (F2a): mesma razão — autenticam pelo token do aparelho (lib/ia-aparelho-auth.js), sem sessão.
+          path.startsWith("/api/engenharia-ia/app/") ||
           // Sync LPC SharePoint — auth própria no handler. ⚠ o bearer do MES só CONSULTA ali:
           // importar apaga e recria 15.066 peças e exige sessão ADMIN/PRODUÇÃO + ?obra=.
           path.startsWith("/api/producao/pecas/sync-lpc-sharepoint") ||

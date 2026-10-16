@@ -1,7 +1,12 @@
 {
-  "build": 3675,
-  "gerado": "2026-10-16T20:12:32.915Z",
+  "build": 3676,
+  "gerado": "2026-10-16T20:17:28.543Z",
   "commits": [
+    {
+      "hash": "8f600ab9",
+      "data": "16/10/2026",
+      "titulo": "fix(carga): comparar arranjos próprios de veículos menores"
+    },
     {
       "hash": "abb1246b",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "d5abfb00",
       "data": "15/10/2026",
       "titulo": "feat: romaneio no modelo da TMSA (FOR-081), em Excel e PDF"
-    },
-    {
-      "hash": "4cdba3f0",
-      "data": "15/10/2026",
-      "titulo": "Revisão: itens comprados na aba Produção"
     }
   ]
 }
