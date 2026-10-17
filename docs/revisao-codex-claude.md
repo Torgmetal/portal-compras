@@ -2981,3 +2981,15 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   PreToolUse × allowedTools, claude.exe fora do asar, node_modules do conector); etapa 6 (piloto com o John).
   ⚠ Para revisão do Codex (`security`): rotas públicas `/app/*`, lista de liberados da pasta da obra, gating de
   ferramentas e subagentes no app, isolamento de ambiente do conector.
+
+## 17/10/2026 — Torg Metal IA: primeiro uso real no PC do Vitor (Claude)
+- **Pareamento:** 4 pedidos do mesmo PC ("PC-Vitor") confundiram a tela de Admin e o ativo (TRG-Y6KM) foi revogado por
+  engano — o 401 seguinte estava certo. Corrigido em `be6e2c59`: "PCs ligados" mostra data do pedido e final do id;
+  quem tem PC ligado (ADMIN sem módulo ENGENHARIA) entra na tabela de teto. Teste novo em `ia-pareamento.teste.js`;
+  suíte 5.517. ⚠ Pendente: teto direto no cartão de aprovação.
+- **Primeiro pedido real** (TRG-T873, teto salvo pela tela): "Aguardando o painel do Tekla…" → `estado_tekla` → resposta
+  correta sobre a cópia do T123. Serialização painel × agente observada na prática.
+- **App** (`f2c-app` `700e0c0`): instalador NSIS por usuário com atalho no menu Iniciar/área de trabalho (o portable
+  não aparecia na busca do Windows) e logo da Torg como ícone.
+- ⚠ Checagem (a) — deny do PreToolUse vencendo `allowedTools` — não é provocável pela tela (o painel não lê com o agente
+  ocupado); fica para teste direto do SDK. Piloto com o John aguarda o Vitor.

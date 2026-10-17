@@ -1,7 +1,12 @@
 {
-  "build": 3687,
-  "gerado": "2026-10-17T13:09:30.380Z",
+  "build": 3688,
+  "gerado": "2026-10-17T13:16:43.069Z",
   "commits": [
+    {
+      "hash": "be6e2c59",
+      "data": "17/10/2026",
+      "titulo": "fix(ia): admin com PC ligado entra na lista de teto; PCs mostram data do pedido e final do id"
+    },
     {
       "hash": "0758792b",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "136fb8d0",
       "data": "15/10/2026",
       "titulo": "Corte e montagem: composição do conjunto abre também quando tudo já foi cortado"
-    },
-    {
-      "hash": "abe41e05",
-      "data": "15/10/2026",
-      "titulo": "Corte e montagem: busca por croqui e material, e filtro com Montado"
     }
   ]
 }
