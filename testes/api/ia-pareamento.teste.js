@@ -151,6 +151,17 @@ describe("listagem da tela de Admin", () => {
     expect(j.usos[0]).toMatchObject({ usuario: "John", aparelho: "PC-JOHN", pedido: "liste" });
     expect(mockPrisma.iaAparelho.findMany.mock.calls[0][0].where).toEqual({ status: { not: "PAREANDO" } });
   });
+  it("ADMIN sem módulo ENGENHARIA que tem PC ligado aparece na lista de teto (senão não teria como liberar o próprio acesso)", async () => {
+    const { GET } = await import("@/app/api/admin/engenharia-ia/route");
+    mockPrisma.iaAparelho.findMany.mockResolvedValue([{ id: "ap9", nome: "PC-Vitor", userId: "uv", status: "ATIVO" }]);
+    mockPrisma.userModulo.findMany.mockResolvedValue([]);
+    mockPrisma.iaLimite.findMany.mockResolvedValue([]);
+    mockPrisma.iaUso.groupBy.mockResolvedValue([]);
+    mockPrisma.iaUso.findMany.mockResolvedValue([]);
+    mockPrisma.user.findMany.mockResolvedValue([{ id: "uv", name: "Vitor", ativo: true }]);
+    const j = await (await GET()).json();
+    expect(j.projetistas).toEqual([{ id: "uv", nome: "Vitor", ativo: true, tetoMensalBrl: null, gastoMesBrl: 0, chamadasMes: 0 }]);
+  });
   it("quem não é ADMIN do portal: 403", async () => {
     const { GET } = await import("@/app/api/admin/engenharia-ia/route");
     sessao.admin.mockRejectedValueOnce(new Error("Forbidden"));

@@ -26,7 +26,9 @@ export async function GET() {
   const gasto = new Map(gastos.map((g) => [g.userId, g]));
   const nomeAparelho = new Map(aparelhos.map((a) => [a.id, a.nome]));
   const projetistas = users
-    .filter((u) => modulos.some((m) => m.userId === u.id) || teto.has(u.id))
+    // Quem tem PC ligado também entra: um ADMIN sem o módulo ENGENHARIA (o Vitor, 17/10/2026) pareava o PC e não tinha
+    // onde definir o próprio teto — e sem teto o portão recusa.
+    .filter((u) => modulos.some((m) => m.userId === u.id) || teto.has(u.id) || aparelhos.some((a) => a.userId === u.id && a.status !== "REVOGADO" && a.status !== "RECUSADO"))
     .map((u) => ({ id: u.id, nome: u.name || u.email, ativo: u.ativo, tetoMensalBrl: teto.get(u.id) ?? null,
       gastoMesBrl: Number(gasto.get(u.id)?._sum?.custoBrl) || 0, chamadasMes: gasto.get(u.id)?._count?._all || 0 }))
     .sort((a, b) => b.gastoMesBrl - a.gastoMesBrl || a.nome.localeCompare(b.nome));

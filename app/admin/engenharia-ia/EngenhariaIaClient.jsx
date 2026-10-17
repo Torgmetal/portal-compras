@@ -160,6 +160,9 @@ export default function EngenhariaIaClient() {
                   <span className="font-medium text-torg-dark">{a.nome}</span>
                   <span className="text-torg-gray">{a.usuario || "—"}</span>
                   <span className={`text-[11px] px-2 py-0.5 rounded-full ${st.cor}`}>{st.rotulo}</span>
+                  {/* Vários PCs com o mesmo nome (o mesmo PC pareado de novo) só se distinguem pela data e pelo final do id —
+                      em 17/10/2026 o Vitor revogou o ativo achando que era um dos antigos. */}
+                  <span className="text-xs text-torg-gray">pedido em {dataHora(a.createdAt)} · id …{String(a.id).slice(-4)}</span>
                   <span className="text-xs text-torg-gray">último uso {dataHora(a.ultimoUsoEm)}</span>
                   {revogavel && <button disabled={agindo === a.id} onClick={() => setRevogar(a)} className="ml-auto px-3 py-1.5 text-xs rounded-lg border border-red-200 text-red-700 hover:bg-red-50 inline-flex items-center gap-1"><Ban size={13} /> Revogar</button>}
                 </li>

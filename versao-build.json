@@ -1,7 +1,12 @@
 {
-  "build": 3686,
-  "gerado": "2026-10-16T23:46:38.937Z",
+  "build": 3687,
+  "gerado": "2026-10-17T13:09:30.380Z",
   "commits": [
+    {
+      "hash": "0758792b",
+      "data": "16/10/2026",
+      "titulo": "Revisão: registra F2 do Torg Metal IA e a validação no Windows"
+    },
     {
       "hash": "0f549a00",
       "data": "16/10/2026",
@@ -146,11 +151,6 @@
       "hash": "abe41e05",
       "data": "15/10/2026",
       "titulo": "Corte e montagem: busca por croqui e material, e filtro com Montado"
-    },
-    {
-      "hash": "e4799282",
-      "data": "15/10/2026",
-      "titulo": "Corte e montagem: obra lembrada que saiu da lista atual some da tela"
     }
   ]
 }
