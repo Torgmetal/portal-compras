@@ -4,8 +4,9 @@ import { atenderPortao } from "@/lib/ia-portao";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// ⚠ resposta longa do Opus em stream: o teto de duração é o do plano da Vercel
-export const maxDuration = 300;
+// ⚠ resposta longa em stream: o teto é o do plano da Vercel (Pro: 800 s). Com 300 s a IA foi cortada no meio de um
+// arquivo de modelo grande (spec de tesoura, 17/10/2026: "Task timed out after 300 seconds" → "Sem conexão com o portal").
+export const maxDuration = 800;
 
 export async function POST(req) {
   return atenderPortao(req);
