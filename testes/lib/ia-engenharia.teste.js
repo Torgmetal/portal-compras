@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MODELOS_PERMITIDOS, custoUsd, usdParaBrl, gerarCodigoPareamento, hashToken, normalizarCodigo,
-  pedidoDoProjetista, LeitorUsage, inicioDoMesSP,
+  pedidoDoProjetista, LeitorUsage, inicioDoMesSP, agruparPorEtapa,
 } from "@/lib/ia-engenharia";
 
 describe("custo", () => {
@@ -16,6 +16,18 @@ describe("custo", () => {
   it("só os dois modelos do piloto; outro modelo não tem preço (o portão recusa antes)", () => {
     expect(MODELOS_PERMITIDOS).toEqual(["claude-opus-5-5", "claude-sonnet-5-5"]);
     expect(() => custoUsd("claude-haiku-5-5", { input_tokens: 1 })).toThrow(/sem preço/);
+  });
+  it("cache de 1 hora grava a 2× a entrada (Opus 8, Sonnet 4); a de 5 min segue 1,25×", () => {
+    const u = { cache_creation_input_tokens: 1_000_000, cache_creation: { ephemeral_5m_input_tokens: 400_000, ephemeral_1h_input_tokens: 600_000 } };
+    expect(custoUsd("claude-opus-5-5", u)).toBeCloseTo(0.4 * 5 + 0.6 * 8, 6);
+    expect(custoUsd("claude-sonnet-5-5", u)).toBeCloseTo(0.4 * 2.5 + 0.6 * 4, 6);
+  });
+  it("sem o detalhamento, todo cache gravado é cobrado como 5 min (comportamento antigo)", () => {
+    expect(custoUsd("claude-opus-5-5", { cache_creation_input_tokens: 1_000_000 })).toBeCloseTo(5, 6);
+  });
+  it("detalhamento que não soma o total: o resto vai a 5 min, nunca fica sem cobrança", () => {
+    const u = { cache_creation_input_tokens: 1_000_000, cache_creation: { ephemeral_1h_input_tokens: 600_000 } };
+    expect(custoUsd("claude-opus-5-5", u)).toBeCloseTo(0.6 * 8 + 0.4 * 5, 6);
   });
   it("R$ pela cotação configurada, com 2 casas", () => {
     expect(usdParaBrl(10, 5.4321)).toBe(54.32);
@@ -66,6 +78,17 @@ describe("consumo lido do stream (SSE da Anthropic)", () => {
     for (let i = 0; i < sse.length; i += 37) l.alimentar(sse.slice(i, i + 37)); // pedaços que cortam no meio
     expect(l.usage()).toEqual({ input_tokens: 1200, output_tokens: 850, cache_read_input_tokens: 30000, cache_creation_input_tokens: 0 });
   });
+  it("guarda o detalhamento cache_creation do stream (message_start)", () => {
+    const sse = 'data: {"type":"message_start","message":{"usage":{"input_tokens":5,"cache_creation_input_tokens":100,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":100}}}}\n\n'
+      + 'data: {"type":"message_delta","usage":{"output_tokens":7}}\n\n';
+    const l = new LeitorUsage(); l.alimentar(sse);
+    expect(l.usage()).toMatchObject({ output_tokens: 7, cache_creation_input_tokens: 100, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 100 } });
+  });
+  it("e no JSON inteiro", () => {
+    const l = new LeitorUsage();
+    l.alimentar(JSON.stringify({ usage: { cache_creation_input_tokens: 9, cache_creation: { ephemeral_5m_input_tokens: 4, ephemeral_1h_input_tokens: 5 } } }));
+    expect(l.usage().cache_creation).toEqual({ ephemeral_5m_input_tokens: 4, ephemeral_1h_input_tokens: 5 });
+  });
   it("resposta sem stream: lê o usage do JSON inteiro", () => {
     const l = new LeitorUsage();
     l.alimentar(JSON.stringify({ type: "message", usage: { input_tokens: 10, output_tokens: 5 } }));
@@ -78,5 +101,19 @@ describe("mês do teto", () => {
     expect(inicioDoMesSP(new Date("2026-10-16T15:00:00Z")).toISOString()).toBe("2026-10-01T03:00:00.000Z");
     // 1º de novembro às 01:00 em SP ainda é 31/10 04:00 UTC → já é novembro em SP
     expect(inicioDoMesSP(new Date("2026-11-01T04:00:00Z")).toISOString()).toBe("2026-11-01T03:00:00.000Z");
+  });
+});
+
+describe("custo por etapa", () => {
+  const L = (etapa, userId, conversa, n, brl, w, r) => ({ etapa, userId, conversa, _count: { _all: n }, _sum: { custoBrl: brl, cacheWriteTokens: w, cacheReadTokens: r } });
+  it("soma por etapa e por usuário, conta conversas distintas e põe 'sem etapa' por último", () => {
+    const r = agruparPorEtapa([
+      L(null, "u1", null, 4, 1, 0, 0), L("livre", "u1", "c-aaaaaaaa", 1, 2, 10, 20),
+      L("2", "u1", "c-aaaaaaaa", 3, 3.333, 100, 200), L("2", "u2", "c-bbbbbbbb", 2, 1.111, 50, 0), L("2", "u1", "c-cccccccc", 1, 1, 0, 5),
+    ], (id) => `nome-${id}`);
+    expect(r.map((e) => e.etapa)).toEqual(["2", "livre", "sem etapa"]);
+    expect(r[0]).toMatchObject({ chamadas: 6, conversas: 3, custoBrl: 5.44, cacheGravado: 150, cacheLido: 205 });
+    expect(r[0].usuarios[0]).toMatchObject({ usuario: "nome-u1", chamadas: 4, conversas: 2, custoBrl: 4.33 });
+    expect(r[2]).toMatchObject({ conversas: 0, chamadas: 4 });
   });
 });

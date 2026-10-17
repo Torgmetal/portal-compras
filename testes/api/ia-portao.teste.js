@@ -124,6 +124,23 @@ describe("repasse e registro", () => {
     expect(d.custoUsd).toBeCloseTo(6, 6);
   });
 
+  it("grava etapa e conversa dos cabeçalhos x-torg-*, sem repassá-los à Anthropic", async () => {
+    const r = await pedir(corpo(), { authorization: `Bearer ${TOKEN}`, "x-torg-etapa": "3", "x-torg-conversa": "abc12345-def" });
+    await r.text();
+    expect(mockPrisma.iaUso.create.mock.calls.at(-1)[0].data).toMatchObject({ etapa: "3", conversa: "abc12345-def" });
+    const enviados = Object.keys(fetchMock.mock.calls[0][1].headers).map((h) => h.toLowerCase());
+    expect(enviados.some((h) => h.startsWith("x-torg"))).toBe(false);
+  });
+
+  it("etapa livre vale; valores fora do padrão viram null", async () => {
+    let r = await pedir(corpo(), { authorization: `Bearer ${TOKEN}`, "x-torg-etapa": "livre" }); await r.text();
+    expect(mockPrisma.iaUso.create.mock.calls.at(-1)[0].data.etapa).toBe("livre");
+    for (const [e, c] of [["7", "curto"], ["0", "tem espaço aqui!"], ["Livre", "x".repeat(65)], ["1; drop", "ab_cdefgh"]]) {
+      r = await pedir(corpo(), { authorization: `Bearer ${TOKEN}`, "x-torg-etapa": e, "x-torg-conversa": c }); await r.text();
+      expect(mockPrisma.iaUso.create.mock.calls.at(-1)[0].data).toMatchObject({ etapa: null, conversa: null });
+    }
+  });
+
   it("falhar ao gravar o consumo NÃO derruba a resposta já entregue", async () => {
     mockPrisma.iaUso.create.mockRejectedValue(new Error("banco fora"));
     const r = await pedir();

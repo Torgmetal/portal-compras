@@ -7124,10 +7124,13 @@ model IaUso {
   custoBrl           Float    @default(0)
   duracaoMs          Int?
   pedido             String?
+  etapa              String?  // "1".."6" ou "livre" — cabeçalho x-torg-etapa do app, validado no portão
+  conversa           String?  // id da conversa (x-torg-conversa), para contar conversas por etapa
   createdAt          DateTime @default(now())
 
   @@index([userId, createdAt])
   @@index([aparelhoId, createdAt])
+  @@index([etapa])
 }
 
 // Teto mensal em R$ por projetista. Sem linha = sem acesso ao portão.

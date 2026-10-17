@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { Fragment, useState, useEffect, useCallback } from "react";
 import { Cpu, RefreshCw, Loader2, AlertCircle, CheckCircle2, XCircle, Laptop, Ban } from "lucide-react";
 import { useStore } from "@/lib/store";
 import ConfirmModal from "@/components/admin/ConfirmModal";
@@ -9,6 +9,8 @@ import ConfirmModal from "@/components/admin/ConfirmModal";
 const brl = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dataHora = (d) => (d ? new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }) : "—");
 const mil = (n) => Number(n || 0).toLocaleString("pt-BR");
+
+const rotuloEtapa = (e) => (/^[1-6]$/.test(e) ? `Etapa ${e}` : e === "livre" ? "Livre" : "Sem etapa");
 
 const STATUS = {
   AGUARDANDO_ADMIN: { rotulo: "Aguardando aprovação", cor: "bg-amber-100 text-amber-800" },
@@ -148,6 +150,40 @@ export default function EngenhariaIaClient() {
         )}
       </section>
 
+      <section className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+        <h2 className="font-semibold text-torg-dark px-4 pt-4">Custo por etapa (mês)</h2>
+        <p className="text-xs text-torg-gray px-4 mt-0.5 mb-3">Só chamadas concluídas. Os valores em R$ aparecem apenas aqui — o app do projetista não mostra custo.</p>
+        {(dados.porEtapa || []).length === 0 ? <p className="px-4 pb-4 text-sm text-torg-gray">Nenhuma chamada neste mês.</p> : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50/60 text-xs text-torg-gray"><tr><th className="text-left px-4 py-2">Etapa</th><th className="text-right px-4 py-2">Chamadas</th><th className="text-right px-4 py-2">Conversas</th><th className="text-right px-4 py-2">Cache gravado</th><th className="text-right px-4 py-2">Cache lido</th><th className="text-right px-4 py-2">Custo</th></tr></thead>
+            <tbody className="divide-y divide-gray-50">
+              {dados.porEtapa.map((e) => (
+                <Fragment key={e.etapa}>
+                  <tr className="font-medium text-torg-dark">
+                    <td className="px-4 py-2">{rotuloEtapa(e.etapa)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{mil(e.chamadas)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{mil(e.conversas)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{mil(e.cacheGravado)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{mil(e.cacheLido)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{brl(e.custoBrl)}</td>
+                  </tr>
+                  {e.usuarios.map((u) => (
+                    <tr key={`${e.etapa}-${u.userId}`} className="text-xs text-torg-gray">
+                      <td className="px-4 py-1.5 pl-8">{u.usuario}</td>
+                      <td className="px-4 py-1.5 text-right tabular-nums">{mil(u.chamadas)}</td>
+                      <td className="px-4 py-1.5 text-right tabular-nums">{mil(u.conversas)}</td>
+                      <td className="px-4 py-1.5 text-right tabular-nums">{mil(u.cacheGravado)}</td>
+                      <td className="px-4 py-1.5 text-right tabular-nums">{mil(u.cacheLido)}</td>
+                      <td className="px-4 py-1.5 text-right tabular-nums">{brl(u.custoBrl)}</td>
+                    </tr>
+                  ))}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
       <section className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <h2 className="font-semibold text-torg-dark mb-3">PCs ligados</h2>
         {outros.length === 0 ? <p className="text-sm text-torg-gray">Nenhum PC aprovado ainda.</p> : (
@@ -176,15 +212,17 @@ export default function EngenhariaIaClient() {
         <h2 className="font-semibold text-torg-dark px-4 pt-4 mb-3">Últimos usos</h2>
         {dados.usos.length === 0 ? <p className="px-4 pb-4 text-sm text-torg-gray">Nenhuma chamada ainda.</p> : (
           <table className="w-full text-sm">
-            <thead className="bg-gray-50/60 text-xs text-torg-gray"><tr><th className="text-left px-4 py-2">Quando</th><th className="text-left px-4 py-2">Quem / PC</th><th className="text-left px-4 py-2">Pedido</th><th className="text-left px-4 py-2">Modelo</th><th className="text-right px-4 py-2">Tokens (entrada/saída)</th><th className="text-right px-4 py-2">Custo</th></tr></thead>
+            <thead className="bg-gray-50/60 text-xs text-torg-gray"><tr><th className="text-left px-4 py-2">Quando</th><th className="text-left px-4 py-2">Quem / PC</th><th className="text-left px-4 py-2">Pedido</th><th className="text-left px-4 py-2">Etapa</th><th className="text-left px-4 py-2">Modelo</th><th className="text-right px-4 py-2">Tokens (entrada/saída)</th><th className="text-right px-4 py-2">Cache (lido/gravado)</th><th className="text-right px-4 py-2">Custo</th></tr></thead>
             <tbody className="divide-y divide-gray-50">
               {dados.usos.map((u) => (
                 <tr key={u.id} className="align-top">
                   <td className="px-4 py-2 whitespace-nowrap text-torg-gray">{dataHora(u.createdAt)}</td>
                   <td className="px-4 py-2 whitespace-nowrap">{u.usuario || "—"}<div className="text-xs text-torg-gray">{u.aparelho || ""}</div></td>
                   <td className="px-4 py-2 max-w-md"><p className="line-clamp-2 text-torg-dark" title={u.pedido || ""}>{u.pedido || "—"}</p>{u.situacao !== "ok" && <span className="text-[11px] text-amber-700">{SITUACAO[u.situacao] || u.situacao}</span>}</td>
+                  <td className="px-4 py-2 whitespace-nowrap text-xs">{u.etapa ? rotuloEtapa(u.etapa) : "—"}</td>
                   <td className="px-4 py-2 whitespace-nowrap text-xs">{u.modelo?.replace("claude-", "") || "—"}</td>
                   <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{mil(u.inputTokens + u.cacheReadTokens)} / {mil(u.outputTokens)}</td>
+                  <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{mil(u.cacheReadTokens)} / {mil(u.cacheWriteTokens)}</td>
                   <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{brl(u.custoBrl)}</td>
                 </tr>
               ))}

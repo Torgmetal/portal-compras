@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS "IaUso" (
 );
 CREATE INDEX IF NOT EXISTS "IaUso_userId_createdAt_idx" ON "IaUso"("userId", "createdAt");
 CREATE INDEX IF NOT EXISTS "IaUso_aparelhoId_createdAt_idx" ON "IaUso"("aparelhoId", "createdAt");
+ALTER TABLE "IaUso" ADD COLUMN IF NOT EXISTS "etapa" TEXT;
+ALTER TABLE "IaUso" ADD COLUMN IF NOT EXISTS "conversa" TEXT;
+CREATE INDEX IF NOT EXISTS "IaUso_etapa_idx" ON "IaUso"("etapa");
 CREATE TABLE IF NOT EXISTS "IaLimite" (
   "id" TEXT PRIMARY KEY,
   "userId" TEXT NOT NULL UNIQUE,
