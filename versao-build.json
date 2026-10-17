@@ -1,7 +1,12 @@
 {
-  "build": 3688,
-  "gerado": "2026-10-17T13:16:43.069Z",
+  "build": 3689,
+  "gerado": "2026-10-17T13:29:17.792Z",
   "commits": [
+    {
+      "hash": "60b9feaf",
+      "data": "17/10/2026",
+      "titulo": "Revisão: primeiro uso real do Torg Metal IA e correção do Admin"
+    },
     {
       "hash": "be6e2c59",
       "data": "17/10/2026",
@@ -146,11 +151,6 @@
       "hash": "cb2fbb41",
       "data": "15/10/2026",
       "titulo": "Data book grande: botão Baixar por volume e atalho no topo"
-    },
-    {
-      "hash": "136fb8d0",
-      "data": "15/10/2026",
-      "titulo": "Corte e montagem: composição do conjunto abre também quando tudo já foi cortado"
     }
   ]
 }

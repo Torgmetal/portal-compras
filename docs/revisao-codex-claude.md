@@ -2991,5 +2991,7 @@ aparece desligado. O caminho inteiro até a chamada está testado.
   correta sobre a cópia do T123. Serialização painel × agente observada na prática.
 - **App** (`f2c-app` `700e0c0`): instalador NSIS por usuário com atalho no menu Iniciar/área de trabalho (o portable
   não aparecia na busca do Windows) e logo da Torg como ícone.
-- ⚠ Checagem (a) — deny do PreToolUse vencendo `allowedTools` — não é provocável pela tela (o painel não lê com o agente
-  ocupado); fica para teste direto do SDK. Piloto com o John aguarda o Vitor.
+- **Checagem (a) provada** (pacote `ed8adcd`, PC do Vitor): com `TORG_APP_TESTE_NEGAR_HOOK=1` (modo de teste que só
+  nega), `estado_tekla` — coberto por `allowedTools` — foi recusado 2×; sem a variável, rodou normal. O deny do
+  PreToolUse vence o `allowedTools`. Detalhes em `conector/VALIDACAO-WINDOWS.md`. Instalação pelo instalador no PC do
+  Vitor autorizada por ele. Piloto com o John aguarda o Vitor.
