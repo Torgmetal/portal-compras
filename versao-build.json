@@ -1,7 +1,12 @@
 {
-  "build": 3690,
-  "gerado": "2026-10-17T15:01:50.438Z",
+  "build": 3691,
+  "gerado": "2026-10-17T17:14:49.459Z",
   "commits": [
+    {
+      "hash": "04655bdc",
+      "data": "17/10/2026",
+      "titulo": "fix(ia): portão com maxDuration 800 s (resposta longa era cortada em 300 s)"
+    },
     {
       "hash": "4a4a8e83",
       "data": "17/10/2026",
@@ -146,11 +151,6 @@
       "hash": "0cfb1ec1",
       "data": "15/10/2026",
       "titulo": "Revisão e memória: localStorage indefinido nos testes do Node 26"
-    },
-    {
-      "hash": "b29de95b",
-      "data": "15/10/2026",
-      "titulo": "Corte e montagem: teste ganha localStorage próprio — no Node 26 o do jsdom some"
     }
   ]
 }

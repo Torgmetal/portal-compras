@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ':(exclude)docs' ':(exclude)testes' ':(exclude)*.md' ':(exclude)versao-build.json'",
+  "ignoreCommand": "[ \"${VERCEL_GIT_COMMIT_REF#backup/}\" != \"$VERCEL_GIT_COMMIT_REF\" ] || git diff --quiet HEAD^ HEAD -- . ':(exclude)docs' ':(exclude)testes' ':(exclude)*.md' ':(exclude)versao-build.json'",
   "redirects": [
     {
       "source": "/:path((?!api/).*)",
