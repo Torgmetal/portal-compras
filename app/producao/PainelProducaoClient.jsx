@@ -43,21 +43,11 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
   const [verFuros, setVerFuros] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  // Exporta a lista de furos para Excel (operadores usam para corrigir no Syneco)
+  // Exporta diferenças para conferência antes de qualquer lançamento no Syneco.
   const exportarFuros = async () => {
-    const header = ["Marca", "OP", "Etapa apontada", "Qtd", "Etapa anterior", "Qtd anterior", "Diferença"];
-    const linhas = furos.map((f) => [
-      f.marca,
-      f.opNumero ?? "",
-      f.setor ?? "",
-      f.valor ?? "",
-      f.setorUp ?? "",
-      f.valorUp ?? "",
-      f.diff ?? "",
-    ]);
-    const {criarExcelTabular}=await import('@/lib/excel-tabular');
-    const {downloadWorkbook}=await import('@/lib/excel-relatorio');
-    const wb=await criarExcelTabular({titulo:'Conferência de apontamentos — Produção',abas:[{nome:'Furos',headers:header,linhas,larguras:[18,12,22,12,22,16,14]}]});
+    const { criarPlanilhaFurosApontamento } = await import('@/lib/furos-apontamento-cliente');
+    const { downloadWorkbook } = await import('@/lib/excel-relatorio');
+    const wb = await criarPlanilhaFurosApontamento(furos);
     const hojeStr = new Date().toLocaleDateString("pt-BR").replace(/\//g, "-");
     await downloadWorkbook(wb, `furos-apontamento-${hojeStr}.xlsx`);
   };
@@ -152,7 +142,7 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
                 <button onClick={() => setVerFuros((v) => !v)} className="flex-1 flex items-center justify-between gap-2 text-left">
                   <span className="flex items-center gap-2 text-sm font-semibold text-red-800">
                     <AlertTriangle size={16} className="text-red-600" />
-                    {furos.length} furo{furos.length > 1 ? "s" : ""} de apontamento no Syneco
+                    {furos.length} diferença{furos.length > 1 ? "s" : ""} entre etapas no Syneco
                   </span>
                   {verFuros ? <ChevronUp size={16} className="text-red-600" /> : <ChevronDown size={16} className="text-red-600" />}
                 </button>
@@ -167,11 +157,11 @@ export default function PainelProducaoClient({ hoje, dia, diasNoMes, pipe, setor
               {verFuros && (
                 <div className="mt-2 space-y-1 text-xs text-red-800">
                   {furos.map((f) => (
-                    <p key={f.marca} className="tabular-nums">
-                      <span className="font-mono font-bold">{f.marca}</span> (OP {f.opNumero}) — {f.resumo}
+                    <p key={`${f.opId}|${f.obraSyneco}|${f.marca}`} className="tabular-nums">
+                      <span className="font-mono font-bold">{f.marca}</span> (OP {f.op || f.opNumero} · Syneco {f.obraSyneco || "—"}) — {f.resumo}
                     </p>
                   ))}
-                  <p className="text-red-600 pt-1">Corrija os lançamentos no Syneco; exporte o relatório nas abas de setor.</p>
+                  <p className="text-red-600 pt-1">Confira os registros das duas etapas antes de lançar. A diferença pode indicar falta ou excesso de apontamento.</p>
                 </div>
               )}
             </div>

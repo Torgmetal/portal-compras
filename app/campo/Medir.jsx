@@ -76,11 +76,14 @@ export default function Medir({ op, onSair, Tela, Equipamentos, relatorioInicial
           </div>
           <div className="space-y-2">
             {g.itens.map((r) => (
-              <button key={r.id} onClick={() => setAbertoId(r.id)}
+              <button key={r.id} onClick={() => r.somenteLeitura
+                ? window.open(`/api/qualidade/inspecoes/${r.id}/pdf`, "_blank", "noopener,noreferrer")
+                : setAbertoId(r.id)}
                 className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3.5 active:bg-gray-50">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono font-bold text-torg-blue text-[15px]">{r.codigo}</span>
                   <span className="flex items-center gap-1.5 shrink-0">
+                    {r.somenteLeitura && <span className="text-[11px] font-semibold text-torg-gray bg-gray-100 border border-gray-200 rounded-full px-2 py-0.5">ver PDF</span>}
                     {r.revisao > 0 && <span className="text-[11px] font-mono font-bold text-torg-gray">{r.rotuloRevisao}</span>}
                     {r.resultadoInspecao === "REPROVADO"
                       ? <span className="text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">reprovado</span>

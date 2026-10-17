@@ -6,8 +6,8 @@
 //
 // Não estava mesmo: o portal de campo só fazia captura de foto. Este é o caminho que faltava.
 //
-// ⚠ SÓ RASCUNHO APARECE. Relatório já enviado para assinatura não se mexe — quem assinou validou um
-// conteúdo, e mudar por baixo faz a assinatura valer para um documento que a pessoa não viu.
+// Relatório emitido continua aparecendo em modo de consulta. Quem o criou no Campo precisa poder
+// reencontrar o próprio trabalho; a edição segue bloqueada e o toque abre o PDF assinado/emitido.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -23,13 +23,13 @@ export async function GET(req) {
   if (!opNumero) return NextResponse.json({ error: "Informe a OP." }, { status: 400 });
 
   // ⚠ RELATÓRIO REPROVADO CONTINUA NA LISTA. Vitor: "no caso de reprova o relatório deve ficar
-  // aberto". Some só quando é aprovado e enviado para assinatura — antes disso, ele é justamente o
-  // que o inspetor vem reinspecionar.
+  // aberto". Os emitidos também aparecem, mas sinalizados como somente leitura.
   const rs = await prisma.relatorioInspecao.findMany({
-    where: { opNumero, envioAssinaturaId: null },
+    where: { opNumero },
     select: {
       id: true, codigo: true, tipo: true, titulo: true, marcas: true, linhas: true,
       inspetor: true, createdAt: true, revisao: true, resultadoInspecao: true,
+      envioAssinaturaId: true, status: true,
     },
     orderBy: { createdAt: "desc" },
     take: 60,
@@ -48,6 +48,8 @@ export async function GET(req) {
       revisao: r.revisao ?? 0,
       rotuloRevisao: `R${String(r.revisao ?? 0).padStart(2, "0")}`,
       resultadoInspecao: r.resultadoInspecao || null,
+      status: r.status,
+      somenteLeitura: !!r.envioAssinaturaId,
     };
   });
 

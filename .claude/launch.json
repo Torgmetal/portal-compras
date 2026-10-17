@@ -4,20 +4,61 @@
     {
       "name": "Next.js Dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000
     },
     {
       "name": "Next.js Start (produção)",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "start"],
+      "runtimeArgs": [
+        "run",
+        "start"
+      ],
       "port": 3000
     },
     {
       "name": "Prisma Studio",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["prisma", "studio"],
+      "runtimeArgs": [
+        "prisma",
+        "studio"
+      ],
       "port": 5555
+    },
+    {
+      "name": "Next.js Dev (worktree carga, 3001)",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/vitorcosta/dev/portal-compras-carga && NEXTAUTH_URL=http://localhost:3001 npm run dev -- -p 3001"
+      ],
+      "port": 3001
+    },
+    {
+      "name": "Simulação de carga OP-118 (local, 8765)",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8765",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "/private/tmp/claude-501/-Users-vitorcosta-dev-portal-compras/8ddc54f2-690a-4ee4-9685-3d360ba69ac7/scratchpad/vitrine"
+      ],
+      "port": 8765
+    },
+    {
+      "name": "Next.js Demo (3002, banco torg_demo)",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/vitorcosta/dev/portal-compras-demo && npm run demo"
+      ],
+      "port": 3002
     }
   ]
 }

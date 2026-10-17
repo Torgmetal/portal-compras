@@ -1072,6 +1072,11 @@ function PitEditor({ secao, acaoLoading, onSave }) {
   return (
     <div className="mt-2 pt-2 border-t border-gray-50">
       <p className="text-[11px] text-torg-gray mb-1.5">Plano de Inspeção e Testes — monte a tabela; ela entra no PDF do data book.</p>
+      {secao.conteudoJson?.origem === "OP" && (
+        <p className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1.5 mb-2">
+          PIT puxado da OP · {secao.conteudoJson.nome} · revisão {secao.conteudoJson.revisao}
+        </p>
+      )}
       {itens.length > 0 ? (
         <div className="overflow-x-auto -mx-1 px-1">
           <table className="w-full text-[10px] border-collapse">

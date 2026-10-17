@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\": \"📋 Workflow padrão: rode npm run dev localmente e valide a mudança antes de fazer git push origin main.\"}'",
+            "statusMessage": "Verificando workflow..."
+          }
+        ]
+      }
+    ]
+  }
+}
