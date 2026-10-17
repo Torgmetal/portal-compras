@@ -29,6 +29,9 @@ describe("custo", () => {
     const u = { cache_creation_input_tokens: 1_000_000, cache_creation: { ephemeral_1h_input_tokens: 600_000 } };
     expect(custoUsd("claude-opus-5-5", u)).toBeCloseTo(0.6 * 8 + 0.4 * 5, 6);
   });
+  it("total ausente mas detalhamento > 0: cobra pela soma do detalhamento", () => {
+    expect(custoUsd("claude-opus-5-5", { cache_creation: { ephemeral_5m_input_tokens: 1_000_000, ephemeral_1h_input_tokens: 1_000_000 } })).toBeCloseTo(13, 6);
+  });
   it("R$ pela cotação configurada, com 2 casas", () => {
     expect(usdParaBrl(10, 5.4321)).toBe(54.32);
   });
@@ -83,6 +86,23 @@ describe("consumo lido do stream (SSE da Anthropic)", () => {
       + 'data: {"type":"message_delta","usage":{"output_tokens":7}}\n\n';
     const l = new LeitorUsage(); l.alimentar(sse);
     expect(l.usage()).toMatchObject({ output_tokens: 7, cache_creation_input_tokens: 100, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 100 } });
+  });
+  it("delta com null/0 em entrada e cache não apaga o que o start trouxe", () => {
+    const l = new LeitorUsage();
+    l.alimentar('data: {"type":"message_start","message":{"usage":{"input_tokens":50,"cache_read_input_tokens":70,"cache_creation_input_tokens":30}}}\n\n'
+      + 'data: {"type":"message_delta","usage":{"input_tokens":null,"cache_read_input_tokens":null,"cache_creation_input_tokens":0,"output_tokens":9}}\n\n');
+    expect(l.usage()).toMatchObject({ input_tokens: 50, cache_read_input_tokens: 70, cache_creation_input_tokens: 30, output_tokens: 9 });
+  });
+  it("delta só com output_tokens mantém o resto", () => {
+    const l = new LeitorUsage();
+    l.alimentar('data: {"type":"message_start","message":{"usage":{"input_tokens":5}}}\n\ndata: {"type":"message_delta","usage":{"output_tokens":3}}\n\n');
+    expect(l.usage()).toMatchObject({ input_tokens: 5, output_tokens: 3 });
+  });
+  it("cache_creation cumulativo no delta: maior por subchave", () => {
+    const l = new LeitorUsage();
+    l.alimentar('data: {"type":"message_start","message":{"usage":{"cache_creation":{"ephemeral_5m_input_tokens":10,"ephemeral_1h_input_tokens":20}}}}\n\n'
+      + 'data: {"type":"message_delta","usage":{"cache_creation":{"ephemeral_5m_input_tokens":null,"ephemeral_1h_input_tokens":25}}}\n\n');
+    expect(l.usage().cache_creation).toEqual({ ephemeral_5m_input_tokens: 10, ephemeral_1h_input_tokens: 25 });
   });
   it("e no JSON inteiro", () => {
     const l = new LeitorUsage();
